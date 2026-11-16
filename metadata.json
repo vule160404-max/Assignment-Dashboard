@@ -1,0 +1,6 @@
+{
+  "name": "AssignTrack",
+  "description": "Academic assignment order management, real-time client tracking portal, deadline calendar, CRM, and payment-locked document delivery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

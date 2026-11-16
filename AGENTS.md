@@ -1,0 +1,91 @@
+# Project Agent Instructions — Spec Kit (Spec-Driven Development)
+
+This project follows **GitHub Spec Kit** (`github/spec-kit`) Spec-Driven Development (SDD) and Idea Assessment workflows. All feature work, planning, and implementation must adhere to this instruction set.
+
+---
+
+## 1. Core Philosophy & Ground Rules
+
+1. **Intent Before Implementation**: Always separate **WHAT** users need and **WHY** (`spec.md`) from **HOW** it is built (`plan.md`, code). Never jump straight to coding before a specification is agreed upon (unless explicitly asked for a quick hotfix via the bug-fix track).
+2. **Constitution Authority**: Project principles stored in `.specify/memory/constitution.md` are **non-negotiable**. Every plan, task breakdown, analysis, and convergence check MUST pass the Constitution Check gate.
+3. **Templates & Artifacts**: Use the canonical templates in `.specify/templates/` when generating artifacts. Never omit mandatory sections; remove inapplicable optional sections rather than leaving `"N/A"`.
+4. **Controlled Clarification**: Never flood the user with open-ended questions. Limit `[NEEDS CLARIFICATION: ...]` markers to **at most 3 critical items** (prioritized by: `scope > security/privacy > user experience > technical details`), making reasonable, documented assumptions for everything else.
+5. **Independent MVP Slices**: User stories in `spec.md` and tasks in `tasks.md` MUST be organized by priority (`P1`, `P2`, `P3`, ...) so each story is independently implementable, testable, and deliverable as an MVP increment.
+
+---
+
+## 2. Directory & Artifact Layout
+
+```text
+.specify/
+├── memory/
+│   └── constitution.md          # Project-wide non-negotiable engineering & UX principles
+├── templates/                   # Canonical Spec Kit templates
+│   ├── constitution-template.md
+│   ├── spec-template.md
+│   ├── plan-template.md
+│   ├── tasks-template.md
+│   └── checklist-template.md
+├── assessments/<slug>/          # (Optional) Pre-SDD Idea Assessment artifacts
+│   ├── intake.md
+│   ├── research.md
+│   ├── problem.md
+│   ├── concept.md
+│   └── decision.md
+└── bugs/<slug>/                 # (Optional) Bug-fix assessment & verification artifacts
+
+specs/<###-feature-name>/
+├── spec.md                      # Functional spec (WHAT & WHY — tech-agnostic)
+├── plan.md                      # Technical plan (HOW — stack, architecture, gates)
+├── research.md                  # Phase 0 resolution of technical unknowns
+├── data-model.md                # Entities, fields, relationships, validation, state
+├── quickstart.md                # Runnable end-to-end validation scenarios
+├── contracts/                   # API / UI / interface contracts
+├── checklists/                  # Requirements-quality checklists (NOT QA test plans)
+└── tasks.md                     # Dependency-ordered, story-grouped execution tasks
+```
+
+---
+
+## 3. Available Workflows & Commands
+
+The user can invoke any phase using `/speckit-*` commands (or natural-language equivalents):
+
+### Track A: Idea Assessment (Optional Pre-SDD Discovery)
+Use when an idea should be challenged, researched, and shaped before committing to build:
+1. `/speckit-assess-intake` — Capture and normalize the raw idea into `intake.md`.
+2. `/speckit-assess-research` — Gather supporting evidence AND explicit *Evidence Against the Idea* (`ASSUMPTION` tags for unsourced claims) into `research.md`.
+3. `/speckit-assess-define` — Define target users, problem statement, goals, non-goals, success metrics, and cost of inaction into `problem.md`.
+4. `/speckit-assess-shape` — Shape 2–3 concept options with appetite and trade-offs into `concept.md`.
+5. `/speckit-assess-decide` — Render a verdict (`go`, `needs-clarification`, or `kill`) in `decision.md`. Only `go` ideas hand off to `/speckit-specify`. (Never write source code during assessment.)
+
+### Track B: Spec-Driven Development (Core Delivery Pipeline)
+
+- **Shorter Path** (small/focused features): `specify` → `plan` → `tasks` → `implement` → `converge`
+- **Full Path** (production features with quality gates):
+  1. `/speckit-constitution` — *(Once per project)* Establish non-negotiable engineering, security, UX, and quality principles in `.specify/memory/constitution.md`.
+  2. `/speckit-specify` — Create `specs/<###-feature>/spec.md` from the user's idea.
+     - Focus strictly on user journeys (`US1` P1, `US2` P2...), edge cases, Functional Requirements (`FR-###`), Key Entities, tech-agnostic measurable Success Criteria (`SC-###`), and Assumptions.
+     - Validate against a built-in spec-quality checklist (`checklists/requirements.md`).
+  3. `/speckit-clarify` — Surface remaining ambiguities via targeted multiple-choice/short questions (max 3–5 per pass) and fold answers directly into `spec.md`.
+  4. `/speckit-plan` — Create `plan.md`, `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
+     - Populate Technical Context (React/Vite/TypeScript/Tailwind/Express or stack chosen), run **Constitution Check** (gate), resolve all unknowns, and re-check Constitution post-design.
+  5. `/speckit-checklist` — *(Optional gate)* Generate domain-specific requirements-quality checklists (e.g. `ux.md`, `security.md`, `api.md`) that test whether requirements are clear, complete, and measurable — **never** implementation tests.
+  6. `/speckit-tasks` — Generate `tasks.md` organized strictly by phase:
+     - Phase 1: Setup (shared infrastructure)
+     - Phase 2: Foundational (blocking prerequisites before any user story)
+     - Phase 3+: One phase per User Story (`US1` MVP, `US2`, `US3`...) with `[P]` parallel markers and exact file paths
+     - Final Phase: Polish & cross-cutting concerns
+  7. `/speckit-analyze` — *(Strictly read-only)* Cross-check `spec.md`, `plan.md`, `tasks.md`, and `constitution.md` for inconsistencies, gaps, duplications, or constitution conflicts before coding.
+  8. `/speckit-implement` — Check checklist gates, then execute `tasks.md` phase-by-phase, marking completed tasks `- [x]` and validating each User Story checkpoint independently.
+  9. `/speckit-converge` — Audit actual implemented code against `spec.md`, `plan.md`, `tasks.md`, and `constitution.md`. Classify gaps as `missing`, `partial`, `contradicts`, or `unrequested` (graded CRITICAL/HIGH/MEDIUM/LOW). Append corrective tasks to a new `## Phase N: Convergence` section in `tasks.md` and repeat `implement` → `converge` until **Converged**.
+
+### Track C: Bug Fixing (Standalone)
+- `/speckit-bug-assess` → `/speckit-bug-fix` → `/speckit-bug-test` (artifacts in `.specify/bugs/<slug>/`; final verdict must be `verified`).
+
+---
+
+## 4. Runtime & Stack Context (This Workspace)
+
+- **Stack**: React 19 + TypeScript + Vite + Tailwind CSS v4 + Express (`server.ts` when backend routes are needed), running on port `3000`.
+- **Verification**: All code changes must pass `npm run lint` (`tsc --noEmit`) and `npm run build` (`vite build`) without errors before reporting completion or convergence.

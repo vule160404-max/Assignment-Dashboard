@@ -1,0 +1,441 @@
+{
+  "entities": {
+    "Order": {
+      "title": "Order",
+      "description": "Full assignment order ticket managed exclusively by the Admin.",
+      "type": "object",
+      "properties": {
+        "orderCode": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32,
+          "pattern": "^[A-Z0-9-]+$",
+          "description": "Unique human-readable order identifier such as ASG-2026-001."
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "topic": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "wordCount": {
+          "type": "number"
+        },
+        "citationStyle": {
+          "type": "string",
+          "enum": ["APA", "Harvard", "IEEE", "MLA", "Chicago", "Other"],
+          "maxLength": 20
+        },
+        "outlineAndInstructions": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "rubricNotes": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "deadlineAt": {
+          "type": "number",
+          "description": "Unix epoch milliseconds for assignment deadline."
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "quoted",
+            "research",
+            "drafting",
+            "turnitin_check",
+            "awaiting_final_payment",
+            "delivered_revision"
+          ],
+          "maxLength": 32
+        },
+        "progressPercent": {
+          "type": "number"
+        },
+        "publicStatusNote": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "internalNotes": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "orderStatus": {
+          "type": "string",
+          "enum": ["active", "completed", "cancelled"],
+          "maxLength": 20
+        },
+        "totalAmount": {
+          "type": "number"
+        },
+        "depositAmount": {
+          "type": "number"
+        },
+        "paidAmount": {
+          "type": "number"
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["unpaid", "deposit_paid", "fully_paid"],
+          "maxLength": 20
+        },
+        "clientId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "clientDisplayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "attachments": {
+          "type": "array",
+          "description": "Bounded up to 20 attachment objects per order."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "orderCode",
+        "subject",
+        "topic",
+        "wordCount",
+        "citationStyle",
+        "deadlineAt",
+        "stage",
+        "progressPercent",
+        "orderStatus",
+        "totalAmount",
+        "depositAmount",
+        "paidAmount",
+        "paymentStatus",
+        "clientId",
+        "clientDisplayName",
+        "attachments",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Client": {
+      "title": "Client",
+      "description": "Mini-CRM customer record containing private contact info.",
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "zaloNumber": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "socialLink": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "schoolMajor": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "tier": {
+          "type": "string",
+          "enum": ["new", "vip", "watchlist"],
+          "maxLength": 20
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["displayName", "tier", "createdAt", "updatedAt"]
+    },
+    "TrackingPortal": {
+      "title": "TrackingPortal",
+      "description": "Zero-PII public projection synced by Admin and read by Order Code.",
+      "type": "object",
+      "properties": {
+        "orderId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "orderCode": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32,
+          "pattern": "^[A-Z0-9-]+$"
+        },
+        "subject": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "topic": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "wordCount": {
+          "type": "number"
+        },
+        "citationStyle": {
+          "type": "string",
+          "enum": ["APA", "Harvard", "IEEE", "MLA", "Chicago", "Other"],
+          "maxLength": 20
+        },
+        "outlineAndInstructions": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "rubricNotes": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "deadlineAt": {
+          "type": "number"
+        },
+        "stage": {
+          "type": "string",
+          "enum": [
+            "quoted",
+            "research",
+            "drafting",
+            "turnitin_check",
+            "awaiting_final_payment",
+            "delivered_revision"
+          ],
+          "maxLength": 32
+        },
+        "progressPercent": {
+          "type": "number"
+        },
+        "publicStatusNote": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "orderStatus": {
+          "type": "string",
+          "enum": ["active", "completed", "cancelled"],
+          "maxLength": 20
+        },
+        "totalAmount": {
+          "type": "number"
+        },
+        "depositAmount": {
+          "type": "number"
+        },
+        "paidAmount": {
+          "type": "number"
+        },
+        "paymentStatus": {
+          "type": "string",
+          "enum": ["unpaid", "deposit_paid", "fully_paid"],
+          "maxLength": 20
+        },
+        "attachments": {
+          "type": "array"
+        },
+        "bankSnapshot": {
+          "type": "object"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "orderId",
+        "orderCode",
+        "subject",
+        "topic",
+        "wordCount",
+        "citationStyle",
+        "deadlineAt",
+        "stage",
+        "progressPercent",
+        "orderStatus",
+        "totalAmount",
+        "depositAmount",
+        "paidAmount",
+        "paymentStatus",
+        "attachments",
+        "bankSnapshot",
+        "updatedAt"
+      ]
+    },
+    "OrderMessage": {
+      "title": "OrderMessage",
+      "description": "48-hour ephemeral chat message tied to a specific orderCode.",
+      "type": "object",
+      "properties": {
+        "orderCode": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32,
+          "pattern": "^[A-Z0-9-]+$"
+        },
+        "senderRole": {
+          "type": "string",
+          "enum": ["admin", "client"],
+          "maxLength": 16
+        },
+        "senderName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "createdAtMs": {
+          "type": "number"
+        },
+        "expiresAtMs": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "orderCode",
+        "senderRole",
+        "senderName",
+        "body",
+        "createdAtMs",
+        "expiresAtMs",
+        "createdAt"
+      ]
+    },
+    "RevisionRequest": {
+      "title": "RevisionRequest",
+      "description": "Formal client revision request tied to an orderCode.",
+      "type": "object",
+      "properties": {
+        "orderCode": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32,
+          "pattern": "^[A-Z0-9-]+$"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 1500
+        },
+        "status": {
+          "type": "string",
+          "enum": ["open", "in_progress", "resolved"],
+          "maxLength": 20
+        },
+        "adminReply": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["orderCode", "message", "status", "createdAt", "updatedAt"]
+    },
+    "BankSettings": {
+      "title": "BankSettings",
+      "description": "Admin bank account, uploaded default QR image, and future VietQR settings.",
+      "type": "object",
+      "properties": {
+        "qrMode": {
+          "type": "string",
+          "enum": ["uploaded_default", "vietqr_dynamic"],
+          "maxLength": 24
+        },
+        "uploadedQrUrl": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "bankName": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "accountNumber": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "accountName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "vietqrBankBin": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "vietqrTemplate": {
+          "type": "string",
+          "enum": ["compact2", "compact", "qr_only", "print"],
+          "maxLength": 20
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["qrMode", "bankName", "accountNumber", "accountName", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Admin-only assignment order tickets."
+    },
+    "/clients/{clientId}": {
+      "schema": { "$ref": "#/entities/Client" },
+      "description": "Admin-only client CRM profiles with Zalo and tier metadata."
+    },
+    "/trackingPortals/{orderCode}": {
+      "schema": { "$ref": "#/entities/TrackingPortal" },
+      "description": "Non-PII public projection looked up strictly by Order Code (get only, list forbidden)."
+    },
+    "/trackingPortals/{orderCode}/messages/{msgId}": {
+      "schema": { "$ref": "#/entities/OrderMessage" },
+      "description": "48-hour expiring live chat messages scoped by orderCode."
+    },
+    "/trackingPortals/{orderCode}/revisions/{reqId}": {
+      "schema": { "$ref": "#/entities/RevisionRequest" },
+      "description": "Client revision requests created against valid trackingPortals and managed by Admin."
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/BankSettings" },
+      "description": "Admin payment QR and bank configuration."
+    }
+  }
+}

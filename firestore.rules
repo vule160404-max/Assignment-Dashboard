@@ -1,0 +1,282 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global safety net: deny everything by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$');
+    }
+
+    function isValidOrderCode(code) {
+      return code is string && code.size() >= 4 && code.size() <= 32 && code.matches('^[A-Z0-9-]+$');
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && (
+          request.auth.token.email == 'cycloneielts@gmail.com'
+          || exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        );
+    }
+
+    function isValidTimestampStr(val) {
+      return val is string && val.size() >= 10 && val.size() <= 40;
+    }
+
+    // --- Entity Validation Blueprints ---
+    function isValidOrder(data) {
+      return data.keys().hasAll([
+          'orderCode', 'subject', 'topic', 'wordCount', 'citationStyle',
+          'deadlineAt', 'stage', 'progressPercent', 'orderStatus',
+          'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
+          'clientId', 'clientDisplayName', 'attachments', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'orderCode', 'subject', 'topic', 'wordCount', 'citationStyle',
+          'outlineAndInstructions', 'rubricNotes', 'deadlineAt', 'stage',
+          'progressPercent', 'publicStatusNote', 'internalNotes', 'orderStatus',
+          'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
+          'clientId', 'clientDisplayName', 'attachments', 'createdAt', 'updatedAt'
+        ])
+        && isValidOrderCode(data.orderCode)
+        && data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 120
+        && data.topic is string && data.topic.size() >= 1 && data.topic.size() <= 240
+        && data.wordCount is number && data.wordCount >= 0 && data.wordCount <= 500000
+        && data.citationStyle in ['APA', 'Harvard', 'IEEE', 'MLA', 'Chicago', 'Other']
+        && (!('outlineAndInstructions' in data) || (data.outlineAndInstructions is string && data.outlineAndInstructions.size() <= 4000))
+        && (!('rubricNotes' in data) || (data.rubricNotes is string && data.rubricNotes.size() <= 4000))
+        && data.deadlineAt is number && data.deadlineAt > 0
+        && data.stage in ['quoted', 'research', 'drafting', 'turnitin_check', 'awaiting_final_payment', 'delivered_revision']
+        && data.progressPercent is number && data.progressPercent >= 0 && data.progressPercent <= 100
+        && (!('publicStatusNote' in data) || (data.publicStatusNote is string && data.publicStatusNote.size() <= 1000))
+        && (!('internalNotes' in data) || (data.internalNotes is string && data.internalNotes.size() <= 2000))
+        && data.orderStatus in ['active', 'completed', 'cancelled']
+        && data.totalAmount is number && data.totalAmount >= 0
+        && data.depositAmount is number && data.depositAmount >= 0
+        && data.paidAmount is number && data.paidAmount >= 0
+        && data.paymentStatus in ['unpaid', 'deposit_paid', 'fully_paid']
+        && isValidId(data.clientId)
+        && data.clientDisplayName is string && data.clientDisplayName.size() >= 1 && data.clientDisplayName.size() <= 120
+        && data.attachments is list && data.attachments.size() <= 20
+        && isValidTimestampStr(data.createdAt)
+        && isValidTimestampStr(data.updatedAt);
+    }
+
+    function isValidClient(data) {
+      return data.keys().hasAll(['displayName', 'tier', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['displayName', 'zaloNumber', 'socialLink', 'schoolMajor', 'tier', 'notes', 'createdAt', 'updatedAt'])
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && (!('zaloNumber' in data) || (data.zaloNumber is string && data.zaloNumber.size() <= 40))
+        && (!('socialLink' in data) || (data.socialLink is string && data.socialLink.size() <= 300))
+        && (!('schoolMajor' in data) || (data.schoolMajor is string && data.schoolMajor.size() <= 160))
+        && data.tier in ['new', 'vip', 'watchlist']
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 2000))
+        && isValidTimestampStr(data.createdAt)
+        && isValidTimestampStr(data.updatedAt);
+    }
+
+    function isValidTrackingPortal(data, orderCode) {
+      return data.keys().hasAll([
+          'orderId', 'orderCode', 'subject', 'topic', 'wordCount', 'citationStyle',
+          'deadlineAt', 'stage', 'progressPercent', 'orderStatus',
+          'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
+          'attachments', 'bankSnapshot', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'orderId', 'orderCode', 'subject', 'topic', 'wordCount', 'citationStyle',
+          'outlineAndInstructions', 'rubricNotes', 'deadlineAt', 'stage',
+          'progressPercent', 'publicStatusNote', 'orderStatus',
+          'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
+          'attachments', 'bankSnapshot', 'updatedAt'
+        ])
+        && isValidId(data.orderId)
+        && data.orderCode == orderCode
+        && data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 120
+        && data.topic is string && data.topic.size() >= 1 && data.topic.size() <= 240
+        && data.wordCount is number && data.wordCount >= 0 && data.wordCount <= 500000
+        && data.citationStyle in ['APA', 'Harvard', 'IEEE', 'MLA', 'Chicago', 'Other']
+        && (!('outlineAndInstructions' in data) || (data.outlineAndInstructions is string && data.outlineAndInstructions.size() <= 4000))
+        && (!('rubricNotes' in data) || (data.rubricNotes is string && data.rubricNotes.size() <= 4000))
+        && data.deadlineAt is number && data.deadlineAt > 0
+        && data.stage in ['quoted', 'research', 'drafting', 'turnitin_check', 'awaiting_final_payment', 'delivered_revision']
+        && data.progressPercent is number && data.progressPercent >= 0 && data.progressPercent <= 100
+        && (!('publicStatusNote' in data) || (data.publicStatusNote is string && data.publicStatusNote.size() <= 1000))
+        && data.orderStatus in ['active', 'completed', 'cancelled']
+        && data.totalAmount is number && data.totalAmount >= 0
+        && data.depositAmount is number && data.depositAmount >= 0
+        && data.paidAmount is number && data.paidAmount >= 0
+        && data.paymentStatus in ['unpaid', 'deposit_paid', 'fully_paid']
+        && data.attachments is list && data.attachments.size() <= 20
+        && data.bankSnapshot is map && data.bankSnapshot.keys().size() <= 10
+        && isValidTimestampStr(data.updatedAt);
+    }
+
+    function isValidOrderMessage(data, orderCode) {
+      return data.keys().hasAll(['orderCode', 'senderRole', 'senderName', 'body', 'createdAtMs', 'expiresAtMs', 'createdAt'])
+        && data.keys().hasOnly(['orderCode', 'senderRole', 'senderName', 'body', 'createdAtMs', 'expiresAtMs', 'createdAt'])
+        && data.orderCode == orderCode
+        && data.senderRole in ['admin', 'client']
+        && data.senderName is string && data.senderName.size() >= 1 && data.senderName.size() <= 60
+        && data.body is string && data.body.size() >= 1 && data.body.size() <= 1000
+        && data.createdAtMs is number && data.createdAtMs > 0
+        && data.expiresAtMs is number
+        && data.expiresAtMs == data.createdAtMs + 172800000
+        && isValidTimestampStr(data.createdAt);
+    }
+
+    function isValidRevisionRequest(data, orderCode) {
+      return data.keys().hasAll(['orderCode', 'message', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['orderCode', 'message', 'status', 'adminReply', 'createdAt', 'updatedAt'])
+        && data.orderCode == orderCode
+        && data.message is string && data.message.size() >= 3 && data.message.size() <= 1500
+        && data.status in ['open', 'in_progress', 'resolved']
+        && (!('adminReply' in data) || (data.adminReply is string && data.adminReply.size() <= 1000))
+        && isValidTimestampStr(data.createdAt)
+        && isValidTimestampStr(data.updatedAt);
+    }
+
+    function isValidBankSettings(data) {
+      return data.keys().hasAll(['qrMode', 'bankName', 'accountNumber', 'accountName', 'updatedAt'])
+        && data.keys().hasOnly(['qrMode', 'uploadedQrUrl', 'bankName', 'accountNumber', 'accountName', 'vietqrBankBin', 'vietqrTemplate', 'updatedAt'])
+        && data.qrMode in ['uploaded_default', 'vietqr_dynamic']
+        && (!('uploadedQrUrl' in data) || (data.uploadedQrUrl is string && data.uploadedQrUrl.size() <= 500))
+        && data.bankName is string && data.bankName.size() <= 100
+        && data.accountNumber is string && data.accountNumber.size() <= 40
+        && data.accountName is string && data.accountName.size() <= 120
+        && (!('vietqrBankBin' in data) || (data.vietqrBankBin is string && data.vietqrBankBin.size() <= 20))
+        && (!('vietqrTemplate' in data) || data.vietqrTemplate in ['compact2', 'compact', 'qr_only', 'print'])
+        && isValidTimestampStr(data.updatedAt);
+    }
+
+    // --- Collection Rules ---
+    match /admins/{uid} {
+      allow get: if isAdmin() && isValidId(uid);
+      allow list, create, update, delete: if false;
+    }
+
+    match /orders/{orderId} {
+      allow get: if isAdmin() && isValidId(orderId);
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(orderId) && isValidOrder(incoming())
+        && exists(/databases/$(database)/documents/clients/$(incoming().clientId));
+      allow update: if isAdmin() && isValidId(orderId) && isValidOrder(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'orderCode', 'subject', 'topic', 'wordCount', 'citationStyle',
+          'outlineAndInstructions', 'rubricNotes', 'deadlineAt', 'stage',
+          'progressPercent', 'publicStatusNote', 'internalNotes', 'orderStatus',
+          'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
+          'clientId', 'clientDisplayName', 'attachments', 'updatedAt'
+        ]);
+      allow delete: if isAdmin() && isValidId(orderId);
+    }
+
+    match /clients/{clientId} {
+      allow get: if isAdmin() && isValidId(clientId);
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(clientId) && isValidClient(incoming());
+      allow update: if isAdmin() && isValidId(clientId) && isValidClient(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'displayName', 'zaloNumber', 'socialLink', 'schoolMajor', 'tier', 'notes', 'updatedAt'
+        ]);
+      allow delete: if isAdmin() && isValidId(clientId);
+    }
+
+    match /settings/{settingId} {
+      allow get: if isAdmin() && isValidId(settingId);
+      allow list: if isAdmin();
+      allow create: if isAdmin() && isValidId(settingId) && isValidBankSettings(incoming());
+      allow update: if isAdmin() && isValidId(settingId) && isValidBankSettings(incoming())
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'qrMode', 'uploadedQrUrl', 'bankName', 'accountNumber', 'accountName', 'vietqrBankBin', 'vietqrTemplate', 'updatedAt'
+        ]);
+      allow delete: if isAdmin() && isValidId(settingId);
+    }
+
+    // Collection-group admin visibility for inbox/revisions across all orders
+    match /{path=**}/revisions/{reqId} {
+      allow get, list: if isAdmin();
+    }
+
+    match /{path=**}/messages/{msgId} {
+      allow get, list: if isAdmin();
+    }
+
+    // Public non-PII tracking projection accessed strictly by exact Order Code
+    match /trackingPortals/{orderCode} {
+      allow get: if isValidOrderCode(orderCode);
+      allow list: if false;
+      allow create: if isAdmin() && isValidOrderCode(orderCode) && isValidTrackingPortal(incoming(), orderCode);
+      allow update: if isAdmin() && isValidOrderCode(orderCode) && isValidTrackingPortal(incoming(), orderCode)
+        && incoming().orderId == existing().orderId
+        && incoming().orderCode == existing().orderCode
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'subject', 'topic', 'wordCount', 'citationStyle',
+          'outlineAndInstructions', 'rubricNotes', 'deadlineAt', 'stage',
+          'progressPercent', 'publicStatusNote', 'orderStatus',
+          'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
+          'attachments', 'bankSnapshot', 'updatedAt'
+        ]);
+      allow delete: if isAdmin() && isValidOrderCode(orderCode);
+
+      // 48-hour ephemeral chat messages scoped under trackingPortals/{orderCode}
+      match /messages/{msgId} {
+        allow get: if (isAdmin() || isValidOrderCode(orderCode)) && isValidId(msgId);
+        allow list: if isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode);
+        allow create: if isValidId(msgId)
+          && isValidOrderCode(orderCode)
+          && isValidOrderMessage(incoming(), orderCode)
+          && exists(/databases/$(database)/documents/trackingPortals/$(orderCode))
+          && (
+            (isAdmin() && incoming().senderRole == 'admin')
+            || (!isAdmin() && incoming().senderRole == 'client')
+          );
+        allow update: if false;
+        allow delete: if isAdmin() && isValidId(msgId);
+      }
+
+      // Revision requests scoped under trackingPortals/{orderCode}
+      match /revisions/{reqId} {
+        allow get: if (isAdmin() || isValidOrderCode(orderCode)) && isValidId(reqId);
+        allow list: if isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode);
+        allow create: if isValidId(reqId)
+          && isValidOrderCode(orderCode)
+          && isValidRevisionRequest(incoming(), orderCode)
+          && incoming().status == 'open'
+          && (!('adminReply' in incoming()) || incoming().adminReply == '')
+          && exists(/databases/$(database)/documents/trackingPortals/$(orderCode));
+        allow update: if isAdmin() && isValidId(reqId)
+          && isValidOrderCode(orderCode)
+          && isValidRevisionRequest(incoming(), orderCode)
+          && incoming().createdAt == existing().createdAt
+          && incoming().orderCode == existing().orderCode
+          && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminReply', 'updatedAt']);
+        allow delete: if isAdmin() && isValidId(reqId);
+      }
+    }
+
+    // Connection check document (empty read-only probe)
+    match /test/connection {
+      allow get: if true;
+      allow list, write: if false;
+    }
+  }
+}
