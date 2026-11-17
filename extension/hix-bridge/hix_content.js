@@ -1,7 +1,7 @@
 (() => {
   // Always allow upgrading listener on dynamic re-inject
-  if (window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ === '1.1.0') return;
-  window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ = '1.1.0';
+  if (window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ === '1.1.1') return;
+  window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ = '1.1.1';
   window.__ASSIGNTRACK_HIX_CONTENT_LOADED__ = true;
 
   let activeRunToken = 0;
@@ -28,14 +28,14 @@
       .toLowerCase();
   }
 
-  function isVisible(el) {
+  function isVisible(el, minW = 24, minH = 16) {
     if (!el || !el.isConnected) return false;
     const style = window.getComputedStyle(el);
     if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
       return false;
     }
     const rect = el.getBoundingClientRect();
-    return rect.width > 30 && rect.height > 20;
+    return rect.width >= minW && rect.height >= minH;
   }
 
   function setNativeTextValue(el, text) {
@@ -48,7 +48,6 @@
           : HTMLInputElement.prototype;
       const descriptor = Object.getOwnPropertyDescriptor(proto, 'value');
 
-      // Clear first so React controlled inputs register a true value change even on retry
       if (descriptor && typeof descriptor.set === 'function') {
         descriptor.set.call(el, '');
       } else {
@@ -72,22 +71,26 @@
           })
         );
       } catch {
-        // Ignore if browser rejects InputEvent constructor fields
+        // Ignore
       }
 
-      el.dispatchEvent(
-        new InputEvent('input', {
-          bubbles: true,
-          data: text,
-          inputType: 'insertText',
-        })
-      );
+      try {
+        el.dispatchEvent(
+          new InputEvent('input', {
+            bubbles: true,
+            data: text,
+            inputType: 'insertText',
+          })
+        );
+      } catch {
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      }
       el.dispatchEvent(new Event('change', { bubbles: true }));
       el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true, key: ' ' }));
       return;
     }
 
-    // contenteditable / TipTap / Lexical / ProseMirror editor support
+    // contenteditable / TipTap / Lexical / ProseMirror support
     try {
       const selection = window.getSelection();
       const range = document.createRange();
@@ -101,7 +104,7 @@
         return;
       }
     } catch {
-      // Fall through to manual DOM update
+      // Fall through
     }
 
     el.textContent = text;
@@ -121,10 +124,9 @@
 
   function findInputElement() {
     const textareas = Array.from(document.querySelectorAll('textarea')).filter(
-      (ta) => isVisible(ta) && !ta.readOnly && !ta.disabled
+      (ta) => isVisible(ta, 60, 40) && !ta.readOnly && !ta.disabled
     );
     if (textareas.length > 0) {
-      // Pick the leftmost visible editable textarea
       textareas.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
       return textareas[0];
     }
@@ -132,7 +134,7 @@
     const editables = Array.from(
       document.querySelectorAll('[contenteditable="true"], [role="textbox"]')
     ).filter((el) => {
-      if (!isVisible(el)) return false;
+      if (!isVisible(el, 60, 40)) return false;
       if (el.getAttribute('aria-readonly') === 'true') return false;
       if (el.getAttribute('contenteditable') === 'false') return false;
       return true;
@@ -182,7 +184,7 @@
 
   function findHumanizeButton() {
     const buttons = Array.from(document.querySelectorAll('button, [role="button"]')).filter((btn) =>
-      isVisible(btn)
+      isVisible(btn, 36, 20)
     );
 
     const exactLabels = new Set([
@@ -208,37 +210,35 @@
     });
     if (exactMatch) return exactMatch;
 
-    // Fuzzy substring match excluding non-humanize actions
-    const fuzzyMatch = buttons.find((btn) => {
-      const txt = normText(btn.textContent);
-      const ascii = stripDiacritics(txt);
-      if (
-        ascii.includes('detector') ||
-        ascii.includes('check for ai') ||
-        ascii.includes('kiem tra ai') ||
-        ascii.includes('history') ||
-        ascii.includes('lich su') ||
-        ascii.includes('upgrade') ||
-        ascii.includes('nang cap') ||
-        ascii.includes('paste') ||
-        ascii.includes('dan van ban') ||
-        ascii.includes('sample') ||
-        ascii.includes('try sample') ||
-        ascii.includes('vi du') ||
-        ascii.includes('copy') ||
-        ascii.includes('sao chep')
-      ) {
-        return false;
-      }
-      return (
-        ascii.includes('humanize') ||
-        ascii.includes('nhan hoa') ||
-        ascii.includes('bypass')
-      );
-    });
-    if (fuzzyMatch) return fuzzyMatch;
-
-    return null;
+    return (
+      buttons.find((btn) => {
+        const txt = normText(btn.textContent);
+        const ascii = stripDiacritics(txt);
+        if (
+          ascii.includes('detector') ||
+          ascii.includes('check for ai') ||
+          ascii.includes('kiem tra ai') ||
+          ascii.includes('history') ||
+          ascii.includes('lich su') ||
+          ascii.includes('upgrade') ||
+          ascii.includes('nang cap') ||
+          ascii.includes('paste') ||
+          ascii.includes('dan van ban') ||
+          ascii.includes('sample') ||
+          ascii.includes('try sample') ||
+          ascii.includes('vi du') ||
+          ascii.includes('copy') ||
+          ascii.includes('sao chep')
+        ) {
+          return false;
+        }
+        return (
+          ascii.includes('humanize') ||
+          ascii.includes('nhan hoa') ||
+          ascii.includes('bypass')
+        );
+      }) || null
+    );
   }
 
   function selectModeIfAvailable(modeName) {
@@ -253,7 +253,7 @@
 
     const candidates = Array.from(
       document.querySelectorAll('button, [role="tab"], [role="radio"], label, [role="option"]')
-    ).filter((el) => isVisible(el));
+    ).filter((el) => isVisible(el, 24, 16));
 
     const match = candidates.find((el) => {
       const txt = normText(el.textContent);
@@ -283,40 +283,105 @@
     'nhap van ban cua ban',
   ];
 
+  const UI_CHROME_LINE_RES = [
+    /^\d+\s*(?:words?|chars?|characters?|từ|ký tự|tu|ky tu)\b/i,
+    /^(?:\d+\s*\/\s*\d+)$/,
+    /^(?:output|result|kết quả|ket qua|humanized|đã nhân hóa|da nhan hoa|ai detector|kiểm tra ai|bypassed|copy|sao chép|sao chep|copied|đã sao chép|share|export|download|re-humanize|nhân hóa lại|clear|xóa)$/i,
+    /^\d{1,3}%\s*(?:human|ai|con người|tự nhiên|human-written)/i,
+    /^(?:the output seems to be|your text appears|your humanized text|all ai detectors|passed|tất cả các trình|văn bản có vẻ|đầu ra có vẻ|vượt qua)/i,
+  ];
+
   function isBoilerplateOrLoadingText(text) {
     const ascii = stripDiacritics(normText(text));
-    if (!ascii || ascii.length < 15) return true;
-    if (PLACEHOLDER_OR_LOADING_SNIPPETS.some((p) => ascii.includes(p))) return true;
-    return false;
+    if (!ascii || ascii.length < 10) return true;
+    return PLACEHOLDER_OR_LOADING_SNIPPETS.some((p) => ascii.includes(p));
   }
 
   function cleanExtractedNodeText(node) {
+    if (!node) return '';
     const clone = node.cloneNode(true);
     clone
       .querySelectorAll(
-        'button, svg, [role="button"], input, textarea, [class*="badge"], [class*="counter"]'
+        'button, svg, [role="button"], input, textarea, select, header, footer, nav, [class*="badge"], [class*="counter"]'
       )
       .forEach((n) => n.remove());
 
-    let raw = (clone.innerText || clone.textContent || '').trim();
-    // Remove common trailing UI lines like "120 words", "120 từ", "Copy", "Sao chép", "100% Human"
-    raw = raw
-      .replace(/\b\d+\s*(?:words?|chars?|characters?|từ|ký tự)\b/gi, '')
-      .replace(/\b\d{1,3}%\s*(?:human|ai|con người|tự nhiên)\b/gi, '')
-      .replace(/^(?:output|kết quả|humanized|đã nhân hóa)\s*:?\s*/i, '')
-      .trim();
-    return raw;
+    // If the node contains <p> prose blocks inside, prefer joining meaningful <p> tags directly
+    const pElements = Array.from(clone.querySelectorAll('p'));
+    if (pElements.length > 0) {
+      const pLines = pElements
+        .map((p) => (p.textContent || '').replace(/\s+/g, ' ').trim())
+        .filter((line) => {
+          if (!line) return false;
+          const ascii = stripDiacritics(line);
+          if (UI_CHROME_LINE_RES.some((re) => re.test(line) || re.test(ascii))) return false;
+          if (PLACEHOLDER_OR_LOADING_SNIPPETS.some((s) => ascii.includes(s))) return false;
+          return true;
+        });
+      const joinedP = pLines.join(' ').trim();
+      if (joinedP.length >= 12) {
+        return joinedP;
+      }
+    }
+
+    const raw = (clone.innerText || clone.textContent || '').trim();
+    if (!raw) return '';
+
+    const cleanLines = raw
+      .split(/\r?\n+/)
+      .map((line) => line.replace(/\s+/g, ' ').trim())
+      .filter((line) => {
+        if (!line) return false;
+        const ascii = stripDiacritics(line);
+        if (UI_CHROME_LINE_RES.some((re) => re.test(line) || re.test(ascii))) return false;
+        if (PLACEHOLDER_OR_LOADING_SNIPPETS.some((s) => ascii.includes(s))) return false;
+        return true;
+      });
+
+    return cleanLines.join(' ').trim();
+  }
+
+  function findTwinOutputPanels(inputEl) {
+    const panels = [];
+    let current = inputEl.parentElement;
+
+    for (let depth = 0; depth < 7 && current && current !== document.body; depth += 1) {
+      const parent = current.parentElement;
+      if (!parent) break;
+
+      const curRect = current.getBoundingClientRect();
+      const siblings = Array.from(parent.children);
+      for (const sib of siblings) {
+        if (sib === current || sib.contains(inputEl) || inputEl.contains(sib)) continue;
+        if (!isVisible(sib, 160, 80)) continue;
+        if (sib.tagName === 'HEADER' || sib.tagName === 'NAV' || sib.tagName === 'ASIDE') continue;
+
+        const sibRect = sib.getBoundingClientRect();
+        const isRight = sibRect.left >= curRect.left + curRect.width * 0.45;
+        const isBelow = sibRect.top >= curRect.bottom - 15 && Math.abs(sibRect.left - curRect.left) < 120;
+        if (isRight || isBelow) {
+          panels.push(sib);
+        }
+      }
+
+      current = parent;
+    }
+
+    return panels;
   }
 
   function readOutputText(inputEl) {
     const inputRect = inputEl.getBoundingClientRect();
+    const inputNorm = normText(inputEl.value !== undefined ? inputEl.value : inputEl.innerText);
 
     // Strategy 1: Second visible textarea or readonly textbox/contenteditable (not inputEl)
-    const textareas = Array.from(document.querySelectorAll('textarea')).filter((ta) => isVisible(ta));
+    const textareas = Array.from(document.querySelectorAll('textarea')).filter((ta) =>
+      isVisible(ta, 60, 40)
+    );
     const otherTextarea = textareas.find((ta) => ta !== inputEl);
     if (otherTextarea) {
       const val = (otherTextarea.value || '').trim();
-      if (val && !isBoilerplateOrLoadingText(val)) {
+      if (val && normText(val) !== inputNorm && !isBoilerplateOrLoadingText(val)) {
         return val;
       }
     }
@@ -325,23 +390,51 @@
       document.querySelectorAll('[role="textbox"], [contenteditable]')
     ).filter((el) => {
       if (el === inputEl || el.contains(inputEl) || inputEl.contains(el)) return false;
-      return isVisible(el);
+      return isVisible(el, 60, 40);
     });
     for (const ed of otherEditors) {
       const txt = cleanExtractedNodeText(ed);
-      if (txt && !isBoilerplateOrLoadingText(txt)) {
+      if (txt && normText(txt) !== inputNorm && !isBoilerplateOrLoadingText(txt)) {
         return txt;
       }
     }
 
-    // Strategy 2: Output panel anchored to a visible "Copy" / "Sao chép" button on the right/bottom side
+    // Strategy 2: Structural Twin-Column Output Panel (the right/bottom card beside inputEl's card)
+    const twinPanels = findTwinOutputPanels(inputEl);
+    for (const panel of twinPanels) {
+      // Check inner scrollable/prose/output elements inside the twin panel first
+      const innerCandidates = Array.from(
+        panel.querySelectorAll(
+          '[data-testid*="output"], [data-testid*="result"], [class*="output"], [class*="result"], .prose, .ProseMirror, [class*="overflow-y"]'
+        )
+      ).filter((n) => isVisible(n, 120, 40));
+
+      for (const inner of innerCandidates) {
+        const txt = cleanExtractedNodeText(inner);
+        if (txt && normText(txt) !== inputNorm && !isBoilerplateOrLoadingText(txt)) {
+          return txt;
+        }
+      }
+
+      // Extract directly from the entire twin Output Card
+      const panelText = cleanExtractedNodeText(panel);
+      if (panelText && normText(panelText) !== inputNorm && !isBoilerplateOrLoadingText(panelText)) {
+        return panelText;
+      }
+    }
+
+    // Strategy 3: Output panel anchored to a Copy / Sao chep button (including small SVG icon buttons)
     const copyButtons = Array.from(
       document.querySelectorAll('button, [role="button"]')
     ).filter((btn) => {
-      if (!isVisible(btn)) return false;
+      if (!isVisible(btn, 14, 14)) return false;
       const txt = stripDiacritics(normText(btn.textContent));
       const aria = stripDiacritics(
-        normText(btn.getAttribute('aria-label') || btn.getAttribute('title') || '')
+        normText(
+          `${btn.getAttribute('aria-label') || ''} ${btn.getAttribute('title') || ''} ${
+            btn.getAttribute('data-testid') || ''
+          }`
+        )
       );
       return (
         txt === 'copy' ||
@@ -354,12 +447,17 @@
 
     for (const copyBtn of copyButtons) {
       let ancestor = copyBtn.parentElement;
-      for (let depth = 0; depth < 5 && ancestor && ancestor !== document.body; depth += 1) {
+      for (let depth = 0; depth < 6 && ancestor && ancestor !== document.body; depth += 1) {
         if (ancestor.contains(inputEl)) break;
         const rect = ancestor.getBoundingClientRect();
-        if (rect.width >= 180 && rect.height >= 90) {
+        if (rect.width >= 160 && rect.height >= 70) {
           const txt = cleanExtractedNodeText(ancestor);
-          if (txt && txt.length >= 20 && !isBoilerplateOrLoadingText(txt)) {
+          if (
+            txt &&
+            txt.length >= 12 &&
+            normText(txt) !== inputNorm &&
+            !isBoilerplateOrLoadingText(txt)
+          ) {
             return txt;
           }
         }
@@ -367,7 +465,7 @@
       }
     }
 
-    // Strategy 3: Semantic class/data-testid selectors OR right/below pane containers
+    // Strategy 4: Global right/below prose or semantic output selector scan
     const candidateSelectors = [
       '[data-testid*="output"]',
       '[data-testid*="result"]',
@@ -382,42 +480,21 @@
       const nodes = Array.from(document.querySelectorAll(sel));
       for (const node of nodes) {
         if (node === inputEl || node.contains(inputEl) || inputEl.contains(node)) continue;
-        if (!isVisible(node)) continue;
+        if (!isVisible(node, 120, 50)) continue;
         const rect = node.getBoundingClientRect();
         const isRightOrBelow =
-          rect.left >= inputRect.left + 80 || rect.top >= inputRect.bottom - 20;
-        if (!isRightOrBelow || rect.height < 60) continue;
+          rect.left >= inputRect.left + 60 || rect.top >= inputRect.bottom - 20;
+        if (!isRightOrBelow) continue;
 
         const txt = cleanExtractedNodeText(node);
-        if (!isBoilerplateOrLoadingText(txt) && txt.length > bestText.length) {
+        if (
+          txt &&
+          normText(txt) !== inputNorm &&
+          !isBoilerplateOrLoadingText(txt) &&
+          txt.length > bestText.length
+        ) {
           bestText = txt;
         }
-      }
-    }
-    if (bestText) return bestText;
-
-    // Strategy 4: Fallback scan for Tailwind right-hand / bottom output div with multi-word prose
-    const allDivs = Array.from(document.querySelectorAll('div, section, article, p'));
-    for (const node of allDivs) {
-      if (node === inputEl || node.contains(inputEl) || inputEl.contains(node)) continue;
-      if (node.closest('header, nav, footer, aside')) continue;
-      if (!isVisible(node)) continue;
-      const rect = node.getBoundingClientRect();
-      const isRightSide = rect.left >= inputRect.left + inputRect.width * 0.6;
-      const isBelow = rect.top >= inputRect.bottom + 10;
-      if ((!isRightSide && !isBelow) || rect.width < 180 || rect.height < 60 || rect.height > 900) {
-        continue;
-      }
-      // Prefer innermost text wrapper containing paragraphs or direct text
-      if (node.querySelectorAll('div').length > 4) continue;
-      const txt = cleanExtractedNodeText(node);
-      if (
-        txt.length >= 25 &&
-        txt.split(/\s+/).length >= 4 &&
-        !isBoilerplateOrLoadingText(txt) &&
-        txt.length > bestText.length
-      ) {
-        bestText = txt;
       }
     }
 
@@ -501,7 +578,6 @@
       return;
     }
 
-    // Wait briefly if React still has button disabled after pasting
     let enableWait = 0;
     while (isButtonDisabled(humanizeBtn) && enableWait < 2400) {
       if (runToken !== activeRunToken) {
@@ -518,6 +594,8 @@
     const deadline = Date.now() + 55000;
     let lastSeenOutput = '';
     let stableChecks = 0;
+    const normInputText = normText(text);
+    const normPrevOutput = normText(prevOutput);
 
     setJob({ step: 'Đang chờ HIX Bypass tạo văn bản mới...' });
 
@@ -555,9 +633,9 @@
       }
 
       const currentOutput = readOutputText(inputEl);
-      const isDifferentFromPrev = currentOutput && currentOutput !== prevOutput;
-      const isDifferentFromInput =
-        currentOutput && normText(currentOutput) !== normText(text);
+      const normCurrent = normText(currentOutput);
+      const isDifferentFromPrev = Boolean(currentOutput) && normCurrent !== normPrevOutput;
+      const isDifferentFromInput = Boolean(currentOutput) && normCurrent !== normInputText;
 
       if (isDifferentFromPrev && isDifferentFromInput) {
         if (currentOutput === lastSeenOutput) {
@@ -568,8 +646,9 @@
           setJob({ step: 'Đang nhận kết quả từ HIX Bypass...' });
         }
 
-        const latestBtn = findHumanizeButton() || humanizeBtn;
-        if (stableChecks >= 2 && !isButtonDisabled(latestBtn)) {
+        // Complete once output stabilizes cleanly (~1.1s unchanged),
+        // without blocking if HIX keeps the Humanize button disabled after run
+        if (stableChecks >= 3) {
           setJob({
             status: 'done',
             ok: true,
@@ -598,7 +677,7 @@
       ok: false,
       errorCode: 'TIMEOUT',
       error:
-        'Đã dán & bấm Nhân hóa nhưng quá 55s chưa thấy kết quả trên tab hixbypass.com. Hãy kiểm tra xem tab HIX có đang hiện kết quả hoặc CAPTCHA không.',
+        'HIX Bypass đã xử lý nhưng Extension chưa đọc được ô kết quả bên phải. Hãy đảm bảo 2 ô Nhập/Kết quả đều đang hiển thị trên tab hixbypass.com.',
     });
   }
 
@@ -647,7 +726,6 @@
       return false;
     }
 
-    // Legacy direct sync support
     if (message.type === 'EXECUTE_HUMANIZE') {
       const jobId = String(message.jobId || `job_${Date.now()}`);
       currentJob = {

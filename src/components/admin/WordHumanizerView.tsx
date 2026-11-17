@@ -376,9 +376,10 @@ export function WordHumanizerView({
       }
 
       if (!res.ok || !res.outputText) {
-        setPlaybackError(
-          res.error || 'HIX Bypass không trả về văn bản hợp lệ. Vui lòng kiểm tra tab hixbypass.com.'
-        );
+        const errMsg =
+          res.error || 'HIX Bypass không trả về văn bản hợp lệ. Vui lòng kiểm tra tab hixbypass.com.';
+        setPlaybackError(errMsg);
+        onToast(errMsg);
         runControlRef.current.paused = true;
         setPlaybackStatus('paused');
         return;
