@@ -92,6 +92,77 @@ export async function uploadFileToServer(
     body: formData,
   });
 
+  if (res.status === 413 && file.size <= 25 * 1024 * 1024) {
+    // Fallback for serverless payload limits (>4.5 MB): direct presigned PUT to Cloudflare R2
+    const presignRes = await fetch('/api/files/presign-upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...authHeaders,
+      },
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        sizeBytes: file.size,
+        isLocked: Boolean(options.isLocked),
+        category: options.category || 'brief',
+        previewMaxPages: options.previewMaxPages,
+        turnitinScorePage: options.turnitinScorePage,
+      }),
+    });
+
+    if (presignRes.ok) {
+      const presigned = (await presignRes.json()) as {
+        uploadUrl: string;
+        fileId: string;
+        storedName: string;
+        fileName: string;
+        mimeType: string;
+        sizeBytes: number;
+      };
+
+      const putRes = await fetch(presigned.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': presigned.mimeType },
+        body: file,
+      }).catch(() => null);
+
+      if (!putRes || !putRes.ok) {
+        throw new Error(
+          'Tệp > 4.5 MB không thể tải trực tiếp lên Cloudflare R2 (kiểm tra lại CORS trên Bucket R2 hoặc nén tệp ≤ 4 MB).'
+        );
+      }
+
+      const confirmRes = await fetch('/api/files/confirm-upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify({
+          fileId: presigned.fileId,
+          storedName: presigned.storedName,
+          fileName: presigned.fileName,
+          mimeType: presigned.mimeType,
+          sizeBytes: presigned.sizeBytes,
+          isLocked: Boolean(options.isLocked),
+          category: options.category || 'brief',
+          previewMaxPages: options.previewMaxPages,
+          turnitinScorePage: options.turnitinScorePage,
+        }),
+      });
+
+      if (!confirmRes.ok) {
+        const err = await confirmRes
+          .json()
+          .catch(() => ({ error: 'Xác nhận tải tệp lên Cloudflare R2 thất bại.' }));
+        throw new Error(err.error || 'Xác nhận tải tệp lên Cloudflare R2 thất bại.');
+      }
+
+      return confirmRes.json();
+    }
+  }
+
   if (!res.ok) {
     const err = await res.json().catch(() => ({ error: 'Tải tệp lên thất bại.' }));
     throw new Error(err.error || 'Tải tệp lên thất bại.');
