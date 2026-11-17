@@ -1,6 +1,6 @@
 (() => {
   const FLAG_ATTR = 'data-assigntrack-hix-bridge';
-  document.documentElement.setAttribute(FLAG_ATTR, '1.0.0');
+  document.documentElement.setAttribute(FLAG_ATTR, '1.1.0');
 
   window.addEventListener('message', (event) => {
     if (event.source !== window) return;
@@ -17,6 +17,7 @@
           type: payload.type,
           text: payload.text,
           mode: payload.mode,
+          jobId: payload.jobId || requestId,
           requestId,
         },
         (response) => {

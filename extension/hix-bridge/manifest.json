@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "AssignTrack HIX Bypass Bridge",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Kết nối an toàn giữa trình chiếu Word trên AssignTrack và tab hixbypass.com bạn đã đăng nhập sẵn.",
   "permissions": ["tabs", "scripting"],
   "host_permissions": [

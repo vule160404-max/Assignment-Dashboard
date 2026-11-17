@@ -52,7 +52,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     return true;
   }
 
-  if (message.type === 'HUMANIZE_CHUNK') {
+  if (message.type === 'START_HUMANIZE' || message.type === 'HUMANIZE_CHUNK') {
     (async () => {
       const tab = await findHixTab();
       if (!tab || typeof tab.id !== 'number') {
@@ -65,10 +65,14 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         return;
       }
 
+      const targetMsgType =
+        message.type === 'START_HUMANIZE' ? 'START_HUMANIZE' : 'EXECUTE_HUMANIZE';
+
       const resp = await sendToHixTabWithAutoInject(tab.id, {
-        type: 'EXECUTE_HUMANIZE',
+        type: targetMsgType,
         text: String(message.text || ''),
         mode: String(message.mode || 'Balanced'),
+        jobId: message.jobId || message.requestId || '',
         requestId: message.requestId || '',
       });
       sendResponse(resp || { ok: false, error: 'Tab HIX Bypass không phản hồi.' });
@@ -80,6 +84,44 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           err instanceof Error
             ? err.message
             : 'Không thể giao tiếp với tab hixbypass.com. Hãy F5 lại tab HIX Bypass.',
+      });
+    });
+    return true;
+  }
+
+  if (message.type === 'POLL_HUMANIZE') {
+    (async () => {
+      const tab = await findHixTab();
+      if (!tab || typeof tab.id !== 'number') {
+        sendResponse({
+          ok: false,
+          status: 'error',
+          errorCode: 'NO_HIX_TAB',
+          error: 'Tab hixbypass.com đã bị đóng trong quá trình xử lý.',
+        });
+        return;
+      }
+
+      const resp = await sendToHixTabWithAutoInject(tab.id, {
+        type: 'POLL_HUMANIZE',
+        jobId: message.jobId || message.requestId || '',
+      });
+      sendResponse(
+        resp || {
+          ok: false,
+          status: 'error',
+          error: 'Tab HIX Bypass không phản hồi trạng thái.',
+        }
+      );
+    })().catch((err) => {
+      sendResponse({
+        ok: false,
+        status: 'error',
+        errorCode: 'TAB_COMMUNICATION_FAILED',
+        error:
+          err instanceof Error
+            ? err.message
+            : 'Mất kết nối tới tab hixbypass.com.',
       });
     });
     return true;

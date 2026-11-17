@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { buildExtensionZipBlob } from '../../lib/extensionZip';
 import {
+  EXPECTED_EXTENSION_VERSION,
   HixBridgeStatus,
   HixBypassMode,
   cancelHixExtensionRun,
@@ -109,6 +110,7 @@ export function WordHumanizerView({
   // Bridge & Extension connection state
   const [bridgeStatus, setBridgeStatus] = useState<HixBridgeStatus>({
     extensionInstalled: false,
+    extensionVersion: '',
     hixTabOpen: false,
     hixTabTitle: '',
     hixTabUrl: '',
@@ -133,6 +135,7 @@ export function WordHumanizerView({
   const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatus>('idle');
   const [currentChunkIdx, setCurrentChunkIdx] = useState<number>(0);
   const [playbackError, setPlaybackError] = useState<string>('');
+  const [hixStepText, setHixStepText] = useState<string>('');
   const [glitchReview, setGlitchReview] = useState<GlitchReviewPayload | null>(null);
   const [showOverwriteTint, setShowOverwriteTint] = useState<boolean>(true);
   const [inspectChunkId, setInspectChunkId] = useState<string | null>(null);
@@ -143,6 +146,7 @@ export function WordHumanizerView({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeSpanRef = useRef<HTMLSpanElement | null>(null);
   const glitchPanelRef = useRef<HTMLDivElement | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Async run loop control refs (prevents stale closures on Pause/Stop/Retry)
   const runControlRef = useRef<{
@@ -352,7 +356,16 @@ export function WordHumanizerView({
 
       // Step 2: Send complete sentence chunk to logged-in hixbypass.com tab via Chrome Extension
       setPlaybackStatus('processing_hix');
-      const res = await humanizeChunkViaExtension(chunk.text, hixMode);
+      setHixStepText('Đang dán văn bản sang tab HIX Bypass...');
+      abortControllerRef.current?.abort();
+      const chunkAbort = new AbortController();
+      abortControllerRef.current = chunkAbort;
+
+      const res = await humanizeChunkViaExtension(chunk.text, hixMode, {
+        signal: chunkAbort.signal,
+        onStepUpdate: (step) => setHixStepText(step),
+      });
+      setHixStepText('');
 
       if (
         runControlRef.current.runId !== myRunId ||
@@ -435,6 +448,8 @@ export function WordHumanizerView({
 
   const handlePause = () => {
     runControlRef.current.paused = true;
+    abortControllerRef.current?.abort();
+    setHixStepText('');
     void cancelHixExtensionRun();
     if (glitchDecisionResolverRef.current) {
       glitchDecisionResolverRef.current({ action: 'abort' });
@@ -448,6 +463,8 @@ export function WordHumanizerView({
   const handleStopAndReset = () => {
     runControlRef.current.aborted = true;
     runControlRef.current.runId += 1;
+    abortControllerRef.current?.abort();
+    setHixStepText('');
     void cancelHixExtensionRun();
     if (glitchDecisionResolverRef.current) {
       glitchDecisionResolverRef.current({ action: 'abort' });
@@ -604,7 +621,9 @@ export function WordHumanizerView({
   if (playbackStatus === 'highlighting') {
     statusHeadline = `AI đang tô đen đoạn ${currentChunkIdx + 1}/${chunks.length}...`;
   } else if (playbackStatus === 'processing_hix') {
-    statusHeadline = `Đang gửi đoạn ${currentChunkIdx + 1}/${chunks.length} sang tab HIX Bypass...`;
+    statusHeadline = `Đoạn ${currentChunkIdx + 1}/${chunks.length}: ${
+      hixStepText || 'Đang gửi sang tab HIX Bypass...'
+    }`;
   } else if (playbackStatus === 'review_glitch') {
     statusHeadline = `Tạm dừng kiểm duyệt lỗi văn bản (Đoạn ${currentChunkIdx + 1}/${chunks.length})`;
   } else if (playbackStatus === 'pasting') {
@@ -614,6 +633,10 @@ export function WordHumanizerView({
   } else if (playbackStatus === 'completed') {
     statusHeadline = `Hoàn tất dán đè ${completedCount}/${chunks.length} đoạn`;
   }
+
+  const isOutdatedExtension =
+    bridgeStatus.extensionInstalled &&
+    bridgeStatus.extensionVersion !== EXPECTED_EXTENSION_VERSION;
 
   return (
     <div className="space-y-5">
@@ -628,12 +651,16 @@ export function WordHumanizerView({
               <span
                 className={
                   bridgeStatus.extensionInstalled
-                    ? 'font-medium text-[#16A34A]'
+                    ? isOutdatedExtension
+                      ? 'font-medium text-[#D97706]'
+                      : 'font-medium text-[#16A34A]'
                     : 'font-medium text-[#D97706]'
                 }
               >
                 {bridgeStatus.extensionInstalled
-                  ? 'Extension: Đã kết nối'
+                  ? isOutdatedExtension
+                    ? `Extension: Bản cũ (${bridgeStatus.extensionVersion || '1.0.0'}) — nên cập nhật lên ${EXPECTED_EXTENSION_VERSION}`
+                    : `Extension: Đã kết nối (v${bridgeStatus.extensionVersion})`
                   : 'Extension: Chưa cài đặt trên Chrome'}
               </span>
               <span aria-hidden="true" className="text-zinc-300">
