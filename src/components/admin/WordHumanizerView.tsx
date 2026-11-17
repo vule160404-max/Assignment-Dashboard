@@ -16,6 +16,7 @@ import {
   Square,
   Upload,
 } from 'lucide-react';
+import { buildExtensionZipBlob } from '../../lib/extensionZip';
 import {
   HixBridgeStatus,
   HixBypassMode,
@@ -137,6 +138,7 @@ export function WordHumanizerView({
   const [inspectChunkId, setInspectChunkId] = useState<string | null>(null);
   const [exportingDocx, setExportingDocx] = useState(false);
   const [attachingOrder, setAttachingOrder] = useState(false);
+  const [downloadingExt, setDownloadingExt] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const activeSpanRef = useRef<HTMLSpanElement | null>(null);
@@ -551,6 +553,41 @@ export function WordHumanizerView({
     }
   };
 
+  const handleDownloadExtensionZip = async () => {
+    setShowInstallGuide(true);
+    setDownloadingExt(true);
+    try {
+      let zipBlob: Blob | null = null;
+      try {
+        const res = await fetch('/api/extension/hix-bridge.zip');
+        const ctype = (res.headers.get('content-type') || '').toLowerCase();
+        if (res.ok && ctype.includes('zip')) {
+          zipBlob = await res.blob();
+        }
+      } catch {
+        // Fallback to in-browser packaging below
+      }
+
+      if (!zipBlob) {
+        zipBlob = await buildExtensionZipBlob();
+      }
+
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'assigntrack-hix-bridge.zip';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 4000);
+      onToast('Đã tải xuống "assigntrack-hix-bridge.zip". Hãy giải nén và làm theo 3 bước bên dưới.');
+    } catch {
+      onToast('Không thể đóng gói file Extension. Vui lòng thử lại.');
+    } finally {
+      setDownloadingExt(false);
+    }
+  };
+
   const isRunning =
     playbackStatus === 'highlighting' ||
     playbackStatus === 'processing_hix' ||
@@ -637,15 +674,17 @@ export function WordHumanizerView({
               <ExternalLink className="w-3.5 h-3.5" />
             </a>
 
-            <a
-              href="/api/extension/hix-bridge.zip"
-              download="assigntrack-hix-bridge.zip"
-              onClick={() => setShowInstallGuide(true)}
-              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#0F172A] hover:bg-slate-800 text-white rounded-lg whitespace-nowrap"
+            <button
+              type="button"
+              disabled={downloadingExt}
+              onClick={() => void handleDownloadExtensionZip()}
+              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#0F172A] hover:bg-slate-800 text-white rounded-lg whitespace-nowrap disabled:opacity-45"
             >
               <Download className="w-3.5 h-3.5" />
-              <span>Tải Chrome Extension (.zip)</span>
-            </a>
+              <span>
+                {downloadingExt ? 'Đang đóng gói...' : 'Tải Chrome Extension (.zip)'}
+              </span>
+            </button>
 
             <button
               type="button"
