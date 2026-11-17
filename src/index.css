@@ -6,19 +6,181 @@
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 }
 
+:root {
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 @layer base {
   html {
     font-family: var(--font-sans);
     color: #0f172a;
     background-color: #fafafa;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4 {
     font-family: var(--font-display);
     text-wrap: balance;
+    letter-spacing: -0.02em;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href] {
+    cursor: pointer;
   }
 }
 
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+/* Tactile button feedback — no transition: all */
+.btn-press {
+  transition-property: transform, background-color, border-color, color, opacity;
+  transition-duration: 160ms;
+  transition-timing-function: var(--ease-out);
+}
+
+.btn-press:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Hover-capable pointer devices only (prevents sticky hover on touch) */
+@media (hover: hover) and (pointer: fine) {
+  .hover-row {
+    transition-property: background-color;
+    transition-duration: 140ms;
+    transition-timing-function: ease;
+  }
+  .hover-row:hover {
+    background-color: rgb(244 244 245 / 0.75);
+  }
+}
+
+/* Translucent sticky navigation header */
+.sticky-glass {
+  background-color: rgb(255 255 255 / 0.86);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Modal backdrop & centered panel (@starting-style entry, never scale(0)) */
+.modal-backdrop {
+  opacity: 1;
+  transition: opacity 220ms var(--ease-out);
+}
+
+@starting-style {
+  .modal-backdrop {
+    opacity: 0;
+  }
+}
+
+.modal-panel {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transform-origin: center;
+  transition-property: opacity, transform;
+  transition-duration: 240ms;
+  transition-timing-function: var(--ease-out);
+}
+
+@starting-style {
+  .modal-panel {
+    opacity: 0;
+    transform: scale(0.96) translateY(4px);
+  }
+}
+
+/* Mobile drawer entrance */
+.drawer-panel {
+  transform: translateX(0);
+  transition: transform 360ms var(--ease-drawer);
+}
+
+@starting-style {
+  .drawer-panel {
+    transform: translateX(-100%);
+  }
+}
+
+/* Sonner-inspired toast entrance */
+.toast-enter {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition-property: opacity, transform;
+  transition-duration: 360ms;
+  transition-timing-function: ease;
+}
+
+@starting-style {
+  .toast-enter {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+
+/* Single container entrance for hero / auth cards */
+.surface-enter {
+  opacity: 1;
+  transform: translateY(0);
+  transition-property: opacity, transform;
+  transition-duration: 280ms;
+  transition-timing-function: var(--ease-out);
+}
+
+@starting-style {
+  .surface-enter {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Hardware-accelerated progress fill using scaleX instead of width */
+.progress-fill {
+  transform-origin: left center;
+  transition: transform 280ms var(--ease-out);
+}
+
+/* Subtle blur crossfade when swapping Copy -> Check icons */
+@keyframes iconMorphIn {
+  from {
+    opacity: 0;
+    transform: scale(0.86);
+    filter: blur(1.5px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: blur(0);
+  }
+}
+
+.icon-morph {
+  animation: iconMorphIn 180ms var(--ease-out) both;
+}
+
+/* Respect reduced motion — collapse transforms/blurs into gentle opacity fades */
+@media (prefers-reduced-motion: reduce) {
+  .btn-press,
+  .modal-backdrop,
+  .modal-panel,
+  .drawer-panel,
+  .toast-enter,
+  .surface-enter,
+  .progress-fill,
+  .icon-morph {
+    transition-duration: 120ms !important;
+    animation-duration: 120ms !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  .btn-press:active:not(:disabled) {
+    transform: none !important;
+  }
 }

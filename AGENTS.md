@@ -89,3 +89,20 @@ Use when an idea should be challenged, researched, and shaped before committing 
 
 - **Stack**: React 19 + TypeScript + Vite + Tailwind CSS v4 + Express (`server.ts` when backend routes are needed), running on port `3000`.
 - **Verification**: All code changes must pass `npm run lint` (`tsc --noEmit`) and `npm run build` (`vite build`) without errors before reporting completion or convergence.
+
+---
+
+## 5. Code Review Workflow — Open Code Review (`alibaba/open-code-review`)
+
+- **Skills Installed**: `.agents/skills/open-code-review/SKILL.md` and `.agents/skills/open-code-review-delegate/SKILL.md`
+- **Project Rules**: `.opencodereview/rule.json` (merged with built-in OCR language rules)
+- **Usage**: Run `ocr delegate preview --format json` and `ocr delegate rule --format json <files...>` to scope reviewable files and rules, inspect each file individually, classify findings by severity (`critical`, `high`, `medium`, `low`), filter out false positives, and report coverage (`total_files`, `reviewed_files`, `skipped_files`, `coverage_rate`).
+
+---
+
+## 6. Design Engineering & Motion Workflow (`emilkowalski/skills`)
+
+- **Skills Installed**: `.agents/skills/emilkowalski/` (`emil-design-eng`, `animate`, `choreograph`, `apple-design`, `learn-taste`, `ui-cheatsheet.md`, `performance-cheatsheet.md`).
+- **Core Rules**: Use `--ease-out` (`cubic-bezier(0.23, 1, 0.32, 1)`) under `300ms` for UI; never use `transition: all`, `ease-in`, or `scale(0)`; animate only `transform` and `opacity` (plus `clip-path` or `<20px` blur); gate hover effects with `@media (hover: hover) and (pointer: fine)`; provide `btn-press` tactile feedback (`scale(0.97)`); support `prefers-reduced-motion: reduce`.
+
+

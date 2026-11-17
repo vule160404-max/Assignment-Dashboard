@@ -1,0 +1,19 @@
+{
+  "rules": [
+    {
+      "path": "src/**/*.{ts,tsx}",
+      "rule": "## AssignTrack TypeScript & React Rules\n- Never use `any`; define explicit interfaces.\n- Never use nested ternary expressions.\n- All Firestore operations MUST catch errors via `handleFirestoreError(error, OperationType, path)`.\n- Never expose client PII (`zaloNumber`, `socialLink`, `schoolMajor`, `tier`, `internalNotes`) inside `trackingPortals` projections.\n- All `useEffect` subscriptions (`onSnapshot`, `setInterval`) MUST return cleanup functions.",
+      "merge_system_rule": true
+    },
+    {
+      "path": "server.ts",
+      "rule": "## Express Server Security & Upload Rules\n- Validate all path/fileId parameters against strict allowlists (`^[a-zA-Z0-9_]+$`) to prevent path traversal.\n- Enforce payment-lock checks (`isLocked`) on download requests (`GET /api/files/:fileId?download=1`).\n- Validate upload file size and MIME/extension handling safely.",
+      "merge_system_rule": true
+    },
+    {
+      "path": "firestore.rules",
+      "rule": "## Firestore Rules Eight Pillars Check\n- Global deny-all catch-all at top.\n- `trackingPortals/{orderCode}` MUST set `allow list: if false`.\n- Admin checks MUST verify `request.auth.token.email_verified == true`.\n- Every string/list field MUST enforce `.size()` limits matching `firebase-blueprint.json`.",
+      "merge_system_rule": true
+    }
+  ]
+}

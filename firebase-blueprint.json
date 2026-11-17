@@ -1,8 +1,126 @@
 {
   "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Authenticated user profile with RBAC role (owner, admin, staff, client) and client saved order bookmarks.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "phoneNumber": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "role": {
+          "type": "string",
+          "enum": ["owner", "admin", "staff", "client"],
+          "maxLength": 16
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "suspended"],
+          "maxLength": 16
+        },
+        "specialty": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "inviteId": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "savedOrderCodes": {
+          "type": "array",
+          "description": "Bounded up to 50 saved order codes for client portal quick access."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "email", "displayName", "role", "status", "createdAt", "updatedAt"]
+    },
+    "TeamInvite": {
+      "title": "TeamInvite",
+      "description": "Admin-issued invitation allowing a collaborator/staff member to register with matching invited email and invite code.",
+      "type": "object",
+      "properties": {
+        "inviteCode": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 32,
+          "pattern": "^[A-Z0-9-]+$"
+        },
+        "email": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "phoneNumber": {
+          "type": "string",
+          "maxLength": 30
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "staff"],
+          "maxLength": 16
+        },
+        "specialty": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "accepted", "revoked"],
+          "maxLength": 16
+        },
+        "acceptedByUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdByUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["inviteCode", "email", "displayName", "role", "status", "createdByUid", "createdAt", "updatedAt"]
+    },
     "Order": {
       "title": "Order",
-      "description": "Full assignment order ticket managed exclusively by the Admin.",
+      "description": "Full assignment order ticket managed by Admin and assigned Staff.",
       "type": "object",
       "properties": {
         "orderCode": {
@@ -95,6 +213,14 @@
           "minLength": 1,
           "maxLength": 120
         },
+        "assignedStaffUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "assignedStaffName": {
+          "type": "string",
+          "maxLength": 120
+        },
         "attachments": {
           "type": "array",
           "description": "Bounded up to 20 attachment objects per order."
@@ -173,7 +299,7 @@
     },
     "TrackingPortal": {
       "title": "TrackingPortal",
-      "description": "Zero-PII public projection synced by Admin and read by Order Code.",
+      "description": "Zero-PII public projection synced by Admin/Staff and read by Order Code.",
       "type": "object",
       "properties": {
         "orderId": {
@@ -413,9 +539,17 @@
     }
   },
   "firestore": {
+    "/users/{uid}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Authenticated user accounts with RBAC roles (owner, admin, staff, client)."
+    },
+    "/teamInvites/{inviteCode}": {
+      "schema": { "$ref": "#/entities/TeamInvite" },
+      "description": "Admin-issued invitations for onboarding collaborators/staff."
+    },
     "/orders/{orderId}": {
       "schema": { "$ref": "#/entities/Order" },
-      "description": "Admin-only assignment order tickets."
+      "description": "Assignment order tickets managed by Admin and assigned Staff."
     },
     "/clients/{clientId}": {
       "schema": { "$ref": "#/entities/Client" },
@@ -431,7 +565,7 @@
     },
     "/trackingPortals/{orderCode}/revisions/{reqId}": {
       "schema": { "$ref": "#/entities/RevisionRequest" },
-      "description": "Client revision requests created against valid trackingPortals and managed by Admin."
+      "description": "Client revision requests created against valid trackingPortals and managed by Admin/assigned Staff."
     },
     "/settings/{settingId}": {
       "schema": { "$ref": "#/entities/BankSettings" },

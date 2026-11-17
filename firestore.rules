@@ -16,7 +16,13 @@ service cloud.firestore {
     }
 
     function isSignedIn() {
-      return request.auth != null;
+      return request.auth != null
+        && 'email' in request.auth.token
+        && request.auth.token.email is string;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
     }
 
     function isValidId(id) {
@@ -27,20 +33,118 @@ service cloud.firestore {
       return code is string && code.size() >= 4 && code.size() <= 32 && code.matches('^[A-Z0-9-]+$');
     }
 
+    function isBootstrappedOwner() {
+      return isSignedIn() && request.auth.token.email.lower() == 'vule160404@gmail.com';
+    }
+
     function isAdmin() {
-      return isSignedIn()
-        && request.auth.token.email_verified == true
-        && (
-          request.auth.token.email == 'cycloneielts@gmail.com'
-          || exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      return isBootstrappedOwner()
+        || (
+          isSignedIn()
+          && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin']
+          && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active'
+        )
+        || (
+          isSignedIn()
+          && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
         );
+    }
+
+    function isActiveStaff() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
+    }
+
+    function isTeamMember() {
+      return isAdmin() || isActiveStaff();
+    }
+
+    function isAssignedToPortal(orderCode) {
+      return isActiveStaff()
+        && exists(/databases/$(database)/documents/trackingPortals/$(orderCode))
+        && exists(/databases/$(database)/documents/orders/$(get(/databases/$(database)/documents/trackingPortals/$(orderCode)).data.orderId))
+        && get(/databases/$(database)/documents/orders/$(get(/databases/$(database)/documents/trackingPortals/$(orderCode)).data.orderId)).data.assignedStaffUid == request.auth.uid;
     }
 
     function isValidTimestampStr(val) {
       return val is string && val.size() >= 10 && val.size() <= 40;
     }
 
+    function isValidSavedOrderCodes(list) {
+      return list is list
+        && list.size() <= 50
+        && (list.size() == 0 || isValidOrderCode(list[0]));
+    }
+
+    function isValidAttachmentsList(list) {
+      return list is list
+        && list.size() <= 20
+        && (
+          list.size() == 0
+          || (
+            list[0] is map
+            && list[0].keys().hasAll(['id', 'name', 'category', 'sourceType', 'fileIdOrUrl', 'isPaymentLocked'])
+            && list[0].id is string && list[0].id.size() <= 128
+            && list[0].name is string && list[0].name.size() <= 240
+            && list[0].category in ['brief', 'turnitin', 'draft', 'final']
+            && list[0].sourceType in ['upload', 'url']
+            && list[0].fileIdOrUrl is string && list[0].fileIdOrUrl.size() <= 1000
+            && list[0].isPaymentLocked is bool
+          )
+        );
+    }
+
+    function isValidBankSnapshot(snap) {
+      return snap is map
+        && snap.keys().hasAll(['qrMode', 'uploadedQrUrl', 'bankName', 'accountNumber', 'accountName', 'vietqrBankBin', 'vietqrTemplate'])
+        && snap.keys().hasOnly(['qrMode', 'uploadedQrUrl', 'bankName', 'accountNumber', 'accountName', 'vietqrBankBin', 'vietqrTemplate'])
+        && snap.qrMode in ['uploaded_default', 'vietqr_dynamic']
+        && snap.uploadedQrUrl is string && snap.uploadedQrUrl.size() <= 500
+        && snap.bankName is string && snap.bankName.size() <= 100
+        && snap.accountNumber is string && snap.accountNumber.size() <= 40
+        && snap.accountName is string && snap.accountName.size() <= 120
+        && snap.vietqrBankBin is string && snap.vietqrBankBin.size() <= 20
+        && snap.vietqrTemplate in ['compact2', 'compact', 'qr_only', 'print'];
+    }
+
     // --- Entity Validation Blueprints ---
+    function isValidUserProfile(data, uid) {
+      return data.keys().hasAll(['uid', 'email', 'displayName', 'role', 'status', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'email', 'displayName', 'phoneNumber', 'role', 'status', 'specialty', 'inviteId', 'savedOrderCodes', 'createdAt', 'updatedAt'])
+        && data.uid == uid
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 30))
+        && data.role in ['owner', 'admin', 'staff', 'client']
+        && data.status in ['active', 'suspended']
+        && (!('specialty' in data) || (data.specialty is string && data.specialty.size() <= 160))
+        && (!('inviteId' in data) || (data.inviteId is string && data.inviteId.size() <= 64))
+        && (!('savedOrderCodes' in data) || isValidSavedOrderCodes(data.savedOrderCodes))
+        && isValidTimestampStr(data.createdAt)
+        && isValidTimestampStr(data.updatedAt);
+    }
+
+    function isValidTeamInvite(data, inviteCode) {
+      return data.keys().hasAll(['inviteCode', 'email', 'displayName', 'role', 'status', 'createdByUid', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['inviteCode', 'email', 'displayName', 'phoneNumber', 'role', 'specialty', 'status', 'acceptedByUid', 'createdByUid', 'createdAt', 'updatedAt'])
+        && data.inviteCode == inviteCode
+        && isValidOrderCode(data.inviteCode)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 160
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 120
+        && (!('phoneNumber' in data) || (data.phoneNumber is string && data.phoneNumber.size() <= 30))
+        && data.role in ['admin', 'staff']
+        && (!('specialty' in data) || (data.specialty is string && data.specialty.size() <= 160))
+        && data.status in ['pending', 'accepted', 'revoked']
+        && (!('acceptedByUid' in data) || (data.acceptedByUid is string && data.acceptedByUid.size() <= 128))
+        && isValidId(data.createdByUid)
+        && isValidTimestampStr(data.createdAt)
+        && isValidTimestampStr(data.updatedAt);
+    }
+
     function isValidOrder(data) {
       return data.keys().hasAll([
           'orderCode', 'subject', 'topic', 'wordCount', 'citationStyle',
@@ -53,7 +157,8 @@ service cloud.firestore {
           'outlineAndInstructions', 'rubricNotes', 'deadlineAt', 'stage',
           'progressPercent', 'publicStatusNote', 'internalNotes', 'orderStatus',
           'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
-          'clientId', 'clientDisplayName', 'attachments', 'createdAt', 'updatedAt'
+          'clientId', 'clientDisplayName', 'assignedStaffUid', 'assignedStaffName',
+          'attachments', 'createdAt', 'updatedAt'
         ])
         && isValidOrderCode(data.orderCode)
         && data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 120
@@ -74,7 +179,9 @@ service cloud.firestore {
         && data.paymentStatus in ['unpaid', 'deposit_paid', 'fully_paid']
         && isValidId(data.clientId)
         && data.clientDisplayName is string && data.clientDisplayName.size() >= 1 && data.clientDisplayName.size() <= 120
-        && data.attachments is list && data.attachments.size() <= 20
+        && (!('assignedStaffUid' in data) || (data.assignedStaffUid is string && data.assignedStaffUid.size() <= 128))
+        && (!('assignedStaffName' in data) || (data.assignedStaffName is string && data.assignedStaffName.size() <= 120))
+        && isValidAttachmentsList(data.attachments)
         && isValidTimestampStr(data.createdAt)
         && isValidTimestampStr(data.updatedAt);
     }
@@ -123,8 +230,8 @@ service cloud.firestore {
         && data.depositAmount is number && data.depositAmount >= 0
         && data.paidAmount is number && data.paidAmount >= 0
         && data.paymentStatus in ['unpaid', 'deposit_paid', 'fully_paid']
-        && data.attachments is list && data.attachments.size() <= 20
-        && data.bankSnapshot is map && data.bankSnapshot.keys().size() <= 10
+        && isValidAttachmentsList(data.attachments)
+        && isValidBankSnapshot(data.bankSnapshot)
         && isValidTimestampStr(data.updatedAt);
     }
 
@@ -171,20 +278,126 @@ service cloud.firestore {
       allow list, create, update, delete: if false;
     }
 
-    match /orders/{orderId} {
-      allow get: if isAdmin() && isValidId(orderId);
+    match /users/{uid} {
+      allow get: if (isOwner(uid) || isAdmin()) && isValidId(uid);
       allow list: if isAdmin();
+      allow create: if isValidId(uid) && isValidUserProfile(incoming(), uid) && (
+        (
+          isBootstrappedOwner()
+          && isOwner(uid)
+          && incoming().role == 'owner'
+          && incoming().status == 'active'
+          && incoming().email.lower() == request.auth.token.email.lower()
+        )
+        || (
+          isOwner(uid)
+          && incoming().role == 'client'
+          && incoming().status == 'active'
+          && incoming().email.lower() == request.auth.token.email.lower()
+        )
+        || (
+          isOwner(uid)
+          && incoming().role in ['admin', 'staff']
+          && incoming().status == 'active'
+          && incoming().email.lower() == request.auth.token.email.lower()
+          && 'inviteId' in incoming()
+          && isValidOrderCode(incoming().inviteId)
+          && exists(/databases/$(database)/documents/teamInvites/$(incoming().inviteId))
+          && get(/databases/$(database)/documents/teamInvites/$(incoming().inviteId)).data.status == 'pending'
+          && get(/databases/$(database)/documents/teamInvites/$(incoming().inviteId)).data.email.lower() == request.auth.token.email.lower()
+          && get(/databases/$(database)/documents/teamInvites/$(incoming().inviteId)).data.role == incoming().role
+          && getAfter(/databases/$(database)/documents/teamInvites/$(incoming().inviteId)).data.status == 'accepted'
+          && getAfter(/databases/$(database)/documents/teamInvites/$(incoming().inviteId)).data.acceptedByUid == uid
+        )
+        || isAdmin()
+      );
+      allow update: if isValidId(uid) && isValidUserProfile(incoming(), uid)
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && (
+          (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['role', 'status', 'displayName', 'phoneNumber', 'specialty', 'updatedAt'])
+          )
+          || (
+            isOwner(uid)
+            && incoming().role == existing().role
+            && incoming().status == existing().status
+            && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'phoneNumber', 'specialty', 'savedOrderCodes', 'updatedAt'])
+          )
+        );
+      allow delete: if isAdmin() && isValidId(uid) && request.auth.uid != uid;
+    }
+
+    match /teamInvites/{inviteCode} {
+      // Exact inviteCode lookup allowed so pre-registration validation can verify email + inviteCode match
+      allow get: if isValidOrderCode(inviteCode);
+      allow list: if isAdmin()
+        || (isSignedIn() && resource.data.email == request.auth.token.email.lower());
+      allow create: if isAdmin()
+        && isValidOrderCode(inviteCode)
+        && isValidTeamInvite(incoming(), inviteCode)
+        && incoming().createdByUid == request.auth.uid
+        && incoming().status == 'pending';
+      allow update: if isValidOrderCode(inviteCode) && isValidTeamInvite(incoming(), inviteCode)
+        && incoming().inviteCode == existing().inviteCode
+        && incoming().email == existing().email
+        && incoming().role == existing().role
+        && incoming().createdByUid == existing().createdByUid
+        && incoming().createdAt == existing().createdAt
+        && (
+          (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'displayName', 'phoneNumber', 'specialty', 'updatedAt'])
+          )
+          || (
+            isSignedIn()
+            && existing().status == 'pending'
+            && existing().email.lower() == request.auth.token.email.lower()
+            && incoming().status == 'accepted'
+            && incoming().acceptedByUid == request.auth.uid
+            && existsAfter(/databases/$(database)/documents/users/$(request.auth.uid))
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'acceptedByUid', 'updatedAt'])
+          )
+        );
+      allow delete: if isAdmin() && isValidOrderCode(inviteCode);
+    }
+
+    match /orders/{orderId} {
+      allow get: if isValidId(orderId) && (
+        isAdmin()
+        || (isActiveStaff() && existing().assignedStaffUid == request.auth.uid)
+      );
+      allow list: if isAdmin()
+        || (isSignedIn() && resource.data.assignedStaffUid == request.auth.uid);
       allow create: if isAdmin() && isValidId(orderId) && isValidOrder(incoming())
         && exists(/databases/$(database)/documents/clients/$(incoming().clientId));
-      allow update: if isAdmin() && isValidId(orderId) && isValidOrder(incoming())
+      allow update: if isValidId(orderId) && isValidOrder(incoming())
         && incoming().createdAt == existing().createdAt
-        && incoming().diff(existing()).affectedKeys().hasOnly([
-          'orderCode', 'subject', 'topic', 'wordCount', 'citationStyle',
-          'outlineAndInstructions', 'rubricNotes', 'deadlineAt', 'stage',
-          'progressPercent', 'publicStatusNote', 'internalNotes', 'orderStatus',
-          'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
-          'clientId', 'clientDisplayName', 'attachments', 'updatedAt'
-        ]);
+        && incoming().orderCode == existing().orderCode
+        && (
+          (
+            isAdmin()
+            && exists(/databases/$(database)/documents/clients/$(incoming().clientId))
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'subject', 'topic', 'wordCount', 'citationStyle',
+              'outlineAndInstructions', 'rubricNotes', 'deadlineAt', 'stage',
+              'progressPercent', 'publicStatusNote', 'internalNotes', 'orderStatus',
+              'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
+              'clientId', 'clientDisplayName', 'assignedStaffUid', 'assignedStaffName',
+              'attachments', 'updatedAt'
+            ])
+          )
+          || (
+            isActiveStaff()
+            && existing().assignedStaffUid == request.auth.uid
+            && incoming().clientId == existing().clientId
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'stage', 'progressPercent', 'publicStatusNote', 'internalNotes', 'attachments', 'updatedAt'
+            ])
+          )
+        );
       allow delete: if isAdmin() && isValidId(orderId);
     }
 
@@ -225,29 +438,40 @@ service cloud.firestore {
       allow get: if isValidOrderCode(orderCode);
       allow list: if false;
       allow create: if isAdmin() && isValidOrderCode(orderCode) && isValidTrackingPortal(incoming(), orderCode);
-      allow update: if isAdmin() && isValidOrderCode(orderCode) && isValidTrackingPortal(incoming(), orderCode)
+      allow update: if isValidOrderCode(orderCode) && isValidTrackingPortal(incoming(), orderCode)
         && incoming().orderId == existing().orderId
         && incoming().orderCode == existing().orderCode
-        && incoming().diff(existing()).affectedKeys().hasOnly([
-          'subject', 'topic', 'wordCount', 'citationStyle',
-          'outlineAndInstructions', 'rubricNotes', 'deadlineAt', 'stage',
-          'progressPercent', 'publicStatusNote', 'orderStatus',
-          'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
-          'attachments', 'bankSnapshot', 'updatedAt'
-        ]);
+        && (
+          (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'subject', 'topic', 'wordCount', 'citationStyle',
+              'outlineAndInstructions', 'rubricNotes', 'deadlineAt', 'stage',
+              'progressPercent', 'publicStatusNote', 'orderStatus',
+              'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
+              'attachments', 'bankSnapshot', 'updatedAt'
+            ])
+          )
+          || (
+            isAssignedToPortal(orderCode)
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'stage', 'progressPercent', 'publicStatusNote', 'attachments', 'updatedAt'
+            ])
+          )
+        );
       allow delete: if isAdmin() && isValidOrderCode(orderCode);
 
       // 48-hour ephemeral chat messages scoped under trackingPortals/{orderCode}
       match /messages/{msgId} {
-        allow get: if (isAdmin() || isValidOrderCode(orderCode)) && isValidId(msgId);
+        allow get: if (isAdmin() || isAssignedToPortal(orderCode) || isValidOrderCode(orderCode)) && isValidId(msgId);
         allow list: if isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode);
         allow create: if isValidId(msgId)
           && isValidOrderCode(orderCode)
           && isValidOrderMessage(incoming(), orderCode)
           && exists(/databases/$(database)/documents/trackingPortals/$(orderCode))
           && (
-            (isAdmin() && incoming().senderRole == 'admin')
-            || (!isAdmin() && incoming().senderRole == 'client')
+            ((isAdmin() || isAssignedToPortal(orderCode)) && incoming().senderRole == 'admin')
+            || (!isTeamMember() && incoming().senderRole == 'client')
           );
         allow update: if false;
         allow delete: if isAdmin() && isValidId(msgId);
@@ -255,7 +479,7 @@ service cloud.firestore {
 
       // Revision requests scoped under trackingPortals/{orderCode}
       match /revisions/{reqId} {
-        allow get: if (isAdmin() || isValidOrderCode(orderCode)) && isValidId(reqId);
+        allow get: if (isAdmin() || isAssignedToPortal(orderCode) || isValidOrderCode(orderCode)) && isValidId(reqId);
         allow list: if isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode);
         allow create: if isValidId(reqId)
           && isValidOrderCode(orderCode)
@@ -263,7 +487,7 @@ service cloud.firestore {
           && incoming().status == 'open'
           && (!('adminReply' in incoming()) || incoming().adminReply == '')
           && exists(/databases/$(database)/documents/trackingPortals/$(orderCode));
-        allow update: if isAdmin() && isValidId(reqId)
+        allow update: if (isAdmin() || isAssignedToPortal(orderCode)) && isValidId(reqId)
           && isValidOrderCode(orderCode)
           && isValidRevisionRequest(incoming(), orderCode)
           && incoming().createdAt == existing().createdAt

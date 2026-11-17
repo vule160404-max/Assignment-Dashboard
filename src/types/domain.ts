@@ -32,6 +32,40 @@ export interface AttachmentItem {
   uploadedAt: string;
 }
 
+export type UserRole = 'owner' | 'admin' | 'staff' | 'client';
+
+export type AccountStatus = 'active' | 'suspended';
+
+export type InviteStatus = 'pending' | 'accepted' | 'revoked';
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  phoneNumber?: string;
+  role: UserRole;
+  status: AccountStatus;
+  specialty?: string;
+  inviteId?: string;
+  savedOrderCodes?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TeamInvite {
+  inviteCode: string;
+  email: string;
+  displayName: string;
+  phoneNumber?: string;
+  role: 'admin' | 'staff';
+  specialty?: string;
+  status: InviteStatus;
+  acceptedByUid?: string;
+  createdByUid: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface OrderRecord {
   id: string;
   orderCode: string;
@@ -53,6 +87,8 @@ export interface OrderRecord {
   paymentStatus: PaymentStatus;
   clientId: string;
   clientDisplayName: string;
+  assignedStaffUid?: string;
+  assignedStaffName?: string;
   attachments: AttachmentItem[];
   createdAt: string;
   updatedAt: string;
@@ -155,6 +191,12 @@ export const FIELD_LIMITS = {
   revisionMessageMax: 1500,
   revisionReplyMax: 1000,
   attachmentsMax: 20,
+  emailMax: 160,
+  displayNameMax: 120,
+  phoneMax: 30,
+  specialtyMax: 160,
+  inviteCodeMax: 32,
+  savedOrdersMax: 50,
 } as const;
 
 export const ORDER_STAGES: {

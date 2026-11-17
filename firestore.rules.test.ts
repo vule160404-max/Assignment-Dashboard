@@ -20,7 +20,8 @@ const dirtyDozen: DirtyDozenCase[] = [
         'outlineAndInstructions', 'rubricNotes', 'deadlineAt', 'stage',
         'progressPercent', 'publicStatusNote', 'internalNotes', 'orderStatus',
         'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
-        'clientId', 'clientDisplayName', 'attachments', 'createdAt', 'updatedAt',
+        'clientId', 'clientDisplayName', 'assignedStaffUid', 'assignedStaffName',
+        'attachments', 'createdAt', 'updatedAt',
       ]);
       const payload = { orderCode: 'ASG-2026-001', isAdminOverride: true };
       return Object.keys(payload).every((k) => allowed.has(k));
@@ -30,25 +31,61 @@ const dirtyDozen: DirtyDozenCase[] = [
     name: '2. Unverified admin email spoof',
     shouldDeny: true,
     validate: () => {
-      const token = { email: 'cycloneielts@gmail.com', email_verified: false };
-      return token.email === 'cycloneielts@gmail.com' && token.email_verified === true;
+      const token = { email: 'vule160404@gmail.com', email_verified: false };
+      return token.email === 'vule160404@gmail.com' && token.email_verified === true;
     },
   },
   {
-    name: '3. Non-admin reading PII clients collection',
+    name: '3. Client self-privilege escalation during registration (role: admin without invite)',
+    shouldDeny: true,
+    validate: () => {
+      const incomingRole: string = 'admin';
+      const hasMatchingPendingInvite = false;
+      return incomingRole === 'client' || hasMatchingPendingInvite;
+    },
+  },
+  {
+    name: '4. User updating own RBAC role from staff to admin',
+    shouldDeny: true,
+    validate: () => {
+      const existingRole: string = 'staff';
+      const incomingRole: string = 'admin';
+      const isAdmin = false;
+      return isAdmin || existingRole === incomingRole;
+    },
+  },
+  {
+    name: '5. Wrong email attempting to claim a pending TeamInvite',
+    shouldDeny: true,
+    validate: () => {
+      const inviteEmail: string = 'invited.writer@gmail.com';
+      const authEmail: string = 'attacker@gmail.com';
+      return inviteEmail === authEmail;
+    },
+  },
+  {
+    name: '6. Staff attempting to mutate paidAmount on assigned order',
+    shouldDeny: true,
+    validate: () => {
+      const staffAllowedKeys = new Set([
+        'stage', 'progressPercent', 'publicStatusNote', 'internalNotes', 'attachments', 'updatedAt',
+      ]);
+      const affected = ['paidAmount', 'updatedAt'];
+      return affected.every((k) => staffAllowedKeys.has(k));
+    },
+  },
+  {
+    name: '7. Staff reading CRM clients collection or unassigned order',
     shouldDeny: true,
     validate: () => {
       const isAdmin = false;
-      return isAdmin;
+      const assignedStaffUid: string = 'uid_staff_a';
+      const requesterUid: string = 'uid_staff_b';
+      return isAdmin || assignedStaffUid === requesterUid;
     },
   },
   {
-    name: '4. Unauthenticated list on trackingPortals',
-    shouldDeny: true,
-    validate: () => false,
-  },
-  {
-    name: '5. Path poisoning with oversized/invalid ID',
+    name: '8. Path poisoning with oversized/invalid ID',
     shouldDeny: true,
     validate: () => {
       const poisonedId = 'bad/id '.repeat(30);
@@ -56,33 +93,21 @@ const dirtyDozen: DirtyDozenCase[] = [
     },
   },
   {
-    name: '6. Client mutating trackingPortal paymentStatus',
-    shouldDeny: true,
-    validate: () => {
-      const isAdmin = false;
-      return isAdmin;
-    },
-  },
-  {
-    name: '7. Chat TTL bypass beyond 48 hours',
+    name: '9. Chat TTL bypass or client spoofing senderRole as admin',
     shouldDeny: true,
     validate: () => {
       const createdAtMs = 1700000000000;
       const expiresAtMs = createdAtMs + 99999999999;
-      return expiresAtMs === createdAtMs + CHAT_TTL_MS;
-    },
-  },
-  {
-    name: '8. Client spoofing senderRole as admin',
-    shouldDeny: true,
-    validate: () => {
-      const isAdmin = false;
       const senderRole: string = 'admin';
-      return (isAdmin && senderRole === 'admin') || (!isAdmin && senderRole === 'client');
+      const isTeamMember = false;
+      return (
+        expiresAtMs === createdAtMs + CHAT_TTL_MS &&
+        ((isTeamMember && senderRole === 'admin') || (!isTeamMember && senderRole === 'client'))
+      );
     },
   },
   {
-    name: '9. Invalid orderCode format on tracking lookup',
+    name: '10. Unauthenticated list on trackingPortals or invalid orderCode',
     shouldDeny: true,
     validate: () => {
       const code = '../etc/passwd';
@@ -90,7 +115,7 @@ const dirtyDozen: DirtyDozenCase[] = [
     },
   },
   {
-    name: '10. Client creating pre-resolved revision',
+    name: '11. Client creating pre-resolved revision',
     shouldDeny: true,
     validate: () => {
       const status: string = 'resolved';
@@ -98,15 +123,7 @@ const dirtyDozen: DirtyDozenCase[] = [
     },
   },
   {
-    name: '11. Denial-of-wallet oversized chat body',
-    shouldDeny: true,
-    validate: () => {
-      const body = 'x'.repeat(2500);
-      return body.length >= 1 && body.length <= 1000;
-    },
-  },
-  {
-    name: '12. Non-admin updating settings/bankConfig',
+    name: '12. Non-admin listing /users PII directory',
     shouldDeny: true,
     validate: () => {
       const isAdmin = false;

@@ -74,12 +74,12 @@ export function evaluateDeadline(
   const days = Math.floor(totalHours / 24);
   const remHours = totalHours % 24;
 
-  const countdownText =
-    days >= 1
-      ? `${days}d ${remHours}h`
-      : totalHours >= 1
-      ? `${totalHours}h ${minutes}m`
-      : `${Math.max(1, minutes)}m`;
+  let countdownText = `${Math.max(1, minutes)}m`;
+  if (days >= 1) {
+    countdownText = `${days}d ${remHours}h`;
+  } else if (totalHours >= 1) {
+    countdownText = `${totalHours}h ${minutes}m`;
+  }
 
   if (totalHours < 24) {
     return {
@@ -135,18 +135,67 @@ export function isValidOrderCode(code: string): boolean {
   return code.length >= 4 && code.length <= FIELD_LIMITS.orderCodeMax && ORDER_CODE_PATTERN.test(code);
 }
 
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+
+function randomCodeSuffix(length = 4): string {
+  const bytes = new Uint8Array(length);
+  if (typeof globalThis.crypto !== 'undefined' && globalThis.crypto.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < length; i++) {
+      bytes[i] = Math.floor(Math.random() * 256);
+    }
+  }
+  let out = '';
+  for (let i = 0; i < length; i++) {
+    out += CODE_ALPHABET[bytes[i] % CODE_ALPHABET.length];
+  }
+  return out;
+}
+
 export function generateOrderCode(existingCodes: string[]): string {
   const year = new Date().getFullYear();
   const prefix = `ASG-${year}-`;
   let maxSeq = 0;
   for (const c of existingCodes) {
     if (c.startsWith(prefix)) {
-      const n = Number.parseInt(c.slice(prefix.length), 10);
+      const rest = c.slice(prefix.length).split('-')[0];
+      const n = Number.parseInt(rest, 10);
       if (Number.isFinite(n) && n > maxSeq) maxSeq = n;
     }
   }
   const next = String(maxSeq + 1).padStart(3, '0');
-  return `${prefix}${next}`;
+  let candidate = `${prefix}${next}-${randomCodeSuffix(4)}`;
+  while (existingCodes.includes(candidate)) {
+    candidate = `${prefix}${next}-${randomCodeSuffix(4)}`;
+  }
+  return candidate;
+}
+
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (!text) return false;
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(text);
+      return true;
+    }
+  } catch {
+    // Fallback to textarea copy below
+  }
+  try {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.setAttribute('readonly', '');
+    textarea.style.position = 'fixed';
+    textarea.style.opacity = '0';
+    document.body.appendChild(textarea);
+    textarea.select();
+    const ok = document.execCommand('copy');
+    textarea.remove();
+    return ok;
+  } catch {
+    return false;
+  }
 }
 
 export function computePaymentStatus(totalAmount: number, paidAmount: number): PaymentStatus {
