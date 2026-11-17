@@ -1,7 +1,7 @@
 (() => {
   // Always allow upgrading listener on dynamic re-inject
-  if (window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ === '1.1.1') return;
-  window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ = '1.1.1';
+  if (window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ === '1.1.2') return;
+  window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ = '1.1.2';
   window.__ASSIGNTRACK_HIX_CONTENT_LOADED__ = true;
 
   let activeRunToken = 0;
@@ -501,22 +501,18 @@
     return bestText;
   }
 
-  function detectBlockerBanner() {
-    const bodyText = stripDiacritics(normText(document.body?.innerText || ''));
-    const captchaPatterns = [
-      'verify you are human',
-      'cf-turnstile',
-      'complete the captcha',
-      'xac minh ban la con nguoi',
-    ];
-    if (
-      document.querySelector(
-        'iframe[src*="turnstile"], iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
-      ) ||
-      captchaPatterns.some((p) => bodyText.includes(p))
-    ) {
-      return 'CAPTCHA_REQUIRED';
-    }
+  function detectBlockerBanner(elapsedMs) {
+    // Inspect only visible modals, dialogs, alerts, and toast notifications
+    // (never static header/footer/pricing text or invisible reCAPTCHA v3 badges)
+    const overlayNodes = Array.from(
+      document.querySelectorAll(
+        '[role="dialog"], [aria-modal="true"], [role="alertdialog"], [role="alert"], [class*="modal"], [class*="toast"]'
+      )
+    ).filter((el) => isVisible(el, 150, 45));
+
+    const overlayText = stripDiacritics(
+      normText(overlayNodes.map((n) => n.innerText || n.textContent || '').join(' '))
+    );
 
     const limitSignals = [
       'reached your word limit',
@@ -527,9 +523,41 @@
       'het luot tu',
       'vuot qua gioi han tu',
     ];
-    if (limitSignals.some((p) => bodyText.includes(p))) {
+    if (limitSignals.some((p) => overlayText.includes(p))) {
       return 'WORD_LIMIT_REACHED';
     }
+
+    // Give automatic invisible Turnstile / reCAPTCHA checks 10 seconds to pass on their own
+    if (elapsedMs < 10000) {
+      return null;
+    }
+
+    const captchaPatterns = [
+      'verify you are human',
+      'complete the captcha',
+      'xac minh ban la con nguoi',
+      'hoan tat xac minh',
+    ];
+
+    const blockingIframe = Array.from(
+      document.querySelectorAll(
+        'iframe[src*="turnstile"], iframe[src*="recaptcha"], iframe[src*="hcaptcha"]'
+      )
+    ).find((iframe) => {
+      if (iframe.closest('.grecaptcha-badge')) return false;
+      if (!isVisible(iframe, 200, 50)) return false;
+      const rect = iframe.getBoundingClientRect();
+      // Ignore corner badges pinned near bottom-right
+      const isBottomRightCorner =
+        rect.right > window.innerWidth - 40 && rect.bottom > window.innerHeight - 140;
+      return !isBottomRightCorner;
+    });
+
+    const hasModalCaptchaText = captchaPatterns.some((p) => overlayText.includes(p));
+    if (blockingIframe || hasModalCaptchaText) {
+      return 'CAPTCHA_REQUIRED';
+    }
+
     return null;
   }
 
@@ -591,7 +619,8 @@
     setJob({ step: 'Đang bấm nút Humanize / Nhân hóa trên HIX Bypass...' });
     triggerHumanClick(humanizeBtn);
 
-    const deadline = Date.now() + 55000;
+    const startedWaitAt = Date.now();
+    const deadline = startedWaitAt + 55000;
     let lastSeenOutput = '';
     let stableChecks = 0;
     const normInputText = normText(text);
@@ -610,7 +639,7 @@
         return;
       }
 
-      const blocker = detectBlockerBanner();
+      const blocker = detectBlockerBanner(Date.now() - startedWaitAt);
       if (blocker === 'CAPTCHA_REQUIRED') {
         setJob({
           status: 'error',
