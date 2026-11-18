@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import * as pdfjsLib from 'pdfjs-dist';
 import { Download, ExternalLink, Eye, Lock, X } from 'lucide-react';
+import { getSafeExternalUrl } from '../../lib/utils';
 import { getAdminAuthHeaders } from '../../services/firestoreService';
 import { AttachmentItem } from '../../types/domain';
 
@@ -184,7 +185,10 @@ export function PdfPreviewModal({
   const handleDownload = async () => {
     if (!canDownload) return;
     if (attachment.sourceType === 'url') {
-      window.open(attachment.fileIdOrUrl, '_blank', 'noopener,noreferrer');
+      const safeUrl = getSafeExternalUrl(attachment.fileIdOrUrl);
+      if (safeUrl) {
+        window.open(safeUrl, '_blank', 'noopener,noreferrer');
+      }
       return;
     }
 

@@ -47,19 +47,27 @@ export function RevenueDashboardView({ orders, onToast }: RevenueDashboardViewPr
     const payoutOrders: OrderRecord[] = [];
 
     for (const o of orders) {
-      if (o.orderStatus === 'cancelled') {
+      const isCancelled = o.orderStatus === 'cancelled';
+      if (isCancelled) {
         cancelledCount += 1;
+      } else if (o.orderStatus === 'completed') {
+        completedCount += 1;
+      } else {
+        activeCount += 1;
+      }
+
+      const payoutAmt = Math.max(0, o.staffPayoutAmount || 0);
+      const realizedPaid = Math.max(0, o.paidAmount || 0);
+      const isPayoutPaid = o.staffPayoutStatus === 'paid';
+
+      if (isCancelled && realizedPaid === 0 && payoutAmt === 0) {
         continue;
       }
 
-      if (o.orderStatus === 'completed') completedCount += 1;
-      else activeCount += 1;
-
-      const payoutAmt = Math.max(0, o.staffPayoutAmount || 0);
-      const isPayoutPaid = o.staffPayoutStatus === 'paid';
-
-      totalCollected += o.paidAmount;
-      totalReceivable += Math.max(0, o.totalAmount - o.paidAmount);
+      totalCollected += realizedPaid;
+      if (!isCancelled) {
+        totalReceivable += Math.max(0, o.totalAmount - realizedPaid);
+      }
       totalPayoutAllocated += payoutAmt;
       if (isPayoutPaid) {
         totalPayoutPaid += payoutAmt;
@@ -69,9 +77,9 @@ export function RevenueDashboardView({ orders, onToast }: RevenueDashboardViewPr
 
       const createdMs = new Date(o.createdAt).getTime();
       if (period === 'week' && createdMs >= weekAgo) {
-        periodRevenue += o.paidAmount;
+        periodRevenue += realizedPaid;
       } else if (period === 'month' && createdMs >= monthStart.getTime()) {
-        periodRevenue += o.paidAmount;
+        periodRevenue += realizedPaid;
       }
 
       const d = new Date(o.createdAt);
@@ -83,7 +91,7 @@ export function RevenueDashboardView({ orders, onToast }: RevenueDashboardViewPr
         payout: 0,
         orders: 0,
       };
-      existing.collected += o.paidAmount;
+      existing.collected += realizedPaid;
       existing.payout += payoutAmt;
       existing.orders += 1;
       monthlyBuckets.set(key, existing);
@@ -99,7 +107,7 @@ export function RevenueDashboardView({ orders, onToast }: RevenueDashboardViewPr
           unpaidPayout: 0,
         };
         sb.orderCount += 1;
-        sb.totalValue += o.totalAmount;
+        sb.totalValue += isCancelled ? realizedPaid : o.totalAmount;
         sb.totalPayout += payoutAmt;
         if (isPayoutPaid) sb.paidPayout += payoutAmt;
         else sb.unpaidPayout += payoutAmt;
@@ -452,11 +460,10 @@ export function RevenueDashboardView({ orders, onToast }: RevenueDashboardViewPr
                               : 'bg-emerald-50 border-emerald-200 text-[#16A34A] hover:bg-emerald-100'
                           }`}
                         >
-                          {isBusy
-                            ? 'Đang lưu...'
-                            : isPaid
-                            ? 'Chuyển về chờ trả'
-                            : 'Đánh dấu đã trả'}
+                          {(() => {
+                            if (isBusy) return 'Đang lưu...';
+                            return isPaid ? 'Chuyển về chờ trả' : 'Đánh dấu đã trả';
+                          })()}
                         </button>
                       </td>
                     </tr>

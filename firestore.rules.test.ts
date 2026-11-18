@@ -65,13 +65,13 @@ const dirtyDozen: DirtyDozenCase[] = [
     },
   },
   {
-    name: '6. Staff attempting to mutate paidAmount or staffPayoutAmount on assigned order',
+    name: '6. Staff attempting to mutate paidAmount, staffPayoutAmount, or internalNotes on assigned order',
     shouldDeny: true,
     validate: () => {
       const staffAllowedKeys = new Set([
-        'stage', 'progressPercent', 'publicStatusNote', 'internalNotes', 'attachments', 'updatedAt',
+        'stage', 'progressPercent', 'publicStatusNote', 'attachments', 'updatedAt',
       ]);
-      const affected = ['paidAmount', 'staffPayoutAmount', 'updatedAt'];
+      const affected = ['paidAmount', 'staffPayoutAmount', 'internalNotes', 'updatedAt'];
       return affected.every((k) => staffAllowedKeys.has(k));
     },
   },

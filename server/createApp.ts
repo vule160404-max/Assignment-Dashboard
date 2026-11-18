@@ -19,6 +19,7 @@ const UPLOADS_DIR = process.env.VERCEL
   ? path.resolve('/tmp', 'assigntrack-uploads')
   : path.resolve(process.cwd(), 'uploads');
 const META_FILE = path.join(UPLOADS_DIR, '.file-meta.json');
+const NOTIF_PREFS_FILE = path.join(UPLOADS_DIR, '.notification-prefs.json');
 const ADMIN_EMAIL = 'vule160404@gmail.com';
 const REMOVED_LEGACY_EMAIL = 'cycloneielts@gmail.com';
 const OWNER_BOOTSTRAP_DIGEST =
@@ -112,6 +113,20 @@ export interface StoredFileMeta {
   storageProvider?: 'cloudflare-r2' | 'local-disk';
 }
 
+interface StoredNotificationPrefs {
+  telegramNotifyRevision: boolean;
+  telegramNotifyMessage: boolean;
+  telegramNotifyDeadline: boolean;
+  updatedAt: string;
+}
+
+const DEFAULT_STORED_NOTIFICATION_PREFS: StoredNotificationPrefs = {
+  telegramNotifyRevision: true,
+  telegramNotifyMessage: true,
+  telegramNotifyDeadline: true,
+  updatedAt: '',
+};
+
 // --- Serialized Local Metadata Store (used when R2 is not configured) ---
 let metaQueue: Promise<unknown> = Promise.resolve();
 
@@ -196,6 +211,59 @@ async function saveFileMeta(meta: StoredFileMeta): Promise<void> {
     store[meta.fileId] = meta;
     await writeLocalMetaStore(store);
   });
+}
+
+function r2NotifPrefsKey(): string {
+  return 'meta/_notification-prefs.json';
+}
+
+async function saveNotificationPrefs(prefs: StoredNotificationPrefs): Promise<void> {
+  if (r2Client && r2Config) {
+    await r2Client.send(
+      new PutObjectCommand({
+        Bucket: r2Config.bucket,
+        Key: r2NotifPrefsKey(),
+        Body: JSON.stringify(prefs),
+        ContentType: 'application/json',
+      })
+    );
+    return;
+  }
+
+  ensureLocalUploadsDir();
+  const tmpPath = `${NOTIF_PREFS_FILE}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+  await fs.promises.writeFile(tmpPath, JSON.stringify(prefs, null, 2), 'utf8');
+  await fs.promises.rename(tmpPath, NOTIF_PREFS_FILE);
+}
+
+async function getNotificationPrefs(): Promise<StoredNotificationPrefs> {
+  if (r2Client && r2Config) {
+    try {
+      const resp = await r2Client.send(
+        new GetObjectCommand({
+          Bucket: r2Config.bucket,
+          Key: r2NotifPrefsKey(),
+        })
+      );
+      const buf = await streamToBuffer(resp.Body);
+      return {
+        ...DEFAULT_STORED_NOTIFICATION_PREFS,
+        ...(JSON.parse(buf.toString('utf8')) as Partial<StoredNotificationPrefs>),
+      };
+    } catch {
+      return DEFAULT_STORED_NOTIFICATION_PREFS;
+    }
+  }
+
+  try {
+    const raw = await fs.promises.readFile(NOTIF_PREFS_FILE, 'utf8');
+    return {
+      ...DEFAULT_STORED_NOTIFICATION_PREFS,
+      ...(JSON.parse(raw) as Partial<StoredNotificationPrefs>),
+    };
+  } catch {
+    return DEFAULT_STORED_NOTIFICATION_PREFS;
+  }
 }
 
 async function getFileMeta(fileId: string): Promise<StoredFileMeta | null> {
@@ -407,7 +475,8 @@ async function verifyTeamBearerToken(
     typeof payload.iat !== 'number' ||
     payload.iat > nowSec + 300 ||
     typeof payload.email !== 'string' ||
-    !payload.email
+    !payload.email ||
+    payload.email_verified !== true
   ) {
     return { authorized: false, isAdmin: false };
   }
@@ -479,10 +548,27 @@ async function requireTeamAuth(
   if (!result.authorized) {
     res.status(401).json({
       error:
-        'Yêu cầu quyền Admin hoặc Nhân sự đang hoạt động để thực hiện thao tác này.',
+        'Yêu cầu tài khoản đã xác minh email với quyền Admin hoặc Nhân sự đang hoạt động.',
     });
     return;
   }
+  res.locals.teamAuth = result;
+  next();
+}
+
+async function requireAdminAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
+  const result = await verifyTeamBearerToken(req.headers.authorization);
+  if (!result.authorized || !result.isAdmin) {
+    res.status(403).json({
+      error: 'Chỉ Admin đã xác minh email mới có quyền thực hiện thao tác này.',
+    });
+    return;
+  }
+  res.locals.teamAuth = result;
   next();
 }
 
@@ -646,6 +732,44 @@ export function createApiApp(): express.Express {
     res.json({ allowed: true });
   });
 
+  function stripOuterQuotes(val: string): string {
+    const trimmed = val.trim();
+    if (
+      (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+      (trimmed.startsWith("'") && trimmed.endsWith("'"))
+    ) {
+      return trimmed.slice(1, -1).trim();
+    }
+    return trimmed;
+  }
+
+  function inspectTelegramEnv(): {
+    hasToken: boolean;
+    hasChatId: boolean;
+    botToken: string;
+    chatId: string;
+  } {
+    const rawToken = stripOuterQuotes(
+      process.env.TELEGRAM_BOT_TOKEN || process.env.TELEGRAM_TOKEN || ''
+    );
+    const botToken = /^bot\d+:/i.test(rawToken) ? rawToken.slice(3) : rawToken;
+    const chatId = stripOuterQuotes(
+      process.env.TELEGRAM_CHAT_ID || process.env.TG_CHAT_ID || ''
+    );
+    return {
+      hasToken: Boolean(botToken),
+      hasChatId: Boolean(chatId),
+      botToken,
+      chatId,
+    };
+  }
+
+  function resolveTelegramConfig(): { botToken: string; chatId: string } | null {
+    const env = inspectTelegramEnv();
+    if (!env.hasToken || !env.hasChatId) return null;
+    return { botToken: env.botToken, chatId: env.chatId };
+  }
+
   app.get('/api/health', async (_req, res) => {
     let r2Connected = false;
     if (r2Client && r2Config) {
@@ -657,31 +781,41 @@ export function createApiApp(): express.Express {
       }
     }
 
+    const tgEnv = inspectTelegramEnv();
     res.json({
       ok: true,
       storageProvider: r2Config ? 'cloudflare-r2' : 'local-disk',
       r2Configured: Boolean(r2Config),
       r2Connected,
-      telegramConfigured: Boolean(
-        (process.env.TELEGRAM_BOT_TOKEN || '').trim() &&
-          (process.env.TELEGRAM_CHAT_ID || '').trim()
-      ),
+      telegramConfigured: tgEnv.hasToken && tgEnv.hasChatId,
+      telegramHasToken: tgEnv.hasToken,
+      telegramHasChatId: tgEnv.hasChatId,
     });
   });
-
-  // --- Telegram Bot Notification Proxy Routes ---
-  function resolveTelegramConfig(): { botToken: string; chatId: string } | null {
-    const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
-    const chatId = (process.env.TELEGRAM_CHAT_ID || '').trim();
-    if (!botToken || !chatId) return null;
-    return { botToken, chatId };
-  }
 
   function escapeTelegramHtml(raw: string): string {
     return raw
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
+  }
+
+  function formatTelegramApiError(status: number, description?: string): string {
+    const desc = (description || '').trim();
+    const lower = desc.toLowerCase();
+    if (status === 401 || lower.includes('unauthorized')) {
+      return 'TELEGRAM_BOT_TOKEN không hợp lệ hoặc đã bị thu hồi từ BotFather.';
+    }
+    if (lower.includes('chat not found')) {
+      return 'Không tìm thấy TELEGRAM_CHAT_ID. Hãy kiểm tra lại ID và đảm bảo bạn đã mở Bot bấm /start (hoặc đã thêm Bot vào nhóm).';
+    }
+    if (lower.includes('bot was blocked')) {
+      return 'Bot đang bị người nhận chặn trên Telegram. Hãy mở lại cuộc trò chuyện và bỏ chặn Bot.';
+    }
+    if (lower.includes('need administrator rights') || lower.includes('not enough rights')) {
+      return 'Bot chưa có quyền gửi tin nhắn trong Channel/Group này.';
+    }
+    return desc || `Telegram Bot API trả về lỗi HTTP ${status}.`;
   }
 
   async function dispatchTelegramHtml(
@@ -716,9 +850,7 @@ export function createApiApp(): express.Express {
         } | null;
         return {
           ok: false,
-          error:
-            errBody?.description ||
-            `Telegram Bot API trả về lỗi HTTP ${resp.status}.`,
+          error: formatTelegramApiError(resp.status, errBody?.description),
         };
       }
       return { ok: true };
@@ -734,10 +866,79 @@ export function createApiApp(): express.Express {
   }
 
   const clientTelegramCooldowns = new Map<string, number>();
+  const notifiedRecordIds = new Map<string, number>();
 
-  app.get('/api/notifications/telegram/status', requireTeamAuth, (_req, res) => {
-    const cfg = resolveTelegramConfig();
-    res.json({ configured: Boolean(cfg) });
+  app.get('/api/notifications/telegram/status', requireTeamAuth, async (_req, res) => {
+    const env = inspectTelegramEnv();
+    const configured = env.hasToken && env.hasChatId;
+    if (!configured) {
+      const missing: string[] = [];
+      if (!env.hasToken) missing.push('TELEGRAM_BOT_TOKEN');
+      if (!env.hasChatId) missing.push('TELEGRAM_CHAT_ID');
+      res.json({
+        configured: false,
+        hasToken: env.hasToken,
+        hasChatId: env.hasChatId,
+        botReachable: false,
+        error: `Máy chủ hiện tại chưa nhận được biến môi trường: ${missing.join(', ')}.`,
+      });
+      return;
+    }
+
+    try {
+      const meResp = await fetch(
+        `https://api.telegram.org/bot${encodeURIComponent(env.botToken)}/getMe`,
+        { signal: AbortSignal.timeout(4000) }
+      );
+      const meJson = (await meResp.json().catch(() => null)) as {
+        ok?: boolean;
+        description?: string;
+        result?: { username?: string };
+      } | null;
+      if (!meResp.ok || !meJson?.ok) {
+        res.json({
+          configured: true,
+          hasToken: true,
+          hasChatId: true,
+          botReachable: false,
+          error: formatTelegramApiError(meResp.status, meJson?.description),
+        });
+        return;
+      }
+      res.json({
+        configured: true,
+        hasToken: true,
+        hasChatId: true,
+        botReachable: true,
+        botUsername: meJson.result?.username || '',
+      });
+    } catch (err) {
+      res.json({
+        configured: true,
+        hasToken: true,
+        hasChatId: true,
+        botReachable: false,
+        error:
+          err instanceof Error
+            ? `Không thể gọi Telegram getMe: ${err.message}`
+            : 'Không thể kết nối kiểm tra Bot với Telegram API.',
+      });
+    }
+  });
+
+  app.post('/api/notifications/telegram/preferences', requireAdminAuth, async (req, res) => {
+    const prefs: StoredNotificationPrefs = {
+      telegramNotifyRevision: req.body?.telegramNotifyRevision !== false,
+      telegramNotifyMessage: req.body?.telegramNotifyMessage !== false,
+      telegramNotifyDeadline: req.body?.telegramNotifyDeadline !== false,
+      updatedAt: new Date().toISOString(),
+    };
+    try {
+      await saveNotificationPrefs(prefs);
+      res.json({ ok: true });
+    } catch {
+      res.status(500).json({ ok: false, error: 'Không thể lưu tùy chọn Telegram phía máy chủ.' });
+    }
   });
 
   app.post('/api/notifications/telegram/test', requireTeamAuth, async (_req, res) => {
@@ -799,51 +1000,121 @@ export function createApiApp(): express.Express {
       req.body?.eventType === 'revision' || req.body?.eventType === 'message'
         ? req.body.eventType
         : '';
-    const senderName =
-      typeof req.body?.senderName === 'string'
-        ? req.body.senderName.trim().slice(0, 60)
-        : 'Khách hàng';
-    const summary =
-      typeof req.body?.summary === 'string'
-        ? req.body.summary.trim().slice(0, 600)
-        : '';
+    const recordId =
+      typeof req.body?.recordId === 'string' ? req.body.recordId.trim() : '';
 
     if (
       !orderCode ||
       !/^[A-Z0-9-]{4,32}$/.test(orderCode) ||
       !eventType ||
-      !summary
+      !/^[a-zA-Z0-9_-]{4,64}$/.test(recordId)
     ) {
       res.status(400).json({ ok: false, error: 'Dữ liệu sự kiện không hợp lệ.' });
       return;
     }
 
-    const cooldownKey = `${orderCode}:${eventType}`;
+    // Respect Admin notification toggles stored on server
+    const prefs = await getNotificationPrefs();
+    if (eventType === 'revision' && !prefs.telegramNotifyRevision) {
+      res.json({ ok: true, skipped: true });
+      return;
+    }
+    if (eventType === 'message' && !prefs.telegramNotifyMessage) {
+      res.json({ ok: true, skipped: true });
+      return;
+    }
+
     const now = Date.now();
+    // Prune stale dedupe entries
+    for (const [k, ts] of notifiedRecordIds.entries()) {
+      if (now - ts > 15 * 60 * 1000) notifiedRecordIds.delete(k);
+    }
+    const dedupeKey = `${orderCode}:${eventType}:${recordId}`;
+    if (notifiedRecordIds.has(dedupeKey)) {
+      res.json({ ok: true, deduplicated: true });
+      return;
+    }
+
+    const cooldownKey = `${orderCode}:${eventType}`;
     const lastSent = clientTelegramCooldowns.get(cooldownKey) || 0;
     if (now - lastSent < 8000) {
       res.json({ ok: true, throttled: true });
       return;
     }
 
-    // Verify tracking portal exists in Firestore before relaying alert
-    if (FIREBASE_PROJECT_ID) {
-      try {
-        const portalUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(
-          FIREBASE_PROJECT_ID
-        )}/databases/${encodeURIComponent(
-          FIRESTORE_DATABASE_ID
-        )}/documents/trackingPortals/${encodeURIComponent(orderCode)}`;
-        const portalResp = await fetch(portalUrl);
-        if (!portalResp.ok) {
-          res.status(404).json({ ok: false, error: 'Không tìm thấy đơn hàng.' });
-          return;
-        }
-      } catch {
-        // Proceed best-effort if REST lookup encounters transient network hiccup
-      }
+    if (!FIREBASE_PROJECT_ID) {
+      res.status(503).json({ ok: false, error: 'Chưa cấu hình Firestore project.' });
+      return;
     }
 
+    // Verify exact Firestore record exists, is fresh (<10 min), and extract authentic content
+    let verifiedSenderName = 'Khách hàng';
+    let verifiedSummary = '';
+    const subCol = eventType === 'revision' ? 'revisions' : 'messages';
+    try {
+      const recordUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(
+        FIREBASE_PROJECT_ID
+      )}/databases/${encodeURIComponent(
+        FIRESTORE_DATABASE_ID
+      )}/documents/trackingPortals/${encodeURIComponent(
+        orderCode
+      )}/${subCol}/${encodeURIComponent(recordId)}`;
+      const recordResp = await fetch(recordUrl);
+      if (!recordResp.ok) {
+        res.status(404).json({ ok: false, error: 'Không tìm thấy bản ghi sự kiện hợp lệ.' });
+        return;
+      }
+      const docJson = (await recordResp.json()) as {
+        fields?: {
+          orderCode?: { stringValue?: string };
+          senderRole?: { stringValue?: string };
+          senderName?: { stringValue?: string };
+          body?: { stringValue?: string };
+          message?: { stringValue?: string };
+          createdAt?: { stringValue?: string };
+          createdAtMs?: { integerValue?: string; doubleValue?: number };
+        };
+      };
+
+      const fields = docJson.fields;
+      if (!fields || fields.orderCode?.stringValue !== orderCode) {
+        res.status(400).json({ ok: false, error: 'Dữ liệu đơn hàng không khớp.' });
+        return;
+      }
+
+      if (eventType === 'message') {
+        if (fields.senderRole?.stringValue !== 'client') {
+          res.json({ ok: true, skipped: true });
+          return;
+        }
+        const createdMs = Number(
+          fields.createdAtMs?.integerValue || fields.createdAtMs?.doubleValue || 0
+        );
+        if (!Number.isFinite(createdMs) || Math.abs(now - createdMs) > 10 * 60 * 1000) {
+          res.status(400).json({ ok: false, error: 'Sự kiện đã quá thời hạn thông báo.' });
+          return;
+        }
+        verifiedSenderName = (fields.senderName?.stringValue || 'Khách hàng').slice(0, 60);
+        verifiedSummary = (fields.body?.stringValue || '').slice(0, 600);
+      } else {
+        const createdMs = Date.parse(fields.createdAt?.stringValue || '');
+        if (!Number.isFinite(createdMs) || Math.abs(now - createdMs) > 10 * 60 * 1000) {
+          res.status(400).json({ ok: false, error: 'Sự kiện đã quá thời hạn thông báo.' });
+          return;
+        }
+        verifiedSummary = (fields.message?.stringValue || '').slice(0, 600);
+      }
+    } catch {
+      res.status(502).json({ ok: false, error: 'Không thể xác thực sự kiện với Firestore.' });
+      return;
+    }
+
+    if (!verifiedSummary) {
+      res.status(400).json({ ok: false, error: 'Nội dung thông báo trống.' });
+      return;
+    }
+
+    notifiedRecordIds.set(dedupeKey, now);
     clientTelegramCooldowns.set(cooldownKey, now);
     const header =
       eventType === 'revision'
@@ -851,8 +1122,8 @@ export function createApiApp(): express.Express {
         : `Tin nhắn mới từ khách · Đơn #${orderCode}`;
     const html = [
       `<b>${escapeTelegramHtml(header)}</b>`,
-      `Người gửi: ${escapeTelegramHtml(senderName || 'Khách hàng')}`,
-      `Nội dung: ${escapeTelegramHtml(summary)}`,
+      `Người gửi: ${escapeTelegramHtml(verifiedSenderName)}`,
+      `Nội dung: ${escapeTelegramHtml(verifiedSummary)}`,
     ].join('\n');
 
     const result = await dispatchTelegramHtml(html);
@@ -1106,9 +1377,18 @@ export function createApiApp(): express.Express {
       return;
     }
 
+    const teamAuth = res.locals.teamAuth as VerifiedTeamResult | undefined;
+    const nextLocked = Boolean(req.body?.isLocked);
+    if (!teamAuth?.isAdmin && meta.isLocked && !nextLocked) {
+      res.status(403).json({
+        error: 'Chỉ Admin mới có quyền mở khóa tải xuống cho tệp đã khóa thanh toán.',
+      });
+      return;
+    }
+
     const updated: StoredFileMeta = {
       ...meta,
-      isLocked: Boolean(req.body?.isLocked),
+      isLocked: nextLocked,
       category: req.body?.category
         ? parseCategory(req.body.category)
         : meta.category,
@@ -1218,11 +1498,20 @@ export function createApiApp(): express.Express {
     res.send(fileBuffer);
   });
 
-  // Delete stored file (Admin or Active Staff)
+  // Delete stored file (Admin always allowed; Active Staff cannot delete payment-locked files)
   app.delete('/api/files/:fileId', requireTeamAuth, async (req, res) => {
     const { fileId } = req.params;
     if (!/^[a-zA-Z0-9_]+$/.test(fileId)) {
       res.status(400).json({ error: 'Invalid fileId' });
+      return;
+    }
+
+    const existingMeta = await getFileMeta(fileId);
+    const teamAuth = res.locals.teamAuth as VerifiedTeamResult | undefined;
+    if (!teamAuth?.isAdmin && existingMeta?.isLocked) {
+      res
+        .status(403)
+        .json({ error: 'Chỉ Admin mới có quyền xóa tệp đang khóa thanh toán.' });
       return;
     }
 

@@ -601,6 +601,10 @@
       "schema": { "$ref": "#/entities/RevisionRequest" },
       "description": "Client revision requests created against valid trackingPortals and managed by Admin/assigned Staff."
     },
+    "/settings/notifications": {
+      "schema": { "$ref": "#/entities/NotificationSettings" },
+      "description": "Admin Telegram notification toggle preferences."
+    },
     "/settings/{settingId}": {
       "schema": { "$ref": "#/entities/BankSettings" },
       "description": "Admin payment QR and bank configuration."

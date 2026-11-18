@@ -6,7 +6,7 @@
       "merge_system_rule": true
     },
     {
-      "path": "server.ts",
+      "path": "{server.ts,server/**/*.ts,api/**/*.ts}",
       "rule": "## Express Server Security & Upload Rules\n- Validate all path/fileId parameters against strict allowlists (`^[a-zA-Z0-9_]+$`) to prevent path traversal.\n- Enforce payment-lock checks (`isLocked`) on download requests (`GET /api/files/:fileId?download=1`).\n- Validate upload file size and MIME/extension handling safely.",
       "merge_system_rule": true
     },

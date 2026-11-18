@@ -131,6 +131,21 @@ export function normalizeOrderCode(raw: string): string {
   return raw.trim().replace(/^#/, '').toUpperCase().replace(/[^A-Z0-9-]/g, '');
 }
 
+export function getSafeExternalUrl(raw: string): string {
+  const trimmed = (raw || '').trim();
+  if (!trimmed) return '';
+  if (trimmed.startsWith('/api/files/')) return trimmed;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+    return '';
+  } catch {
+    return '';
+  }
+}
+
 export function isValidOrderCode(code: string): boolean {
   return code.length >= 4 && code.length <= FIELD_LIMITS.orderCodeMax && ORDER_CODE_PATTERN.test(code);
 }

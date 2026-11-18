@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
-import { Bell, QrCode, Send, Upload } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Bell, QrCode, RefreshCw, Send, Upload } from 'lucide-react';
 import {
   DEFAULT_NOTIFICATION_SETTINGS,
+  TelegramServerStatus,
   deleteServerFile,
   fetchTelegramServerStatus,
   saveBankSettings,
@@ -46,7 +47,9 @@ export function BankSettingsView({
   const [saving, setSaving] = useState(false);
 
   // Telegram Bot notification preferences (tokens strictly live on server env vars)
-  const [tgConfigured, setTgConfigured] = useState<boolean | null>(null);
+  const [tgStatus, setTgStatus] = useState<TelegramServerStatus | null>(null);
+  const [checkingTg, setCheckingTg] = useState(false);
+  const [tgTestError, setTgTestError] = useState('');
   const [tgNotifyRevision, setTgNotifyRevision] = useState(
     notificationSettings.telegramNotifyRevision
   );
@@ -76,19 +79,27 @@ export function BankSettingsView({
     setTgNotifyDeadline(notificationSettings.telegramNotifyDeadline);
   }, [notificationSettings]);
 
-  useEffect(() => {
-    let cancelled = false;
-    fetchTelegramServerStatus()
-      .then((res) => {
-        if (!cancelled) setTgConfigured(res.configured);
-      })
-      .catch(() => {
-        if (!cancelled) setTgConfigured(false);
+  const checkTelegramConnection = useCallback(async () => {
+    setCheckingTg(true);
+    try {
+      const res = await fetchTelegramServerStatus();
+      setTgStatus(res);
+    } catch (err) {
+      setTgStatus({
+        configured: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : 'Không thể kết nối tới API kiểm tra Telegram.',
       });
-    return () => {
-      cancelled = true;
-    };
+    } finally {
+      setCheckingTg(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void checkTelegramConnection();
+  }, [checkTelegramConnection]);
 
   const handleUploadQrImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -113,6 +124,10 @@ export function BankSettingsView({
     field: 'revision' | 'message' | 'deadline',
     checked: boolean
   ) => {
+    const prevRevision = tgNotifyRevision;
+    const prevMessage = tgNotifyMessage;
+    const prevDeadline = tgNotifyDeadline;
+
     const nextRevision = field === 'revision' ? checked : tgNotifyRevision;
     const nextMessage = field === 'message' ? checked : tgNotifyMessage;
     const nextDeadline = field === 'deadline' ? checked : tgNotifyDeadline;
@@ -129,17 +144,25 @@ export function BankSettingsView({
       });
       onToast('Đã cập nhật tùy chọn cảnh báo Telegram.');
     } catch (err) {
+      setTgNotifyRevision(prevRevision);
+      setTgNotifyMessage(prevMessage);
+      setTgNotifyDeadline(prevDeadline);
       onToast(err instanceof Error ? err.message : 'Không thể lưu tùy chọn thông báo.');
     }
   };
 
   const handleTestTelegram = async () => {
     setTestingTg(true);
+    setTgTestError('');
     try {
       await sendTelegramTestAlert();
       onToast('Đã gửi tin thử nghiệm tới Telegram thành công!');
+      void checkTelegramConnection();
     } catch (err) {
-      onToast(err instanceof Error ? err.message : 'Gửi tin thử nghiệm Telegram thất bại.');
+      const msg =
+        err instanceof Error ? err.message : 'Gửi tin thử nghiệm Telegram thất bại.';
+      setTgTestError(msg);
+      onToast(msg);
     } finally {
       setTestingTg(false);
     }
@@ -188,25 +211,18 @@ export function BankSettingsView({
     e.preventDefault();
     setSaving(true);
     try {
-      await Promise.all([
-        saveBankSettings(
-          {
-            qrMode,
-            uploadedQrUrl,
-            bankName,
-            accountNumber,
-            accountName,
-            vietqrBankBin,
-            vietqrTemplate,
-          },
-          orders
-        ),
-        saveNotificationSettings({
-          telegramNotifyRevision: tgNotifyRevision,
-          telegramNotifyMessage: tgNotifyMessage,
-          telegramNotifyDeadline: tgNotifyDeadline,
-        }),
-      ]);
+      await saveBankSettings(
+        {
+          qrMode,
+          uploadedQrUrl,
+          bankName,
+          accountNumber,
+          accountName,
+          vietqrBankBin,
+          vietqrTemplate,
+        },
+        orders
+      );
       if (replacedQrUrls.length > 0) {
         await Promise.allSettled(
           replacedQrUrls
@@ -215,7 +231,7 @@ export function BankSettingsView({
         );
         setReplacedQrUrls([]);
       }
-      onToast('Đã lưu cài đặt thanh toán & thông báo Telegram.');
+      onToast('Đã lưu cài đặt thanh toán & QR ngân hàng.');
     } catch (err) {
       onToast(err instanceof Error ? err.message : 'Lưu cài đặt thất bại.');
     } finally {
@@ -408,21 +424,39 @@ export function BankSettingsView({
             </div>
           </div>
 
-          <span
-            className={`text-xs font-medium whitespace-nowrap ${
-              tgConfigured === null
-                ? 'text-zinc-500'
-                : tgConfigured
-                ? 'text-[#16A34A]'
-                : 'text-[#D97706]'
-            }`}
-          >
-            {tgConfigured === null
-              ? 'Đang kiểm tra máy chủ...'
-              : tgConfigured
-              ? 'Đã cấu hình trên máy chủ'
-              : 'Chưa cấu hình biến môi trường'}
-          </span>
+          <div className="flex items-center gap-2">
+            {(() => {
+              let tgStatusClass = 'text-[#D97706]';
+              let tgStatusLabel = 'Chưa cấu hình biến môi trường';
+              if (!tgStatus || checkingTg) {
+                tgStatusClass = 'text-zinc-500';
+                tgStatusLabel = 'Đang kiểm tra máy chủ...';
+              } else if (tgStatus.configured && tgStatus.botReachable) {
+                tgStatusClass = 'text-[#16A34A]';
+                tgStatusLabel = tgStatus.botUsername
+                  ? `Đã kết nối Bot @${tgStatus.botUsername}`
+                  : 'Đã kết nối Telegram Bot';
+              } else if (tgStatus.configured && tgStatus.botReachable === false) {
+                tgStatusClass = 'text-[#DC2626]';
+                tgStatusLabel = 'Biến có sẵn nhưng Bot lỗi kết nối';
+              }
+              return (
+                <span className={`text-xs font-medium whitespace-nowrap ${tgStatusClass}`}>
+                  {tgStatusLabel}
+                </span>
+              );
+            })()}
+            <button
+              type="button"
+              disabled={checkingTg}
+              onClick={() => void checkTelegramConnection()}
+              title="Kiểm tra lại kết nối máy chủ Telegram"
+              className="btn-press inline-flex items-center gap-1 px-2 py-1 text-[11px] font-medium bg-zinc-100 hover:bg-zinc-200/80 text-slate-700 rounded-md disabled:opacity-45"
+            >
+              <RefreshCw className={`w-3 h-3 ${checkingTg ? 'animate-spin' : ''}`} />
+              <span>Kiểm tra</span>
+            </button>
+          </div>
         </div>
 
         <div className="pt-3 border-t border-zinc-100 space-y-2.5 text-xs">
@@ -455,11 +489,36 @@ export function BankSettingsView({
           </label>
         </div>
 
-        {!tgConfigured && tgConfigured !== null && (
-          <p className="text-xs text-zinc-600 bg-zinc-50 px-3.5 py-2.5 rounded-lg leading-relaxed">
-            Để kích hoạt Bot bảo mật phía máy chủ, hãy thêm 2 biến môi trường{' '}
-            <span className="font-mono font-semibold text-slate-900">TELEGRAM_BOT_TOKEN</span> và{' '}
-            <span className="font-mono font-semibold text-slate-900">TELEGRAM_CHAT_ID</span> trên Vercel (Project Settings → Environment Variables) hoặc tệp <span className="font-mono">.env</span> của máy chủ.
+        {tgStatus && (!tgStatus.configured || !tgStatus.botReachable) && (
+          <div className="text-xs text-zinc-700 bg-amber-50/70 border border-amber-200 px-3.5 py-3 rounded-lg leading-relaxed space-y-1.5">
+            {tgStatus.error && (
+              <p className="font-semibold text-amber-900">{tgStatus.error}</p>
+            )}
+            <p>
+              Hãy kiểm tra lại 3 điểm sau khi khai báo{' '}
+              <span className="font-mono font-semibold text-slate-900">TELEGRAM_BOT_TOKEN</span> và{' '}
+              <span className="font-mono font-semibold text-slate-900">TELEGRAM_CHAT_ID</span> trên Vercel:
+            </p>
+            <ul className="list-disc pl-4 space-y-0.5 text-zinc-700">
+              <li>
+                <strong>Bắt buộc bấm Redeploy</strong> trên Vercel sau khi thêm/sửa Environment Variables (bản deploy cũ không tự nạp biến mới), và kiểm tra đã tick chọn cả <strong>Production</strong> lẫn <strong>Preview</strong>.
+              </li>
+              <li>
+                Đảm bảo bạn đang mở <strong>đúng tên miền Vercel</strong> (link xem trước của AI Studio không dùng biến môi trường của Vercel).
+              </li>
+              <li>
+                Dán giá trị thô (không bọc dấu ngoặc kép, không gõ dư chữ <span className="font-mono">bot</span> phía trước token), và đã bấm <span className="font-mono font-semibold">/start</span> với Bot trên Telegram.
+              </li>
+            </ul>
+          </div>
+        )}
+
+        {tgTestError && (
+          <p
+            role="alert"
+            className="text-xs text-[#DC2626] bg-red-50 border border-red-200 px-3.5 py-2.5 rounded-lg"
+          >
+            {tgTestError}
           </p>
         )}
 

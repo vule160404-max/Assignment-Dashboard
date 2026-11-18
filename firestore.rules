@@ -21,6 +21,12 @@ service cloud.firestore {
         && request.auth.token.email is string;
     }
 
+    function isVerifiedEmail() {
+      return isSignedIn()
+        && 'email_verified' in request.auth.token
+        && request.auth.token.email_verified == true;
+    }
+
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }
@@ -34,25 +40,25 @@ service cloud.firestore {
     }
 
     function isBootstrappedOwner() {
-      return isSignedIn() && request.auth.token.email.lower() == 'vule160404@gmail.com';
+      return isVerifiedEmail() && request.auth.token.email.lower() == 'vule160404@gmail.com';
     }
 
     function isAdmin() {
       return isBootstrappedOwner()
         || (
-          isSignedIn()
+          isVerifiedEmail()
           && exists(/databases/$(database)/documents/users/$(request.auth.uid))
           && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin']
           && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active'
         )
         || (
-          isSignedIn()
+          isVerifiedEmail()
           && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
         );
     }
 
     function isActiveStaff() {
-      return isSignedIn()
+      return isVerifiedEmail()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'staff'
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'active';
@@ -76,7 +82,28 @@ service cloud.firestore {
     function isValidSavedOrderCodes(list) {
       return list is list
         && list.size() <= 50
-        && (list.size() == 0 || isValidOrderCode(list[0]));
+        && (
+          list.size() == 0
+          || (
+            isValidOrderCode(list[0])
+            && isValidOrderCode(list[list.size() - 1])
+          )
+        );
+    }
+
+    function isValidAttachmentItem(att) {
+      return att is map
+        && att.keys().hasAll(['id', 'name', 'category', 'sourceType', 'fileIdOrUrl', 'isPaymentLocked'])
+        && att.id is string && att.id.size() <= 128
+        && att.name is string && att.name.size() <= 240
+        && att.category in ['brief', 'turnitin', 'draft', 'final']
+        && att.sourceType in ['upload', 'url']
+        && att.fileIdOrUrl is string && att.fileIdOrUrl.size() <= 1000
+        && (
+          (att.sourceType == 'upload' && att.fileIdOrUrl.matches('^/api/files/[a-zA-Z0-9_]+$'))
+          || (att.sourceType == 'url' && (att.fileIdOrUrl == '' || att.fileIdOrUrl.matches('^https?://.*')))
+        )
+        && att.isPaymentLocked is bool;
     }
 
     function isValidAttachmentsList(list) {
@@ -85,14 +112,8 @@ service cloud.firestore {
         && (
           list.size() == 0
           || (
-            list[0] is map
-            && list[0].keys().hasAll(['id', 'name', 'category', 'sourceType', 'fileIdOrUrl', 'isPaymentLocked'])
-            && list[0].id is string && list[0].id.size() <= 128
-            && list[0].name is string && list[0].name.size() <= 240
-            && list[0].category in ['brief', 'turnitin', 'draft', 'final']
-            && list[0].sourceType in ['upload', 'url']
-            && list[0].fileIdOrUrl is string && list[0].fileIdOrUrl.size() <= 1000
-            && list[0].isPaymentLocked is bool
+            isValidAttachmentItem(list[0])
+            && isValidAttachmentItem(list[list.size() - 1])
           )
         );
     }
@@ -383,7 +404,7 @@ service cloud.firestore {
         || (isActiveStaff() && existing().assignedStaffUid == request.auth.uid)
       );
       allow list: if isAdmin()
-        || (isSignedIn() && resource.data.assignedStaffUid == request.auth.uid);
+        || (isActiveStaff() && resource.data.assignedStaffUid == request.auth.uid);
       allow create: if isAdmin() && isValidId(orderId) && isValidOrder(incoming())
         && exists(/databases/$(database)/documents/clients/$(incoming().clientId));
       allow update: if isValidId(orderId) && isValidOrder(incoming())
@@ -408,7 +429,7 @@ service cloud.firestore {
             && existing().assignedStaffUid == request.auth.uid
             && incoming().clientId == existing().clientId
             && incoming().diff(existing()).affectedKeys().hasOnly([
-              'stage', 'progressPercent', 'publicStatusNote', 'internalNotes', 'attachments', 'updatedAt'
+              'stage', 'progressPercent', 'publicStatusNote', 'attachments', 'updatedAt'
             ])
           )
         );

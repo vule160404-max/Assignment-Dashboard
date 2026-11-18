@@ -2,14 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Check,
   Copy,
-  Eye,
   FileText,
-  Link2,
-  Lock,
   Plus,
   Trash2,
-  Unlock,
-  Upload,
   X,
 } from 'lucide-react';
 import {
@@ -26,9 +21,8 @@ import {
   buildClientZaloMessage,
   computePaymentStatus,
   copyTextToClipboard,
-  formatBytes,
-  formatVnd,
   generateOrderCode,
+  getSafeExternalUrl,
   normalizeOrderCode,
 } from '../../lib/utils';
 import {
@@ -51,8 +45,10 @@ import {
   UserRole,
 } from '../../types/domain';
 import { DeadlineBadge } from '../shared/DeadlineBadge';
-import { OrderChatPanel } from '../shared/OrderChatPanel';
 import { PdfPreviewModal } from '../shared/PdfPreviewModal';
+import { OrderAttachmentsTab } from './order/OrderAttachmentsTab';
+import { OrderFinanceSidebar } from './order/OrderFinanceSidebar';
+import { OrderRevisionsTab } from './order/OrderRevisionsTab';
 
 interface OrderWorkspaceModalProps {
   isOpen: boolean;
@@ -146,11 +142,15 @@ export function OrderWorkspaceModal({
   const [previewAtt, setPreviewAtt] = useState<AttachmentItem | null>(null);
   const initializedSessionRef = useRef<string>('');
   const copyTimerRef = useRef<number | null>(null);
+  const zaloCopyTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     return () => {
       if (copyTimerRef.current !== null) {
         window.clearTimeout(copyTimerRef.current);
+      }
+      if (zaloCopyTimerRef.current !== null) {
+        window.clearTimeout(zaloCopyTimerRef.current);
       }
     };
   }, []);
@@ -270,7 +270,6 @@ export function OrderWorkspaceModal({
   if (!isOpen) return null;
 
   const paymentStatus = computePaymentStatus(totalAmount, paidAmount);
-  const balance = Math.max(0, totalAmount - paidAmount);
   const openRevisionsCount = revisions.filter((r) => r.status !== 'resolved').length;
 
   const handleStageSelect = (newStage: OrderStage) => {
@@ -330,6 +329,11 @@ export function OrderWorkspaceModal({
 
   const handleAddExternalUrl = () => {
     if (!externalUrl.trim()) return;
+    const safeUrl = getSafeExternalUrl(externalUrl);
+    if (!safeUrl || (!safeUrl.startsWith('http://') && !safeUrl.startsWith('https://'))) {
+      onToast('Liên kết ngoài không hợp lệ. Chỉ chấp nhận đường dẫn http:// hoặc https://.');
+      return;
+    }
     if (attachments.length >= FIELD_LIMITS.attachmentsMax) {
       onToast(`Tối đa ${FIELD_LIMITS.attachmentsMax} tệp cho mỗi đơn.`);
       return;
@@ -338,10 +342,10 @@ export function OrderWorkspaceModal({
       (attCategory === 'draft' || attCategory === 'final') && attLocked;
     const item: AttachmentItem = {
       id: `att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      name: externalName.trim() || externalUrl.trim(),
+      name: externalName.trim() || safeUrl,
       category: attCategory,
       sourceType: 'url',
-      fileIdOrUrl: externalUrl.trim(),
+      fileIdOrUrl: safeUrl,
       mimeType: 'text/uri-list',
       sizeBytes: 0,
       isPaymentLocked: shouldLock,
@@ -357,6 +361,10 @@ export function OrderWorkspaceModal({
   };
 
   const handleRemoveAttachment = (att: AttachmentItem) => {
+    if (isStaffMode && att.isPaymentLocked) {
+      onToast('Chỉ Admin mới có quyền xóa tài liệu đang khóa thanh toán.');
+      return;
+    }
     setAttachments((prev) => prev.filter((a) => a.id !== att.id));
     if (att.sourceType === 'upload' && att.fileIdOrUrl.startsWith('/api/files/')) {
       setPendingDeleteUrls((prev) => [...prev, att.fileIdOrUrl]);
@@ -365,9 +373,14 @@ export function OrderWorkspaceModal({
 
   const handleToggleLock = (attId: string) => {
     setAttachments((prev) =>
-      prev.map((a) =>
-        a.id === attId ? { ...a, isPaymentLocked: !a.isPaymentLocked } : a
-      )
+      prev.map((a) => {
+        if (a.id !== attId) return a;
+        if (isStaffMode && a.isPaymentLocked) {
+          onToast('Chỉ Admin mới có quyền mở khóa tải xuống.');
+          return a;
+        }
+        return { ...a, isPaymentLocked: !a.isPaymentLocked };
+      })
     );
   };
 
@@ -545,7 +558,10 @@ export function OrderWorkspaceModal({
       handover: 'Bàn giao Final',
     };
     onToast(`Đã chép mẫu tin "${labelMap[template]}" cho #${normalizeOrderCode(orderCode)}`);
-    window.setTimeout(() => {
+    if (zaloCopyTimerRef.current !== null) {
+      window.clearTimeout(zaloCopyTimerRef.current);
+    }
+    zaloCopyTimerRef.current = window.setTimeout(() => {
       setCopiedZaloTpl((prev) => (prev === template ? '' : prev));
     }, 1800);
   };
@@ -1006,208 +1022,46 @@ export function OrderWorkspaceModal({
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-700 mb-1">
-                      Ghi chú nội bộ (chỉ Admin thấy)
-                    </label>
-                    <input
-                      type="text"
-                      maxLength={FIELD_LIMITS.internalNoteMax}
-                      value={internalNotes}
-                      onChange={(e) => setInternalNotes(e.target.value)}
-                      placeholder="Ghi chú riêng cho bạn..."
-                      className={inputCls}
-                    />
-                  </div>
+                  {!isStaffMode && (
+                    <div>
+                      <label className="block text-xs font-medium text-zinc-700 mb-1">
+                        Ghi chú nội bộ (chỉ Admin thấy)
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={FIELD_LIMITS.internalNoteMax}
+                        value={internalNotes}
+                        onChange={(e) => setInternalNotes(e.target.value)}
+                        placeholder="Ghi chú riêng cho bạn..."
+                        className={inputCls}
+                      />
+                    </div>
+                  )}
                 </div>
 
-                {/* Finance & VND Deposit (Admin Only) */}
+                {/* Finance, CTV Payout & 1-Tap Zalo Templates (Admin Only) */}
                 {!isStaffMode && (
-                  <div className="border border-zinc-200 rounded-xl p-4 space-y-3.5">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-semibold text-slate-900">
-                        Tài chính & Công nợ (VNĐ)
-                      </h3>
-                      <span className="text-xs font-mono font-semibold text-[#DC2626] tabular-nums">
-                        Còn thiếu: {formatVnd(balance)}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      <div>
-                        <label className="block text-[11px] font-medium text-zinc-600 mb-1">
-                          Tổng giá trị
-                        </label>
-                        <input
-                          type="number"
-                          min={0}
-                          step={10000}
-                          value={totalAmount}
-                          onChange={(e) => setTotalAmount(Number(e.target.value))}
-                          className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-medium text-zinc-600 mb-1">
-                          Mức cọc yêu cầu
-                        </label>
-                        <input
-                          type="number"
-                          min={0}
-                          step={10000}
-                          value={depositAmount}
-                          onChange={(e) => setDepositAmount(Number(e.target.value))}
-                          className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-medium text-zinc-600 mb-1">
-                          Đã nhận (VNĐ)
-                        </label>
-                        <input
-                          type="number"
-                          min={0}
-                          step={10000}
-                          value={paidAmount}
-                          onChange={(e) => setPaidAmount(Number(e.target.value))}
-                          className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPaidAmount(depositAmount);
-                          if (stage === 'quoted') handleStageSelect('research');
-                        }}
-                        className="btn-press px-2.5 py-1 text-xs font-medium bg-amber-50 text-[#D97706] border border-amber-200 rounded-md hover:bg-amber-100"
-                      >
-                        Xác nhận đã cọc ({formatVnd(depositAmount)})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPaidAmount(totalAmount)}
-                        className="btn-press px-2.5 py-1 text-xs font-medium bg-emerald-50 text-[#16A34A] border border-emerald-200 rounded-md hover:bg-emerald-100"
-                      >
-                        Đã thanh toán đủ
-                      </button>
-                    </div>
-
-                    {/* Staff Payout & Net Profit */}
-                    <div className="pt-3.5 border-t border-zinc-100 space-y-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-slate-900">
-                          Tiền công CTV & Lợi nhuận ròng
-                        </span>
-                        {(() => {
-                          const net =
-                            Math.max(0, Number(totalAmount) || 0) -
-                            Math.max(0, Number(staffPayoutAmount) || 0);
-                          return (
-                            <span
-                              className={`text-xs font-mono font-semibold tabular-nums ${
-                                net >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'
-                              }`}
-                            >
-                              Lãi ròng: {net < 0 ? '-' : ''}
-                              {formatVnd(Math.abs(net))}
-                            </span>
-                          );
-                        })()}
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-end">
-                        <div>
-                          <label className="block text-[11px] font-medium text-zinc-600 mb-1">
-                            Tiền công CTV / Nhân sự (VNĐ)
-                          </label>
-                          <input
-                            type="number"
-                            min={0}
-                            step={10000}
-                            value={staffPayoutAmount}
-                            onChange={(e) => setStaffPayoutAmount(Number(e.target.value))}
-                            className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-                          />
-                        </div>
-                        <div className="flex items-center gap-1 flex-wrap">
-                          {[30, 40, 50, 60].map((pct) => (
-                            <button
-                              key={pct}
-                              type="button"
-                              onClick={() =>
-                                setStaffPayoutAmount(
-                                  Math.round(((Math.max(0, Number(totalAmount) || 0) * pct) / 100) / 1000) * 1000
-                                )
-                              }
-                              className="btn-press px-2 py-1.5 text-[11px] font-mono font-medium bg-zinc-100 hover:bg-zinc-200 text-slate-700 rounded-md whitespace-nowrap"
-                            >
-                              {pct}%
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer pt-0.5">
-                        <input
-                          type="checkbox"
-                          checked={staffPayoutStatus === 'paid'}
-                          onChange={(e) => {
-                            const next: StaffPayoutStatus = e.target.checked ? 'paid' : 'unpaid';
-                            setStaffPayoutStatus(next);
-                            setStaffPayoutPaidAt(next === 'paid' ? new Date().toISOString() : '');
-                          }}
-                          className="w-4 h-4 accent-[#16A34A]"
-                        />
-                        <span>
-                          Đã thanh toán tiền công cho CTV
-                          {staffPayoutStatus === 'paid' && staffPayoutPaidAt
-                            ? ` (${new Date(staffPayoutPaidAt).toLocaleDateString('vi-VN')})`
-                            : ''}
-                        </span>
-                      </label>
-                    </div>
-                  </div>
-                )}
-
-                {/* 1-Tap Zalo / Messenger Message Templates (Admin Only) */}
-                {!isStaffMode && (
-                  <div className="border border-zinc-200 rounded-xl p-4 space-y-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                      <h3 className="text-sm font-semibold text-slate-900">
-                        Chép nhanh tin nhắn Zalo / Messenger
-                      </h3>
-                      <span className="text-[11px] text-zinc-500">1 chạm</span>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      {(
-                        [
-                          ['quote_deposit', 'Báo giá & Mời cọc'],
-                          ['final_payment', 'Nhắc tất toán'],
-                          ['handover', 'Bàn giao Final'],
-                        ] as const
-                      ).map(([tplKey, label]) => {
-                        const isCopied = copiedZaloTpl === tplKey;
-                        return (
-                          <button
-                            key={tplKey}
-                            type="button"
-                            onClick={() => handleCopyZaloTemplate(tplKey)}
-                            className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-slate-800 rounded-lg whitespace-nowrap"
-                          >
-                            {isCopied ? (
-                              <Check className="w-3.5 h-3.5 text-[#16A34A]" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5 text-zinc-500" />
-                            )}
-                            <span>{label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <OrderFinanceSidebar
+                    totalAmount={totalAmount}
+                    depositAmount={depositAmount}
+                    paidAmount={paidAmount}
+                    staffPayoutAmount={staffPayoutAmount}
+                    staffPayoutStatus={staffPayoutStatus}
+                    staffPayoutPaidAt={staffPayoutPaidAt}
+                    copiedZaloTpl={copiedZaloTpl}
+                    onChangeTotalAmount={setTotalAmount}
+                    onChangeDepositAmount={setDepositAmount}
+                    onChangePaidAmount={setPaidAmount}
+                    onConfirmDepositStageCheck={() => {
+                      if (stage === 'quoted') handleStageSelect('research');
+                    }}
+                    onChangeStaffPayoutAmount={setStaffPayoutAmount}
+                    onChangeStaffPayoutStatus={(status, paidAt) => {
+                      setStaffPayoutStatus(status);
+                      setStaffPayoutPaidAt(paidAt);
+                    }}
+                    onCopyZaloTemplate={(tpl) => void handleCopyZaloTemplate(tpl)}
+                  />
                 )}
               </div>
               </div>
@@ -1215,284 +1069,46 @@ export function OrderWorkspaceModal({
           )}
 
           {activeTab === 'files' && (
-            <div className="space-y-6">
-              <div className="border border-zinc-200 rounded-xl p-5 bg-zinc-50/60 space-y-4">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Thêm tài liệu mới (Upload trực tiếp hoặc Liên kết ngoài)
-                </h3>
-
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-zinc-700 mb-1">
-                      Phân loại tài liệu
-                    </label>
-                    <select
-                      value={attCategory}
-                      onChange={(e) => {
-                        const cat = e.target.value as AttachmentCategory;
-                        setAttCategory(cat);
-                        if (cat === 'draft' || cat === 'final') {
-                          setAttLocked(true);
-                        } else {
-                          setAttLocked(false);
-                        }
-                      }}
-                      className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-                    >
-                      <option value="brief">Đề bài & Tài liệu khách</option>
-                      <option value="turnitin">Báo cáo Turnitin / AI Check</option>
-                      <option value="draft">Bản nháp (Draft)</option>
-                      <option value="final">Bài hoàn chỉnh (Final)</option>
-                    </select>
-                  </div>
-
-                  {attCategory === 'turnitin' && (
-                    <div>
-                      <label className="block text-xs font-medium text-zinc-700 mb-1">
-                        Trang chứa % đạo văn/AI
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        value={attTurnitinScorePage}
-                        onChange={(e) =>
-                          setAttTurnitinScorePage(Math.max(1, Number(e.target.value)))
-                        }
-                        className="w-full px-3 py-2 text-sm font-mono bg-white border border-zinc-200 rounded-lg"
-                      />
-                      <p className="text-[11px] text-zinc-500 mt-1">
-                        Khách xem từ trang 1 đến trang {attTurnitinScorePage + 2}
-                      </p>
-                    </div>
-                  )}
-
-                  {(attCategory === 'draft' || attCategory === 'final') && (
-                    <>
-                      <div className="flex items-center gap-2 pt-5">
-                        <input
-                          id="lockToggle"
-                          type="checkbox"
-                          checked={attLocked}
-                          onChange={(e) => setAttLocked(e.target.checked)}
-                          className="w-4 h-4 accent-[#4338CA]"
-                        />
-                        <label htmlFor="lockToggle" className="text-xs font-medium text-slate-800">
-                          Khóa tải xuống cho tới khi thanh toán đủ
-                        </label>
-                      </div>
-                      {attLocked && (
-                        <div>
-                          <label className="block text-xs font-medium text-zinc-700 mb-1">
-                            Số trang xem trước rõ (còn lại làm mờ)
-                          </label>
-                          <input
-                            type="number"
-                            min={1}
-                            max={5}
-                            value={attPreviewPages}
-                            onChange={(e) =>
-                              setAttPreviewPages(Math.max(1, Number(e.target.value)))
-                            }
-                            className="w-full px-3 py-2 text-sm font-mono bg-white border border-zinc-200 rounded-lg"
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-zinc-200">
-                  {/* Direct File Upload */}
-                  <div className="bg-white border border-zinc-200 rounded-xl p-3.5 space-y-2">
-                    <span className="text-xs font-semibold text-slate-800 block">
-                      Cách 1: Tải file từ máy (PDF, DOCX, Ảnh...)
-                    </span>
-                    <label className="btn-press inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] cursor-pointer">
-                      <Upload className="w-3.5 h-3.5" />
-                      {uploadingFile ? 'Đang tải lên...' : 'Chọn tệp để tải lên'}
-                      <input
-                        type="file"
-                        disabled={uploadingFile}
-                        onChange={handleUploadAttachment}
-                        className="hidden"
-                      />
-                    </label>
-                  </div>
-
-                  {/* External URL */}
-                  <div className="bg-white border border-zinc-200 rounded-xl p-3.5 space-y-2">
-                    <span className="text-xs font-semibold text-slate-800 block">
-                      Cách 2: Dán liên kết ngoài (Google Drive / Docs)
-                    </span>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input
-                        type="text"
-                        placeholder="Tên hiển thị (VD: Final Google Doc)"
-                        value={externalName}
-                        onChange={(e) => setExternalName(e.target.value)}
-                        className="flex-1 px-2.5 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-lg"
-                      />
-                      <input
-                        type="url"
-                        placeholder="https://drive.google.com/..."
-                        value={externalUrl}
-                        onChange={(e) => setExternalUrl(e.target.value)}
-                        className="flex-1 px-2.5 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleAddExternalUrl}
-                        disabled={!externalUrl.trim()}
-                        className="btn-press inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-[#0F172A] text-white rounded-lg hover:bg-slate-800 disabled:opacity-45 shrink-0"
-                      >
-                        <Link2 className="w-3.5 h-3.5" />
-                        Thêm link
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Attachment List */}
-              <div className="border border-zinc-200 rounded-xl divide-y divide-zinc-100 overflow-hidden">
-                {attachments.length === 0 ? (
-                  <div className="p-8 text-center text-sm text-zinc-500">
-                    Chưa có tệp đính kèm nào.
-                  </div>
-                ) : (
-                  attachments.map((att) => (
-                    <div
-                      key={att.id}
-                      className="hover-row p-4 bg-white flex flex-wrap items-center justify-between gap-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-slate-900 truncate">
-                          {att.name}
-                        </p>
-                        <p className="text-xs text-zinc-500 mt-0.5">
-                          Loại: {att.category}
-                          {att.sizeBytes > 0 && ` · ${formatBytes(att.sizeBytes)}`}
-                          {att.category === 'turnitin' &&
-                            ` · Cửa sổ Turnitin: Trang 1–${(att.turnitinScorePage || 1) + 2}`}
-                          {att.isPaymentLocked &&
-                            ` · Đang khóa tải (xem trước ${att.previewMaxPages || 2} trang)`}
-                        </p>
-                      </div>
-
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => setPreviewAtt(att)}
-                          className="btn-press inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium bg-zinc-100 hover:bg-zinc-200/80 rounded-lg"
-                        >
-                          <Eye className="w-3.5 h-3.5" />
-                          Xem
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleToggleLock(att.id)}
-                          className={`btn-press inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium border rounded-lg ${
-                            att.isPaymentLocked
-                              ? 'bg-amber-50 text-[#D97706] border-amber-200'
-                              : 'bg-emerald-50 text-[#16A34A] border-emerald-200'
-                          }`}
-                        >
-                          {att.isPaymentLocked ? (
-                            <>
-                              <Lock className="w-3.5 h-3.5" />
-                              Đang khóa
-                            </>
-                          ) : (
-                            <>
-                              <Unlock className="w-3.5 h-3.5" />
-                              Đang mở
-                            </>
-                          )}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveAttachment(att)}
-                          aria-label="Xóa tệp"
-                          className="btn-press p-1.5 text-zinc-400 hover:text-[#DC2626] rounded-lg"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
+            <OrderAttachmentsTab
+              attachments={attachments}
+              attCategory={attCategory}
+              attLocked={attLocked}
+              attPreviewPages={attPreviewPages}
+              attTurnitinScorePage={attTurnitinScorePage}
+              externalUrl={externalUrl}
+              externalName={externalName}
+              uploadingFile={uploadingFile}
+              isStaffMode={isStaffMode}
+              onChangeCategory={setAttCategory}
+              onChangeLocked={setAttLocked}
+              onChangePreviewPages={setAttPreviewPages}
+              onChangeTurnitinScorePage={setAttTurnitinScorePage}
+              onChangeExternalName={setExternalName}
+              onChangeExternalUrl={setExternalUrl}
+              onUploadAttachment={handleUploadAttachment}
+              onAddExternalUrl={handleAddExternalUrl}
+              onPreviewAttachment={setPreviewAtt}
+              onToggleLock={handleToggleLock}
+              onRemoveAttachment={handleRemoveAttachment}
+            />
           )}
             </form>
           )}
 
           {activeTab === 'chat_revisions' && editingOrder && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-              <OrderChatPanel
-                orderCode={editingOrder.orderCode}
-                senderRole="admin"
-                senderName={editorDisplayName}
-              />
-
-              <div className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">
-                <h3 className="text-sm font-semibold text-slate-900">
-                  Yêu cầu chỉnh sửa từ khách ({revisions.length})
-                </h3>
-                {revisions.length === 0 ? (
-                  <p className="text-xs text-zinc-500 py-8 text-center">
-                    Khách hàng chưa gửi yêu cầu chỉnh sửa nào cho đơn này.
-                  </p>
-                ) : (
-                  <div className="space-y-3 max-h-96 overflow-y-auto">
-                    {revisions.map((rev) => (
-                      <div
-                        key={rev.id}
-                        className="border border-zinc-200 rounded-xl p-3.5 space-y-2.5 text-sm"
-                      >
-                        <div className="flex items-center justify-between text-xs text-zinc-500">
-                          <span className="font-mono tabular-nums">
-                            {new Date(rev.createdAt).toLocaleString('vi-VN')}
-                          </span>
-                          <span className="font-semibold text-slate-700 uppercase">
-                            {rev.status}
-                          </span>
-                        </div>
-                        <p className="text-slate-900 whitespace-pre-wrap">{rev.message}</p>
-                        <input
-                          type="text"
-                          value={revReplies[rev.id] || ''}
-                          onChange={(e) =>
-                            setRevReplies((prev) => ({
-                              ...prev,
-                              [rev.id]: e.target.value,
-                            }))
-                          }
-                          placeholder="Phản hồi cho khách (VD: Đã up Final v2)..."
-                          className="w-full px-2.5 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-                        />
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateRev(rev, 'in_progress')}
-                            className="btn-press px-2.5 py-1 text-xs font-medium bg-amber-50 text-[#D97706] border border-amber-200 rounded-md hover:bg-amber-100"
-                          >
-                            Đang sửa
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleUpdateRev(rev, 'resolved')}
-                            className="btn-press px-2.5 py-1 text-xs font-medium bg-emerald-50 text-[#16A34A] border border-emerald-200 rounded-md hover:bg-emerald-100"
-                          >
-                            Đánh dấu đã xong
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
+            <OrderRevisionsTab
+              orderCode={editingOrder.orderCode}
+              editorDisplayName={editorDisplayName}
+              revisions={revisions}
+              revReplies={revReplies}
+              onChangeReply={(revId, value) =>
+                setRevReplies((prev) => ({
+                  ...prev,
+                  [revId]: value,
+                }))
+              }
+              onUpdateRevision={(rev, status) => void handleUpdateRev(rev, status)}
+            />
           )}
 
           {/* Footer Bar */}

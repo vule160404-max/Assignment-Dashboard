@@ -1,4 +1,5 @@
 import { ArrowRight, Search, ShieldCheck } from 'lucide-react';
+import { BrandLogo } from './BrandLogo';
 
 interface RoleSelectionGateProps {
   onSelectClient: () => void;
@@ -14,9 +15,7 @@ export function RoleSelectionGate({
       {/* Top Bar Contract: 1-row, clean zones separated by gap-8 */}
       <header className="sticky top-0 z-20 sticky-glass border-b border-zinc-200/80 px-4 sm:px-8 h-14 flex items-center">
         <div className="max-w-4xl w-full mx-auto flex items-center justify-between gap-8">
-          <span className="text-base font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0">
-            AssignTrack
-          </span>
+          <BrandLogo />
 
           <span className="text-xs font-medium text-zinc-500 truncate">
             Hệ thống Điều phối & Tra cứu Đơn hàng Học thuật

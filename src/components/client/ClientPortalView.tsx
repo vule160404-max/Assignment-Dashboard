@@ -43,6 +43,7 @@ import {
 import {
   formatBytes,
   formatDateTime,
+  getSafeExternalUrl,
   getStageMeta,
   isValidOrderCode,
   normalizeOrderCode,
@@ -56,6 +57,7 @@ import {
   UserProfile,
 } from '../../types/domain';
 import { DeadlineBadge } from '../shared/DeadlineBadge';
+import { BrandLogo } from '../shared/BrandLogo';
 import { OrderChatPanel } from '../shared/OrderChatPanel';
 import { PdfPreviewModal } from '../shared/PdfPreviewModal';
 import { PaymentQrCard } from './PaymentQrCard';
@@ -166,7 +168,9 @@ export function ClientPortalView({
 
       if (user && userProfile) {
         saveClientOrderBookmark(user.uid, userProfile.savedOrderCodes, normalized).catch(
-          () => undefined
+          (err) => {
+            console.warn('Could not save order bookmark:', err);
+          }
         );
       }
     } catch {
@@ -316,9 +320,9 @@ export function ClientPortalView({
                 handleResetLookup();
                 setHomeTab('lookup');
               }}
-              className="text-base font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0"
+              className="whitespace-nowrap shrink-0"
             >
-              AssignTrack
+              <BrandLogo />
             </a>
           </div>
 
@@ -956,10 +960,14 @@ export function ClientPortalView({
                     <div className="divide-y divide-zinc-100 border border-zinc-200 rounded-xl overflow-hidden">
                       {portal.attachments.map((att) => {
                         const locked = att.isPaymentLocked && !isFullyPaid;
-                        const downloadHref =
+                        const safeUrl =
                           att.sourceType === 'upload'
-                            ? `${att.fileIdOrUrl}?download=1`
-                            : att.fileIdOrUrl;
+                            ? getSafeExternalUrl(att.fileIdOrUrl)
+                            : getSafeExternalUrl(att.fileIdOrUrl);
+                        const downloadHref =
+                          att.sourceType === 'upload' && safeUrl
+                            ? `${safeUrl}?download=1`
+                            : safeUrl;
                         const downloadTarget =
                           att.sourceType === 'url' ? '_blank' : undefined;
                         const downloadName =
@@ -1004,7 +1012,7 @@ export function ClientPortalView({
                                 </span>
                               )}
 
-                              {!locked && Boolean(att.fileIdOrUrl) && (
+                              {!locked && Boolean(downloadHref) && (
                                 <a
                                   href={downloadHref}
                                   target={downloadTarget}

@@ -180,6 +180,10 @@
     filter: none !important;
   }
 
+  .animate-spin {
+    animation: none !important;
+  }
+
   .btn-press:active:not(:disabled) {
     transform: none !important;
   }

@@ -15,12 +15,18 @@ Admin configures default Bank Account details + uploaded Bank QR image (with fut
 ### User Story 3 - 48-Hour Live Order Chat & Revision Requests (Priority: P2)
 Clients and Admin exchange messages directly inside the order's 48-hour live chat (messages auto-expire after 48 hours). Clients can also submit formal Revision Requests tracked on the Admin Dashboard.
 
-### User Story 4 - Mini-CRM, Deadline Calendar & Revenue Analytics (Priority: P2)
-Admin manages client profiles (Zalo number, school/major, New/VIP/Watchlist tiers, computed debt), monitors monthly deadline density in Calendar View, and tracks weekly/monthly collected revenue, receivables, and completion/cancellation rates.
+### User Story 4 - Mini-CRM, Deadline Calendar, CTV Payouts & Revenue Analytics (Priority: P2)
+Admin manages client profiles (Zalo number, school/major, New/VIP/Watchlist tiers, computed debt), monitors monthly deadline density in Calendar View, tracks CTV/Staff payouts (`staffPayoutAmount`, `staffPayoutStatus`), and analyzes weekly/monthly collected revenue, net margin, receivables, and completion/cancellation rates.
+
+### User Story 5 - Team RBAC, Staff Invites, Zalo Templates, Telegram Bot & Word Humanizer (Priority: P2)
+Owner/Admin invites Staff/CTV accounts via `staffInvites`, manages active/suspended team roles (`owner`/`admin`/`staff`/`client`), enforces verified email sign-in, generates 1-tap Zalo status/payment messages, receives Telegram Bot alerts for revisions/chats/deadlines, and runs the Word (.docx) Humanizer with HIX Bypass Chrome Extension automation (50+ word paragraph batching, CAPTCHA pause/resume, and in-place `.docx` rebuild/attachment).
 
 ## Functional Requirements
-- **FR-001**: Admin Portal protected by Google Auth (`cycloneielts@gmail.com`) with full CRUD on `orders`, `clients`, `settings`.
+- **FR-001**: Team Portal protected by Firebase Auth (Email/Password + Google) with mandatory `email_verified == true` enforcement (`vule160404@gmail.com` Owner bootstrap + RBAC `owner`/`admin`/`staff`).
 - **FR-002**: Client Tracking Portal accessible via Order Code only (`trackingPortals/{orderCode}`), `allow list: if false`, zero client PII exposed.
 - **FR-003**: Deadline countdown badge with color + label alerts (`>72h` Green, `24–72h` Amber, `<24h`/Overdue Crimson).
-- **FR-004**: Hybrid attachment support (direct server file upload + external URL) with PDF.js page-windowed blur previews and server-enforced download locks.
+- **FR-004**: Hybrid attachment support (Cloudflare R2 S3 + local-disk fallback, direct presigned/multer upload + external URL) with PDF.js page-windowed blur previews and server-enforced Admin-locked downloads.
 - **FR-005**: 48-hour ephemeral chat (`expiresAtMs == createdAtMs + 172800000`) enforced in Firestore rules and client/admin sync.
+- **FR-006**: Word `.docx` XML-preserving Humanizer + HIX Bypass Chrome Extension Bridge with automatic sentence-boundary chunking (`>=50` words/batch), CAPTCHA detection pause/resume, and instant order attachment.
+- **FR-007**: Server-side Telegram Bot alerts (`telegramNotifyRevision`, `telegramNotifyMessage`, `telegramNotifyDeadline`) validated against authentic Firestore documents and persisted Admin notification preferences.
+

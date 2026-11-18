@@ -17,6 +17,7 @@ const REMOVED_LEGACY_EMAIL = 'cycloneielts@gmail.com';
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
+  const [emailVerified, setEmailVerified] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [authReady, setAuthReady] = useState(false);
@@ -37,10 +38,12 @@ export default function App() {
       if (u && (u.email || '').trim().toLowerCase() === REMOVED_LEGACY_EMAIL) {
         signOut(auth).catch(() => undefined);
         setUser(null);
+        setEmailVerified(false);
         setAuthReady(true);
         return;
       }
       setUser(u);
+      setEmailVerified(Boolean(u?.emailVerified));
       setAuthReady(true);
     });
     return () => unsub();
@@ -50,11 +53,15 @@ export default function App() {
     const current = auth.currentUser;
     if (!current) {
       setUserProfile(null);
+      setEmailVerified(false);
       setProfileLoading(false);
       return;
     }
     setProfileLoading(true);
     try {
+      await current.reload().catch(() => undefined);
+      await current.getIdToken(true).catch(() => undefined);
+      setEmailVerified(Boolean(current.emailVerified));
       const prof = await ensureOwnerOrReadProfile(current);
       setUserProfile(prof);
     } catch {
@@ -68,6 +75,7 @@ export default function App() {
     if (!authReady) return;
     if (!user) {
       setUserProfile(null);
+      setEmailVerified(false);
       setProfileLoading(false);
       return;
     }
@@ -100,7 +108,7 @@ export default function App() {
       cancelled = true;
       unsubProfile();
     };
-  }, [authReady, user]);
+  }, [authReady, user, emailVerified]);
 
   // Update countdowns every 15 seconds
   useEffect(() => {
@@ -161,6 +169,7 @@ export default function App() {
     activeContent = (
       <AdminPortalView
         user={user}
+        emailVerified={emailVerified}
         userProfile={userProfile}
         profileLoading={profileLoading}
         authReady={authReady}

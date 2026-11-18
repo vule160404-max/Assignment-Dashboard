@@ -1,127 +1,28 @@
-import { type ReactElement, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
-  ArrowRight,
-  Check,
   CheckCircle2,
   Download,
-  ExternalLink,
   Eye,
-  FileText,
   FolderUp,
   Maximize2,
   Minimize2,
   Pause,
   Play,
-  RefreshCw,
   RotateCcw,
-  ShieldCheck,
   Square,
   Upload,
 } from 'lucide-react';
-import { buildExtensionZipBlob } from '../../lib/extensionZip';
-import {
-  EXPECTED_EXTENSION_VERSION,
-  HixBridgeStatus,
-  HixBypassMode,
-  cancelHixExtensionRun,
-  checkHixBridgeStatus,
-  humanizeChunkViaExtension,
-} from '../../lib/hixBridgeClient';
-import {
-  GlitchCheckResult,
-  HumanizeChunk,
-  MIN_HIX_CHUNK_WORDS,
-  ParsedWordDocument,
-  buildSentenceBoundaryChunks,
-  computeDocFingerprint,
-  computeWordDiff,
-  countWords,
-  createWordDocumentFromText,
-  detectHixGlitch,
-  detectReferenceSectionStartIndex,
-  exportPatchedDocx,
-  parseDocxFile,
-} from '../../lib/wordHumanizer';
+import { countWords } from '../../lib/wordHumanizer';
 import { OrderRecord } from '../../types/domain';
-
-const CHECKPOINT_STORAGE_KEY = 'assigntrack_hix_checkpoints_v1';
-
-interface SavedHumanizeCheckpoint {
-  fingerprint: string;
-  fileName: string;
-  maxWordsPerChunk: number;
-  hixMode: HixBypassMode;
-  protectedTermsInput: string;
-  excludedParagraphIndices: number[];
-  chunkResults: Record<string, { outputText: string; accepted: boolean }>;
-  pastedPlainText?: string;
-  updatedAt: string;
-}
-
-function readCheckpoints(): Record<string, SavedHumanizeCheckpoint> {
-  try {
-    const raw = window.localStorage.getItem(CHECKPOINT_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object'
-      ? (parsed as Record<string, SavedHumanizeCheckpoint>)
-      : {};
-  } catch {
-    return {};
-  }
-}
-
-function writeCheckpoint(entry: SavedHumanizeCheckpoint): void {
-  try {
-    const all = readCheckpoints();
-    all[entry.fingerprint] = entry;
-    // Keep up to 5 most recent checkpoints
-    const sorted = Object.values(all)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, 5);
-    const trimmed: Record<string, SavedHumanizeCheckpoint> = {};
-    sorted.forEach((item) => {
-      trimmed[item.fingerprint] = item;
-    });
-    window.localStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(trimmed));
-  } catch {
-    // Ignore storage quota errors
-  }
-}
-
-function removeCheckpoint(fingerprint: string): void {
-  try {
-    const all = readCheckpoints();
-    if (!all[fingerprint]) return;
-    delete all[fingerprint];
-    window.localStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(all));
-  } catch {
-    // Ignore
-  }
-}
-
-type PlaybackStatus =
-  | 'idle'
-  | 'ready'
-  | 'highlighting'
-  | 'processing_hix'
-  | 'review_glitch'
-  | 'pasting'
-  | 'paused'
-  | 'completed';
-
-interface ChunkResult {
-  outputText: string;
-  accepted: boolean;
-}
-
-interface GlitchReviewPayload {
-  chunk: HumanizeChunk;
-  rawOutput: string;
-  editedOutput: string;
-  check: GlitchCheckResult;
-}
+import { ChunkDiffDrawer } from './humanizer/ChunkDiffDrawer';
+import { DocumentWorkspaceTabs } from './humanizer/DocumentWorkspaceTabs';
+import { GlitchReviewPanel } from './humanizer/GlitchReviewPanel';
+import { HixConnectionHeader } from './humanizer/HixConnectionHeader';
+import { WordPaperCanvas } from './humanizer/WordPaperCanvas';
+import { WordUploadToolbar } from './humanizer/WordUploadToolbar';
+import { computeSessionChunks, isSessionRunning } from './humanizer/types';
+import { useHumanizerSessions } from './humanizer/useHumanizerSessions';
 
 interface WordHumanizerViewProps {
   orders: OrderRecord[];
@@ -130,1030 +31,206 @@ interface WordHumanizerViewProps {
   onToast: (msg: string) => void;
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
-}
-
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-function highlightSuspectTokens(text: string, tokens: string[]) {
-  if (!tokens || tokens.length === 0) return text;
-  const pattern = tokens
-    .filter((t) => t.trim().length > 0)
-    .map(escapeRegExp)
-    .join('|');
-  if (!pattern) return text;
-
-  const regex = new RegExp(`(${pattern})`, 'gi');
-  const parts = text.split(regex);
-  return parts.map((part, idx) => {
-    const isSuspect = tokens.some((t) => t.toLowerCase() === part.toLowerCase());
-    if (!isSuspect) return <span key={idx}>{part}</span>;
-    return (
-      <mark
-        key={idx}
-        className="bg-red-100 text-[#DC2626] font-semibold px-1 rounded underline decoration-[#DC2626]/60"
-      >
-        {part}
-      </mark>
-    );
-  });
-}
-
 export function WordHumanizerView({
   orders,
   initialOrderCode = '',
   onAttachDocxToOrder,
   onToast,
 }: WordHumanizerViewProps) {
-  // Bridge & Extension connection state
-  const [bridgeStatus, setBridgeStatus] = useState<HixBridgeStatus>({
-    extensionInstalled: false,
-    extensionVersion: '',
-    hixTabOpen: false,
-    hixTabTitle: '',
-    hixTabUrl: '',
-  });
-  const [checkingBridge, setCheckingBridge] = useState(false);
   const [showInstallGuide, setShowInstallGuide] = useState(false);
+  const [cleanPresentationMode, setCleanPresentationMode] = useState(false);
+  const emptyDropInputRef = useRef<HTMLInputElement | null>(null);
 
-  // Document & Chunks state
-  const [wordDoc, setWordDoc] = useState<ParsedWordDocument | null>(null);
-  const [docFingerprint, setDocFingerprint] = useState<string>('');
-  const [isPastedDoc, setIsPastedDoc] = useState<boolean>(false);
-  const [pastedSourceText, setPastedSourceText] = useState<string>('');
-  const [excludedParaIndices, setExcludedParaIndices] = useState<number[]>([]);
-  const [refSectionIdx, setRefSectionIdx] = useState<number>(-1);
-  const [protectedTermsInput, setProtectedTermsInput] = useState<string>('');
-  const [cleanPresentationMode, setCleanPresentationMode] = useState<boolean>(false);
-  const [restoredFromCheckpoint, setRestoredFromCheckpoint] = useState<boolean>(false);
-  const [chunks, setChunks] = useState<HumanizeChunk[]>([]);
-  const [chunkResults, setChunkResults] = useState<Record<string, ChunkResult>>({});
-  const [maxWordsPerChunk, setMaxWordsPerChunk] = useState<number>(115);
-  const [hixMode, setHixMode] = useState<HixBypassMode>('Balanced');
-  const [selectedOrderCode, setSelectedOrderCode] = useState<string>(initialOrderCode);
+  const {
+    bridgeStatus,
+    checkingBridge,
+    downloadingExt,
+    sessions,
+    activeSession,
+    activeSessionId,
+    setActiveSessionId,
+    busyTabIds,
+    recentCheckpoints,
+    exportingDocx,
+    attachingOrder,
+    refreshBridge,
+    mutateSession,
+    handleUploadFiles,
+    handleCreateFromPaste,
+    handleRestorePastedCheckpoint,
+    handleStartOrResume,
+    handlePauseSession,
+    handleStopAndReset,
+    handleRunAllParallel,
+    handlePauseAll,
+    handleCloseSession,
+    handleRetrySingleChunk,
+    handleResolveGlitch,
+    handleDownloadDocx,
+    handleAttachToOrder,
+    handleDownloadExtensionZip,
+  } = useHumanizerSessions({
+    orders,
+    initialOrderCode,
+    onAttachDocxToOrder,
+    onToast,
+  });
 
-  // Optional paste-to-create Word mode
-  const [showPasteCreator, setShowPasteCreator] = useState(false);
-  const [pasteDocTitle, setPasteDocTitle] = useState('assignment-draft.docx');
-  const [pasteDocBody, setPasteDocBody] = useState('');
-
-  // Playback Presentation state
-  const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatus>('idle');
-  const [currentChunkIdx, setCurrentChunkIdx] = useState<number>(0);
-  const [playbackError, setPlaybackError] = useState<string>('');
-  const [hixStepText, setHixStepText] = useState<string>('');
-  const [glitchReview, setGlitchReview] = useState<GlitchReviewPayload | null>(null);
-  const [showOverwriteTint, setShowOverwriteTint] = useState<boolean>(true);
-  const [inspectChunkId, setInspectChunkId] = useState<string | null>(null);
-  const [exportingDocx, setExportingDocx] = useState(false);
-  const [attachingOrder, setAttachingOrder] = useState(false);
-  const [downloadingExt, setDownloadingExt] = useState(false);
-
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const activeSpanRef = useRef<HTMLSpanElement | null>(null);
-  const glitchPanelRef = useRef<HTMLDivElement | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Async run loop control refs (prevents stale closures on Pause/Stop/Retry)
-  const runControlRef = useRef<{
-    runId: number;
-    paused: boolean;
-    aborted: boolean;
-  }>({ runId: 0, paused: false, aborted: false });
-
-  const glitchDecisionResolverRef = useRef<
-    ((decision: { action: 'accept'; text: string } | { action: 'retry' } | { action: 'abort' }) => void) | null
-  >(null);
-
-  useEffect(() => {
-    if (initialOrderCode) {
-      setSelectedOrderCode(initialOrderCode);
-    }
-  }, [initialOrderCode]);
-
-  const refreshBridge = useCallback(async () => {
-    setCheckingBridge(true);
-    try {
-      const st = await checkHixBridgeStatus();
-      setBridgeStatus(st);
-    } finally {
-      setCheckingBridge(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refreshBridge();
-  }, [refreshBridge]);
-
-  const excludedParaSet = useMemo(
-    () => new Set(excludedParaIndices),
-    [excludedParaIndices]
+  const chunks = useMemo(
+    () => (activeSession ? computeSessionChunks(activeSession) : []),
+    [activeSession]
   );
 
-  const parsedProtectedTerms = useMemo(
-    () =>
-      protectedTermsInput
-        .split(/[,;\n]+/)
-        .map((t) => t.trim())
-        .filter((t) => t.length >= 2),
-    [protectedTermsInput]
-  );
-
-  const recentCheckpoints = useMemo(
-    () =>
-      Object.values(readCheckpoints())
-        .filter((cp) => Object.values(cp.chunkResults).some((r) => r.accepted))
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    // Re-evaluate when returning to empty doc view
-    [wordDoc]
-  );
-
-  // Rebuild chunks whenever wordDoc, maxWordsPerChunk, or excluded paragraphs change
-  useEffect(() => {
-    if (!wordDoc) {
-      setChunks([]);
-      return;
-    }
-    const built = buildSentenceBoundaryChunks(
-      wordDoc.paragraphs,
-      maxWordsPerChunk,
-      MIN_HIX_CHUNK_WORDS,
-      excludedParaSet
-    );
-    setChunks(built);
-  }, [wordDoc, maxWordsPerChunk, excludedParaSet]);
-
-  // Auto-save checkpoint into localStorage whenever chunks complete
-  useEffect(() => {
-    if (!wordDoc || !docFingerprint) return;
-    const doneCount = Object.values(chunkResults).filter((r) => r.accepted).length;
-    if (doneCount === 0) return;
-
-    writeCheckpoint({
-      fingerprint: docFingerprint,
-      fileName: wordDoc.fileName,
-      maxWordsPerChunk,
-      hixMode,
-      protectedTermsInput,
-      excludedParagraphIndices: excludedParaIndices,
-      chunkResults,
-      pastedPlainText: isPastedDoc ? pastedSourceText : undefined,
-      updatedAt: new Date().toISOString(),
-    });
-  }, [
-    wordDoc,
-    docFingerprint,
-    chunkResults,
-    maxWordsPerChunk,
-    hixMode,
-    protectedTermsInput,
-    excludedParaIndices,
-    isPastedDoc,
-    pastedSourceText,
-  ]);
-
-  // Smoothly scroll the currently highlighted sentence block into view during playback
-  useEffect(() => {
-    if (
-      (playbackStatus === 'highlighting' ||
-        playbackStatus === 'processing_hix' ||
-        playbackStatus === 'pasting') &&
-      activeSpanRef.current
-    ) {
-      activeSpanRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
-    }
-  }, [playbackStatus, currentChunkIdx]);
-
-  useEffect(() => {
-    if (playbackStatus === 'review_glitch' && glitchPanelRef.current) {
-      glitchPanelRef.current.scrollIntoView({
-        behavior: 'smooth',
-        block: 'nearest',
-      });
-    }
-  }, [playbackStatus, glitchReview]);
-
-  const activeOrder = useMemo(
-    () => orders.find((o) => o.orderCode === selectedOrderCode) || null,
-    [orders, selectedOrderCode]
-  );
-
-  const completedCount = useMemo(
-    () => chunks.filter((c) => chunkResults[c.id]?.accepted).length,
-    [chunks, chunkResults]
-  );
+  const completedCount = useMemo(() => {
+    if (!activeSession) return 0;
+    return chunks.filter((c) => activeSession.chunkResults[c.id]?.accepted).length;
+  }, [activeSession, chunks]);
 
   const totalDocumentWords = useMemo(() => {
-    if (!wordDoc) return 0;
-    return wordDoc.paragraphs.reduce((sum, p) => sum + countWords(p.text), 0);
-  }, [wordDoc]);
+    if (!activeSession) return 0;
+    return activeSession.wordDoc.paragraphs.reduce(
+      (sum, p) => sum + countWords(p.text),
+      0
+    );
+  }, [activeSession]);
 
   const chunkedWordsTotal = useMemo(
     () => chunks.reduce((sum, c) => sum + c.wordCount, 0),
     [chunks]
   );
 
-  const applyLoadedDocument = (
-    parsed: ParsedWordDocument,
-    options: { isPasted: boolean; pastedText?: string }
-  ) => {
-    runControlRef.current.aborted = true;
-    runControlRef.current.runId += 1;
-
-    const fp = computeDocFingerprint(parsed);
-    const refIdx = detectReferenceSectionStartIndex(parsed.paragraphs);
-    const defaultExcluded =
-      refIdx >= 0
-        ? parsed.paragraphs.filter((p) => p.index >= refIdx).map((p) => p.index)
-        : [];
-
-    const existingCp = readCheckpoints()[fp];
-    const existingDoneCount = existingCp
-      ? Object.values(existingCp.chunkResults).filter((r) => r.accepted).length
-      : 0;
-
-    setWordDoc(parsed);
-    setDocFingerprint(fp);
-    setIsPastedDoc(options.isPasted);
-    setPastedSourceText(options.pastedText || '');
-    setRefSectionIdx(refIdx);
-    setPlaybackError('');
-    setGlitchReview(null);
-    setInspectChunkId(null);
-
-    if (existingCp && existingDoneCount > 0) {
-      setMaxWordsPerChunk(existingCp.maxWordsPerChunk);
-      setHixMode(existingCp.hixMode);
-      setProtectedTermsInput(existingCp.protectedTermsInput || '');
-      setExcludedParaIndices(existingCp.excludedParagraphIndices || defaultExcluded);
-      setChunkResults(existingCp.chunkResults);
-      const previewChunks = buildSentenceBoundaryChunks(
-        parsed.paragraphs,
-        existingCp.maxWordsPerChunk,
-        MIN_HIX_CHUNK_WORDS,
-        new Set(existingCp.excludedParagraphIndices || defaultExcluded)
-      );
-      const firstPending = previewChunks.findIndex(
-        (c) => !existingCp.chunkResults[c.id]?.accepted
-      );
-      setCurrentChunkIdx(firstPending >= 0 ? firstPending : 0);
-      setRestoredFromCheckpoint(true);
-      setPlaybackStatus(firstPending >= 0 ? 'paused' : 'completed');
-      onToast(
-        `Đã khôi phục tiến trình dở của "${parsed.fileName}" (${existingDoneCount} đoạn đã xong).`
-      );
-    } else {
-      setExcludedParaIndices(defaultExcluded);
-      setChunkResults({});
-      setCurrentChunkIdx(0);
-      setRestoredFromCheckpoint(false);
-      setPlaybackStatus('ready');
-      const nonEmptyWords = countWords(
-        parsed.paragraphs
-          .filter((p) => !p.isEmpty)
-          .map((p) => p.text)
-          .join(' ')
-      );
-      const refNote =
-        refIdx >= 0 ? ' (đã tự động bỏ qua phần References/Phụ lục)' : '';
-      onToast(`Đã tải bài Word "${parsed.fileName}" (${nonEmptyWords} từ)${refNote}.`);
-    }
-  };
-
-  const handleUploadDocx = async (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.docx')) {
-      onToast('Vui lòng chọn tệp Word định dạng .docx.');
-      return;
-    }
-    try {
-      const parsed = await parseDocxFile(file);
-      const nonEmpty = parsed.paragraphs.filter((p) => !p.isEmpty);
-      if (nonEmpty.length === 0) {
-        onToast('File Word này không chứa văn bản.');
-        return;
-      }
-      applyLoadedDocument(parsed, { isPasted: false });
-    } catch (err) {
-      onToast(err instanceof Error ? err.message : 'Không thể đọc file Word.');
-    }
-  };
-
-  const handleCreateFromPaste = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!pasteDocBody.trim()) {
-      onToast('Vui lòng dán nội dung bài làm trước.');
-      return;
-    }
-    try {
-      const parsed = await createWordDocumentFromText(pasteDocTitle, pasteDocBody);
-      setShowPasteCreator(false);
-      applyLoadedDocument(parsed, { isPasted: true, pastedText: pasteDocBody });
-    } catch (err) {
-      onToast(err instanceof Error ? err.message : 'Không thể tạo tài liệu Word.');
-    }
-  };
-
-  const handleRestorePastedCheckpoint = async (cp: SavedHumanizeCheckpoint) => {
-    if (!cp.pastedPlainText) return;
-    try {
-      const parsed = await createWordDocumentFromText(cp.fileName, cp.pastedPlainText);
-      applyLoadedDocument(parsed, {
-        isPasted: true,
-        pastedText: cp.pastedPlainText,
-      });
-    } catch {
-      onToast('Không thể khôi phục bài dán đã lưu.');
-    }
-  };
-
-  const waitForGlitchDecision = (
-    payload: GlitchReviewPayload
-  ): Promise<{ action: 'accept'; text: string } | { action: 'retry' } | { action: 'abort' }> => {
-    setGlitchReview(payload);
-    setPlaybackStatus('review_glitch');
-    return new Promise((resolve) => {
-      glitchDecisionResolverRef.current = resolve;
-    });
-  };
-
-  const runPlaybackFromIndex = async (startIdx: number) => {
-    if (!wordDoc || chunks.length === 0) return;
-
-    const statusNow = await checkHixBridgeStatus();
-    setBridgeStatus(statusNow);
-
-    if (!statusNow.extensionInstalled) {
-      setShowInstallGuide(true);
-      setPlaybackError(
-        'Chưa phát hiện Chrome Extension "AssignTrack HIX Bridge". Hãy tải và cài Extension rồi tải lại trang (F5).'
-      );
-      setPlaybackStatus('paused');
-      return;
-    }
-
-    if (!statusNow.hixTabOpen) {
-      setPlaybackError(
-        'Chưa thấy tab hixbypass.com đang mở trong Chrome. Hãy mở & đăng nhập https://hixbypass.com/ trước khi chạy.'
-      );
-      setPlaybackStatus('paused');
-      return;
-    }
-
-    const myRunId = runControlRef.current.runId + 1;
-    runControlRef.current = {
-      runId: myRunId,
-      paused: false,
-      aborted: false,
-    };
-    setPlaybackError('');
-    setGlitchReview(null);
-    setInspectChunkId(null);
-
-    let idx = startIdx;
-    while (idx < chunks.length) {
-      const ctrl = runControlRef.current;
-      if (ctrl.runId !== myRunId || ctrl.aborted || ctrl.paused) {
-        return;
-      }
-
-      const chunk = chunks[idx];
-      if (chunkResults[chunk.id]?.accepted) {
-        idx += 1;
-        continue;
-      }
-
-      setCurrentChunkIdx(idx);
-
-      // Step 1: Visual highlight / "AI tô đen đoạn cần humanize"
-      setPlaybackStatus('highlighting');
-      await sleep(550);
-
-      if (
-        runControlRef.current.runId !== myRunId ||
-        runControlRef.current.aborted ||
-        runControlRef.current.paused
-      ) {
-        return;
-      }
-
-      // Step 2: Send complete sentence chunk to logged-in hixbypass.com tab via Chrome Extension
-      setPlaybackStatus('processing_hix');
-      setHixStepText('Đang dán văn bản sang tab HIX Bypass...');
-      abortControllerRef.current?.abort();
-      const chunkAbort = new AbortController();
-      abortControllerRef.current = chunkAbort;
-
-      const res = await humanizeChunkViaExtension(chunk.text, hixMode, {
-        signal: chunkAbort.signal,
-        onStepUpdate: (step) => setHixStepText(step),
-      });
-      setHixStepText('');
-
-      if (
-        runControlRef.current.runId !== myRunId ||
-        runControlRef.current.aborted ||
-        runControlRef.current.paused
-      ) {
-        return;
-      }
-
-      if (!res.ok || !res.outputText) {
-        const errMsg =
-          res.error || 'HIX Bypass không trả về văn bản hợp lệ. Vui lòng kiểm tra tab hixbypass.com.';
-        setPlaybackError(errMsg);
-        onToast(errMsg);
-        runControlRef.current.paused = true;
-        setPlaybackStatus('paused');
-        return;
-      }
-
-      // Step 3: Check output for garbled characters, corrupted HIX generation, citations, numbers & locked terms
-      const glitchCheck = detectHixGlitch(
-        chunk.text,
-        res.outputText,
-        parsedProtectedTerms
-      );
-      let finalOutputText = res.outputText;
-
-      if (glitchCheck.hasGlitch) {
-        const decision = await waitForGlitchDecision({
-          chunk,
-          rawOutput: res.outputText,
-          editedOutput: res.outputText,
-          check: glitchCheck,
-        });
-
-        setGlitchReview(null);
-        glitchDecisionResolverRef.current = null;
-
-        if (
-          runControlRef.current.runId !== myRunId ||
-          runControlRef.current.aborted ||
-          decision.action === 'abort'
-        ) {
-          return;
-        }
-
-        if (decision.action === 'retry') {
-          // Loop stays at same idx to retry HIX Bypass cleanly
-          onToast(`Đang chạy lại đoạn ${idx + 1}/${chunks.length} trên HIX Bypass...`);
-          continue;
-        }
-
-        finalOutputText = decision.text.trim();
-      }
-
-      // Step 4: Visual overwrite / "Dán đè lên đoạn văn cũ"
-      setPlaybackStatus('pasting');
-      setChunkResults((prev) => ({
-        ...prev,
-        [chunk.id]: {
-          outputText: finalOutputText,
-          accepted: true,
-        },
-      }));
-      await sleep(520);
-
-      idx += 1;
-    }
-
-    if (runControlRef.current.runId === myRunId && !runControlRef.current.aborted) {
-      setPlaybackStatus('completed');
-      onToast('Đã hoàn thành trình chiếu & Humanize toàn bộ bài Word!');
-    }
-  };
-
-  const handleStartOrResume = () => {
-    if (playbackStatus === 'paused') {
-      void runPlaybackFromIndex(currentChunkIdx);
-      return;
-    }
-    const firstPending = chunks.findIndex((c) => !chunkResults[c.id]?.accepted);
-    const startAt = firstPending >= 0 ? firstPending : 0;
-    void runPlaybackFromIndex(startAt);
-  };
-
-  const handlePause = () => {
-    runControlRef.current.paused = true;
-    abortControllerRef.current?.abort();
-    setHixStepText('');
-    void cancelHixExtensionRun();
-    if (glitchDecisionResolverRef.current) {
-      glitchDecisionResolverRef.current({ action: 'abort' });
-      glitchDecisionResolverRef.current = null;
-      setGlitchReview(null);
-    }
-    setPlaybackStatus('paused');
-    onToast(`Đã tạm dừng tại đoạn ${currentChunkIdx + 1}/${chunks.length}.`);
-  };
-
-  const handleStopAndReset = () => {
-    runControlRef.current.aborted = true;
-    runControlRef.current.runId += 1;
-    abortControllerRef.current?.abort();
-    setHixStepText('');
-    void cancelHixExtensionRun();
-    if (glitchDecisionResolverRef.current) {
-      glitchDecisionResolverRef.current({ action: 'abort' });
-      glitchDecisionResolverRef.current = null;
-      setGlitchReview(null);
-    }
-    if (docFingerprint) {
-      removeCheckpoint(docFingerprint);
-    }
-    setChunkResults({});
-    setCurrentChunkIdx(0);
-    setPlaybackError('');
-    setInspectChunkId(null);
-    setRestoredFromCheckpoint(false);
-    setPlaybackStatus(wordDoc ? 'ready' : 'idle');
-  };
-
-  const handleToggleParagraphInclusion = (paraIdx: number) => {
-    if (isRunning || playbackStatus === 'review_glitch' || completedCount > 0) return;
-    setExcludedParaIndices((prev) =>
-      prev.includes(paraIdx)
-        ? prev.filter((i) => i !== paraIdx)
-        : [...prev, paraIdx]
-    );
-  };
-
-  const handleSelectBodyOnly = () => {
-    if (!wordDoc || isRunning || completedCount > 0) return;
-    if (refSectionIdx >= 0) {
-      setExcludedParaIndices(
-        wordDoc.paragraphs.filter((p) => p.index >= refSectionIdx).map((p) => p.index)
-      );
-      onToast('Đã chọn lại toàn bộ thân bài & giữ nguyên bỏ qua phần References.');
-    } else {
-      setExcludedParaIndices([]);
-      onToast('Đã chọn toàn bộ các đoạn văn đủ điều kiện trong bài.');
-    }
-  };
-
-  // Reconstruct current text of every paragraph with accepted humanized chunks pasted in place
-  const updatedParagraphTexts = useMemo(() => {
-    const map: Record<number, string> = {};
-    if (!wordDoc) return map;
-
-    const chunksByPara = new Map<number, HumanizeChunk[]>();
-    chunks.forEach((c) => {
-      const list = chunksByPara.get(c.paragraphIndex) || [];
-      list.push(c);
-      chunksByPara.set(c.paragraphIndex, list);
-    });
-
-    for (const para of wordDoc.paragraphs) {
-      const paraChunks = chunksByPara.get(para.index);
-      if (!paraChunks || paraChunks.length === 0) continue;
-
-      let rebuilt = '';
-      let cursor = 0;
-      let anyReplaced = false;
-
-      for (const chk of paraChunks) {
-        if (chk.startOffset > cursor) {
-          rebuilt += para.text.slice(cursor, chk.startOffset);
-        }
-        const res = chunkResults[chk.id];
-        if (res?.accepted) {
-          rebuilt += res.outputText;
-          anyReplaced = true;
-        } else {
-          rebuilt += para.text.slice(chk.startOffset, chk.endOffset);
-        }
-        cursor = chk.endOffset;
-      }
-
-      if (cursor < para.text.length) {
-        rebuilt += para.text.slice(cursor);
-      }
-
-      if (anyReplaced) {
-        map[para.index] = rebuilt;
-      }
-    }
-
-    return map;
-  }, [wordDoc, chunks, chunkResults]);
-
-  const buildOutputDocxFile = async (): Promise<File | null> => {
-    if (!wordDoc) return null;
-    const blob = await exportPatchedDocx(wordDoc, updatedParagraphTexts);
-    const baseName = wordDoc.fileName.replace(/\.docx$/i, '');
-    return new File([blob], `${baseName}_humanized.docx`, {
-      type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    });
-  };
-
-  const handleDownloadDocx = async () => {
-    if (!wordDoc) return;
-    setExportingDocx(true);
-    try {
-      const outFile = await buildOutputDocxFile();
-      if (!outFile) return;
-      const url = URL.createObjectURL(outFile);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = outFile.name;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      onToast(`Đã tải xuống "${outFile.name}".`);
-    } catch (err) {
-      onToast(err instanceof Error ? err.message : 'Xuất file Word thất bại.');
-    } finally {
-      setExportingDocx(false);
-    }
-  };
-
-  const handleAttachToOrder = async () => {
-    if (!activeOrder || !onAttachDocxToOrder || !wordDoc) return;
-    setAttachingOrder(true);
-    try {
-      const outFile = await buildOutputDocxFile();
-      if (!outFile) return;
-      await onAttachDocxToOrder(activeOrder, outFile);
-      onToast(`Đã đính kèm "${outFile.name}" vào đơn #${activeOrder.orderCode}.`);
-    } catch (err) {
-      onToast(err instanceof Error ? err.message : 'Không thể đính kèm vào đơn hàng.');
-    } finally {
-      setAttachingOrder(false);
-    }
-  };
-
-  const handleDownloadExtensionZip = async () => {
-    setShowInstallGuide(true);
-    setDownloadingExt(true);
-    try {
-      let zipBlob: Blob | null = null;
-      try {
-        const res = await fetch('/api/extension/hix-bridge.zip');
-        const ctype = (res.headers.get('content-type') || '').toLowerCase();
-        if (res.ok && ctype.includes('zip')) {
-          zipBlob = await res.blob();
-        }
-      } catch {
-        // Fallback to in-browser packaging below
-      }
-
-      if (!zipBlob) {
-        zipBlob = await buildExtensionZipBlob();
-      }
-
-      const url = URL.createObjectURL(zipBlob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'assigntrack-hix-bridge.zip';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.setTimeout(() => URL.revokeObjectURL(url), 4000);
-      onToast('Đã tải xuống "assigntrack-hix-bridge.zip". Hãy giải nén và làm theo 3 bước bên dưới.');
-    } catch {
-      onToast('Không thể đóng gói file Extension. Vui lòng thử lại.');
-    } finally {
-      setDownloadingExt(false);
-    }
-  };
-
-  const isRunning =
-    playbackStatus === 'highlighting' ||
-    playbackStatus === 'processing_hix' ||
-    playbackStatus === 'pasting';
-
+  const isRunning = activeSession
+    ? isSessionRunning(activeSession.playbackStatus)
+    : false;
   const progressPercent =
     chunks.length > 0 ? Math.round((completedCount / chunks.length) * 100) : 0;
 
-  const activeChunk = chunks[currentChunkIdx] || null;
-  const inspectedChunk = chunks.find((c) => c.id === inspectChunkId) || null;
-  const inspectedResult = inspectedChunk ? chunkResults[inspectedChunk.id] : null;
+  const activeOrder = useMemo(() => {
+    const code = activeSession?.selectedOrderCode || '';
+    return orders.find((o) => o.orderCode === code) || null;
+  }, [activeSession?.selectedOrderCode, orders]);
+
+  const inspectedChunk = activeSession?.inspectChunkId
+    ? chunks.find((c) => c.id === activeSession.inspectChunkId) || null
+    : null;
+  const inspectedResult =
+    inspectedChunk && activeSession
+      ? activeSession.chunkResults[inspectedChunk.id] || null
+      : null;
 
   let statusHeadline = 'Sẵn sàng trình chiếu';
-  if (playbackStatus === 'highlighting') {
-    statusHeadline = `AI đang tô đen đoạn ${currentChunkIdx + 1}/${chunks.length}...`;
-  } else if (playbackStatus === 'processing_hix') {
-    statusHeadline = `Đoạn ${currentChunkIdx + 1}/${chunks.length}: ${
-      hixStepText || 'Đang gửi sang tab HIX Bypass...'
-    }`;
-  } else if (playbackStatus === 'review_glitch') {
-    statusHeadline = `Tạm dừng kiểm duyệt lỗi văn bản (Đoạn ${currentChunkIdx + 1}/${chunks.length})`;
-  } else if (playbackStatus === 'pasting') {
-    statusHeadline = `Đang dán đè văn bản mới lên đoạn ${currentChunkIdx + 1}/${chunks.length}...`;
-  } else if (playbackStatus === 'paused') {
-    statusHeadline = `Đã tạm dừng tại đoạn ${currentChunkIdx + 1}/${chunks.length}`;
-  } else if (playbackStatus === 'completed') {
-    statusHeadline = `Hoàn tất dán đè ${completedCount}/${chunks.length} đoạn`;
+  if (activeSession) {
+    const idx = activeSession.currentChunkIdx;
+    if (activeSession.playbackStatus === 'highlighting') {
+      statusHeadline = `AI đang tô đen đoạn ${idx + 1}/${chunks.length}...`;
+    } else if (activeSession.playbackStatus === 'processing_hix') {
+      statusHeadline = `Đoạn ${idx + 1}/${chunks.length}: ${
+        activeSession.hixStepText || 'Đang gửi sang tab HIX Bypass...'
+      }`;
+    } else if (activeSession.playbackStatus === 'review_glitch') {
+      statusHeadline = `Tạm dừng kiểm duyệt lỗi văn bản (Đoạn ${idx + 1}/${chunks.length})`;
+    } else if (activeSession.playbackStatus === 'pasting') {
+      statusHeadline = `Đang dán đè văn bản mới lên đoạn ${idx + 1}/${chunks.length}...`;
+    } else if (activeSession.playbackStatus === 'paused') {
+      statusHeadline = `Đã tạm dừng tại đoạn ${idx + 1}/${chunks.length}`;
+    } else if (activeSession.playbackStatus === 'completed') {
+      statusHeadline = `Hoàn tất dán đè ${completedCount}/${chunks.length} đoạn`;
+    }
   }
 
-  const isOutdatedExtension =
-    bridgeStatus.extensionInstalled &&
-    bridgeStatus.extensionVersion !== EXPECTED_EXTENSION_VERSION;
-
   return (
-    <div className="space-y-5">
-      {/* 1. Extension & HIX Bypass Tab Connection Bar (Hidden in Clean Presentation Mode) */}
+    <div className="space-y-4">
       {!cleanPresentationMode && (
-      <section className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="space-y-1">
-            <h2 className="text-base font-bold text-slate-900">
-              Trình chiếu Word & Tự động Humanize qua HIX Bypass
-            </h2>
-            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
-              <span
-                className={
-                  bridgeStatus.extensionInstalled
-                    ? isOutdatedExtension
-                      ? 'font-medium text-[#D97706]'
-                      : 'font-medium text-[#16A34A]'
-                    : 'font-medium text-[#D97706]'
-                }
-              >
-                {bridgeStatus.extensionInstalled
-                  ? isOutdatedExtension
-                    ? `Extension: Bản cũ (${bridgeStatus.extensionVersion || '1.0.0'}) — nên cập nhật lên ${EXPECTED_EXTENSION_VERSION}`
-                    : `Extension: Đã kết nối (v${bridgeStatus.extensionVersion})`
-                  : 'Extension: Chưa cài đặt trên Chrome'}
-              </span>
-              <span aria-hidden="true" className="text-zinc-300">
-                ·
-              </span>
-              <span
-                className={
-                  bridgeStatus.hixTabOpen
-                    ? 'font-medium text-[#16A34A]'
-                    : 'font-medium text-zinc-500'
-                }
-              >
-                {bridgeStatus.hixTabOpen
-                  ? 'Tab HIX Bypass: Đang mở & sẵn sàng'
-                  : 'Tab HIX Bypass: Chưa mở trong Chrome'}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={() => void refreshBridge()}
-              disabled={checkingBridge}
-              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-zinc-100 hover:bg-zinc-200/80 text-slate-800 rounded-lg whitespace-nowrap"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${checkingBridge ? 'animate-spin' : ''}`} />
-              <span>Kiểm tra kết nối</span>
-            </button>
-
-            <a
-              href="https://hixbypass.com/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-50 hover:bg-indigo-100 text-[#4338CA] rounded-lg whitespace-nowrap"
-            >
-              <span>Mở HIX Bypass</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
-
-            <button
-              type="button"
-              disabled={downloadingExt}
-              onClick={() => void handleDownloadExtensionZip()}
-              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#0F172A] hover:bg-slate-800 text-white rounded-lg whitespace-nowrap disabled:opacity-45"
-            >
-              <Download className="w-3.5 h-3.5" />
-              <span>
-                {downloadingExt ? 'Đang đóng gói...' : 'Tải Chrome Extension (.zip)'}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowInstallGuide((v) => !v)}
-              className="btn-press px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:text-slate-900"
-            >
-              {showInstallGuide ? 'Ẩn hướng dẫn' : 'Cách cài Extension'}
-            </button>
-          </div>
-        </div>
-
-        {showInstallGuide && (
-          <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 text-xs text-zinc-700 space-y-2">
-            <p className="font-semibold text-slate-900">
-              Hướng dẫn cài Extension kết nối tab HIX Bypass (chỉ làm 1 lần, 30 giây):
-            </p>
-            <ol className="list-decimal list-inside space-y-1 leading-relaxed">
-              <li>
-                Nhấn nút <span className="font-semibold text-slate-900">Tải Chrome Extension (.zip)</span> ở trên rồi giải nén ra một thư mục trên máy tính.
-              </li>
-              <li>
-                Mở tab mới trên Chrome truy cập <span className="font-mono font-semibold text-slate-900">chrome://extensions</span>, gạt bật chế độ <span className="font-semibold">Developer mode</span> (góc phải trên).
-              </li>
-              <li>
-                Bấm <span className="font-semibold">Load unpacked</span> và chọn thư mục vừa giải nén. Sau đó bấm <span className="font-semibold">F5</span> tải lại trang AssignTrack này và mở sẵn tab <span className="font-mono">hixbypass.com</span> đã đăng nhập.
-              </li>
-            </ol>
-          </div>
-        )}
-      </section>
+        <HixConnectionHeader
+          bridgeStatus={bridgeStatus}
+          busyTabIds={busyTabIds}
+          checkingBridge={checkingBridge}
+          downloadingExt={downloadingExt}
+          showInstallGuide={showInstallGuide}
+          onRefreshBridge={() => void refreshBridge()}
+          onDownloadExtension={() => {
+            setShowInstallGuide(true);
+            void handleDownloadExtensionZip();
+          }}
+          onToggleInstallGuide={() => setShowInstallGuide((v) => !v)}
+        />
       )}
 
-      {/* 2. Upload Word (.docx) & Configuration Toolbar (Hidden in Clean Presentation Mode) */}
       {!cleanPresentationMode && (
-      <section className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".docx"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                  void handleUploadDocx(file);
-                }
-                e.target.value = '';
-              }}
-            />
-            <button
-              type="button"
-              disabled={isRunning}
-              onClick={() => fileInputRef.current?.click()}
-              className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45 whitespace-nowrap"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>{wordDoc ? 'Đổi file Word (.docx)' : 'Tải file Word (.docx) lên'}</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={isRunning}
-              onClick={() => setShowPasteCreator((v) => !v)}
-              className="btn-press inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-zinc-100 hover:bg-zinc-200/80 text-slate-800 rounded-lg disabled:opacity-45 whitespace-nowrap"
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Dán bài làm trực tiếp</span>
-            </button>
-          </div>
-
-          {/* Controls: Order link, Word-per-chunk, Mode */}
-          <div className="flex flex-wrap items-center gap-2.5 text-xs">
-            <select
-              value={selectedOrderCode}
-              onChange={(e) => setSelectedOrderCode(e.target.value)}
-              disabled={isRunning}
-              aria-label="Gắn với đơn hàng"
-              className="px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-slate-800"
-            >
-              <option value="">Không gắn đơn hàng</option>
-              {orders
-                .filter((o) => o.orderStatus !== 'cancelled')
-                .map((ord) => (
-                  <option key={ord.id} value={ord.orderCode}>
-                    #{ord.orderCode} · {ord.subject}
-                  </option>
-                ))}
-            </select>
-
-            <select
-              value={maxWordsPerChunk}
-              onChange={(e) => setMaxWordsPerChunk(Number(e.target.value))}
-              disabled={isRunning || completedCount > 0}
-              aria-label="Giới hạn từ mỗi lượt HIX Bypass"
-              className="px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-slate-800 font-mono"
-            >
-              <option value={115}>~115 từ/lượt (Free)</option>
-              <option value={250}>~250 từ/lượt</option>
-              <option value={500}>~500 từ/lượt (Pro)</option>
-              <option value={1000}>~1000 từ/lượt</option>
-            </select>
-
-            <select
-              value={hixMode}
-              onChange={(e) => setHixMode(e.target.value as HixBypassMode)}
-              disabled={isRunning}
-              aria-label="Chế độ HIX Bypass"
-              className="px-2.5 py-1.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs text-slate-800"
-            >
-              <option value="Balanced">Chế độ: Balanced</option>
-              <option value="Fast">Chế độ: Fast</option>
-              <option value="Aggressive">Chế độ: Aggressive</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Citation, Number & Custom Protected Terms Guard */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 pt-2 border-t border-zinc-100">
-          <div className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 shrink-0">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#4338CA]" />
-            <span>Từ khóa bắt buộc giữ nguyên:</span>
-          </div>
-          <input
-            type="text"
-            value={protectedTermsInput}
-            onChange={(e) => setProtectedTermsInput(e.target.value)}
-            disabled={isRunning}
-            placeholder="VD: VinFast, SPayLater, Porter's Five Forces (tự động bảo vệ trích dẫn (Author, 2023) & số liệu %)"
-            className="flex-1 min-w-0 px-3 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-          />
-        </div>
-
-        <p className="text-xs text-zinc-500 leading-relaxed">
-          Quy tắc tách câu an toàn: Hệ thống chỉ copy những câu hoàn chỉnh kết thúc bằng dấu chấm{' '}
-          <span className="font-mono font-semibold text-slate-800">(.)</span> và ghép mỗi lượt{' '}
-          <span className="font-mono font-semibold text-slate-800">
-            tối thiểu {MIN_HIX_CHUNK_WORDS} từ
-          </span>{' '}
-          đúng yêu cầu của HIX Bypass (các đoạn ngắn dưới {MIN_HIX_CHUNK_WORDS} từ & mục Tài liệu tham khảo được giữ nguyên).
-        </p>
-
-        {showPasteCreator && (
-          <form
-            onSubmit={handleCreateFromPaste}
-            className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 space-y-3"
-          >
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold text-slate-900">
-                Tạo nhanh tài liệu Word từ văn bản tiếng Anh
-              </span>
-              <input
-                type="text"
-                value={pasteDocTitle}
-                onChange={(e) => setPasteDocTitle(e.target.value)}
-                placeholder="ten-bai-lam.docx"
-                className="px-2.5 py-1 text-xs font-mono bg-white border border-zinc-200 rounded-lg w-52"
-              />
-            </div>
-            <textarea
-              rows={5}
-              value={pasteDocBody}
-              onChange={(e) => setPasteDocBody(e.target.value)}
-              placeholder="Dán các đoạn văn tiếng Anh học thuật vào đây..."
-              className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-            />
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowPasteCreator(false)}
-                className="btn-press px-3 py-1.5 text-xs font-medium text-zinc-600"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                className="btn-press px-3.5 py-1.5 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3]"
-              >
-                Nạp vào màn trình chiếu Word
-              </button>
-            </div>
-          </form>
-        )}
-      </section>
+        <DocumentWorkspaceTabs
+          sessions={sessions}
+          activeSessionId={activeSessionId}
+          hixTabs={bridgeStatus.hixTabs}
+          onSelectSession={setActiveSessionId}
+          onAddNewBlank={() => setActiveSessionId('')}
+          onCloseSession={handleCloseSession}
+          onRunAllParallel={() => void handleRunAllParallel()}
+          onPauseAll={handlePauseAll}
+        />
       )}
 
-      {/* 3. Word Presentation / Playback Stage */}
-      {!wordDoc ? (
+      {!cleanPresentationMode && (
+        <WordUploadToolbar
+          orders={orders}
+          activeSession={activeSession}
+          hixTabs={bridgeStatus.hixTabs}
+          completedCount={completedCount}
+          onUploadFiles={handleUploadFiles}
+          onCreateFromPaste={handleCreateFromPaste}
+          onUpdateSessionConfig={(sid, patch) =>
+            mutateSession(sid, (cur) => ({ ...cur, ...patch }))
+          }
+        />
+      )}
+
+      {!activeSession ? (
         <section
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
-            const f = e.dataTransfer.files?.[0];
-            if (f) void handleUploadDocx(f);
+            const files = Array.from(e.dataTransfer.files || []);
+            if (files.length > 0) void handleUploadFiles(files);
           }}
           className="bg-white border border-dashed border-zinc-300 rounded-xl py-14 px-6 text-center space-y-4"
         >
+          <input
+            ref={emptyDropInputRef}
+            type="file"
+            accept=".docx"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              const files = Array.from(e.target.files || []);
+              if (files.length > 0) void handleUploadFiles(files);
+              e.target.value = '';
+            }}
+          />
           <FolderUp className="w-8 h-8 text-zinc-400 mx-auto" />
           <div className="space-y-2">
             <p className="text-sm font-semibold text-slate-900">
-              Kéo thả hoặc tải lên file Word (.docx) để bắt đầu trình chiếu
+              Kéo thả hoặc chọn nhiều file Word (.docx) để trình chiếu & chạy song song
             </p>
-            <p className="text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
-              Màn trình chiếu sẽ hiển thị nguyên bài Word gốc, tự động bỏ qua phần References/Phụ lục, tô đen từng cụm câu hoàn chỉnh kết thúc bằng dấu chấm, gửi sang HIX Bypass và kiểm tra lỗi ký tự / trích dẫn trước khi dán đè.
+            <p className="text-xs text-zinc-500 max-w-lg mx-auto leading-relaxed">
+              Có thể nạp nhiều bài Word cùng lúc. Mỗi bài sẽ tự động gắn với 1 tab{' '}
+              <span className="font-mono text-slate-700">hixbypass.com</span> riêng để chạy song song không xung đột.
             </p>
           </div>
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => emptyDropInputRef.current?.click()}
             className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3]"
           >
             <Upload className="w-3.5 h-3.5" />
-            <span>Chọn file .docx từ máy</span>
+            <span>Chọn file .docx từ máy (hỗ trợ chọn nhiều file)</span>
           </button>
 
           {recentCheckpoints.length > 0 && (
             <div className="max-w-lg mx-auto mt-4 pt-4 border-t border-zinc-200/80 text-left space-y-2">
               <p className="text-xs font-semibold text-slate-800">
-                Tiến trình trình chiếu đang lưu gần đây (Auto-save):
+                Tiến trình đang lưu gần đây (Auto-save):
               </p>
               <div className="space-y-1.5">
-                {recentCheckpoints.slice(0, 3).map((cp) => {
+                {recentCheckpoints.slice(0, 4).map((cp) => {
                   const done = Object.values(cp.chunkResults).filter((r) => r.accepted).length;
                   return (
                     <div
@@ -1177,7 +254,7 @@ export function WordHumanizerView({
                       ) : (
                         <button
                           type="button"
-                          onClick={() => fileInputRef.current?.click()}
+                          onClick={() => emptyDropInputRef.current?.click()}
                           className="btn-press px-2.5 py-1 text-xs font-medium bg-zinc-200/70 text-slate-800 hover:bg-zinc-200 rounded-md whitespace-nowrap"
                         >
                           Chọn lại file để chạy tiếp
@@ -1192,42 +269,42 @@ export function WordHumanizerView({
         </section>
       ) : (
         <section className="relative bg-[#F4F4F5] border border-zinc-200 rounded-2xl p-4 sm:p-7 space-y-5">
-          {/* Corner Pause / Stop / Clean Presentation Dock */}
           {(isRunning ||
-            playbackStatus === 'paused' ||
-            playbackStatus === 'review_glitch' ||
+            activeSession.playbackStatus === 'paused' ||
+            activeSession.playbackStatus === 'review_glitch' ||
             cleanPresentationMode) && (
             <div className="sticky top-16 z-30 flex justify-end pointer-events-none">
               <div className="pointer-events-auto inline-flex items-center gap-1.5 bg-white/95 backdrop-blur border border-zinc-200 rounded-xl p-1.5 shadow-[0_10px_28px_rgb(15,23,42,0.12)]">
-                {isRunning || playbackStatus === 'review_glitch' ? (
+                {isRunning || activeSession.playbackStatus === 'review_glitch' ? (
                   <button
                     type="button"
-                    onClick={handlePause}
+                    onClick={() => handlePauseSession(activeSession.sessionId)}
                     className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-[#DC2626] text-white rounded-lg hover:bg-red-700 whitespace-nowrap"
                   >
                     <Pause className="w-3.5 h-3.5" />
-                    <span>Tạm dừng</span>
+                    <span>Tạm dừng bài này</span>
                   </button>
                 ) : (
                   <>
                     <button
                       type="button"
-                      onClick={handleStartOrResume}
+                      onClick={() => handleStartOrResume(activeSession.sessionId)}
                       disabled={
                         chunks.length === 0 ||
-                        (playbackStatus === 'completed' && completedCount === chunks.length)
+                        (activeSession.playbackStatus === 'completed' &&
+                          completedCount === chunks.length)
                       }
                       className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45 whitespace-nowrap"
                     >
                       <Play className="w-3.5 h-3.5" />
                       <span>
-                        {playbackStatus === 'paused' ? 'Tiếp tục' : 'Bắt đầu'}
+                        {activeSession.playbackStatus === 'paused' ? 'Tiếp tục' : 'Bắt đầu'}
                       </span>
                     </button>
-                    {playbackStatus === 'paused' && (
+                    {activeSession.playbackStatus === 'paused' && (
                       <button
                         type="button"
-                        onClick={handleStopAndReset}
+                        onClick={() => handleStopAndReset(activeSession.sessionId)}
                         className="btn-press inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-zinc-100 text-slate-800 hover:bg-zinc-200 rounded-lg whitespace-nowrap"
                       >
                         <Square className="w-3.5 h-3.5" />
@@ -1257,12 +334,14 @@ export function WordHumanizerView({
               <div className="space-y-0.5 min-w-0">
                 <div className="flex items-center gap-2 text-xs text-zinc-500 font-mono tabular-nums">
                   <span className="font-semibold text-slate-900 truncate max-w-[260px]">
-                    {wordDoc.fileName}
+                    {activeSession.wordDoc.fileName}
                   </span>
                   <span aria-hidden="true">·</span>
                   <span>{totalDocumentWords} từ gốc</span>
                   <span aria-hidden="true">·</span>
-                  <span>{chunks.length} lượt câu hoàn chỉnh ({chunkedWordsTotal} từ)</span>
+                  <span>
+                    {chunks.length} lượt câu ({chunkedWordsTotal} từ)
+                  </span>
                 </div>
                 <p className="text-sm font-bold text-slate-900">{statusHeadline}</p>
               </div>
@@ -1292,23 +371,38 @@ export function WordHumanizerView({
 
                 <button
                   type="button"
-                  onClick={() => setShowOverwriteTint((v) => !v)}
+                  onClick={() =>
+                    mutateSession(activeSession.sessionId, (s) => ({
+                      ...s,
+                      showOverwriteTint: !s.showOverwriteTint,
+                    }))
+                  }
                   className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-zinc-100 hover:bg-zinc-200/80 text-slate-800 rounded-lg whitespace-nowrap"
                 >
                   <Eye className="w-3.5 h-3.5" />
-                  <span>{showOverwriteTint ? 'Ẩn màu đã dán đè' : 'Hiện màu đã dán đè'}</span>
+                  <span>
+                    {activeSession.showOverwriteTint
+                      ? 'Ẩn màu đã dán đè'
+                      : 'Hiện màu đã dán đè'}
+                  </span>
                 </button>
 
-                {!isRunning && playbackStatus !== 'review_glitch' && (
+                {!isRunning && activeSession.playbackStatus !== 'review_glitch' && (
                   <button
                     type="button"
-                    disabled={chunks.length === 0 || (playbackStatus === 'completed' && completedCount === chunks.length)}
-                    onClick={handleStartOrResume}
+                    disabled={
+                      chunks.length === 0 ||
+                      (activeSession.playbackStatus === 'completed' &&
+                        completedCount === chunks.length)
+                    }
+                    onClick={() => handleStartOrResume(activeSession.sessionId)}
                     className="btn-press inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45 whitespace-nowrap"
                   >
                     <Play className="w-3.5 h-3.5" />
                     <span>
-                      {playbackStatus === 'paused' ? 'Tiếp tục trình chiếu' : 'Bắt đầu Humanize'}
+                      {activeSession.playbackStatus === 'paused'
+                        ? 'Tiếp tục trình chiếu'
+                        : 'Bắt đầu Humanize'}
                     </span>
                   </button>
                 )}
@@ -1318,7 +412,7 @@ export function WordHumanizerView({
                     <button
                       type="button"
                       disabled={exportingDocx}
-                      onClick={() => void handleDownloadDocx()}
+                      onClick={() => void handleDownloadDocx(activeSession.sessionId)}
                       className="btn-press inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold bg-[#16A34A] text-white rounded-lg hover:bg-emerald-700 disabled:opacity-45 whitespace-nowrap"
                     >
                       <Download className="w-3.5 h-3.5" />
@@ -1329,7 +423,7 @@ export function WordHumanizerView({
                       <button
                         type="button"
                         disabled={attachingOrder}
-                        onClick={() => void handleAttachToOrder()}
+                        onClick={() => void handleAttachToOrder(activeSession.sessionId)}
                         className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-50 text-[#4338CA] hover:bg-indigo-100 rounded-lg disabled:opacity-45 whitespace-nowrap"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1343,7 +437,7 @@ export function WordHumanizerView({
 
                     <button
                       type="button"
-                      onClick={handleStopAndReset}
+                      onClick={() => handleStopAndReset(activeSession.sessionId)}
                       className="btn-press inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:text-slate-900"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -1369,7 +463,7 @@ export function WordHumanizerView({
               </div>
             </div>
 
-            {restoredFromCheckpoint && (
+            {activeSession.restoredFromCheckpoint && (
               <div className="bg-indigo-50/80 border border-indigo-200 rounded-xl px-3.5 py-2.5 text-xs text-[#4338CA] flex flex-wrap items-center justify-between gap-2">
                 <span>
                   Đã khôi phục tiến trình đang làm dở ({completedCount}/{chunks.length} đoạn đã xong). Bấm Tiếp tục để chạy nốt phần còn lại.
@@ -1377,7 +471,7 @@ export function WordHumanizerView({
                 {!isRunning && (
                   <button
                     type="button"
-                    onClick={handleStopAndReset}
+                    onClick={() => handleStopAndReset(activeSession.sessionId)}
                     className="btn-press px-2.5 py-1 text-xs font-semibold bg-white border border-indigo-200 rounded-md hover:bg-indigo-100"
                   >
                     Xóa bản lưu & chạy lại
@@ -1389,383 +483,125 @@ export function WordHumanizerView({
             {!cleanPresentationMode && !isRunning && completedCount === 0 && (
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100 text-xs text-zinc-600">
                 <span>
-                  {refSectionIdx >= 0
+                  {activeSession.refSectionIdx >= 0
                     ? 'Đã tự động bỏ qua phần Tài liệu tham khảo (References/Phụ lục). Bạn có thể tick chọn/bỏ từng đoạn bên dưới.'
                     : 'Tick chọn hoặc bỏ chọn các đoạn văn bên dưới trước khi bấm Bắt đầu Humanize.'}
                 </span>
                 <button
                   type="button"
-                  onClick={handleSelectBodyOnly}
+                  onClick={() => {
+                    const defaultExcl =
+                      activeSession.refSectionIdx >= 0
+                        ? activeSession.wordDoc.paragraphs
+                            .filter((p) => p.index >= activeSession.refSectionIdx)
+                            .map((p) => p.index)
+                        : [];
+                    mutateSession(activeSession.sessionId, (s) => ({
+                      ...s,
+                      excludedParaIndices: defaultExcl,
+                    }));
+                    onToast(
+                      activeSession.refSectionIdx >= 0
+                        ? 'Đã chọn lại toàn bộ thân bài & bỏ qua References.'
+                        : 'Đã chọn lại toàn bộ các đoạn đủ điều kiện.'
+                    );
+                  }}
                   className="btn-press px-2.5 py-1 text-xs font-medium bg-zinc-100 hover:bg-zinc-200/80 text-slate-800 rounded-md whitespace-nowrap"
                 >
-                  {refSectionIdx >= 0 ? 'Chỉ chọn phần thân bài' : 'Chọn lại tất cả'}
+                  {activeSession.refSectionIdx >= 0
+                    ? 'Chỉ chọn phần thân bài'
+                    : 'Chọn lại tất cả'}
                 </button>
               </div>
             )}
 
-            {playbackError && (
+            {activeSession.playbackError && (
               <div
                 role="alert"
                 className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-[#DC2626] flex items-start gap-2.5 leading-relaxed"
               >
                 <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                <span>{playbackError}</span>
+                <span>{activeSession.playbackError}</span>
               </div>
             )}
           </div>
 
-          {/* Pre-Paste Glitch Review Dialog (triggered automatically if corrupted output detected) */}
-          {playbackStatus === 'review_glitch' && glitchReview && (
-            <div
-              ref={glitchPanelRef}
-              className="surface-enter bg-white border border-amber-300 rounded-xl p-5 space-y-4 shadow-[0_14px_36px_rgb(15,23,42,0.08)]"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <p className="text-sm font-bold text-[#D97706] flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    Phát hiện đoạn văn từ HIX Bypass có dấu hiệu lỗi ký tự hoặc sai lệch trích dẫn (Chưa dán đè)
-                  </p>
-                  <ul className="list-disc list-inside text-xs text-slate-700 space-y-0.5">
-                    {glitchReview.check.reasons.map((reason, idx) => (
-                      <li key={idx}>{reason}</li>
-                    ))}
-                  </ul>
-                </div>
-                <span className="font-mono text-xs text-zinc-500 tabular-nums">
-                  Đoạn {glitchReview.chunk.chunkOrder}/{chunks.length}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div className="bg-zinc-50 border border-zinc-200 rounded-lg p-3.5 space-y-1.5">
-                  <p className="text-xs font-semibold text-zinc-600">Đoạn gốc trong Word</p>
-                  <p className="text-sm text-slate-800 leading-relaxed whitespace-pre-wrap">
-                    {glitchReview.chunk.text}
-                  </p>
-                </div>
-
-                <div className="bg-amber-50/40 border border-amber-200 rounded-lg p-3.5 space-y-2">
-                  <p className="text-xs font-semibold text-[#D97706]">
-                    Bản HIX Bypass trả về (vị trí nghi lỗi được tô đỏ)
-                  </p>
-                  <p className="text-xs text-slate-800 leading-relaxed bg-white border border-zinc-200 rounded-md p-2.5">
-                    {highlightSuspectTokens(
-                      glitchReview.rawOutput,
-                      glitchReview.check.suspectTokens
-                    )}
-                  </p>
-                  <label className="block text-[11px] font-medium text-zinc-600">
-                    Chỉnh sửa nhanh nếu muốn vẫn dán đoạn này:
-                  </label>
-                  <textarea
-                    rows={4}
-                    value={glitchReview.editedOutput}
-                    onChange={(e) =>
-                      setGlitchReview((prev) =>
-                        prev ? { ...prev, editedOutput: e.target.value } : null
-                      )
-                    }
-                    className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center justify-end gap-2.5 pt-2 border-t border-zinc-100">
-                <button
-                  type="button"
-                  onClick={() =>
-                    glitchDecisionResolverRef.current?.({ action: 'retry' })
-                  }
-                  className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3]"
-                >
-                  <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Không dán & Thử lại (Retry) ở HIX Bypass</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    glitchDecisionResolverRef.current?.({
-                      action: 'accept',
-                      text: glitchReview.editedOutput,
-                    })
-                  }
-                  className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-white border border-zinc-300 text-slate-800 hover:bg-zinc-50 rounded-lg"
-                >
-                  <Check className="w-3.5 h-3.5 text-[#16A34A]" />
-                  <span>Vẫn dán đoạn này & Tiếp tục</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Simulated Microsoft Word Paper Canvas */}
-          <div className="bg-white border border-zinc-200 rounded-xl max-w-[780px] mx-auto px-6 sm:px-14 py-9 sm:py-12 shadow-[0_8px_28px_rgb(15,23,42,0.04)] space-y-5">
-            <div className="pb-4 border-b border-zinc-100 flex items-center justify-between gap-4 text-xs text-zinc-400 font-mono">
-              <span className="truncate">{wordDoc.fileName}</span>
-              <span>Academic Word Playback</span>
-            </div>
-
-            <div className="space-y-4">
-              {wordDoc.paragraphs.map((para) => {
-                if (para.isEmpty) {
-                  return <div key={para.index} className="h-2" />;
+          {activeSession.playbackStatus === 'review_glitch' &&
+            activeSession.glitchReview && (
+              <GlitchReviewPanel
+                review={activeSession.glitchReview}
+                totalChunks={chunks.length}
+                onChangeEditedOutput={(nextText) =>
+                  mutateSession(activeSession.sessionId, (s) => ({
+                    ...s,
+                    glitchReview: s.glitchReview
+                      ? { ...s.glitchReview, editedOutput: nextText }
+                      : null,
+                  }))
                 }
-
-                if (para.isHeading) {
-                  const isRefHeading = refSectionIdx >= 0 && para.index === refSectionIdx;
-                  return (
-                    <h3
-                      key={para.index}
-                      className="text-base sm:text-lg font-bold text-slate-900 pt-2 flex items-center gap-2"
-                    >
-                      <span>{para.text}</span>
-                      {isRefHeading && !cleanPresentationMode && (
-                        <span className="text-[11px] font-normal text-zinc-500 font-mono">
-                          (Bỏ qua mặc định)
-                        </span>
-                      )}
-                    </h3>
-                  );
+                onRetry={() =>
+                  handleResolveGlitch(activeSession.sessionId, { action: 'retry' })
                 }
-
-                const isExcluded = excludedParaSet.has(para.index);
-                const canTogglePara =
-                  !cleanPresentationMode &&
-                  !isRunning &&
-                  playbackStatus !== 'review_glitch' &&
-                  completedCount === 0 &&
-                  countWords(para.text) >= MIN_HIX_CHUNK_WORDS;
-
-                const paraChunks = chunks.filter((c) => c.paragraphIndex === para.index);
-                if (paraChunks.length === 0) {
-                  // Paragraph skipped (References / user unchecked / < 50w / no terminal period)
-                  return (
-                    <div key={para.index} className="flex items-start gap-2.5 group">
-                      {canTogglePara && (
-                        <input
-                          type="checkbox"
-                          checked={!isExcluded}
-                          onChange={() => handleToggleParagraphInclusion(para.index)}
-                          title="Chọn / bỏ chọn đoạn này để Humanize"
-                          aria-label="Chọn đoạn văn để Humanize"
-                          className="mt-1.5 w-3.5 h-3.5 accent-[#4338CA] shrink-0 cursor-pointer"
-                        />
-                      )}
-                      <p
-                        className={`text-[15px] leading-[1.75] ${
-                          isExcluded && !cleanPresentationMode
-                            ? 'text-zinc-400'
-                            : 'text-slate-800'
-                        }`}
-                      >
-                        {para.text}
-                      </p>
-                    </div>
-                  );
+                onAccept={(text) =>
+                  handleResolveGlitch(activeSession.sessionId, {
+                    action: 'accept',
+                    text,
+                  })
                 }
+              />
+            )}
 
-                // Render paragraph piecewise so active chunk is highlighted & completed chunks overwrite cleanly
-                const nodes: ReactElement[] = [];
-                let cursor = 0;
+          <WordPaperCanvas
+            wordDoc={activeSession.wordDoc}
+            chunks={chunks}
+            chunkResults={activeSession.chunkResults}
+            playbackStatus={activeSession.playbackStatus}
+            currentChunkIdx={activeSession.currentChunkIdx}
+            refSectionIdx={activeSession.refSectionIdx}
+            excludedParaIndices={activeSession.excludedParaIndices}
+            cleanPresentationMode={cleanPresentationMode}
+            showOverwriteTint={activeSession.showOverwriteTint}
+            isRunning={isRunning}
+            completedCount={completedCount}
+            onToggleParagraphInclusion={(paraIdx) => {
+              if (
+                isRunning ||
+                activeSession.playbackStatus === 'review_glitch' ||
+                completedCount > 0
+              ) {
+                return;
+              }
+              mutateSession(activeSession.sessionId, (s) => ({
+                ...s,
+                excludedParaIndices: s.excludedParaIndices.includes(paraIdx)
+                  ? s.excludedParaIndices.filter((i) => i !== paraIdx)
+                  : [...s.excludedParaIndices, paraIdx],
+              }));
+            }}
+            onInspectChunk={(chunkId) =>
+              mutateSession(activeSession.sessionId, (s) => ({
+                ...s,
+                inspectChunkId: s.inspectChunkId === chunkId ? null : chunkId,
+              }))
+            }
+          />
 
-                paraChunks.forEach((chk) => {
-                  if (chk.startOffset > cursor) {
-                    nodes.push(
-                      <span key={`pre_${chk.id}`}>
-                        {para.text.slice(cursor, chk.startOffset)}
-                      </span>
-                    );
-                  }
-
-                  const isCurrentActive =
-                    activeChunk?.id === chk.id &&
-                    (playbackStatus === 'highlighting' ||
-                      playbackStatus === 'processing_hix' ||
-                      playbackStatus === 'review_glitch' ||
-                      playbackStatus === 'pasting' ||
-                      playbackStatus === 'paused');
-
-                  const doneResult = chunkResults[chk.id];
-
-                  if (isCurrentActive && playbackStatus === 'pasting' && doneResult?.accepted) {
-                    nodes.push(
-                      <span
-                        key={chk.id}
-                        ref={activeSpanRef}
-                        className="relative inline bg-emerald-100 text-slate-900 px-1 py-0.5 rounded ring-1 ring-[#16A34A]/40 transition-colors"
-                      >
-                        <span className="inline-flex items-center gap-1 mr-1.5 px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-[#16A34A] text-white rounded align-middle">
-                          Đang dán đè
-                        </span>
-                        {doneResult.outputText}
-                      </span>
-                    );
-                  } else if (
-                    isCurrentActive &&
-                    (playbackStatus === 'highlighting' ||
-                      playbackStatus === 'processing_hix' ||
-                      playbackStatus === 'review_glitch' ||
-                      playbackStatus === 'paused')
-                  ) {
-                    const actionBadge = (() => {
-                      if (playbackStatus === 'highlighting') return 'AI đang tô đen';
-                      if (playbackStatus === 'processing_hix') return 'Đang qua HIX Bypass';
-                      if (playbackStatus === 'review_glitch') return 'Chờ kiểm duyệt';
-                      return 'Đang tạm dừng';
-                    })();
-
-                    nodes.push(
-                      <span
-                        key={chk.id}
-                        ref={activeSpanRef}
-                        className="relative inline bg-indigo-100/95 text-slate-900 px-1 py-0.5 rounded ring-1 ring-[#4338CA]/45"
-                      >
-                        <span className="inline-flex items-center gap-1 mr-1.5 px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-[#4338CA] text-white rounded align-middle">
-                          {actionBadge}
-                        </span>
-                        {doneResult?.accepted ? doneResult.outputText : chk.text}
-                      </span>
-                    );
-                  } else if (doneResult?.accepted) {
-                    nodes.push(
-                      <span
-                        key={chk.id}
-                        role="button"
-                        tabIndex={0}
-                        onClick={() =>
-                          setInspectChunkId((prev) => (prev === chk.id ? null : chk.id))
-                        }
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            setInspectChunkId((prev) => (prev === chk.id ? null : chk.id));
-                          }
-                        }}
-                        title="Bấm để xem đối chiếu thay đổi trước/sau"
-                        className={`cursor-pointer rounded px-0.5 transition-colors ${
-                          showOverwriteTint
-                            ? 'bg-emerald-50/85 border-b border-emerald-300 hover:bg-emerald-100/80'
-                            : 'hover:bg-zinc-100'
-                        }`}
-                      >
-                        {doneResult.outputText}
-                      </span>
-                    );
-                  } else {
-                    nodes.push(
-                      <span key={chk.id} className="text-slate-800">
-                        {chk.text}
-                      </span>
-                    );
-                  }
-
-                  cursor = chk.endOffset;
-                });
-
-                if (cursor < para.text.length) {
-                  nodes.push(
-                    <span key={`tail_${para.index}`} className="text-slate-500">
-                      {para.text.slice(cursor)}
-                    </span>
-                  );
-                }
-
-                return (
-                  <div key={para.index} className="flex items-start gap-2.5">
-                    {canTogglePara && (
-                      <input
-                        type="checkbox"
-                        checked={!isExcluded}
-                        onChange={() => handleToggleParagraphInclusion(para.index)}
-                        title="Chọn / bỏ chọn đoạn này để Humanize"
-                        aria-label="Chọn đoạn văn để Humanize"
-                        className="mt-1.5 w-3.5 h-3.5 accent-[#4338CA] shrink-0 cursor-pointer"
-                      />
-                    )}
-                    <p className="text-[15px] leading-[1.75] text-slate-900">
-                      {nodes}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Click-to-Inspect Word Diff Drawer for any completed chunk */}
           {inspectedChunk && inspectedResult && (
-            <div className="surface-enter max-w-[780px] mx-auto bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-bold text-slate-900 flex items-center gap-2">
-                  <span>Đối chiếu thay đổi · Đoạn {inspectedChunk.chunkOrder}/{chunks.length}</span>
-                  <ArrowRight className="w-3.5 h-3.5 text-zinc-400" />
-                  <span className="font-mono text-zinc-500">
-                    {countWords(inspectedChunk.text)}w → {countWords(inspectedResult.outputText)}w
-                  </span>
-                </p>
-                <div className="flex items-center gap-2">
-                  {!isRunning && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const targetIdx = chunks.findIndex((c) => c.id === inspectedChunk.id);
-                        if (targetIdx >= 0) {
-                          setChunkResults((prev) => {
-                            const copy = { ...prev };
-                            delete copy[inspectedChunk.id];
-                            return copy;
-                          });
-                          setInspectChunkId(null);
-                          void runPlaybackFromIndex(targetIdx);
-                        }
-                      }}
-                      className="btn-press inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-indigo-50 text-[#4338CA] hover:bg-indigo-100 rounded-md"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      <span>Chạy lại đoạn này</span>
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => setInspectChunkId(null)}
-                    className="btn-press px-2 py-1 text-xs font-medium text-zinc-500 hover:text-slate-900"
-                  >
-                    Đóng
-                  </button>
-                </div>
-              </div>
-
-              <div className="text-sm leading-relaxed bg-zinc-50 border border-zinc-200 rounded-lg p-3.5">
-                {computeWordDiff(inspectedChunk.text, inspectedResult.outputText).map(
-                  (part, i) => {
-                    if (part.type === 'removed') {
-                      return (
-                        <del
-                          key={i}
-                          className="bg-red-100/80 text-[#DC2626] px-1 rounded mx-0.5"
-                        >
-                          {part.value}
-                        </del>
-                      );
-                    }
-                    if (part.type === 'added') {
-                      return (
-                        <ins
-                          key={i}
-                          className="no-underline bg-emerald-100/90 text-[#16A34A] font-medium px-1 rounded mx-0.5"
-                        >
-                          {part.value}
-                        </ins>
-                      );
-                    }
-                    return (
-                      <span key={i} className="text-slate-800 mx-0.5">
-                        {part.value}
-                      </span>
-                    );
-                  }
-                )}
-              </div>
-            </div>
+            <ChunkDiffDrawer
+              chunk={inspectedChunk}
+              result={inspectedResult}
+              totalChunks={chunks.length}
+              isRunning={isRunning}
+              onRetryChunk={(chunkId) =>
+                handleRetrySingleChunk(activeSession.sessionId, chunkId)
+              }
+              onClose={() =>
+                mutateSession(activeSession.sessionId, (s) => ({
+                  ...s,
+                  inspectChunkId: null,
+                }))
+              }
+            />
           )}
         </section>
       )}
