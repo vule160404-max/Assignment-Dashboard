@@ -14,6 +14,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import { analyzeDocumentIntegrity } from './integrityAnalyzer';
 
 const UPLOADS_DIR = process.env.VERCEL
   ? path.resolve('/tmp', 'assigntrack-uploads')
@@ -1798,6 +1799,45 @@ export function createApiApp(): express.Express {
           err instanceof Error
             ? `Lỗi kết nối tới API Chatbot: ${err.message}`
             : 'Không thể kết nối tới máy chủ AI Chatbot.',
+      });
+    }
+  });
+
+  // Intermediary Plagiarism (Crossref + OpenAlex + Wikipedia) & AI Forensics Checker
+  app.post('/api/check/analyze', async (req, res) => {
+    const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+    if (text.length < 40) {
+      res.status(400).json({
+        error:
+          'Vui lòng nhập hoặc tải lên tối thiểu 40 ký tự để hệ thống phân tích.',
+      });
+      return;
+    }
+    if (text.length > 150000) {
+      res.status(413).json({
+        error: 'Văn bản vượt quá giới hạn tối đa 150.000 ký tự mỗi lượt kiểm tra.',
+      });
+      return;
+    }
+    try {
+      const report = await analyzeDocumentIntegrity(text, {
+        title: typeof req.body?.title === 'string' ? req.body.title : undefined,
+        excludeReferences:
+          typeof req.body?.excludeReferences === 'boolean'
+            ? req.body.excludeReferences
+            : true,
+        excludeQuotes:
+          typeof req.body?.excludeQuotes === 'boolean'
+            ? req.body.excludeQuotes
+            : true,
+      });
+      res.json(report);
+    } catch (err) {
+      res.status(500).json({
+        error:
+          err instanceof Error
+            ? `Không thể hoàn tất kiểm tra: ${err.message}`
+            : 'Lỗi máy chủ khi kiểm tra Đạo văn & AI.',
       });
     }
   });

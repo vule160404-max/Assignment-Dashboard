@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Search,
   Send,
+  ShieldCheck,
   UserPlus,
   X,
 } from 'lucide-react';
@@ -60,6 +61,7 @@ import { DeadlineBadge } from '../shared/DeadlineBadge';
 import { BrandLogo } from '../shared/BrandLogo';
 import { OrderChatPanel } from '../shared/OrderChatPanel';
 import { PdfPreviewModal } from '../shared/PdfPreviewModal';
+import { ClientIntegrityCheckerView } from './ClientIntegrityCheckerView';
 import { PaymentQrCard } from './PaymentQrCard';
 
 interface ClientPortalViewProps {
@@ -98,8 +100,21 @@ export function ClientPortalView({
   const [lookupError, setLookupError] = useState('');
   const [previewAttachment, setPreviewAttachment] = useState<AttachmentItem | null>(null);
 
-  // Client auth tab state (Email & Password only — no Google Sign-In)
-  const [homeTab, setHomeTab] = useState<'lookup' | 'auth'>('lookup');
+  // Client home tab state ('lookup' | 'checker' | 'auth')
+  const [homeTab, setHomeTabState] = useState<'lookup' | 'checker' | 'auth'>(() => {
+    const urlTab = new URLSearchParams(window.location.search).get('tab');
+    if (urlTab === 'checker' || urlTab === 'auth' || urlTab === 'lookup') {
+      return urlTab;
+    }
+    return 'lookup';
+  });
+
+  const setHomeTab = (nextTab: 'lookup' | 'checker' | 'auth') => {
+    setHomeTabState(nextTab);
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', nextTab);
+    window.history.replaceState({}, '', url.toString());
+  };
   const [authMode, setAuthMode] = useState<'login' | 'register'>('login');
   const [authName, setAuthName] = useState('');
   const [authPhone, setAuthPhone] = useState('');
@@ -345,6 +360,21 @@ export function ClientPortalView({
               type="button"
               onClick={() => {
                 handleResetLookup();
+                setHomeTab('checker');
+              }}
+              className={`whitespace-nowrap shrink-0 transition-colors inline-flex items-center gap-1 ${
+                homeTab === 'checker' && !portal
+                  ? 'text-[#4338CA] font-semibold'
+                  : 'hover:text-slate-900'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Check Đạo văn &amp; AI</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleResetLookup();
                 setHomeTab('auth');
               }}
               className={`whitespace-nowrap shrink-0 transition-colors ${
@@ -398,7 +428,11 @@ export function ClientPortalView({
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-4 sm:px-8 py-8 sm:py-10">
+      <main
+        className={`${
+          !portal && homeTab === 'checker' ? 'max-w-6xl' : 'max-w-5xl'
+        } mx-auto px-4 sm:px-8 py-8 sm:py-10`}
+      >
         {(() => {
           if (activeCode && loading && !portal) {
             return (
@@ -412,37 +446,64 @@ export function ClientPortalView({
           }
 
           if (!activeCode || !portal) {
+            const segmentedBar = (
+              <div className="bg-zinc-100 p-1 rounded-xl grid grid-cols-3 gap-1">
+                <button
+                  type="button"
+                  onClick={() => setHomeTab('lookup')}
+                  className={`btn-press py-2.5 px-2.5 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 ${
+                    homeTab === 'lookup'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-zinc-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Search className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Tra cứu đơn</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHomeTab('checker')}
+                  className={`btn-press py-2.5 px-2.5 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 ${
+                    homeTab === 'checker'
+                      ? 'bg-white text-[#4338CA] shadow-xs'
+                      : 'text-zinc-600 hover:text-slate-900'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">Check Đạo văn &amp; AI</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setHomeTab('auth')}
+                  className={`btn-press py-2.5 px-2.5 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 ${
+                    homeTab === 'auth'
+                      ? 'bg-white text-[#4338CA] shadow-xs'
+                      : 'text-zinc-600 hover:text-slate-900'
+                  }`}
+                >
+                  <UserPlus className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">
+                    {user ? 'Tài khoản' : 'Đăng nhập'}
+                  </span>
+                </button>
+              </div>
+            );
+
+            if (homeTab === 'checker') {
+              return (
+                <div className="surface-enter space-y-6">
+                  <div className="max-w-xl mx-auto">{segmentedBar}</div>
+                  <ClientIntegrityCheckerView onToast={onToast} />
+                </div>
+              );
+            }
+
             return (
               <div className="surface-enter max-w-xl w-full mx-auto">
                 <section className="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 flex flex-col justify-between shadow-[0_8px_28px_rgb(15,23,42,0.03)] space-y-6">
                   <div className="space-y-6">
-                    {/* Segmented Mode Switcher: Quick Lookup vs Client Account */}
-                    <div className="bg-zinc-100 p-1 rounded-xl grid grid-cols-2 gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setHomeTab('lookup')}
-                        className={`btn-press py-2.5 px-3 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 ${
-                          homeTab === 'lookup'
-                            ? 'bg-white text-slate-900 shadow-xs'
-                            : 'text-zinc-600 hover:text-slate-900'
-                        }`}
-                      >
-                        <Search className="w-3.5 h-3.5" />
-                        Tra cứu nhanh (Mã đơn)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setHomeTab('auth')}
-                        className={`btn-press py-2.5 px-3 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 ${
-                          homeTab === 'auth'
-                            ? 'bg-white text-[#4338CA] shadow-xs'
-                            : 'text-zinc-600 hover:text-slate-900'
-                        }`}
-                      >
-                        <UserPlus className="w-3.5 h-3.5" />
-                        {user ? 'Tài khoản Khách hàng' : 'Đăng nhập / Đăng ký'}
-                      </button>
-                    </div>
+                    {/* Segmented Mode Switcher */}
+                    {segmentedBar}
 
                     {homeTab === 'lookup' && (
                       <div className="space-y-6">
