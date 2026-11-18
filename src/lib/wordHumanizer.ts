@@ -357,14 +357,19 @@ export function splitParagraphIntoTerminalPeriodSentences(paragraphText: string)
   return sentences;
 }
 
+export const MIN_HIX_CHUNK_WORDS = 50;
+
 /**
- * Group complete terminal-period sentences into chunks under `maxWordsPerChunk`.
- * NEVER splits a sentence mid-way and NEVER includes sentences without a terminal period `.`.
+ * Group complete terminal-period sentences into chunks between `minWordsPerChunk` (50) and `maxWordsPerChunk`.
+ * NEVER splits a sentence mid-way, NEVER includes sentences without a terminal period `.`,
+ * and rebalances trailing sentences so HIX Bypass's 50-word minimum requirement is respected.
  */
 export function buildSentenceBoundaryChunks(
   paragraphs: WordParagraph[],
-  maxWordsPerChunk: number
+  maxWordsPerChunk: number,
+  minWordsPerChunk: number = MIN_HIX_CHUNK_WORDS
 ): HumanizeChunk[] {
+  const effectiveMax = Math.max(minWordsPerChunk, maxWordsPerChunk);
   const chunks: HumanizeChunk[] = [];
   let globalOrder = 0;
 
@@ -376,41 +381,88 @@ export function buildSentenceBoundaryChunks(
     );
     if (sentences.length === 0) continue;
 
-    let groupSentences: SentenceSpan[] = [];
-    let groupWords = 0;
+    const rawGroups: SentenceSpan[][] = [];
+    let currentGroup: SentenceSpan[] = [];
+    let currentWords = 0;
 
-    const flushGroup = () => {
-      if (groupSentences.length === 0) return;
-      const first = groupSentences[0];
-      const last = groupSentences[groupSentences.length - 1];
+    const flushCurrent = () => {
+      if (currentGroup.length === 0) return;
+      rawGroups.push(currentGroup);
+      currentGroup = [];
+      currentWords = 0;
+    };
+
+    for (const sent of sentences) {
+      const w = countWords(sent.text);
+      if (currentGroup.length > 0 && currentWords + w > effectiveMax) {
+        flushCurrent();
+      }
+      currentGroup.push(sent);
+      currentWords += w;
+      if (w >= effectiveMax) {
+        flushCurrent();
+      }
+    }
+    flushCurrent();
+
+    const groupWordCount = (grp: SentenceSpan[]): number =>
+      grp.reduce((sum, s) => sum + countWords(s.text), 0);
+
+    // Rebalance trailing chunk if it fell below 50 words by shifting whole sentences from previous chunk
+    if (rawGroups.length >= 2) {
+      const lastIdx = rawGroups.length - 1;
+      const lastGrp = rawGroups[lastIdx];
+      const prevGrp = rawGroups[lastIdx - 1];
+
+      while (
+        groupWordCount(lastGrp) < minWordsPerChunk &&
+        prevGrp.length >= 2
+      ) {
+        const candidate = prevGrp[prevGrp.length - 1];
+        const candidateWords = countWords(candidate.text);
+        const nextPrevWords = groupWordCount(prevGrp) - candidateWords;
+        const nextLastWords = groupWordCount(lastGrp) + candidateWords;
+        if (nextPrevWords >= minWordsPerChunk && nextLastWords <= effectiveMax) {
+          prevGrp.pop();
+          lastGrp.unshift(candidate);
+        } else {
+          break;
+        }
+      }
+
+      // If tail is still < 50 words, merge with previous chunk if combined size fits within limit
+      if (
+        groupWordCount(lastGrp) < minWordsPerChunk &&
+        groupWordCount(prevGrp) + groupWordCount(lastGrp) <= Math.max(effectiveMax, 125)
+      ) {
+        prevGrp.push(...lastGrp);
+        rawGroups.pop();
+      }
+    }
+
+    for (const grp of rawGroups) {
+      if (grp.length === 0) continue;
+      const first = grp[0];
+      const last = grp[grp.length - 1];
       const joined = para.text.slice(first.startOffset, last.endOffset).trim();
+      const wc = countWords(joined);
+
+      // Strictly respect HIX Bypass minimum 50-word requirement
+      if (wc < minWordsPerChunk) {
+        continue;
+      }
+
       globalOrder += 1;
       chunks.push({
         id: `chk_${para.index}_${globalOrder}`,
         paragraphIndex: para.index,
         chunkOrder: globalOrder,
         text: joined,
-        wordCount: countWords(joined),
+        wordCount: wc,
         startOffset: first.startOffset,
         endOffset: last.endOffset,
       });
-      groupSentences = [];
-      groupWords = 0;
-    };
-
-    for (const sent of sentences) {
-      const w = countWords(sent.text);
-      if (groupSentences.length > 0 && groupWords + w > maxWordsPerChunk) {
-        flushGroup();
-      }
-      groupSentences.push(sent);
-      groupWords += w;
-      if (w >= maxWordsPerChunk) {
-        // Single long complete sentence: keep it intact in its own chunk
-        flushGroup();
-      }
     }
-    flushGroup();
   }
 
   return chunks;

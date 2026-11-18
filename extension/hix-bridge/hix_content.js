@@ -1,7 +1,7 @@
 (() => {
   // Always allow upgrading listener on dynamic re-inject
-  if (window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ === '1.1.2') return;
-  window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ = '1.1.2';
+  if (window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ === '1.1.3') return;
+  window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ = '1.1.3';
   window.__ASSIGNTRACK_HIX_CONTENT_LOADED__ = true;
 
   let activeRunToken = 0;
@@ -527,6 +527,17 @@
       return 'WORD_LIMIT_REACHED';
     }
 
+    const minWordsSignals = [
+      'at least 50 words',
+      'minimum 50 words',
+      'minimum of 50 words',
+      'toi thieu 50 tu',
+      'it nhat 50 tu',
+    ];
+    if (minWordsSignals.some((p) => overlayText.includes(p))) {
+      return 'MIN_WORDS_REQUIRED';
+    }
+
     // Give automatic invisible Turnstile / reCAPTCHA checks 10 seconds to pass on their own
     if (elapsedMs < 10000) {
       return null;
@@ -657,6 +668,16 @@
           errorCode: 'WORD_LIMIT_REACHED',
           error:
             'Tài khoản hixbypass.com báo hết lượt từ (Word limit). Vui lòng kiểm tra gói hoặc đăng nhập tài khoản khác.',
+        });
+        return;
+      }
+      if (blocker === 'MIN_WORDS_REQUIRED') {
+        setJob({
+          status: 'error',
+          ok: false,
+          errorCode: 'MIN_WORDS_REQUIRED',
+          error:
+            'HIX Bypass yêu cầu tối thiểu 50 từ cho mỗi lượt. Hãy tăng giới hạn từ/lượt lên (~250 từ/lượt) hoặc gộp thêm câu trong đoạn.',
         });
         return;
       }

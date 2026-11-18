@@ -28,6 +28,7 @@ import {
 import {
   GlitchCheckResult,
   HumanizeChunk,
+  MIN_HIX_CHUNK_WORDS,
   ParsedWordDocument,
   buildSentenceBoundaryChunks,
   computeWordDiff,
@@ -830,7 +831,11 @@ export function WordHumanizerView({
 
         <p className="text-xs text-zinc-500 leading-relaxed">
           Quy tắc tách câu an toàn: Hệ thống chỉ copy những câu hoàn chỉnh kết thúc bằng dấu chấm{' '}
-          <span className="font-mono font-semibold text-slate-800">(.)</span> sang HIX Bypass, không bao giờ cắt giữa câu hoặc gửi câu chưa hoàn chỉnh.
+          <span className="font-mono font-semibold text-slate-800">(.)</span> và ghép mỗi lượt{' '}
+          <span className="font-mono font-semibold text-slate-800">
+            tối thiểu {MIN_HIX_CHUNK_WORDS} từ
+          </span>{' '}
+          đúng yêu cầu của HIX Bypass (các đoạn ngắn dưới {MIN_HIX_CHUNK_WORDS} từ được giữ nguyên).
         </p>
 
         {showPasteCreator && (

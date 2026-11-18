@@ -1,6 +1,6 @@
 export type HixBypassMode = 'Fast' | 'Balanced' | 'Aggressive';
 
-export const EXPECTED_EXTENSION_VERSION = '1.1.2';
+export const EXPECTED_EXTENSION_VERSION = '1.1.3';
 
 export interface HixBridgeStatus {
   extensionInstalled: boolean;
