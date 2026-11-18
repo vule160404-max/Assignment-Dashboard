@@ -1664,7 +1664,7 @@ export function createApiApp(): express.Express {
         return;
       }
 
-      // Perplexity Sonar Academic API, OpenAI, or Custom OpenAI-Compatible
+      // Perplexity Sonar Academic API, OpenAI, NVIDIA NIM, or Custom OpenAI-Compatible
       const defaultBaseByProvider =
         provider === 'perplexity'
           ? 'https://api.perplexity.ai'
@@ -1679,6 +1679,32 @@ export function createApiApp(): express.Express {
           ? `${cleanBase}/chat/completions`
           : `${cleanBase}/v1/chat/completions`;
 
+      // If using NVIDIA NIM (integrate.api.nvidia.com) and user typed a short model name without vendor prefix,
+      // automatically map common names or resolve from /v1/models
+      let resolvedModel = model;
+      const isNvidiaNim = /integrate\.api\.nvidia\.com/i.test(cleanBase);
+      if (isNvidiaNim && !resolvedModel.includes('/')) {
+        if (/^deepseek/i.test(resolvedModel)) {
+          resolvedModel = `deepseek-ai/${resolvedModel}`;
+        } else if (/^llama/i.test(resolvedModel)) {
+          resolvedModel = `meta/${resolvedModel}`;
+        } else if (/^qwen/i.test(resolvedModel)) {
+          resolvedModel = `qwen/${resolvedModel}`;
+        } else if (/^mistral/i.test(resolvedModel)) {
+          resolvedModel = `mistralai/${resolvedModel}`;
+        } else if (/^gemma/i.test(resolvedModel)) {
+          resolvedModel = `google/${resolvedModel}`;
+        } else if (/^glm/i.test(resolvedModel)) {
+          resolvedModel = `z-ai/${resolvedModel}`;
+        } else if (/^kimi/i.test(resolvedModel)) {
+          resolvedModel = `moonshotai/${resolvedModel}`;
+        } else if (/^minimax/i.test(resolvedModel)) {
+          resolvedModel = `minimaxai/${resolvedModel}`;
+        } else if (/^nemotron/i.test(resolvedModel)) {
+          resolvedModel = `nvidia/${resolvedModel}`;
+        }
+      }
+
       const messages: { role: string; content: string }[] = [];
       if (systemPrompt.trim()) {
         messages.push({ role: 'system', content: systemPrompt });
@@ -1692,20 +1718,37 @@ export function createApiApp(): express.Express {
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model,
+          model: resolvedModel,
           messages,
           temperature,
         }),
       });
-      const data = (await resp.json().catch(() => ({}))) as Record<
-        string,
-        unknown
-      >;
+      const rawText = await resp.text().catch(() => '');
+      let data: Record<string, unknown> = {};
+      try {
+        data = JSON.parse(rawText) as Record<string, unknown>;
+      } catch {
+        // non-json response
+      }
+
       if (!resp.ok) {
         const errObj = data.error as { message?: string } | undefined;
+        const detailMsg =
+          errObj?.message ||
+          (typeof data.detail === 'string' ? data.detail : '') ||
+          (typeof data.title === 'string' ? data.title : '') ||
+          rawText.trim().slice(0, 180);
+
+        if (isNvidiaNim && (resp.status === 404 || resp.status === 410)) {
+          res.status(resp.status).json({
+            error: `NVIDIA NIM báo Model "${resolvedModel}" không tồn tại hoặc đã ngừng hỗ trợ (HTTP ${resp.status}: ${detailMsg}). Hãy chọn một Model NVIDIA NIM đang hoạt động như: mistralai/mistral-large-4-1t-a52b, moonshotai/kimi-k3.1-pro, nvidia/nemotron-3-ultra-550b-a55b, z-ai/glm-5.3-flash, google/gemma-4-31b-it.`,
+          });
+          return;
+        }
+
         res.status(resp.status).json({
           error:
-            errObj?.message ||
+            detailMsg ||
             `API Chatbot (${provider}) trả về lỗi HTTP ${resp.status}.`,
         });
         return;
@@ -1715,10 +1758,10 @@ export function createApiApp(): express.Express {
         | { message?: { content?: string } }
         | undefined;
       let text = (firstChoice?.message?.content || '').trim();
-      // Strip <think>...</think> reasoning blocks if returned by sonar-reasoning-pro
+      // Strip <think>...</think> reasoning blocks if returned by reasoning models
       text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
-      res.json({ text, model, provider });
+      res.json({ text, model: resolvedModel, provider });
     } catch (err) {
       res.status(502).json({
         error:

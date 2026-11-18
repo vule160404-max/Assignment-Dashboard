@@ -154,13 +154,17 @@ export const AI_PROVIDER_SUGGESTED_MODELS: Record<AiProviderType, string[]> = {
     'claude-3-5-haiku-latest',
   ],
   custom_openai: [
+    'mistralai/mistral-large-4-1t-a52b',
+    'moonshotai/kimi-k3.1-pro',
+    'nvidia/nemotron-3-ultra-550b-a55b',
+    'nvidia/nemotron-3.5-super-vl-120b-a12b',
+    'z-ai/glm-5.3-flash',
+    'minimaxai/minimax-m3.1-flash',
+    'google/gemma-4-31b-it',
+    'stepfun-ai/step-5-preview',
     'deepseek-chat',
     'deepseek-reasoner',
     'llama-3.3-70b-versatile',
-    'qwen/qwen-2.5-72b-instruct',
-    'anthropic/claude-3.7-sonnet',
-    'google/gemini-2.5-pro',
-    'openai/gpt-4.1',
   ],
 };
 
