@@ -205,9 +205,14 @@ async function callOpenAiCompatibleDirectBrowser(
   const apiKey = profile.apiKey.trim();
   const defaultBase = 'https://api.openai.com/v1';
   const cleanBase = (profile.baseUrl.trim() || defaultBase).replace(/\/+$/, '');
-  const url = cleanBase.endsWith('/chat/completions')
-    ? cleanBase
-    : `${cleanBase}/chat/completions`;
+  const candidateUrls = cleanBase.endsWith('/chat/completions')
+    ? [cleanBase]
+    : cleanBase.endsWith('/v1')
+    ? [`${cleanBase}/chat/completions`]
+    : [
+        `${cleanBase}/v1/chat/completions`,
+        `${cleanBase}/chat/completions`,
+      ];
 
   const messages: { role: string; content: string }[] = [];
   if (systemPrompt.trim()) {
@@ -215,35 +220,108 @@ async function callOpenAiCompatibleDirectBrowser(
   }
   messages.push({ role: 'user', content: userPrompt });
 
-  const resp = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model: profile.model.trim() || 'gpt-4o',
-      messages,
-      temperature: profile.temperature,
-    }),
-  });
+  let lastErr = '';
 
-  const data = (await resp.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!resp.ok) {
+  for (const url of candidateUrls) {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: profile.model.trim() || 'gpt-4o-mini',
+        messages,
+        temperature: profile.temperature,
+      }),
+    });
+
+    const data = (await resp.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    if (resp.ok) {
+      const choices = Array.isArray(data.choices) ? data.choices : [];
+      const firstChoice = choices[0] as
+        | { message?: { content?: string } }
+        | undefined;
+      const text = (firstChoice?.message?.content || '').trim();
+      if (text) return text;
+    }
+
     const errObj = data.error as { message?: string } | undefined;
-    throw new Error(
-      errObj?.message || `Không thể gọi ${profile.label} (HTTP ${resp.status}).`
-    );
+    lastErr =
+      errObj?.message ||
+      (typeof data.message === 'string' ? data.message : '') ||
+      `Không thể gọi ${profile.label} (HTTP ${resp.status} tại ${url}).`;
+
+    if (resp.status !== 404) {
+      break;
+    }
   }
-  const choices = Array.isArray(data.choices) ? data.choices : [];
-  const firstChoice = choices[0] as
-    | { message?: { content?: string } }
-    | undefined;
-  const text = (firstChoice?.message?.content || '').trim();
-  if (!text) {
-    throw new Error('Chatbot phản hồi rỗng. Vui lòng thử lại.');
+
+  throw new Error(lastErr || 'Chatbot phản hồi rỗng. Vui lòng kiểm tra lại Model.');
+}
+
+export async function fetchOpenAiCompatibleModels(
+  profile: AiProviderProfile
+): Promise<string[]> {
+  const apiKey = profile.apiKey.trim();
+  if (!apiKey) {
+    throw new Error('Vui lòng nhập API Key trước khi tải danh sách Model.');
   }
-  return text;
+
+  // 1. Try server proxy first (/api/ai/models) to avoid CORS
+  try {
+    const proxyResp = await fetch('/api/ai/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        apiKey,
+        baseUrl: profile.baseUrl.trim(),
+      }),
+    });
+    const proxyData = (await proxyResp.json().catch(() => ({}))) as {
+      models?: string[];
+      error?: string;
+    };
+    if (proxyResp.ok && Array.isArray(proxyData.models) && proxyData.models.length > 0) {
+      return proxyData.models;
+    }
+  } catch {
+    // fallback to direct browser fetch below
+  }
+
+  // 2. Direct browser fallback to /v1/models
+  const cleanBase = (profile.baseUrl.trim() || 'https://api.openai.com/v1')
+    .replace(/\/+$/, '')
+    .replace(/\/chat\/completions$/i, '');
+
+  const candidateUrls = cleanBase.endsWith('/v1')
+    ? [`${cleanBase}/models`]
+    : [`${cleanBase}/v1/models`, `${cleanBase}/models`];
+
+  for (const url of candidateUrls) {
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+    });
+    const data = (await resp.json().catch(() => ({}))) as {
+      data?: Array<{ id?: string }>;
+    };
+    if (resp.ok && Array.isArray(data.data)) {
+      const list = data.data
+        .map((m) => (typeof m?.id === 'string' ? m.id.trim() : ''))
+        .filter(Boolean);
+      if (list.length > 0) return list;
+    }
+  }
+
+  throw new Error(
+    'Không tải được danh sách Model tự động từ Endpoint này. Hãy kiểm tra lại API Key hoặc tự nhập tên Model.'
+  );
 }
 
 export async function callAiChatbot({

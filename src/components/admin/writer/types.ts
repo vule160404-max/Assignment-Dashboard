@@ -117,16 +117,21 @@ export const AI_PROVIDER_SUGGESTED_MODELS: Record<AiProviderType, string[]> = {
     'claude-3-5-haiku-latest',
   ],
   custom_openai: [
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'claude-3-7-sonnet-20250219',
+    'claude-3-5-sonnet-20241022',
+    'gemini-2.5-pro',
+    'gemini-2.5-flash',
     'deepseek-chat',
     'deepseek-reasoner',
-    'anthropic/claude-3.7-sonnet',
-    'google/gemini-2.5-pro',
-    'llama-3.3-70b-versatile',
   ],
 };
 
 export const DEFAULT_AI_SETTINGS: AiChatbotSettingsStore = {
-  activeProvider: 'gemini',
+  activeProvider: 'custom_openai',
   profiles: {
     gemini: {
       provider: 'gemini',
@@ -154,10 +159,10 @@ export const DEFAULT_AI_SETTINGS: AiChatbotSettingsStore = {
     },
     custom_openai: {
       provider: 'custom_openai',
-      label: 'Custom OpenAI-Compatible (DeepSeek / OpenRouter / Groq)',
+      label: 'Trạm API Bên thứ 3 (XingChi / NewAPI / OpenRouter)',
       apiKey: '',
-      model: 'deepseek-chat',
-      baseUrl: 'https://api.deepseek.com/v1',
+      model: 'gpt-4o-mini',
+      baseUrl: 'https://api.xingchiapi.com/v1',
       temperature: 0.4,
     },
   },
