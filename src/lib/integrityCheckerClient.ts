@@ -1,9 +1,10 @@
-import type {
-  AnalyzedSentence,
-  DetectedAiPhrase,
-  IntegrityAnalysisReport,
-  IntegrityCheckOptions,
-  MatchedSourceItem,
+import {
+  analyzeDocumentIntegrity,
+  type AnalyzedSentence,
+  type DetectedAiPhrase,
+  type IntegrityAnalysisReport,
+  type IntegrityCheckOptions,
+  type MatchedSourceItem,
 } from '../../server/integrityAnalyzer';
 
 export type {
@@ -29,35 +30,47 @@ export async function runIntegrityCheck(params: {
   excludeReferences?: boolean;
   excludeQuotes?: boolean;
 }): Promise<IntegrityAnalysisReport> {
-  const resp = await fetch('/api/check/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
-
-  const rawText = await resp.text().catch(() => '');
-  let parsed: (IntegrityAnalysisReport & { error?: string }) | null = null;
   try {
-    parsed = JSON.parse(rawText) as IntegrityAnalysisReport & { error?: string };
-  } catch {
-    // non-json response
-  }
+    const resp = await fetch('/api/check/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
 
-  if (!resp.ok || !parsed || !Array.isArray(parsed.sentences)) {
-    const snippet = rawText
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 180);
+    const rawText = await resp.text().catch(() => '');
+    let parsed: (IntegrityAnalysisReport & { error?: string }) | null = null;
+    try {
+      parsed = JSON.parse(rawText) as IntegrityAnalysisReport & { error?: string };
+    } catch {
+      // non-json response
+    }
+
+    if (resp.ok && parsed && Array.isArray(parsed.sentences)) {
+      return parsed;
+    }
+
+    // If serverless endpoint fails (e.g. 500/502/504/404), execute directly in browser via CORS-enabled scholarly APIs
+    if (resp.status >= 500 || resp.status === 404 || !parsed) {
+      return await analyzeDocumentIntegrity(params.text, {
+        title: params.title,
+        excludeReferences: params.excludeReferences,
+        excludeQuotes: params.excludeQuotes,
+      });
+    }
+
     throw new Error(
-      parsed?.error ||
-        (snippet
-          ? `Không thể phân tích tài liệu (HTTP ${resp.status}: ${snippet}).`
-          : `Không thể phân tích tài liệu (HTTP ${resp.status}).`)
+      parsed.error || `Không thể phân tích tài liệu (HTTP ${resp.status}).`
     );
+  } catch (err) {
+    if (err instanceof TypeError) {
+      return await analyzeDocumentIntegrity(params.text, {
+        title: params.title,
+        excludeReferences: params.excludeReferences,
+        excludeQuotes: params.excludeQuotes,
+      });
+    }
+    throw err;
   }
-
-  return parsed;
 }
 
 function escapeHtml(str: string): string {

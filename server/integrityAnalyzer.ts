@@ -91,10 +91,15 @@ const SOURCE_BADGE_COLORS = [
   '#4F46E5', // Indigo
 ];
 
-const POLITE_HEADERS = {
-  'User-Agent': 'AssignTrackAcademicChecker/1.0 (mailto:vule160404@gmail.com)',
-  Accept: 'application/json',
-};
+const POLITE_HEADERS: Record<string, string> =
+  typeof window === 'undefined'
+    ? {
+        'User-Agent': 'AssignTrackAcademicChecker/1.0 (mailto:vule160404@gmail.com)',
+        Accept: 'application/json',
+      }
+    : {
+        Accept: 'application/json',
+      };
 
 const PROTECTED_ABBR_PATTERNS: RegExp[] = [
   /\b(e\.g|i\.e|et al|etc|vs|cf|approx|est|incl|ca|viz)\./gi,
@@ -240,7 +245,7 @@ async function queryCrossrefForSentence(
   try {
     const url = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(
       query
-    )}&rows=2&select=DOI,title,author,published,container-title,abstract,URL`;
+    )}&rows=2&mailto=vule160404@gmail.com&select=DOI,title,author,published,container-title,abstract,URL`;
     const resp = await fetch(url, {
       headers: POLITE_HEADERS,
       signal: AbortSignal.timeout(4500),
@@ -296,7 +301,7 @@ async function queryOpenAlexForSentence(
   try {
     const url = `https://api.openalex.org/works?search=${encodeURIComponent(
       query
-    )}&per-page=2&select=id,doi,title,publication_year,primary_location,authorships,abstract_inverted_index`;
+    )}&per-page=2&mailto=vule160404@gmail.com&select=id,doi,title,publication_year,primary_location,authorships,abstract_inverted_index`;
     const resp = await fetch(url, {
       headers: POLITE_HEADERS,
       signal: AbortSignal.timeout(4500),
@@ -349,7 +354,7 @@ async function queryWikipediaForSentence(
     const lang = isVietnamese ? 'vi' : 'en';
     const url = `https://${lang}.wikipedia.org/w/api.php?action=query&list=search&srsearch=${encodeURIComponent(
       query
-    )}&utf8=&format=json&srlimit=2`;
+    )}&utf8=&format=json&origin=*&srlimit=2`;
     const resp = await fetch(url, {
       headers: POLITE_HEADERS,
       signal: AbortSignal.timeout(4000),
