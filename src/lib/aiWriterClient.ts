@@ -59,11 +59,29 @@ export function loadGlobalSkillLibrary(): SkillDocument[] {
   try {
     const raw = localStorage.getItem(SKILL_LIBRARY_STORAGE_KEY);
     if (!raw) return DEFAULT_BUILTIN_SKILLS;
-    const parsed = JSON.parse(raw) as SkillDocument[];
+    const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed) || parsed.length === 0) {
       return DEFAULT_BUILTIN_SKILLS;
     }
-    return parsed;
+    const sanitized: SkillDocument[] = parsed
+      .filter((item): item is SkillDocument => Boolean(item && typeof item === 'object'))
+      .map((item, idx) => ({
+        id: typeof item.id === 'string' && item.id ? item.id : `skill_restored_${idx}`,
+        name: typeof item.name === 'string' ? item.name : 'Untitled Skill',
+        fileName: typeof item.fileName === 'string' ? item.fileName : 'skill.md',
+        description: typeof item.description === 'string' ? item.description : '',
+        content: typeof item.content === 'string' ? item.content : '',
+        enabled: typeof item.enabled === 'boolean' ? item.enabled : true,
+        isBuiltIn: Boolean(item.isBuiltIn),
+        updatedAt: typeof item.updatedAt === 'string' ? item.updatedAt : new Date().toISOString(),
+      }));
+
+    if (sanitized.length === 0) return DEFAULT_BUILTIN_SKILLS;
+
+    // Ensure built-in strict citation skill is kept up-to-date if not customized, and any missing built-ins are included
+    const existingIds = new Set(sanitized.map((s) => s.id));
+    const missingBuiltIns = DEFAULT_BUILTIN_SKILLS.filter((b) => !existingIds.has(b.id));
+    return [...sanitized, ...missingBuiltIns];
   } catch {
     return DEFAULT_BUILTIN_SKILLS;
   }
@@ -613,9 +631,11 @@ ${fullOutlineMap}
 ${priorWrittenSections || '(No prior sections drafted yet; provide authoritative scholarly references for this topic.)'}
 
 INSTRUCTIONS FOR "${targetSection.title}":
-- Compile EVERY single in-text citation used in the previously written sections above into a complete, strictly formatted ${session.citationStyle} reference list.
+- Compile ONLY authentic scholarly, statistical, regulatory, and industry sources that were actually cited in-text in the previously written sections above into a complete, strictly formatted ${session.citationStyle} reference list.
+- STRICT PROHIBITION: NEVER cite, list, or include the assignment prompt, grading rubric, marking criteria, course instructions, or skill guidelines as a reference entry.
+- Ensure 1-to-1 matching: every in-text citation in the body must appear here, and every entry here must be cited in-text.
 - Sort alphabetically by author surname (or numbered [1], [2]... if IEEE).
-- Include full bibliographic details (Authors, Year, Article/Book Title, Journal/Publisher, Volume(Issue), Page range, and DOI/URL where applicable).
+- Include full bibliographic details (Author, A. A. (Year). Title of work. *Source*, Volume(Issue), Page range. DOI/URL).
 - Output ONLY the reference entries (one reference paragraph per line), without repeating the section heading "${targetSection.title}" at the top and without conversational filler.`
     : `Now write ONLY Section ${sectionIdx + 1} of the paper: "${targetSection.title}".
 

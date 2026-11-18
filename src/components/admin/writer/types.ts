@@ -300,17 +300,20 @@ export const DEFAULT_BUILTIN_SKILLS: SkillDocument[] = [
   },
   {
     id: 'skill_citation_mastery',
-    name: 'In-Text Citation & Reference Precision Skill',
-    fileName: 'citation-reference-rules.skill.md',
+    name: 'Strict References & Citation Integrity Skill',
+    fileName: 'strict-references-citation.skill.md',
     description:
-      'Đảm bảo trích dẫn trong bài (in-text citations) khớp 100% với danh mục Tài liệu tham khảo cuối bài theo đúng chuẩn APA/Harvard/MLA/IEEE.',
+      'Ép AI chỉ liệt kê các nguồn học thuật/báo cáo thực sự được trích dẫn trong bài ở phần References; tuyệt đối KHÔNG trích dẫn Rubric, đề bài hay hướng dẫn làm bài.',
     enabled: true,
     isBuiltIn: true,
     updatedAt: new Date().toISOString(),
-    content: `# Skill: Citation & Reference Integrity
-- Every factual claim, theoretical framework, or empirical statistic must include an authentic scholarly in-text citation matching the requested Citation Style (e.g., (Author, Year) for APA/Harvard; [1] for IEEE).
-- Prefer peer-reviewed journal articles, university press books, and authoritative institutional reports published within the last 5-10 years alongside seminal foundational works.
-- In the final References / Bibliography section, compile and alphabetically sort (or number for IEEE) every single source cited across all earlier sections with complete bibliographic details (Author, Year, Title, Journal/Publisher, Volume(Issue), Pages, DOI).`,
+    content: `# Skill: Strict References & Citation Integrity (No Rubric / Prompt Leakage)
+- NEVER cite, list, or reference the assignment brief, grading rubric, marking criteria, lecturer instructions, syllabus, or uploaded skill files as entries in the References / Bibliography section.
+- Compile ONLY authentic scholarly, statistical, regulatory, and industry sources that are actually cited in-text in the body of the paper (aim for 20-35 high-quality references for full research papers, or proportional to paper length).
+- Enforce 1-to-1 citation consistency: every in-text citation used in earlier sections MUST have a matching full entry in References, and every entry in References MUST be cited in-text.
+- Strict Citation Style formatting (e.g., APA 7th: Author, A. A. (Year). Title of work. *Source*, Volume(Issue), Page range. https://doi.org/... or URL).
+- Ensure source diversity where relevant to the topic: peer-reviewed journal articles, official statistical yearbooks & government/central bank reports, reputable industry reports (e.g., World Bank, McKinsey, CGAP), and seminal academic textbooks.
+- Order entries strictly alphabetically by first author surname (or sequentially [1], [2]... for IEEE).`,
   },
   {
     id: 'skill_rubric_maximizer',
