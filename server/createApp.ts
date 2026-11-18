@@ -1519,6 +1519,203 @@ export function createApiApp(): express.Express {
     res.json({ ok: true });
   });
 
+  // Multi-Provider AI Chatbot Proxy (Gemini, OpenAI, Anthropic Claude, Custom OpenAI-Compatible)
+  app.post('/api/ai/generate', async (req, res) => {
+    const provider =
+      typeof req.body?.provider === 'string' ? req.body.provider.trim() : 'gemini';
+    const rawApiKey =
+      typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+    const apiKey =
+      rawApiKey ||
+      (provider === 'gemini' ? (process.env.GEMINI_API_KEY || '').trim() : '');
+    const model =
+      typeof req.body?.model === 'string' && req.body.model.trim()
+        ? req.body.model.trim()
+        : provider === 'openai'
+        ? 'gpt-4o'
+        : provider === 'anthropic'
+        ? 'claude-3-5-sonnet-latest'
+        : 'gemini-2.5-flash';
+    const baseUrl =
+      typeof req.body?.baseUrl === 'string' ? req.body.baseUrl.trim() : '';
+    const systemPrompt =
+      typeof req.body?.systemPrompt === 'string' ? req.body.systemPrompt : '';
+    const userPrompt =
+      typeof req.body?.userPrompt === 'string' ? req.body.userPrompt : '';
+    const temperature =
+      typeof req.body?.temperature === 'number'
+        ? Math.max(0, Math.min(1.5, req.body.temperature))
+        : 0.4;
+
+    if (!apiKey) {
+      res.status(400).json({
+        error:
+          'Vui lòng nhập API Key của Chatbot trong phần Cài đặt AI trước khi chạy.',
+      });
+      return;
+    }
+
+    if (!userPrompt.trim()) {
+      res.status(400).json({ error: 'Nội dung yêu cầu (prompt) không được để trống.' });
+      return;
+    }
+
+    try {
+      if (provider === 'gemini') {
+        const cleanBase = (
+          baseUrl || 'https://generativelanguage.googleapis.com/v1beta'
+        ).replace(/\/+$/, '');
+        const url = `${cleanBase}/models/${encodeURIComponent(
+          model
+        )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+        const payload: Record<string, unknown> = {
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: userPrompt }],
+            },
+          ],
+          generationConfig: {
+            temperature,
+          },
+        };
+        if (systemPrompt.trim()) {
+          payload.systemInstruction = {
+            parts: [{ text: systemPrompt }],
+          };
+        }
+
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = (await resp.json().catch(() => ({}))) as Record<string, unknown>;
+        if (!resp.ok) {
+          const errObj = data.error as { message?: string } | undefined;
+          res.status(resp.status).json({
+            error:
+              errObj?.message ||
+              `Gemini API trả về lỗi HTTP ${resp.status}. Vui lòng kiểm tra API Key hoặc tên Model.`,
+          });
+          return;
+        }
+        const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+        const firstCandidate = candidates[0] as
+          | { content?: { parts?: { text?: string }[] } }
+          | undefined;
+        const text = (firstCandidate?.content?.parts || [])
+          .map((p) => p.text || '')
+          .join('')
+          .trim();
+
+        res.json({ text, model, provider });
+        return;
+      }
+
+      if (provider === 'anthropic') {
+        const cleanBase = (baseUrl || 'https://api.anthropic.com/v1').replace(
+          /\/+$/,
+          ''
+        );
+        const url = cleanBase.endsWith('/messages')
+          ? cleanBase
+          : `${cleanBase}/messages`;
+
+        const payload: Record<string, unknown> = {
+          model,
+          max_tokens: 8192,
+          temperature,
+          messages: [{ role: 'user', content: userPrompt }],
+        };
+        if (systemPrompt.trim()) {
+          payload.system = systemPrompt;
+        }
+
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-api-key': apiKey,
+            'anthropic-version': '2023-06-01',
+          },
+          body: JSON.stringify(payload),
+        });
+        const data = (await resp.json().catch(() => ({}))) as Record<string, unknown>;
+        if (!resp.ok) {
+          const errObj = data.error as { message?: string } | undefined;
+          res.status(resp.status).json({
+            error:
+              errObj?.message ||
+              `Anthropic Claude API lỗi HTTP ${resp.status}. Vui lòng kiểm tra API Key hoặc Model.`,
+          });
+          return;
+        }
+        const contentArr = Array.isArray(data.content) ? data.content : [];
+        const text = contentArr
+          .map((block: { type?: string; text?: string }) =>
+            block?.type === 'text' ? block.text || '' : ''
+          )
+          .join('')
+          .trim();
+
+        res.json({ text, model, provider });
+        return;
+      }
+
+      // OpenAI or Custom OpenAI-Compatible (OpenRouter, DeepSeek, Groq, Together, v.v.)
+      const defaultOpenAiBase = 'https://api.openai.com/v1';
+      const cleanBase = (baseUrl || defaultOpenAiBase).replace(/\/+$/, '');
+      const url = cleanBase.endsWith('/chat/completions')
+        ? cleanBase
+        : `${cleanBase}/chat/completions`;
+
+      const messages: { role: string; content: string }[] = [];
+      if (systemPrompt.trim()) {
+        messages.push({ role: 'system', content: systemPrompt });
+      }
+      messages.push({ role: 'user', content: userPrompt });
+
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature,
+        }),
+      });
+      const data = (await resp.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!resp.ok) {
+        const errObj = data.error as { message?: string } | undefined;
+        res.status(resp.status).json({
+          error:
+            errObj?.message ||
+            `API Chatbot (${provider}) trả về lỗi HTTP ${resp.status}.`,
+        });
+        return;
+      }
+      const choices = Array.isArray(data.choices) ? data.choices : [];
+      const firstChoice = choices[0] as
+        | { message?: { content?: string } }
+        | undefined;
+      const text = (firstChoice?.message?.content || '').trim();
+
+      res.json({ text, model, provider });
+    } catch (err) {
+      res.status(502).json({
+        error:
+          err instanceof Error
+            ? `Lỗi kết nối tới API Chatbot: ${err.message}`
+            : 'Không thể kết nối tới máy chủ AI Chatbot.',
+      });
+    }
+  });
+
   // Multer & upload validation error handler
   app.use((err: unknown, req: Request, res: Response, next: NextFunction) => {
     if (!req.path.startsWith('/api/')) {

@@ -5,6 +5,7 @@ import {
   FileText,
   Plus,
   Trash2,
+  Wand2,
   X,
 } from 'lucide-react';
 import {
@@ -62,6 +63,7 @@ interface OrderWorkspaceModalProps {
   nowMs: number;
   onClose: () => void;
   onOpenWordHumanizer?: (orderCode: string) => void;
+  onOpenAiWriter?: (orderCode: string) => void;
   onToast: (msg: string) => void;
 }
 
@@ -85,6 +87,7 @@ export function OrderWorkspaceModal({
   nowMs,
   onClose,
   onOpenWordHumanizer,
+  onOpenAiWriter,
   onToast,
 }: OrderWorkspaceModalProps) {
   const isStaffMode = userRole === 'staff';
@@ -616,6 +619,20 @@ export function OrderWorkspaceModal({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {editingOrder && onOpenAiWriter && (
+              <button
+                type="button"
+                onClick={() => {
+                  const code = editingOrder.orderCode;
+                  void handleCloseModal();
+                  onOpenAiWriter(code);
+                }}
+                className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#4338CA] hover:bg-indigo-700 text-white rounded-lg whitespace-nowrap shadow-2xs"
+              >
+                <Wand2 className="w-3.5 h-3.5" />
+                <span>Mở AI Writer Studio</span>
+              </button>
+            )}
             {editingOrder && onOpenWordHumanizer && (
               <button
                 type="button"

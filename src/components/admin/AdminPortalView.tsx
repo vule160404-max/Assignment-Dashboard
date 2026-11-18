@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   TrendingUp,
   Users,
+  Wand2,
   X,
 } from 'lucide-react';
 import { ADMIN_EMAIL, auth } from '../../lib/firebase';
@@ -58,6 +59,7 @@ import {
 import { DeadlineBadge } from '../shared/DeadlineBadge';
 import { BrandLogo } from '../shared/BrandLogo';
 import { AdminAuthGate } from './AdminAuthGate';
+import { AiWriterStudioView } from './AiWriterStudioView';
 import { BankSettingsView } from './BankSettingsView';
 import { CalendarView } from './CalendarView';
 import { ClientsCrmView } from './ClientsCrmView';
@@ -66,7 +68,7 @@ import { RevenueDashboardView } from './RevenueDashboardView';
 import { TeamManagementView } from './TeamManagementView';
 import { WordHumanizerView } from './WordHumanizerView';
 
-type AdminTab = 'orders' | 'calendar' | 'humanizer' | 'clients' | 'revenue' | 'team' | 'settings';
+type AdminTab = 'orders' | 'calendar' | 'ai_writer' | 'humanizer' | 'clients' | 'revenue' | 'team' | 'settings';
 type OrderFilter = 'all' | 'active' | 'urgent' | 'unpaid_balance' | 'completed';
 
 const ZALO_TPL_LABELS: Record<ZaloTemplateType, string> = {
@@ -126,6 +128,7 @@ export function AdminPortalView({
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
   const [humanizerOrderCode, setHumanizerOrderCode] = useState('');
+  const [writerOrderCode, setWriterOrderCode] = useState('');
   const syncedNotifKeyRef = useRef('');
 
   const isBootstrappedOwner = Boolean(
@@ -327,6 +330,12 @@ export function AdminPortalView({
     setActiveTab('humanizer');
   };
 
+  const handleOpenAiWriterForOrder = (code: string) => {
+    setWorkspaceOpen(false);
+    setWriterOrderCode(code);
+    setActiveTab('ai_writer');
+  };
+
   const handleAttachHumanizedDocx = async (order: OrderRecord, file: File) => {
     const existingAttachments = order.attachments || [];
     if (existingAttachments.length >= FIELD_LIMITS.attachmentsMax) {
@@ -507,6 +516,7 @@ export function AdminPortalView({
       badge: metrics.urgentCount > 0 ? metrics.urgentCount : undefined,
     },
     { key: 'calendar', label: 'Lịch Deadline', icon: Calendar },
+    { key: 'ai_writer', label: 'AI Writer Studio', icon: Wand2 },
     { key: 'humanizer', label: 'Humanize Word (HIX)', icon: FileText },
     { key: 'clients', label: 'Khách hàng (CRM)', icon: Users, adminOnly: true },
     { key: 'revenue', label: 'Doanh thu & Công CTV', icon: TrendingUp, adminOnly: true },
@@ -694,7 +704,11 @@ export function AdminPortalView({
           )}
         </header>
 
-        <main className="p-5 sm:p-6 max-w-6xl w-full mx-auto space-y-6">
+        <main
+          className={`p-5 sm:p-6 w-full mx-auto space-y-6 ${
+            activeTab === 'ai_writer' ? 'max-w-[1440px]' : 'max-w-6xl'
+          }`}
+        >
           {activeTab === 'orders' && (
             <>
               {/* Cohesive Operational Strip */}
@@ -1004,6 +1018,34 @@ export function AdminPortalView({
             />
           )}
 
+          {activeTab === 'ai_writer' && (
+            <AiWriterStudioView
+              orders={orders}
+              initialOrderCode={writerOrderCode}
+              onAttachDocxToOrder={async (ord, file) => {
+                await handleAttachHumanizedDocx(ord, file);
+                onToast(`Đã đính kèm bản thảo Word (${file.name}) vào đơn #${ord.orderCode}!`);
+              }}
+              onSendDocxToHumanizer={(orderCode, file) => {
+                // Download file and switch directly to humanizer tab
+                const url = URL.createObjectURL(file);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = file.name;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                setHumanizerOrderCode(orderCode);
+                setActiveTab('humanizer');
+                onToast(
+                  `Đã xuất "${file.name}" và chuyển sang tab Word Humanizer!`
+                );
+              }}
+              onToast={onToast}
+            />
+          )}
+
           {activeTab === 'humanizer' && (
             <WordHumanizerView
               orders={orders}
@@ -1054,6 +1096,7 @@ export function AdminPortalView({
         nowMs={nowMs}
         onClose={() => setWorkspaceOpen(false)}
         onOpenWordHumanizer={handleOpenHumanizerForOrder}
+        onOpenAiWriter={handleOpenAiWriterForOrder}
         onToast={onToast}
       />
     </div>
