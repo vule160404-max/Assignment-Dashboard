@@ -14,6 +14,25 @@ import {
 import { UserProfile } from './types/domain';
 
 const REMOVED_LEGACY_EMAIL = 'cycloneielts@gmail.com';
+const PORTAL_MODE_STORAGE_KEY = 'assigntrack_portal_mode_v1';
+
+function resolveInitialPortalMode(): 'select' | 'admin' | 'client' {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('code')) return 'client';
+  const urlPortal = params.get('portal');
+  if (urlPortal === 'admin' || urlPortal === 'client' || urlPortal === 'select') {
+    return urlPortal;
+  }
+  try {
+    const saved = localStorage.getItem(PORTAL_MODE_STORAGE_KEY);
+    if (saved === 'admin' || saved === 'client') {
+      return saved;
+    }
+  } catch {
+    // ignore storage errors
+  }
+  return 'select';
+}
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
@@ -25,8 +44,8 @@ export default function App() {
   const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
 
   const initialCodeParam = new URLSearchParams(window.location.search).get('code') || '';
-  const [mode, setMode] = useState<'select' | 'admin' | 'client'>(() =>
-    initialCodeParam ? 'client' : 'select'
+  const [mode, setMode] = useState<'select' | 'admin' | 'client'>(
+    resolveInitialPortalMode
   );
   const [clientInitialCode, setClientInitialCode] = useState(() =>
     normalizeOrderCode(initialCodeParam)
@@ -126,24 +145,49 @@ export default function App() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
+  const persistPortalMode = useCallback((nextMode: 'select' | 'admin' | 'client') => {
+    try {
+      localStorage.setItem(PORTAL_MODE_STORAGE_KEY, nextMode);
+    } catch {
+      // ignore
+    }
+    const url = new URL(window.location.href);
+    if (nextMode === 'select') {
+      url.searchParams.delete('portal');
+      url.searchParams.delete('tab');
+      url.searchParams.delete('code');
+    } else {
+      url.searchParams.set('portal', nextMode);
+      if (nextMode === 'client') {
+        url.searchParams.delete('tab');
+      } else {
+        url.searchParams.delete('code');
+      }
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, []);
+
   const handleSwitchToClient = (orderCode?: string) => {
-    setClientInitialCode(orderCode ? normalizeOrderCode(orderCode) : '');
+    const normalized = orderCode ? normalizeOrderCode(orderCode) : '';
+    setClientInitialCode(normalized);
     setMode('client');
+    persistPortalMode('client');
+    if (normalized) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('code', normalized);
+      window.history.replaceState({}, '', url.toString());
+    }
   };
 
   const handleSwitchToAdmin = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('code');
-    window.history.replaceState({}, '', url.toString());
     setMode('admin');
+    persistPortalMode('admin');
   };
 
   const handleBackToRoleSelect = () => {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('code');
-    window.history.replaceState({}, '', url.toString());
     setClientInitialCode('');
     setMode('select');
+    persistPortalMode('select');
   };
 
   let activeContent = (

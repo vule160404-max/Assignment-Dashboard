@@ -71,6 +71,34 @@ import { WordHumanizerView } from './WordHumanizerView';
 type AdminTab = 'orders' | 'calendar' | 'ai_writer' | 'humanizer' | 'clients' | 'revenue' | 'team' | 'settings';
 type OrderFilter = 'all' | 'active' | 'urgent' | 'unpaid_balance' | 'completed';
 
+const ADMIN_TAB_STORAGE_KEY = 'assigntrack_admin_tab_v1';
+const VALID_ADMIN_TABS: AdminTab[] = [
+  'orders',
+  'calendar',
+  'ai_writer',
+  'humanizer',
+  'clients',
+  'revenue',
+  'team',
+  'settings',
+];
+
+function resolveInitialAdminTab(): AdminTab {
+  const urlTab = new URLSearchParams(window.location.search).get('tab') as AdminTab | null;
+  if (urlTab && VALID_ADMIN_TABS.includes(urlTab)) {
+    return urlTab;
+  }
+  try {
+    const saved = localStorage.getItem(ADMIN_TAB_STORAGE_KEY) as AdminTab | null;
+    if (saved && VALID_ADMIN_TABS.includes(saved)) {
+      return saved;
+    }
+  } catch {
+    // ignore
+  }
+  return 'orders';
+}
+
 const ZALO_TPL_LABELS: Record<ZaloTemplateType, string> = {
   quote_deposit: 'Mời cọc',
   final_payment: 'Nhắc tất toán',
@@ -102,8 +130,21 @@ export function AdminPortalView({
   onRefreshProfile,
   onToast,
 }: AdminPortalViewProps) {
-  const [activeTab, setActiveTab] = useState<AdminTab>('orders');
+  const [activeTab, setActiveTabState] = useState<AdminTab>(resolveInitialAdminTab);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const setActiveTab = (nextTab: AdminTab) => {
+    setActiveTabState(nextTab);
+    try {
+      localStorage.setItem(ADMIN_TAB_STORAGE_KEY, nextTab);
+    } catch {
+      // ignore
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.set('portal', 'admin');
+    url.searchParams.set('tab', nextTab);
+    window.history.replaceState({}, '', url.toString());
+  };
 
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [clients, setClients] = useState<ClientRecord[]>([]);

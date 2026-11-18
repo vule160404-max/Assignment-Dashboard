@@ -137,10 +137,26 @@ export function AiWriterStudioView({
   });
   const [activeSessionId, setActiveSessionId] = useState<string>(() => {
     const saved = loadWriterSessions();
+    try {
+      const lastId = localStorage.getItem('assigntrack_ai_writer_active_session_v1');
+      if (lastId && saved.some((s) => s.id === lastId)) {
+        return lastId;
+      }
+    } catch {
+      // ignore
+    }
     return saved[0]?.id || '';
   });
 
-  const [leftTab, setLeftTab] = useState<'brief' | 'outline'>('outline');
+  const [leftTab, setLeftTab] = useState<'brief' | 'outline'>(() => {
+    try {
+      const savedTab = localStorage.getItem('assigntrack_ai_writer_left_tab_v1');
+      if (savedTab === 'brief' || savedTab === 'outline') return savedTab;
+    } catch {
+      // ignore
+    }
+    return 'outline';
+  });
   const [focusPaperMode, setFocusPaperMode] = useState(false);
   const [showApiModal, setShowApiModal] = useState(false);
   const [showSkillModal, setShowSkillModal] = useState(false);
@@ -171,7 +187,25 @@ export function AiWriterStudioView({
     if (activeSession && activeSession.id !== activeSessionId) {
       setActiveSessionId(activeSession.id);
     }
+    if (activeSession?.id) {
+      try {
+        localStorage.setItem(
+          'assigntrack_ai_writer_active_session_v1',
+          activeSession.id
+        );
+      } catch {
+        // ignore
+      }
+    }
   }, [activeSession, activeSessionId]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('assigntrack_ai_writer_left_tab_v1', leftTab);
+    } catch {
+      // ignore
+    }
+  }, [leftTab]);
 
   useEffect(() => {
     if (!initialOrderCode) return;
