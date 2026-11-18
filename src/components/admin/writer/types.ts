@@ -84,6 +84,15 @@ export interface SessionContextFile {
   uploadedAt: string;
 }
 
+export type WriterBatchStatus =
+  | 'idle'
+  | 'queued'
+  | 'outlining'
+  | 'writing_sections'
+  | 'paused'
+  | 'completed'
+  | 'error';
+
 export interface WriterSession {
   id: string;
   title: string;
@@ -102,6 +111,8 @@ export interface WriterSession {
   activeSectionId: string;
   viewMode: 'sections' | 'full_paper';
   fullPaperOverride?: string;
+  batchStatus?: WriterBatchStatus;
+  batchErrorMsg?: string;
   historyStack: string[];
   historyIndex: number;
   updatedAt: string;

@@ -3,12 +3,11 @@ import {
   BookOpen,
   Bot,
   Download,
-  FilePlus,
   FileText,
   Layers,
   Paperclip,
   Sparkles,
-  Trash2,
+  Wand2,
 } from 'lucide-react';
 import {
   AiRefineAction,
@@ -45,6 +44,10 @@ import { WriterOutlinePanel } from './writer/WriterOutlinePanel';
 import { WriterPaperCanvas } from './writer/WriterPaperCanvas';
 import { WriterSkillLibraryModal } from './writer/WriterSkillLibraryModal';
 import { WriterWordRibbon } from './writer/WriterWordRibbon';
+import {
+  WriterWorkspaceTabs,
+  isWriterSessionBusy,
+} from './writer/WriterWorkspaceTabs';
 
 interface AiWriterStudioViewProps {
   orders: OrderRecord[];
@@ -89,6 +92,7 @@ function createDefaultSession(order?: OrderRecord | null): WriterSession {
     activeSectionId: defaultOutline[0]?.id || '',
     viewMode: 'sections',
     fullPaperOverride: '',
+    batchStatus: 'idle',
     historyStack: [],
     historyIndex: -1,
     updatedAt: new Date().toISOString(),
@@ -110,7 +114,22 @@ export function AiWriterStudioView({
   );
   const [sessions, setSessions] = useState<WriterSession[]>(() => {
     const saved = loadWriterSessions();
-    if (saved.length > 0) return saved;
+    if (saved.length > 0) {
+      // Reset any stuck generating statuses from previous page reload
+      return saved.map((s) => ({
+        ...s,
+        batchStatus:
+          s.batchStatus === 'outlining' ||
+          s.batchStatus === 'writing_sections' ||
+          s.batchStatus === 'queued'
+            ? 'idle'
+            : s.batchStatus,
+        outline: s.outline.map((sec) => ({
+          ...sec,
+          status: sec.status === 'generating' ? 'idle' : sec.status,
+        })),
+      }));
+    }
     const matchedOrder = initialOrderCode
       ? orders.find((o) => o.orderCode === initialOrderCode) || null
       : null;
@@ -126,13 +145,16 @@ export function AiWriterStudioView({
   const [showApiModal, setShowApiModal] = useState(false);
   const [showSkillModal, setShowSkillModal] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
-  const [generatingOutline, setGeneratingOutline] = useState(false);
-  const [runningAllSections, setRunningAllSections] = useState(false);
+  const [concurrencyLimit, setConcurrencyLimit] = useState(2);
   const [refiningSection, setRefiningSection] = useState(false);
   const [exportingDocx, setExportingDocx] = useState(false);
+  const [exportingAllDocx, setExportingAllDocx] = useState(false);
   const [attachingToOrder, setAttachingToOrder] = useState(false);
 
-  const stopSequentialRef = useRef(false);
+  // Refs for background multi-session parallel execution
+  const sessionsRef = useRef<WriterSession[]>(sessions);
+  sessionsRef.current = sessions;
+  const pausedSessionIdsRef = useRef<Set<string>>(new Set());
   const activeTextareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -153,7 +175,7 @@ export function AiWriterStudioView({
 
   useEffect(() => {
     if (!initialOrderCode) return;
-    const existing = sessions.find(
+    const existing = sessionsRef.current.find(
       (s) => s.linkedOrderCode === initialOrderCode
     );
     if (existing) {
@@ -174,14 +196,15 @@ export function AiWriterStudioView({
     [skills]
   );
 
-  const mutateActiveSession = (
+  // Mutate a specific session by ID (safe for background concurrent tasks)
+  const mutateSessionById = (
+    targetId: string,
     updater: (prev: WriterSession) => WriterSession,
     pushHistory = false
   ) => {
-    if (!activeSession) return;
     setSessions((prev) =>
       prev.map((s) => {
-        if (s.id !== activeSession.id) return s;
+        if (s.id !== targetId) return s;
         const next = updater(s);
         if (pushHistory) {
           const snapshot = JSON.stringify(
@@ -205,6 +228,14 @@ export function AiWriterStudioView({
         };
       })
     );
+  };
+
+  const mutateActiveSession = (
+    updater: (prev: WriterSession) => WriterSession,
+    pushHistory = false
+  ) => {
+    if (!activeSession) return;
+    mutateSessionById(activeSession.id, updater, pushHistory);
   };
 
   const handleSaveAiSettings = (next: AiChatbotSettingsStore) => {
@@ -257,13 +288,24 @@ export function AiWriterStudioView({
 
   const handleCreateNewSession = () => {
     const created = createDefaultSession(null);
-    setSessions((prev) => [created, ...prev]);
+    setSessions((prev) => [...prev, created]);
     setActiveSessionId(created.id);
     setLeftTab('brief');
-    onToast('Đã tạo phiên làm bài mới.');
+    onToast('Đã thêm tab bài viết mới.');
+  };
+
+  const handleImportMultipleOrders = (selectedOrders: OrderRecord[]) => {
+    if (selectedOrders.length === 0) return;
+    const newSessions = selectedOrders.map((ord) => createDefaultSession(ord));
+    setSessions((prev) => [...prev, ...newSessions]);
+    setActiveSessionId(newSessions[0].id);
+    onToast(
+      `Đã mở thêm ${newSessions.length} tab bài viết từ danh sách Đơn hàng! Bạn có thể bấm "Viết song song tất cả".`
+    );
   };
 
   const handleDeleteSession = (id: string) => {
+    pausedSessionIdsRef.current.add(id);
     if (sessions.length <= 1) {
       const reset = createDefaultSession(null);
       setSessions([reset]);
@@ -308,36 +350,45 @@ export function AiWriterStudioView({
     }
   };
 
-  // --- Outline Management ---
-  const handleAiGenerateOutline = async () => {
-    if (!activeSession) return;
+  // --- Outline Management (Session-Safe) ---
+  const handleAiGenerateOutlineForSession = async (targetSessionId: string) => {
+    const sess = sessionsRef.current.find((s) => s.id === targetSessionId);
+    if (!sess) return;
     if (!activeProfile.apiKey.trim()) {
       setShowApiModal(true);
       onToast('Vui lòng nhập API Key Chatbot trước khi tạo dàn ý.');
       return;
     }
-    setLeftTab('outline');
-    setGeneratingOutline(true);
+    if (targetSessionId === activeSession?.id) {
+      setLeftTab('outline');
+    }
+
+    mutateSessionById(targetSessionId, (s) => ({
+      ...s,
+      batchStatus: 'outlining',
+      batchErrorMsg: undefined,
+    }));
+
     try {
-      const sections = await generateOutlineWithAi(
-        activeSession,
-        skills,
-        activeProfile
-      );
-      mutateActiveSession((s) => ({
+      const sections = await generateOutlineWithAi(sess, skills, activeProfile);
+      mutateSessionById(targetSessionId, (s) => ({
         ...s,
         outline: sections,
         activeSectionId: sections[0]?.id || '',
+        batchStatus: 'idle',
       }));
       onToast(
-        `AI (${activeProfile.model}) đã thiết kế dàn ý gồm ${sections.length} mục bám sát Rubric & Skill.`
+        `AI (${activeProfile.model}) đã lập dàn ý ${sections.length} mục cho "${sess.title}".`
       );
     } catch (err) {
-      onToast(
-        err instanceof Error ? err.message : 'Tạo dàn ý bằng AI thất bại.'
-      );
-    } finally {
-      setGeneratingOutline(false);
+      const msg =
+        err instanceof Error ? err.message : 'Tạo dàn ý bằng AI thất bại.';
+      mutateSessionById(targetSessionId, (s) => ({
+        ...s,
+        batchStatus: 'error',
+        batchErrorMsg: msg,
+      }));
+      onToast(msg);
     }
   };
 
@@ -349,7 +400,8 @@ export function AiWriterStudioView({
       title: `${activeSession.outline.length + 1}. Mục nội dung mới`,
       headingLevel: 'h1',
       targetWords: 350,
-      guidanceNotes: 'Luận điểm, dẫn chứng học thuật và trích dẫn cần triển khai...',
+      guidanceNotes:
+        'Luận điểm, dẫn chứng học thuật và trích dẫn cần triển khai...',
       content: '',
       status: 'idle',
     };
@@ -407,23 +459,29 @@ export function AiWriterStudioView({
     }));
   };
 
-  // --- AI Section Writing (Single & Sequential All) ---
+  // --- Single Section & Full-Paper Background Pipeline ---
   const handleWriteSingleSection = async (sectionId: string) => {
     if (!activeSession) return;
+    const targetSessionId = activeSession.id;
     if (!activeProfile.apiKey.trim()) {
       setShowApiModal(true);
       onToast('Vui lòng nhập API Key Chatbot trước khi viết bài.');
       return;
     }
 
-    handleUpdateOutlineSection(sectionId, {
-      status: 'generating',
-      errorMsg: undefined,
-    });
+    mutateSessionById(targetSessionId, (s) => ({
+      ...s,
+      outline: s.outline.map((sec) =>
+        sec.id === sectionId
+          ? { ...sec, status: 'generating', errorMsg: undefined }
+          : sec
+      ),
+    }));
 
     try {
       const latestSession =
-        sessions.find((s) => s.id === activeSession.id) || activeSession;
+        sessionsRef.current.find((s) => s.id === targetSessionId) ||
+        activeSession;
       const generatedText = await generateSectionWithAi(
         latestSession,
         sectionId,
@@ -431,96 +489,253 @@ export function AiWriterStudioView({
         activeProfile
       );
 
-      handleUpdateOutlineSection(
-        sectionId,
-        {
-          content: generatedText,
-          status: 'completed',
-          errorMsg: undefined,
-        },
+      mutateSessionById(
+        targetSessionId,
+        (s) => ({
+          ...s,
+          outline: s.outline.map((sec) =>
+            sec.id === sectionId
+              ? {
+                  ...sec,
+                  content: generatedText,
+                  status: 'completed',
+                  errorMsg: undefined,
+                }
+              : sec
+          ),
+        }),
         true
       );
-      onToast('Đã viết xong mục dàn ý! Bạn có thể kiểm tra và sửa trực tiếp trên trang A4.');
+      onToast('Đã viết xong mục dàn ý!');
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : 'Lỗi khi gọi AI viết mục này.';
-      handleUpdateOutlineSection(sectionId, {
-        status: 'error',
-        errorMsg: msg,
-      });
+      mutateSessionById(targetSessionId, (s) => ({
+        ...s,
+        outline: s.outline.map((sec) =>
+          sec.id === sectionId
+            ? { ...sec, status: 'error', errorMsg: msg }
+            : sec
+        ),
+      }));
       onToast(msg);
     }
   };
 
-  const handleWriteAllSectionsSequentially = async () => {
+  /**
+   * Executes a full paper pipeline for a single sessionId in the background:
+   * 1. If the session still has a generic outline and has a topic/instructions, optionally generate outline if outline is empty.
+   * 2. Sequentially write all sections that are still empty (or all sections if `forceAll` is true).
+   */
+  const runSinglePaperPipeline = async (
+    targetSessionId: string,
+    onlyUnwrittenSections = true
+  ): Promise<void> => {
+    pausedSessionIdsRef.current.delete(targetSessionId);
+
+    const initialSnap = sessionsRef.current.find(
+      (s) => s.id === targetSessionId
+    );
+    if (!initialSnap) return;
+
+    mutateSessionById(targetSessionId, (s) => ({
+      ...s,
+      batchStatus: 'writing_sections',
+      batchErrorMsg: undefined,
+    }));
+
+    try {
+      const sectionIds = initialSnap.outline.map((sec) => sec.id);
+
+      for (const secId of sectionIds) {
+        if (pausedSessionIdsRef.current.has(targetSessionId)) {
+          mutateSessionById(targetSessionId, (s) => ({
+            ...s,
+            batchStatus: 'paused',
+          }));
+          return;
+        }
+
+        const currentSnap = sessionsRef.current.find(
+          (s) => s.id === targetSessionId
+        );
+        if (!currentSnap) return;
+        const secObj = currentSnap.outline.find((sec) => sec.id === secId);
+        if (!secObj) continue;
+
+        if (onlyUnwrittenSections && countWords(secObj.content) > 0) {
+          continue;
+        }
+
+        // Mark section generating
+        mutateSessionById(targetSessionId, (s) => ({
+          ...s,
+          activeSectionId: secId,
+          outline: s.outline.map((sec) =>
+            sec.id === secId
+              ? { ...sec, status: 'generating', errorMsg: undefined }
+              : sec
+          ),
+        }));
+
+        const latestBeforeCall =
+          sessionsRef.current.find((s) => s.id === targetSessionId) ||
+          currentSnap;
+
+        const generatedText = await generateSectionWithAi(
+          latestBeforeCall,
+          secId,
+          skills,
+          activeProfile
+        );
+
+        if (pausedSessionIdsRef.current.has(targetSessionId)) {
+          mutateSessionById(targetSessionId, (s) => ({
+            ...s,
+            batchStatus: 'paused',
+            outline: s.outline.map((sec) =>
+              sec.id === secId ? { ...sec, status: 'idle' } : sec
+            ),
+          }));
+          return;
+        }
+
+        mutateSessionById(
+          targetSessionId,
+          (s) => ({
+            ...s,
+            outline: s.outline.map((sec) =>
+              sec.id === secId
+                ? {
+                    ...sec,
+                    content: generatedText,
+                    status: 'completed',
+                    errorMsg: undefined,
+                  }
+                : sec
+            ),
+          }),
+          true
+        );
+      }
+
+      mutateSessionById(targetSessionId, (s) => ({
+        ...s,
+        batchStatus: 'completed',
+      }));
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : 'Quá trình viết bài tự động bị gián đoạn.';
+      mutateSessionById(targetSessionId, (s) => ({
+        ...s,
+        batchStatus: 'error',
+        batchErrorMsg: msg,
+        outline: s.outline.map((sec) =>
+          sec.status === 'generating'
+            ? { ...sec, status: 'error', errorMsg: msg }
+            : sec
+        ),
+      }));
+      throw err;
+    }
+  };
+
+  const handleWriteCurrentPaperSequentially = async () => {
     if (!activeSession) return;
     if (!activeProfile.apiKey.trim()) {
       setShowApiModal(true);
       onToast('Vui lòng nhập API Key Chatbot trước khi chạy tự động.');
       return;
     }
-
-    stopSequentialRef.current = false;
-    setRunningAllSections(true);
-
     try {
-      let workingSession: WriterSession = { ...activeSession };
-
-      for (let i = 0; i < workingSession.outline.length; i++) {
-        if (stopSequentialRef.current) {
-          onToast('Đã dừng viết tuần tự theo yêu cầu.');
-          break;
-        }
-        const targetSec = workingSession.outline[i];
-
-        workingSession = {
-          ...workingSession,
-          activeSectionId: targetSec.id,
-          outline: workingSession.outline.map((sec) =>
-            sec.id === targetSec.id
-              ? { ...sec, status: 'generating', errorMsg: undefined }
-              : sec
-          ),
-        };
-        setSessions((prev) =>
-          prev.map((s) => (s.id === workingSession.id ? workingSession : s))
-        );
-
-        const generatedText = await generateSectionWithAi(
-          workingSession,
-          targetSec.id,
-          skills,
-          activeProfile
-        );
-
-        workingSession = {
-          ...workingSession,
-          outline: workingSession.outline.map((sec) =>
-            sec.id === targetSec.id
-              ? { ...sec, content: generatedText, status: 'completed' }
-              : sec
-          ),
-          updatedAt: new Date().toISOString(),
-        };
-        setSessions((prev) =>
-          prev.map((s) => (s.id === workingSession.id ? workingSession : s))
-        );
-      }
-
-      if (!stopSequentialRef.current) {
-        onToast(
-          'Hoàn tất viết toàn bộ các mục trong dàn ý! Bạn có thể rà soát trên trang giấy A4.'
-        );
-      }
+      await runSinglePaperPipeline(activeSession.id, false);
+      onToast(`Đã viết hoàn tất bài "${activeSession.title}"!`);
     } catch (err) {
       onToast(
-        err instanceof Error
-          ? err.message
-          : 'Quá trình viết tuần tự bị gián đoạn.'
+        err instanceof Error ? err.message : 'Viết bài tuần tự bị gián đoạn.'
       );
-    } finally {
-      setRunningAllSections(false);
     }
+  };
+
+  /**
+   * Run ALL open sessions that have remaining unwritten sections in parallel
+   * using a bounded worker pool (`concurrencyLimit` papers at once).
+   */
+  const handleRunAllPapersParallel = async () => {
+    if (!activeProfile.apiKey.trim()) {
+      setShowApiModal(true);
+      onToast('Vui lòng nhập API Key Chatbot trước khi chạy song song nhiều bài.');
+      return;
+    }
+
+    const runnableIds = sessionsRef.current
+      .filter((s) => {
+        if (isWriterSessionBusy(s)) return false;
+        const doneSecs = s.outline.filter(
+          (sec) => countWords(sec.content) > 0
+        ).length;
+        return doneSecs < s.outline.length;
+      })
+      .map((s) => s.id);
+
+    if (runnableIds.length === 0) {
+      onToast('Tất cả các bài đang mở đều đã viết đủ các mục.');
+      return;
+    }
+
+    // Mark all runnable sessions as queued
+    runnableIds.forEach((id) => {
+      pausedSessionIdsRef.current.delete(id);
+      mutateSessionById(id, (s) => ({
+        ...s,
+        batchStatus: 'queued',
+        batchErrorMsg: undefined,
+      }));
+    });
+
+    onToast(
+      `Bắt đầu viết song song ${runnableIds.length} bài (${concurrencyLimit} luồng đồng thời)...`
+    );
+
+    const queue = [...runnableIds];
+    const workerCount = Math.min(concurrencyLimit, queue.length);
+
+    const runWorker = async () => {
+      while (queue.length > 0) {
+        const nextSessionId = queue.shift();
+        if (!nextSessionId) break;
+        if (pausedSessionIdsRef.current.has(nextSessionId)) continue;
+        try {
+          await runSinglePaperPipeline(nextSessionId, true);
+        } catch {
+          // Individual paper error is already recorded on its tab
+        }
+      }
+    };
+
+    await Promise.allSettled(
+      Array.from({ length: workerCount }, () => runWorker())
+    );
+
+    onToast('Đã hoàn tất đợt chạy song song các bài viết!');
+  };
+
+  const handlePauseAllPapers = () => {
+    sessionsRef.current.forEach((s) => {
+      pausedSessionIdsRef.current.add(s.id);
+      if (isWriterSessionBusy(s)) {
+        mutateSessionById(s.id, (prev) => ({
+          ...prev,
+          batchStatus: 'paused',
+          outline: prev.outline.map((sec) =>
+            sec.status === 'generating' ? { ...sec, status: 'idle' } : sec
+          ),
+        }));
+      }
+    });
+    onToast('Đã gửi lệnh tạm dừng tất cả các bài đang chạy.');
   };
 
   // --- Ribbon Formatting & Manual Editing Actions ---
@@ -785,6 +1000,39 @@ export function AiWriterStudioView({
     }
   };
 
+  const handleExportAllDraftedDocx = async () => {
+    const draftedSessions = sessionsRef.current.filter((s) =>
+      s.outline.some((sec) => countWords(sec.content) > 0)
+    );
+    if (draftedSessions.length === 0) return;
+
+    setExportingAllDocx(true);
+    try {
+      for (const sess of draftedSessions) {
+        const file = await buildFormattedDocxFromSession(sess);
+        const url = URL.createObjectURL(file);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = file.name;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+      onToast(
+        `Đã tải xuống hàng loạt ${draftedSessions.length} file Word (.DOCX)!`
+      );
+    } catch (err) {
+      onToast(
+        err instanceof Error
+          ? err.message
+          : 'Không thể xuất hàng loạt file .docx.'
+      );
+    } finally {
+      setExportingAllDocx(false);
+    }
+  };
+
   const handleAttachToLinkedOrder = async () => {
     if (!activeSession || !linkedOrder || !onAttachDocxToOrder) return;
     setAttachingToOrder(true);
@@ -818,61 +1066,53 @@ export function AiWriterStudioView({
 
   if (!activeSession) return null;
 
+  const isActivePaperOutlining = activeSession.batchStatus === 'outlining';
+  const isActivePaperWriting =
+    activeSession.batchStatus === 'writing_sections' ||
+    activeSession.outline.some((sec) => sec.status === 'generating');
+
   return (
     <div className="surface-enter space-y-3">
-      {/* Compact Studio Header Bar */}
+      {/* Multi-Paper Workspace Tabs & Parallel Runner */}
+      <WriterWorkspaceTabs
+        sessions={sessions}
+        activeSessionId={activeSession.id}
+        orders={orders}
+        concurrencyLimit={concurrencyLimit}
+        exportingAll={exportingAllDocx}
+        onSelectSession={setActiveSessionId}
+        onAddNewBlank={handleCreateNewSession}
+        onImportMultipleOrders={handleImportMultipleOrders}
+        onCloseSession={handleDeleteSession}
+        onRunAllParallel={() => void handleRunAllPapersParallel()}
+        onPauseAll={handlePauseAllPapers}
+        onConcurrencyChange={setConcurrencyLimit}
+        onExportAllDocx={() => void handleExportAllDraftedDocx()}
+      />
+
+      {/* Current Paper Action Bar */}
       <div className="bg-white border border-zinc-200/90 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-        {/* Session & Linked Order Controls */}
         <div className="flex flex-wrap items-center gap-2">
+          <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-[#4338CA] px-2.5 py-1.5 rounded-lg text-xs font-bold">
+            <Wand2 className="w-3.5 h-3.5" />
+            <span className="truncate max-w-[200px]">
+              {activeSession.title || 'Bài nghiên cứu'}
+            </span>
+          </div>
+
           <select
-            aria-label="Phiên làm bài"
-            value={activeSession.id}
-            onChange={(e) => setActiveSessionId(e.target.value)}
-            className="px-2.5 py-1.5 text-xs font-semibold bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#4338CA] max-w-[210px]"
+            aria-label="Nạp đề bài từ mã đơn cho tab hiện tại"
+            value={activeSession.linkedOrderCode}
+            onChange={(e) => handleLoadFromOrder(e.target.value)}
+            className="px-2.5 py-1.5 text-xs font-mono font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#4338CA]"
           >
-            {sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.title || 'Bài nghiên cứu mới'}
+            <option value="">-- Nạp đề từ Đơn hàng cho tab này --</option>
+            {orders.map((o) => (
+              <option key={o.id} value={o.orderCode}>
+                #{o.orderCode} · {o.subject} ({o.wordCount}w)
               </option>
             ))}
           </select>
-
-          <button
-            type="button"
-            onClick={handleCreateNewSession}
-            title="Tạo bài viết mới"
-            className="btn-press px-2 py-1.5 text-xs font-medium bg-zinc-100 hover:bg-zinc-200/80 text-zinc-700 rounded-lg inline-flex items-center gap-1"
-          >
-            <FilePlus className="w-3.5 h-3.5" />
-            <span>Bài mới</span>
-          </button>
-
-          {sessions.length > 1 && (
-            <button
-              type="button"
-              onClick={() => handleDeleteSession(activeSession.id)}
-              title="Xóa phiên làm bài này"
-              className="btn-press p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
-
-          <div className="inline-flex items-center gap-1.5 pl-2 border-l border-zinc-200">
-            <select
-              aria-label="Nạp đề bài từ mã đơn"
-              value={activeSession.linkedOrderCode}
-              onChange={(e) => handleLoadFromOrder(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-mono font-medium bg-white border border-zinc-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#4338CA]"
-            >
-              <option value="">Nạp đề từ Đơn hàng...</option>
-              {orders.map((o) => (
-                <option key={o.id} value={o.orderCode}>
-                  #{o.orderCode} · {o.subject} ({o.wordCount}w)
-                </option>
-              ))}
-            </select>
-          </div>
         </div>
 
         {/* Right Controls: Skill Library, API Chatbot, Export .DOCX */}
@@ -952,7 +1192,9 @@ export function AiWriterStudioView({
           activeSession.historyIndex < activeSession.historyStack.length - 1
         }
         zoomPercent={zoomPercent}
-        aiBusy={generatingOutline || runningAllSections || refiningSection}
+        aiBusy={
+          isActivePaperOutlining || isActivePaperWriting || refiningSection
+        }
         onUpdateFormat={handleUpdateFormat}
         onApplyPreset={handleApplyPreset}
         onInlineFormat={handleInlineFormat}
@@ -1006,7 +1248,7 @@ export function AiWriterStudioView({
                 onUploadContextFiles={handleUploadContextFiles}
                 onSwitchToOutlineWithAi={() => {
                   setLeftTab('outline');
-                  void handleAiGenerateOutline();
+                  void handleAiGenerateOutlineForSession(activeSession.id);
                 }}
               />
             ) : (
@@ -1015,17 +1257,19 @@ export function AiWriterStudioView({
                 currentSectionId={currentSection?.id || ''}
                 totalDraftedWords={totalDraftedWords}
                 totalOutlineTargetWords={totalOutlineTargetWords}
-                generatingOutline={generatingOutline}
-                runningAllSections={runningAllSections}
+                generatingOutline={isActivePaperOutlining}
+                runningAllSections={isActivePaperWriting}
                 onSelectSection={(secId) =>
                   mutateActiveSession((s) => ({ ...s, activeSectionId: secId }))
                 }
-                onAiGenerateOutline={() => void handleAiGenerateOutline()}
+                onAiGenerateOutline={() =>
+                  void handleAiGenerateOutlineForSession(activeSession.id)
+                }
                 onWriteAllSequentially={() =>
-                  void handleWriteAllSectionsSequentially()
+                  void handleWriteCurrentPaperSequentially()
                 }
                 onStopSequential={() => {
-                  stopSequentialRef.current = true;
+                  pausedSessionIdsRef.current.add(activeSession.id);
                 }}
                 onWriteSingleSection={(secId) =>
                   void handleWriteSingleSection(secId)
