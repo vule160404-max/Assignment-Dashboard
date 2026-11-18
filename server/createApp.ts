@@ -1762,11 +1762,34 @@ export function createApiApp(): express.Express {
       }
       const choices = Array.isArray(data.choices) ? data.choices : [];
       const firstChoice = choices[0] as
-        | { message?: { content?: string } }
+        | {
+            message?: {
+              content?: string | Array<{ text?: string }>;
+              reasoning_content?: string;
+            };
+            text?: string;
+            finish_reason?: string;
+          }
         | undefined;
-      let text = (firstChoice?.message?.content || '').trim();
+      const rawContent = firstChoice?.message?.content;
+      let text = (
+        typeof rawContent === 'string'
+          ? rawContent
+          : Array.isArray(rawContent)
+          ? rawContent.map((p) => p?.text || '').join('')
+          : firstChoice?.text || ''
+      ).trim();
       // Strip <think>...</think> reasoning blocks if returned by reasoning models
       text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+
+      if (!text) {
+        res.status(502).json({
+          error: `Model "${resolvedModel}" trả về nội dung rỗng (finish_reason: ${
+            firstChoice?.finish_reason || 'không rõ'
+          }). Hãy thử lại hoặc chọn Model khác (khuyên dùng nvidia/nemotron-3-ultra-550b-a55b trên NVIDIA NIM).`,
+        });
+        return;
+      }
 
       res.json({ text, model: resolvedModel, provider });
     } catch (err) {

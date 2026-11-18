@@ -154,10 +154,11 @@ export const AI_PROVIDER_SUGGESTED_MODELS: Record<AiProviderType, string[]> = {
     'claude-3-5-haiku-latest',
   ],
   custom_openai: [
+    'nvidia/nemotron-3-ultra-550b-a55b',
+    'nvidia/nemotron-3.5-lightning-30b-a3b',
+    'nvidia/nemotron-3.5-super-vl-120b-a12b',
     'mistralai/mistral-large-4-1t-a52b',
     'moonshotai/kimi-k3.1-pro',
-    'nvidia/nemotron-3-ultra-550b-a55b',
-    'nvidia/nemotron-3.5-super-vl-120b-a12b',
     'z-ai/glm-5.3-flash',
     'minimaxai/minimax-m3.1-flash',
     'google/gemma-4-31b-it',
