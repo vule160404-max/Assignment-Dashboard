@@ -164,6 +164,54 @@
   animation: iconMorphIn 180ms var(--ease-out) both;
 }
 
+/* Emil Kowalski popover / collapsible bar entrance (origin-aware, never scale(0)) */
+.popover-enter {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+  transform-origin: top center;
+  transition-property: opacity, transform;
+  transition-duration: 180ms;
+  transition-timing-function: var(--ease-out);
+}
+
+@starting-style {
+  .popover-enter {
+    opacity: 0;
+    transform: scale(0.97) translateY(-4px);
+  }
+}
+
+/* Tab panel content switch — subtle blur + opacity crossfade */
+@keyframes tabPanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+    filter: blur(1.5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.tab-panel-enter {
+  animation: tabPanelIn 200ms var(--ease-out) both;
+}
+
+/* Interactive card hover & press states (only on fine pointers) */
+.card-interactive {
+  transition-property: transform, border-color, background-color, box-shadow;
+  transition-duration: 180ms;
+  transition-timing-function: var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card-interactive:hover {
+    border-color: rgb(165 180 252 / 0.85);
+  }
+}
+
 /* Respect reduced motion — collapse transforms/blurs into gentle opacity fades */
 @media (prefers-reduced-motion: reduce) {
   .btn-press,
@@ -173,7 +221,10 @@
   .toast-enter,
   .surface-enter,
   .progress-fill,
-  .icon-morph {
+  .icon-morph,
+  .popover-enter,
+  .tab-panel-enter,
+  .card-interactive {
     transition-duration: 120ms !important;
     animation-duration: 120ms !important;
     transform: none !important;

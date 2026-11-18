@@ -4,10 +4,11 @@ import {
   Bot,
   Download,
   FilePlus,
+  FileText,
+  Layers,
   Paperclip,
   Sparkles,
   Trash2,
-  Wand2,
 } from 'lucide-react';
 import {
   AiRefineAction,
@@ -120,6 +121,8 @@ export function AiWriterStudioView({
     return saved[0]?.id || '';
   });
 
+  const [leftTab, setLeftTab] = useState<'brief' | 'outline'>('outline');
+  const [focusPaperMode, setFocusPaperMode] = useState(false);
   const [showApiModal, setShowApiModal] = useState(false);
   const [showSkillModal, setShowSkillModal] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
@@ -128,7 +131,6 @@ export function AiWriterStudioView({
   const [refiningSection, setRefiningSection] = useState(false);
   const [exportingDocx, setExportingDocx] = useState(false);
   const [attachingToOrder, setAttachingToOrder] = useState(false);
-  const [collapsedBriefPanel, setCollapsedBriefPanel] = useState(false);
 
   const stopSequentialRef = useRef(false);
   const activeTextareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -257,6 +259,7 @@ export function AiWriterStudioView({
     const created = createDefaultSession(null);
     setSessions((prev) => [created, ...prev]);
     setActiveSessionId(created.id);
+    setLeftTab('brief');
     onToast('Đã tạo phiên làm bài mới.');
   };
 
@@ -313,6 +316,7 @@ export function AiWriterStudioView({
       onToast('Vui lòng nhập API Key Chatbot trước khi tạo dàn ý.');
       return;
     }
+    setLeftTab('outline');
     setGeneratingOutline(true);
     try {
       const sections = await generateOutlineWithAi(
@@ -700,7 +704,7 @@ export function AiWriterStudioView({
   ) => {
     if (!activeSession || !currentSection) return;
     if (!currentSection.content.trim()) {
-      onToast('Mục này chưa có nội dung. Hãy bấm "AI Viết mục này" hoặc gõ bản nháp trước.');
+      onToast('Mục này chưa có nội dung. Hãy bấm "Viết" hoặc gõ bản nháp trước.');
       return;
     }
     if (!activeProfile.apiKey.trim()) {
@@ -815,20 +819,16 @@ export function AiWriterStudioView({
   if (!activeSession) return null;
 
   return (
-    <div className="space-y-4">
-      {/* Top Studio Header Bar */}
-      <div className="bg-white border border-zinc-200 rounded-xl p-3.5 shadow-2xs flex flex-wrap items-center justify-between gap-3">
+    <div className="surface-enter space-y-3">
+      {/* Compact Studio Header Bar */}
+      <div className="bg-white border border-zinc-200/90 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
+        {/* Session & Linked Order Controls */}
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-[#4338CA] px-2.5 py-1.5 rounded-lg text-xs font-bold">
-            <Wand2 className="w-4 h-4" />
-            <span>AI Writer Studio</span>
-          </div>
-
           <select
             aria-label="Phiên làm bài"
             value={activeSession.id}
             onChange={(e) => setActiveSessionId(e.target.value)}
-            className="px-2.5 py-1.5 text-xs font-semibold bg-zinc-50 border border-zinc-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#4338CA] max-w-[220px]"
+            className="px-2.5 py-1.5 text-xs font-semibold bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#4338CA] max-w-[210px]"
           >
             {sessions.map((s) => (
               <option key={s.id} value={s.id}>
@@ -840,8 +840,8 @@ export function AiWriterStudioView({
           <button
             type="button"
             onClick={handleCreateNewSession}
-            title="Tạo tab bài viết mới"
-            className="p-1.5 text-xs font-medium bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg inline-flex items-center gap-1"
+            title="Tạo bài viết mới"
+            className="btn-press px-2 py-1.5 text-xs font-medium bg-zinc-100 hover:bg-zinc-200/80 text-zinc-700 rounded-lg inline-flex items-center gap-1"
           >
             <FilePlus className="w-3.5 h-3.5" />
             <span>Bài mới</span>
@@ -851,22 +851,21 @@ export function AiWriterStudioView({
             <button
               type="button"
               onClick={() => handleDeleteSession(activeSession.id)}
-              title="Đóng phiên làm bài này"
-              className="p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg"
+              title="Xóa phiên làm bài này"
+              className="btn-press p-1.5 text-zinc-400 hover:text-rose-600 rounded-lg"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>
           )}
 
           <div className="inline-flex items-center gap-1.5 pl-2 border-l border-zinc-200">
-            <span className="text-xs text-zinc-500">Nạp đề từ Đơn:</span>
             <select
               aria-label="Nạp đề bài từ mã đơn"
               value={activeSession.linkedOrderCode}
               onChange={(e) => handleLoadFromOrder(e.target.value)}
-              className="px-2.5 py-1.5 text-xs font-mono font-medium bg-white border border-zinc-200 rounded-lg text-slate-900 focus:outline-none focus:border-[#4338CA]"
+              className="px-2.5 py-1.5 text-xs font-mono font-medium bg-white border border-zinc-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#4338CA]"
             >
-              <option value="">-- Tự nhập đề bài độc lập --</option>
+              <option value="">Nạp đề từ Đơn hàng...</option>
               {orders.map((o) => (
                 <option key={o.id} value={o.orderCode}>
                   #{o.orderCode} · {o.subject} ({o.wordCount}w)
@@ -877,30 +876,30 @@ export function AiWriterStudioView({
         </div>
 
         {/* Right Controls: Skill Library, API Chatbot, Export .DOCX */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             onClick={() => setShowSkillModal(true)}
-            className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-indigo-200 bg-indigo-50/70 text-[#4338CA] hover:bg-indigo-100 inline-flex items-center gap-1.5"
+            className="btn-press px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-indigo-200/80 bg-indigo-50/60 text-[#4338CA] hover:bg-indigo-100 inline-flex items-center gap-1.5"
           >
             <BookOpen className="w-3.5 h-3.5" />
-            <span>Kho File Skill ({enabledSkillsCount} bật)</span>
+            <span>Skills ({enabledSkillsCount})</span>
           </button>
 
           <button
             type="button"
             onClick={() => setShowApiModal(true)}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-lg border inline-flex items-center gap-1.5 ${
+            className={`btn-press px-2.5 py-1.5 text-xs font-semibold rounded-lg border inline-flex items-center gap-1.5 ${
               activeProfile.apiKey.trim()
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+                ? 'border-emerald-200 bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100'
                 : 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100'
             }`}
           >
             <Bot className="w-3.5 h-3.5" />
             <span>
               {activeProfile.apiKey.trim()
-                ? `${activeProfile.model}`
-                : 'Nhập API Chatbot'}
+                ? activeProfile.model
+                : 'Cài đặt API'}
             </span>
           </button>
 
@@ -909,13 +908,13 @@ export function AiWriterStudioView({
               type="button"
               disabled={attachingToOrder || totalDraftedWords === 0}
               onClick={() => void handleAttachToLinkedOrder()}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 bg-white text-slate-800 hover:bg-zinc-50 disabled:opacity-40 inline-flex items-center gap-1.5"
+              className="btn-press px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 bg-white text-slate-800 hover:bg-zinc-50 disabled:opacity-40 inline-flex items-center gap-1.5"
             >
               <Paperclip className="w-3.5 h-3.5 text-[#4338CA]" />
               <span>
                 {attachingToOrder
-                  ? 'Đang đính kèm...'
-                  : `Đính kèm vào #${linkedOrder.orderCode}`}
+                  ? 'Đang lưu...'
+                  : `Gắn vào #${linkedOrder.orderCode}`}
               </span>
             </button>
           )}
@@ -925,11 +924,11 @@ export function AiWriterStudioView({
               type="button"
               disabled={totalDraftedWords === 0}
               onClick={() => void handlePushToHumanizer()}
-              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 bg-white text-slate-800 hover:bg-zinc-50 disabled:opacity-40 inline-flex items-center gap-1.5"
+              className="btn-press px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 bg-white text-slate-800 hover:bg-zinc-50 disabled:opacity-40 inline-flex items-center gap-1.5"
               title="Xuất file Word và chuyển thẳng sang tab Word Humanizer"
             >
               <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>Đẩy sang Humanizer</span>
+              <span>Humanize</span>
             </button>
           )}
 
@@ -937,15 +936,15 @@ export function AiWriterStudioView({
             type="button"
             disabled={exportingDocx}
             onClick={() => void handleExportDocx()}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[#4338CA] text-white hover:bg-indigo-700 shadow-2xs inline-flex items-center gap-1.5"
+            className="btn-press px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#4338CA] text-white hover:bg-indigo-700 shadow-2xs inline-flex items-center gap-1.5"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>{exportingDocx ? 'Đang đóng gói...' : 'Tải xuống .DOCX'}</span>
+            <span>{exportingDocx ? 'Đang xuất...' : 'Tải .DOCX'}</span>
           </button>
         </div>
       </div>
 
-      {/* Optimized Word-Like Formatting & AI Ribbon */}
+      {/* Streamlined Single-Row Word Ribbon */}
       <WriterWordRibbon
         format={activeSession.format}
         canUndo={activeSession.historyIndex > 0}
@@ -967,46 +966,84 @@ export function AiWriterStudioView({
         }
       />
 
-      {/* Main Workspace Grid */}
+      {/* Main 2-Zone Workspace Grid: Segmented Sidebar (4 cols) + Live A4 Paper (8 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-        <div className="lg:col-span-5 space-y-4">
-          <WriterBriefPanel
-            session={activeSession}
-            collapsed={collapsedBriefPanel}
-            onToggleCollapse={() => setCollapsedBriefPanel((v) => !v)}
-            onUpdateSession={(updater) => mutateActiveSession(updater)}
-            onUploadContextFiles={handleUploadContextFiles}
-          />
+        {!focusPaperMode && (
+          <div className="lg:col-span-4 bg-white border border-zinc-200/90 rounded-2xl shadow-2xs overflow-hidden">
+            {/* Segmented Tab Switcher (Brief vs Outline) */}
+            <div className="p-1.5 bg-zinc-100/80 border-b border-zinc-200/80 grid grid-cols-2 gap-1">
+              <button
+                type="button"
+                onClick={() => setLeftTab('brief')}
+                className={`btn-press py-1.5 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 ${
+                  leftTab === 'brief'
+                    ? 'bg-white text-[#4338CA] shadow-2xs'
+                    : 'text-zinc-600 hover:text-slate-900'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>1. Đề bài & Rubric</span>
+              </button>
 
-          <WriterOutlinePanel
-            session={activeSession}
-            currentSectionId={currentSection?.id || ''}
-            totalDraftedWords={totalDraftedWords}
-            totalOutlineTargetWords={totalOutlineTargetWords}
-            generatingOutline={generatingOutline}
-            runningAllSections={runningAllSections}
-            onSelectSection={(secId) =>
-              mutateActiveSession((s) => ({ ...s, activeSectionId: secId }))
-            }
-            onAiGenerateOutline={() => void handleAiGenerateOutline()}
-            onWriteAllSequentially={() =>
-              void handleWriteAllSectionsSequentially()
-            }
-            onStopSequential={() => {
-              stopSequentialRef.current = true;
-            }}
-            onWriteSingleSection={(secId) => void handleWriteSingleSection(secId)}
-            onAddSection={handleAddOutlineSection}
-            onUpdateSection={handleUpdateOutlineSection}
-            onMoveSection={handleMoveOutlineSection}
-            onDeleteSection={handleDeleteOutlineSection}
-          />
-        </div>
+              <button
+                type="button"
+                onClick={() => setLeftTab('outline')}
+                className={`btn-press py-1.5 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 ${
+                  leftTab === 'outline'
+                    ? 'bg-white text-[#4338CA] shadow-2xs'
+                    : 'text-zinc-600 hover:text-slate-900'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5" />
+                <span>2. Dàn ý ({activeSession.outline.length})</span>
+              </button>
+            </div>
+
+            {leftTab === 'brief' ? (
+              <WriterBriefPanel
+                session={activeSession}
+                onUpdateSession={(updater) => mutateActiveSession(updater)}
+                onUploadContextFiles={handleUploadContextFiles}
+                onSwitchToOutlineWithAi={() => {
+                  setLeftTab('outline');
+                  void handleAiGenerateOutline();
+                }}
+              />
+            ) : (
+              <WriterOutlinePanel
+                session={activeSession}
+                currentSectionId={currentSection?.id || ''}
+                totalDraftedWords={totalDraftedWords}
+                totalOutlineTargetWords={totalOutlineTargetWords}
+                generatingOutline={generatingOutline}
+                runningAllSections={runningAllSections}
+                onSelectSection={(secId) =>
+                  mutateActiveSession((s) => ({ ...s, activeSectionId: secId }))
+                }
+                onAiGenerateOutline={() => void handleAiGenerateOutline()}
+                onWriteAllSequentially={() =>
+                  void handleWriteAllSectionsSequentially()
+                }
+                onStopSequential={() => {
+                  stopSequentialRef.current = true;
+                }}
+                onWriteSingleSection={(secId) =>
+                  void handleWriteSingleSection(secId)
+                }
+                onAddSection={handleAddOutlineSection}
+                onUpdateSection={handleUpdateOutlineSection}
+                onMoveSection={handleMoveOutlineSection}
+                onDeleteSection={handleDeleteOutlineSection}
+              />
+            )}
+          </div>
+        )}
 
         <WriterPaperCanvas
           session={activeSession}
           currentSectionId={currentSection?.id || ''}
           zoomPercent={zoomPercent}
+          focusPaperMode={focusPaperMode}
           activeTextareaRef={activeTextareaRef}
           onSelectSection={(secId) =>
             mutateActiveSession((s) => ({ ...s, activeSectionId: secId }))
@@ -1017,6 +1054,7 @@ export function AiWriterStudioView({
           onUpdateViewMode={(mode) =>
             mutateActiveSession((s) => ({ ...s, viewMode: mode }))
           }
+          onToggleFocusPaperMode={() => setFocusPaperMode((v) => !v)}
           onUpdateFormat={handleUpdateFormat}
           onUpdateSection={handleUpdateOutlineSection}
         />
