@@ -1664,14 +1664,20 @@ export function createApiApp(): express.Express {
         return;
       }
 
-      // OpenAI or Custom OpenAI-Compatible (OpenRouter, DeepSeek, Groq, Together, v.v.)
-      const defaultOpenAiBase = 'https://api.openai.com/v1';
-      const cleanBase = (baseUrl || defaultOpenAiBase)
+      // Perplexity Sonar Academic API, OpenAI, or Custom OpenAI-Compatible
+      const defaultBaseByProvider =
+        provider === 'perplexity'
+          ? 'https://api.perplexity.ai'
+          : 'https://api.openai.com/v1';
+      const cleanBase = (baseUrl || defaultBaseByProvider)
         .replace(/\/+$/, '')
         .replace(/\/chat\/completions$/i, '');
-      const url = cleanBase.endsWith('/v1')
-        ? `${cleanBase}/chat/completions`
-        : `${cleanBase}/v1/chat/completions`;
+      const url =
+        provider === 'perplexity'
+          ? `${cleanBase.replace(/\/v1$/i, '')}/chat/completions`
+          : cleanBase.endsWith('/v1')
+          ? `${cleanBase}/chat/completions`
+          : `${cleanBase}/v1/chat/completions`;
 
       const messages: { role: string; content: string }[] = [];
       if (systemPrompt.trim()) {
@@ -1708,7 +1714,9 @@ export function createApiApp(): express.Express {
       const firstChoice = choices[0] as
         | { message?: { content?: string } }
         | undefined;
-      const text = (firstChoice?.message?.content || '').trim();
+      let text = (firstChoice?.message?.content || '').trim();
+      // Strip <think>...</think> reasoning blocks if returned by sonar-reasoning-pro
+      text = text.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
 
       res.json({ text, model, provider });
     } catch (err) {

@@ -4,6 +4,7 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  Globe,
   KeyRound,
   Loader2,
   Sparkles,
@@ -25,19 +26,11 @@ interface WriterApiSettingsModalProps {
   onToast: (msg: string) => void;
 }
 
-const PROVIDER_TABS: { key: AiProviderType; shortLabel: string; badge: string }[] = [
-  { key: 'gemini', shortLabel: 'Google Gemini', badge: 'Gemini 2.5 Pro / Flash' },
-  { key: 'openai', shortLabel: 'OpenAI (ChatGPT)', badge: 'GPT-4.1 / GPT-4o / o3' },
-  {
-    key: 'anthropic',
-    shortLabel: 'Anthropic Claude',
-    badge: 'Claude 4 / 3.7 Sonnet',
-  },
-  {
-    key: 'custom_openai',
-    shortLabel: 'Custom API (OpenRouter / DeepSeek / Groq)',
-    badge: 'Tương thích OpenAI',
-  },
+const OTHER_PROVIDERS: { key: Exclude<AiProviderType, 'perplexity'>; label: string }[] = [
+  { key: 'gemini', label: 'Google Gemini (2.5 Pro / Flash / 2.0 / 1.5)' },
+  { key: 'openai', label: 'OpenAI ChatGPT (GPT-4.1 / GPT-4o / o3 / o4-mini)' },
+  { key: 'anthropic', label: 'Anthropic Claude (Claude 4 / 3.7 / 3.5 Sonnet)' },
+  { key: 'custom_openai', label: 'Custom OpenAI-Compatible (OpenRouter / DeepSeek / Groq)' },
 ];
 
 export function WriterApiSettingsModal({
@@ -48,6 +41,13 @@ export function WriterApiSettingsModal({
   onToast,
 }: WriterApiSettingsModalProps) {
   const [draft, setDraft] = useState<AiChatbotSettingsStore>(settings);
+  const [lastOtherProvider, setLastOtherProvider] = useState<
+    Exclude<AiProviderType, 'perplexity'>
+  >(
+    settings.activeProvider === 'perplexity'
+      ? 'gemini'
+      : settings.activeProvider
+  );
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState<{
@@ -58,8 +58,31 @@ export function WriterApiSettingsModal({
   if (!isOpen) return null;
 
   const activeProvider = draft.activeProvider;
+  const isPerplexityMode = activeProvider === 'perplexity';
   const currentProfile: AiProviderProfile = draft.profiles[activeProvider];
   const suggestedModels = AI_PROVIDER_SUGGESTED_MODELS[activeProvider] || [];
+
+  const hasPerplexityKey = Boolean(draft.profiles.perplexity?.apiKey?.trim());
+  const hasOtherKey = OTHER_PROVIDERS.some((p) =>
+    Boolean(draft.profiles[p.key]?.apiKey?.trim())
+  );
+
+  const selectMainCategory = (mode: 'perplexity' | 'other') => {
+    setTestResult(null);
+    if (mode === 'perplexity') {
+      setDraft((prev) => ({ ...prev, activeProvider: 'perplexity' }));
+    } else {
+      setDraft((prev) => ({ ...prev, activeProvider: lastOtherProvider }));
+    }
+  };
+
+  const selectOtherSubProvider = (
+    sub: Exclude<AiProviderType, 'perplexity'>
+  ) => {
+    setTestResult(null);
+    setLastOtherProvider(sub);
+    setDraft((prev) => ({ ...prev, activeProvider: sub }));
+  };
 
   const updateCurrentProfile = (patch: Partial<AiProviderProfile>) => {
     setTestResult(null);
@@ -121,10 +144,10 @@ export function WriterApiSettingsModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Cài đặt API Chatbot Nghiên cứu & Viết bài
+                Cài đặt Mô hình AI Nghiên cứu Học thuật
               </h3>
               <p className="text-xs text-zinc-500">
-                Chọn nền tảng AI, nhập API Key và phiên bản Model để tự động lập dàn ý & viết từng mục.
+                Chọn giữa Perplexity (chuyên tra cứu học thuật & trích dẫn thực) hoặc nhóm các mô hình AI khác.
               </p>
             </div>
           </div>
@@ -139,51 +162,97 @@ export function WriterApiSettingsModal({
 
         {/* Body */}
         <div className="p-6 overflow-y-auto space-y-5">
-          {/* Provider selector */}
+          {/* 1. Two Consolidated Options: Perplexity vs All Other Models */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
-              1. Chọn Hãng AI Chatbot đang sử dụng
+              1. Chọn chế độ Mô hình AI
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-              {PROVIDER_TABS.map((tab) => {
-                const isSelected = activeProvider === tab.key;
-                const hasKey = Boolean(draft.profiles[tab.key]?.apiKey?.trim());
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => {
-                      setTestResult(null);
-                      setDraft((prev) => ({ ...prev, activeProvider: tab.key }));
-                    }}
-                    className={`btn-press p-3 rounded-xl border text-left flex items-start justify-between ${
-                      isSelected
-                        ? 'border-[#4338CA] bg-indigo-50/60 ring-2 ring-indigo-500/15'
-                        : 'border-zinc-200 hover:border-zinc-300 bg-white'
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Option A: Perplexity Academic */}
+              <button
+                type="button"
+                onClick={() => selectMainCategory('perplexity')}
+                className={`btn-press p-3.5 rounded-xl border text-left flex flex-col justify-between gap-2 ${
+                  isPerplexityMode
+                    ? 'border-[#4338CA] bg-indigo-50/60 ring-2 ring-indigo-500/15'
+                    : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2 w-full">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                    <Globe className="w-4 h-4 text-[#4338CA] shrink-0" />
+                    <span>Perplexity Academic (Sonar)</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                      hasPerplexityKey
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-indigo-100/80 text-[#4338CA]'
                     }`}
                   >
-                    <div>
-                      <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                        <span>{tab.shortLabel}</span>
-                      </div>
-                      <span className="inline-block mt-1 text-[11px] text-zinc-500">
-                        {tab.badge}
-                      </span>
-                    </div>
-                    <span
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                        hasKey
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-zinc-100 text-zinc-500'
-                      }`}
-                    >
-                      {hasKey ? 'Đã có Key' : 'Chưa nhập Key'}
-                    </span>
-                  </button>
-                );
-              })}
+                    {hasPerplexityKey ? 'Đã có Key' : 'Khuyên dùng Học thuật'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                  Tối ưu nhất cho nghiên cứu: `sonar-deep-research`, `sonar-reasoning-pro`, `sonar-pro` tự động tìm nguồn bài báo & trích dẫn thực tế.
+                </p>
+              </button>
+
+              {/* Option B: All Other AI Models Consolidated */}
+              <button
+                type="button"
+                onClick={() => selectMainCategory('other')}
+                className={`btn-press p-3.5 rounded-xl border text-left flex flex-col justify-between gap-2 ${
+                  !isPerplexityMode
+                    ? 'border-[#4338CA] bg-indigo-50/60 ring-2 ring-indigo-500/15'
+                    : 'border-zinc-200 hover:border-zinc-300 bg-white'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2 w-full">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
+                    <Sparkles className="w-4 h-4 text-[#4338CA] shrink-0" />
+                    <span>Các Mô hình AI khác (Gộp chung)</span>
+                  </div>
+                  <span
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                      hasOtherKey
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-zinc-100 text-zinc-500'
+                    }`}
+                  >
+                    {hasOtherKey ? 'Đã có Key' : 'Đa nền tảng'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                  Bao gồm Google Gemini 2.5, OpenAI GPT-4.1 / GPT-4o / o3, Anthropic Claude 4 / 3.7 Sonnet, DeepSeek & OpenRouter.
+                </p>
+              </button>
             </div>
           </div>
+
+          {/* Sub-provider selector when "Other AI Models" is active */}
+          {!isPerplexityMode && (
+            <div className="popover-enter p-3.5 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-2">
+              <label className="block text-xs font-semibold text-slate-800">
+                Chọn nền tảng trong nhóm Mô hình AI khác:
+              </label>
+              <select
+                value={activeProvider}
+                onChange={(e) =>
+                  selectOtherSubProvider(
+                    e.target.value as Exclude<AiProviderType, 'perplexity'>
+                  )
+                }
+                className="w-full px-3 py-2 text-xs font-semibold bg-white border border-zinc-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#4338CA]"
+              >
+                {OTHER_PROVIDERS.map((p) => (
+                  <option key={p.key} value={p.key}>
+                    {p.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* API Key Input */}
           <div>
@@ -197,7 +266,9 @@ export function WriterApiSettingsModal({
                 value={currentProfile.apiKey}
                 onChange={(e) => updateCurrentProfile({ apiKey: e.target.value })}
                 placeholder={
-                  activeProvider === 'gemini'
+                  activeProvider === 'perplexity'
+                    ? 'pplx-...'
+                    : activeProvider === 'gemini'
                     ? 'AIzaSy...'
                     : activeProvider === 'anthropic'
                     ? 'sk-ant-api03-...'
@@ -219,24 +290,30 @@ export function WriterApiSettingsModal({
               </button>
             </div>
             <p className="text-[11px] text-zinc-500 mt-1">
-              API Key được lưu cục bộ trên trình duyệt của bạn và gọi qua kết nối bảo mật.
+              {isPerplexityMode
+                ? 'Lấy Perplexity API Key tại perplexity.ai/settings/api (bắt đầu bằng pplx-...).'
+                : 'API Key được lưu cục bộ trên trình duyệt của bạn và gọi qua kết nối bảo mật.'}
             </p>
           </div>
 
           {/* Model Name + Suggested Chips */}
           <div>
             <label className="block text-xs font-semibold text-slate-800 mb-1.5">
-              3. Phiên bản Model (Chọn nhanh bên dưới hoặc tự gõ tên Model mới)
+              3. Phiên bản Model ({isPerplexityMode ? 'Perplexity Sonar' : currentProfile.label})
             </label>
             <input
               type="text"
               value={currentProfile.model}
               onChange={(e) => updateCurrentProfile({ model: e.target.value })}
-              placeholder="Nhập tên model (VD: gemini-2.5-pro, gpt-4.1, claude-sonnet-4-20250514...)"
+              placeholder={
+                isPerplexityMode
+                  ? 'sonar-deep-research, sonar-reasoning-pro, sonar-pro...'
+                  : 'Nhập tên model (VD: gemini-2.5-pro, gpt-4.1, claude-sonnet-4-20250514...)'
+              }
               className="w-full px-3 py-2 text-sm font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#4338CA]"
             />
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              <span className="text-[11px] text-zinc-500 mr-1">Phiên bản có sẵn:</span>
+              <span className="text-[11px] text-zinc-500 mr-1">Chọn nhanh phiên bản:</span>
               {suggestedModels.map((m) => (
                 <button
                   key={m}
@@ -258,7 +335,7 @@ export function WriterApiSettingsModal({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-slate-800 mb-1.5">
-                4. API Base URL (Tùy chỉnh cho OpenRouter / DeepSeek / Groq)
+                4. API Base URL
               </label>
               <input
                 type="text"
@@ -266,7 +343,11 @@ export function WriterApiSettingsModal({
                 onChange={(e) =>
                   updateCurrentProfile({ baseUrl: e.target.value })
                 }
-                placeholder="https://api.openai.com/v1"
+                placeholder={
+                  isPerplexityMode
+                    ? 'https://api.perplexity.ai'
+                    : 'https://api.openai.com/v1'
+                }
                 className="w-full px-3 py-2 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#4338CA]"
               />
             </div>
@@ -283,7 +364,7 @@ export function WriterApiSettingsModal({
                 value={currentProfile.temperature}
                 onChange={(e) =>
                   updateCurrentProfile({
-                    temperature: Number(e.target.value) || 0.4,
+                    temperature: Number(e.target.value) || 0.2,
                   })
                 }
                 className="w-full accent-[#4338CA] mt-2"
@@ -339,7 +420,7 @@ export function WriterApiSettingsModal({
               onClick={handleSave}
               className="btn-press px-5 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-indigo-700 shadow-xs"
             >
-              Lưu & Sử dụng Chatbot này
+              Lưu & Sử dụng Mô hình này
             </button>
           </div>
         </div>

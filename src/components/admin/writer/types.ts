@@ -1,6 +1,11 @@
 import { CitationStyle } from '../../../types/domain';
 
-export type AiProviderType = 'gemini' | 'openai' | 'anthropic' | 'custom_openai';
+export type AiProviderType =
+  | 'perplexity'
+  | 'gemini'
+  | 'openai'
+  | 'anthropic'
+  | 'custom_openai';
 
 export interface AiProviderProfile {
   provider: AiProviderType;
@@ -103,6 +108,13 @@ export interface WriterSession {
 }
 
 export const AI_PROVIDER_SUGGESTED_MODELS: Record<AiProviderType, string[]> = {
+  perplexity: [
+    'sonar-deep-research',
+    'sonar-reasoning-pro',
+    'sonar-reasoning',
+    'sonar-pro',
+    'sonar',
+  ],
   gemini: [
     'gemini-2.5-pro',
     'gemini-2.5-flash',
@@ -142,8 +154,16 @@ export const AI_PROVIDER_SUGGESTED_MODELS: Record<AiProviderType, string[]> = {
 };
 
 export const DEFAULT_AI_SETTINGS: AiChatbotSettingsStore = {
-  activeProvider: 'gemini',
+  activeProvider: 'perplexity',
   profiles: {
+    perplexity: {
+      provider: 'perplexity',
+      label: 'Perplexity Academic (Sonar)',
+      apiKey: '',
+      model: 'sonar-reasoning-pro',
+      baseUrl: 'https://api.perplexity.ai',
+      temperature: 0.2,
+    },
     gemini: {
       provider: 'gemini',
       label: 'Google Gemini API',

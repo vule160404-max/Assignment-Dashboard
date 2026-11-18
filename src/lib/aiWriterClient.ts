@@ -20,6 +20,10 @@ export function loadAiChatbotSettings(): AiChatbotSettingsStore {
     return {
       activeProvider: parsed.activeProvider || DEFAULT_AI_SETTINGS.activeProvider,
       profiles: {
+        perplexity: {
+          ...DEFAULT_AI_SETTINGS.profiles.perplexity,
+          ...(parsed.profiles?.perplexity || {}),
+        },
         gemini: {
           ...DEFAULT_AI_SETTINGS.profiles.gemini,
           ...(parsed.profiles?.gemini || {}),
