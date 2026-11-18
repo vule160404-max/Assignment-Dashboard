@@ -307,11 +307,17 @@ export async function callAiChatbot({
       }),
     });
 
-    const data = (await resp.json().catch(() => ({}))) as {
+    const rawRespText = await resp.text().catch(() => '');
+    let data: {
       text?: string;
       model?: string;
       error?: string;
-    };
+    } = {};
+    try {
+      data = JSON.parse(rawRespText) as typeof data;
+    } catch {
+      // non-json response
+    }
 
     if (resp.ok && data.text?.trim()) {
       return data.text.trim();
@@ -344,8 +350,17 @@ export async function callAiChatbot({
       }
     }
 
+    const rawSnippet = rawRespText
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 180);
+
     throw new Error(
-      data.error || `Không thể gọi ${profile.label} (HTTP ${resp.status}).`
+      data.error ||
+        (rawSnippet
+          ? `Không thể gọi ${profile.label} (HTTP ${resp.status}: ${rawSnippet}).`
+          : `Không thể gọi ${profile.label} (HTTP ${resp.status}).`)
     );
   } catch (err) {
     if (
