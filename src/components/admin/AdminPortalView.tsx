@@ -24,6 +24,7 @@ import {
   LayoutList,
   LogOut,
   Menu,
+  MessageSquare,
   Plus,
   Search,
   ShieldCheck,
@@ -40,22 +41,28 @@ import {
 } from '../../lib/firebase';
 import {
   DEFAULT_BANK_SETTINGS,
+  DEFAULT_NOTIFICATION_SETTINGS,
   acceptTeamInviteAndCreateProfile,
   ensureOwnerOrReadProfile,
   findPendingInvitesForEmail,
   saveOrder,
+  sendTelegramAdminAlert,
   subscribeAllRevisionsAdmin,
   subscribeAllUsersAdmin,
   subscribeBankSettings,
   subscribeClients,
+  subscribeNotificationSettings,
   subscribeOrders,
   subscribeTeamInvitesAdmin,
   uploadFileToServer,
   verifyTeamInviteBeforeSignup,
 } from '../../services/firestoreService';
 import {
+  ZaloTemplateType,
+  buildClientZaloMessage,
   copyTextToClipboard,
   evaluateDeadline,
+  formatDateTime,
   formatVnd,
   getStageMeta,
   normalizeOrderCode,
@@ -65,6 +72,7 @@ import {
   BankSettings,
   ClientRecord,
   FIELD_LIMITS,
+  NotificationSettings,
   OrderRecord,
   RevisionRequest,
   TeamInvite,
@@ -111,6 +119,9 @@ export function AdminPortalView({
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [clients, setClients] = useState<ClientRecord[]>([]);
   const [bankSettings, setBankSettings] = useState<BankSettings>(DEFAULT_BANK_SETTINGS);
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(
+    DEFAULT_NOTIFICATION_SETTINGS
+  );
   const [revisions, setRevisions] = useState<RevisionRequest[]>([]);
   const [teamUsers, setTeamUsers] = useState<UserProfile[]>([]);
   const [teamInvites, setTeamInvites] = useState<TeamInvite[]>([]);
@@ -257,6 +268,7 @@ export function AdminPortalView({
 
     const unsubClients = subscribeClients((list) => setClients(list));
     const unsubBank = subscribeBankSettings((cfg) => setBankSettings(cfg));
+    const unsubNotif = subscribeNotificationSettings((cfg) => setNotificationSettings(cfg));
     const unsubRevs = subscribeAllRevisionsAdmin((list) => setRevisions(list));
     const unsubUsers = subscribeAllUsersAdmin((list) => setTeamUsers(list));
     const unsubInvites = subscribeTeamInvitesAdmin((list) => setTeamInvites(list));
@@ -265,11 +277,87 @@ export function AdminPortalView({
       unsubOrders();
       unsubClients();
       unsubBank();
+      unsubNotif();
       unsubRevs();
       unsubUsers();
       unsubInvites();
     };
   }, [authReady, profileLoading, user, isTeamMember, isAdmin]);
+
+  // Automatic Admin session-deduplicated Telegram deadline alerts (<24h, <6h, overdue)
+  useEffect(() => {
+    if (
+      !isAdmin ||
+      dataLoading ||
+      orders.length === 0 ||
+      !notificationSettings.telegramNotifyDeadline
+    ) {
+      return;
+    }
+
+    const storageKey = 'assigntrack_tg_deadline_sent_v1';
+    const now = Date.now();
+    let sentMap: Record<string, number> = {};
+    try {
+      const raw = window.localStorage.getItem(storageKey);
+      if (raw) sentMap = JSON.parse(raw) as Record<string, number>;
+    } catch {
+      sentMap = {};
+    }
+
+    // Prune entries older than 72 hours
+    for (const [k, ts] of Object.entries(sentMap)) {
+      if (typeof ts !== 'number' || now - ts > 72 * 60 * 60 * 1000) {
+        delete sentMap[k];
+      }
+    }
+
+    const alertsToSend: { key: string; line: string }[] = [];
+    for (const o of orders) {
+      if (o.orderStatus !== 'active') continue;
+      const diffMs = o.deadlineAt - now;
+      let tier: 'overdue' | 'under_6h' | 'under_24h' | null = null;
+      let tierLabel = '';
+      if (diffMs <= 0) {
+        tier = 'overdue';
+        tierLabel = 'QUÁ HẠN';
+      } else if (diffMs <= 6 * 60 * 60 * 1000) {
+        tier = 'under_6h';
+        tierLabel = 'Còn dưới 6 giờ';
+      } else if (diffMs <= 24 * 60 * 60 * 1000) {
+        tier = 'under_24h';
+        tierLabel = 'Sắp hạn (<24h)';
+      }
+
+      if (!tier) continue;
+      const dedupeKey = `${o.orderCode}:${tier}`;
+      if (sentMap[dedupeKey]) continue;
+
+      const badge = evaluateDeadline(o.deadlineAt, now, o.orderStatus);
+      alertsToSend.push({
+        key: dedupeKey,
+        line: `• #${o.orderCode} (${o.subject}) — ${tierLabel} (${badge.countdownText}) · Hạn: ${formatDateTime(
+          o.deadlineAt
+        )}`,
+      });
+    }
+
+    if (alertsToSend.length === 0) return;
+
+    alertsToSend.forEach((a) => {
+      sentMap[a.key] = now;
+    });
+    try {
+      window.localStorage.setItem(storageKey, JSON.stringify(sentMap));
+    } catch {
+      // Ignore storage quota issues
+    }
+
+    void sendTelegramAdminAlert({
+      title: `Cảnh báo Deadline tự động (${alertsToSend.length} đơn)`,
+      lines: alertsToSend.slice(0, 12).map((a) => a.line),
+    });
+  }, [isAdmin, dataLoading, orders, notificationSettings.telegramNotifyDeadline]);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -587,6 +675,28 @@ export function AdminPortalView({
       window.clearTimeout(copyTimerRef.current);
     }
     copyTimerRef.current = window.setTimeout(() => setCopiedOrderCode(''), 1800);
+  };
+
+  const handleQuickCopyZaloMessage = async (order: OrderRecord) => {
+    let tpl: ZaloTemplateType = 'handover';
+    if (order.paymentStatus === 'unpaid') {
+      tpl = 'quote_deposit';
+    } else if (order.paymentStatus !== 'fully_paid') {
+      tpl = 'final_payment';
+    }
+    const text = buildClientZaloMessage(tpl, order, bankSettings);
+    const ok = await copyTextToClipboard(text);
+    if (!ok) {
+      onToast('Không thể sao chép tin nhắn Zalo vào clipboard.');
+      return;
+    }
+    const tplLabel =
+      tpl === 'quote_deposit'
+        ? 'Mời cọc'
+        : tpl === 'final_payment'
+        ? 'Nhắc tất toán'
+        : 'Bàn giao Final';
+    onToast(`Đã chép tin nhắn Zalo (${tplLabel}) cho #${order.orderCode}`);
   };
 
   const metrics = useMemo(() => {
@@ -1272,9 +1382,9 @@ export function AdminPortalView({
     { key: 'calendar', label: 'Lịch Deadline', icon: Calendar },
     { key: 'humanizer', label: 'Humanize Word (HIX)', icon: FileText },
     { key: 'clients', label: 'Khách hàng (CRM)', icon: Users, adminOnly: true },
-    { key: 'revenue', label: 'Doanh thu', icon: TrendingUp, adminOnly: true },
+    { key: 'revenue', label: 'Doanh thu & Công CTV', icon: TrendingUp, adminOnly: true },
     { key: 'team', label: 'Nhân sự & Phân quyền', icon: ShieldCheck, adminOnly: true },
-    { key: 'settings', label: 'Thanh toán & QR', icon: CreditCard, adminOnly: true },
+    { key: 'settings', label: 'Thanh toán & Cảnh báo', icon: CreditCard, adminOnly: true },
   ];
 
   const navItems = allNavItems.filter((item) => !item.adminOnly || isAdmin);
@@ -1726,16 +1836,32 @@ export function AdminPortalView({
                               )}
 
                               <td className="py-3 px-4 text-right whitespace-nowrap">
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    openEditOrder(ord);
-                                  }}
-                                  className="btn-press px-2.5 py-1 text-xs font-medium text-[#4338CA] bg-indigo-50 hover:bg-indigo-100 rounded-md"
-                                >
-                                  Chi tiết
-                                </button>
+                                <div className="inline-flex items-center justify-end gap-1.5">
+                                  {isAdmin && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        void handleQuickCopyZaloMessage(ord);
+                                      }}
+                                      title="Chép nhanh tin nhắn Zalo gửi khách"
+                                      aria-label={`Chép tin nhắn Zalo cho đơn ${ord.orderCode}`}
+                                      className="btn-press p-1.5 text-zinc-500 hover:text-[#4338CA] hover:bg-indigo-50 rounded-md"
+                                    >
+                                      <MessageSquare className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      openEditOrder(ord);
+                                    }}
+                                    className="btn-press px-2.5 py-1 text-xs font-medium text-[#4338CA] bg-indigo-50 hover:bg-indigo-100 rounded-md whitespace-nowrap"
+                                  >
+                                    Chi tiết
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -1770,7 +1896,7 @@ export function AdminPortalView({
           )}
 
           {activeTab === 'revenue' && isAdmin && (
-            <RevenueDashboardView orders={orders} />
+            <RevenueDashboardView orders={orders} onToast={onToast} />
           )}
 
           {activeTab === 'team' && isAdmin && (
@@ -1786,6 +1912,7 @@ export function AdminPortalView({
           {activeTab === 'settings' && isAdmin && (
             <BankSettingsView
               bankSettings={bankSettings}
+              notificationSettings={notificationSettings}
               orders={orders}
               onToast={onToast}
             />

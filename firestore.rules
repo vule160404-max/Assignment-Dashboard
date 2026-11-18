@@ -158,6 +158,7 @@ service cloud.firestore {
           'progressPercent', 'publicStatusNote', 'internalNotes', 'orderStatus',
           'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
           'clientId', 'clientDisplayName', 'assignedStaffUid', 'assignedStaffName',
+          'staffPayoutAmount', 'staffPayoutStatus', 'staffPayoutPaidAt',
           'attachments', 'createdAt', 'updatedAt'
         ])
         && isValidOrderCode(data.orderCode)
@@ -181,6 +182,9 @@ service cloud.firestore {
         && data.clientDisplayName is string && data.clientDisplayName.size() >= 1 && data.clientDisplayName.size() <= 120
         && (!('assignedStaffUid' in data) || (data.assignedStaffUid is string && data.assignedStaffUid.size() <= 128))
         && (!('assignedStaffName' in data) || (data.assignedStaffName is string && data.assignedStaffName.size() <= 120))
+        && (!('staffPayoutAmount' in data) || (data.staffPayoutAmount is number && data.staffPayoutAmount >= 0))
+        && (!('staffPayoutStatus' in data) || data.staffPayoutStatus in ['unpaid', 'paid'])
+        && (!('staffPayoutPaidAt' in data) || (data.staffPayoutPaidAt is string && data.staffPayoutPaidAt.size() <= 40))
         && isValidAttachmentsList(data.attachments)
         && isValidTimestampStr(data.createdAt)
         && isValidTimestampStr(data.updatedAt);
@@ -269,6 +273,15 @@ service cloud.firestore {
         && data.accountName is string && data.accountName.size() <= 120
         && (!('vietqrBankBin' in data) || (data.vietqrBankBin is string && data.vietqrBankBin.size() <= 20))
         && (!('vietqrTemplate' in data) || data.vietqrTemplate in ['compact2', 'compact', 'qr_only', 'print'])
+        && isValidTimestampStr(data.updatedAt);
+    }
+
+    function isValidNotificationSettings(data) {
+      return data.keys().hasAll(['telegramNotifyRevision', 'telegramNotifyMessage', 'telegramNotifyDeadline', 'updatedAt'])
+        && data.keys().hasOnly(['telegramNotifyRevision', 'telegramNotifyMessage', 'telegramNotifyDeadline', 'updatedAt'])
+        && data.telegramNotifyRevision is bool
+        && data.telegramNotifyMessage is bool
+        && data.telegramNotifyDeadline is bool
         && isValidTimestampStr(data.updatedAt);
     }
 
@@ -386,6 +399,7 @@ service cloud.firestore {
               'progressPercent', 'publicStatusNote', 'internalNotes', 'orderStatus',
               'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
               'clientId', 'clientDisplayName', 'assignedStaffUid', 'assignedStaffName',
+              'staffPayoutAmount', 'staffPayoutStatus', 'staffPayoutPaidAt',
               'attachments', 'updatedAt'
             ])
           )
@@ -416,11 +430,26 @@ service cloud.firestore {
     match /settings/{settingId} {
       allow get: if isAdmin() && isValidId(settingId);
       allow list: if isAdmin();
-      allow create: if isAdmin() && isValidId(settingId) && isValidBankSettings(incoming());
-      allow update: if isAdmin() && isValidId(settingId) && isValidBankSettings(incoming())
-        && incoming().diff(existing()).affectedKeys().hasOnly([
-          'qrMode', 'uploadedQrUrl', 'bankName', 'accountNumber', 'accountName', 'vietqrBankBin', 'vietqrTemplate', 'updatedAt'
-        ]);
+      allow create: if isAdmin() && isValidId(settingId) && (
+        (settingId == 'notifications' && isValidNotificationSettings(incoming()))
+        || (settingId != 'notifications' && isValidBankSettings(incoming()))
+      );
+      allow update: if isAdmin() && isValidId(settingId) && (
+        (
+          settingId == 'notifications'
+          && isValidNotificationSettings(incoming())
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'telegramNotifyRevision', 'telegramNotifyMessage', 'telegramNotifyDeadline', 'updatedAt'
+          ])
+        )
+        || (
+          settingId != 'notifications'
+          && isValidBankSettings(incoming())
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'qrMode', 'uploadedQrUrl', 'bankName', 'accountNumber', 'accountName', 'vietqrBankBin', 'vietqrTemplate', 'updatedAt'
+          ])
+        )
+      );
       allow delete: if isAdmin() && isValidId(settingId);
     }
 

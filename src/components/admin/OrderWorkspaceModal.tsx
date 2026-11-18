@@ -22,6 +22,8 @@ import {
   uploadFileToServer,
 } from '../../services/firestoreService';
 import {
+  ZaloTemplateType,
+  buildClientZaloMessage,
   computePaymentStatus,
   copyTextToClipboard,
   formatBytes,
@@ -44,6 +46,7 @@ import {
   OrderStage,
   OrderStatus,
   RevisionRequest,
+  StaffPayoutStatus,
   UserProfile,
   UserRole,
 } from '../../types/domain';
@@ -119,6 +122,10 @@ export function OrderWorkspaceModal({
   const [totalAmount, setTotalAmount] = useState(1000000);
   const [depositAmount, setDepositAmount] = useState(500000);
   const [paidAmount, setPaidAmount] = useState(0);
+  const [staffPayoutAmount, setStaffPayoutAmount] = useState(0);
+  const [staffPayoutStatus, setStaffPayoutStatus] = useState<StaffPayoutStatus>('unpaid');
+  const [staffPayoutPaidAt, setStaffPayoutPaidAt] = useState('');
+  const [copiedZaloTpl, setCopiedZaloTpl] = useState<ZaloTemplateType | ''>('');
 
   const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
   const [attCategory, setAttCategory] = useState<AttachmentCategory>('brief');
@@ -188,6 +195,9 @@ export function OrderWorkspaceModal({
       setTotalAmount(editingOrder.totalAmount);
       setDepositAmount(editingOrder.depositAmount);
       setPaidAmount(editingOrder.paidAmount);
+      setStaffPayoutAmount(editingOrder.staffPayoutAmount || 0);
+      setStaffPayoutStatus(editingOrder.staffPayoutStatus === 'paid' ? 'paid' : 'unpaid');
+      setStaffPayoutPaidAt(editingOrder.staffPayoutPaidAt || '');
       setAttachments(editingOrder.attachments || []);
       setShowNewClientInline(false);
     } else {
@@ -215,6 +225,9 @@ export function OrderWorkspaceModal({
       setTotalAmount(1000000);
       setDepositAmount(500000);
       setPaidAmount(0);
+      setStaffPayoutAmount(0);
+      setStaffPayoutStatus('unpaid');
+      setStaffPayoutPaidAt('');
       setAttachments([]);
     }
   }, [isOpen, editingOrder, clients, existingOrderCodes]);
@@ -431,6 +444,12 @@ export function OrderWorkspaceModal({
           clientDisplayName: resolvedClientName,
           assignedStaffUid,
           assignedStaffName,
+          staffPayoutAmount: Math.max(0, Number(staffPayoutAmount) || 0),
+          staffPayoutStatus,
+          staffPayoutPaidAt:
+            staffPayoutStatus === 'paid'
+              ? staffPayoutPaidAt || new Date().toISOString()
+              : '',
           attachments,
         },
         bankSettings,
@@ -488,6 +507,47 @@ export function OrderWorkspaceModal({
       window.clearTimeout(copyTimerRef.current);
     }
     copyTimerRef.current = window.setTimeout(() => setCopiedCode(false), 1800);
+  };
+
+  const handleCopyZaloTemplate = async (template: ZaloTemplateType) => {
+    const resolvedClientDisplay =
+      editingOrder?.clientDisplayName ||
+      (showNewClientInline
+        ? newClientName.trim()
+        : clients.find((c) => c.id === clientId)?.displayName || '') ||
+      'bạn';
+    const deadlineMs = new Date(deadlineLocal).getTime();
+    const message = buildClientZaloMessage(
+      template,
+      {
+        orderCode: normalizeOrderCode(orderCode) || 'ORDER',
+        subject: subject.trim() || 'Assignment',
+        topic: topic.trim() || 'Bài làm',
+        wordCount: Math.max(0, Number(wordCount) || 0),
+        deadlineAt: Number.isFinite(deadlineMs) && deadlineMs > 0 ? deadlineMs : Date.now(),
+        totalAmount: Math.max(0, Number(totalAmount) || 0),
+        depositAmount: Math.max(0, Number(depositAmount) || 0),
+        paidAmount: Math.max(0, Number(paidAmount) || 0),
+        progressPercent,
+        clientDisplayName: resolvedClientDisplay,
+      },
+      bankSettings
+    );
+    const ok = await copyTextToClipboard(message);
+    if (!ok) {
+      onToast('Không thể sao chép mẫu tin nhắn vào clipboard.');
+      return;
+    }
+    setCopiedZaloTpl(template);
+    const labelMap: Record<ZaloTemplateType, string> = {
+      quote_deposit: 'Báo giá & Mời cọc',
+      final_payment: 'Nhắc tất toán',
+      handover: 'Bàn giao Final',
+    };
+    onToast(`Đã chép mẫu tin "${labelMap[template]}" cho #${normalizeOrderCode(orderCode)}`);
+    window.setTimeout(() => {
+      setCopiedZaloTpl((prev) => (prev === template ? '' : prev));
+    }, 1800);
   };
 
   const handleUpdateRev = async (rev: RevisionRequest, status: RevisionRequest['status']) => {
@@ -1033,6 +1093,119 @@ export function OrderWorkspaceModal({
                       >
                         Đã thanh toán đủ
                       </button>
+                    </div>
+
+                    {/* Staff Payout & Net Profit */}
+                    <div className="pt-3.5 border-t border-zinc-100 space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-slate-900">
+                          Tiền công CTV & Lợi nhuận ròng
+                        </span>
+                        {(() => {
+                          const net =
+                            Math.max(0, Number(totalAmount) || 0) -
+                            Math.max(0, Number(staffPayoutAmount) || 0);
+                          return (
+                            <span
+                              className={`text-xs font-mono font-semibold tabular-nums ${
+                                net >= 0 ? 'text-[#16A34A]' : 'text-[#DC2626]'
+                              }`}
+                            >
+                              Lãi ròng: {net < 0 ? '-' : ''}
+                              {formatVnd(Math.abs(net))}
+                            </span>
+                          );
+                        })()}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 items-end">
+                        <div>
+                          <label className="block text-[11px] font-medium text-zinc-600 mb-1">
+                            Tiền công CTV / Nhân sự (VNĐ)
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            step={10000}
+                            value={staffPayoutAmount}
+                            onChange={(e) => setStaffPayoutAmount(Number(e.target.value))}
+                            className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {[30, 40, 50, 60].map((pct) => (
+                            <button
+                              key={pct}
+                              type="button"
+                              onClick={() =>
+                                setStaffPayoutAmount(
+                                  Math.round(((Math.max(0, Number(totalAmount) || 0) * pct) / 100) / 1000) * 1000
+                                )
+                              }
+                              className="btn-press px-2 py-1.5 text-[11px] font-mono font-medium bg-zinc-100 hover:bg-zinc-200 text-slate-700 rounded-md whitespace-nowrap"
+                            >
+                              {pct}%
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <label className="inline-flex items-center gap-2 text-xs font-medium text-slate-800 cursor-pointer pt-0.5">
+                        <input
+                          type="checkbox"
+                          checked={staffPayoutStatus === 'paid'}
+                          onChange={(e) => {
+                            const next: StaffPayoutStatus = e.target.checked ? 'paid' : 'unpaid';
+                            setStaffPayoutStatus(next);
+                            setStaffPayoutPaidAt(next === 'paid' ? new Date().toISOString() : '');
+                          }}
+                          className="w-4 h-4 accent-[#16A34A]"
+                        />
+                        <span>
+                          Đã thanh toán tiền công cho CTV
+                          {staffPayoutStatus === 'paid' && staffPayoutPaidAt
+                            ? ` (${new Date(staffPayoutPaidAt).toLocaleDateString('vi-VN')})`
+                            : ''}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+
+                {/* 1-Tap Zalo / Messenger Message Templates (Admin Only) */}
+                {!isStaffMode && (
+                  <div className="border border-zinc-200 rounded-xl p-4 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="text-sm font-semibold text-slate-900">
+                        Chép nhanh tin nhắn Zalo / Messenger
+                      </h3>
+                      <span className="text-[11px] text-zinc-500">1 chạm</span>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {(
+                        [
+                          ['quote_deposit', 'Báo giá & Mời cọc'],
+                          ['final_payment', 'Nhắc tất toán'],
+                          ['handover', 'Bàn giao Final'],
+                        ] as const
+                      ).map(([tplKey, label]) => {
+                        const isCopied = copiedZaloTpl === tplKey;
+                        return (
+                          <button
+                            key={tplKey}
+                            type="button"
+                            onClick={() => handleCopyZaloTemplate(tplKey)}
+                            className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-slate-800 rounded-lg whitespace-nowrap"
+                          >
+                            {isCopied ? (
+                              <Check className="w-3.5 h-3.5 text-[#16A34A]" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5 text-zinc-500" />
+                            )}
+                            <span>{label}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
                 )}

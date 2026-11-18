@@ -359,6 +359,42 @@ export function splitParagraphIntoTerminalPeriodSentences(paragraphText: string)
 
 export const MIN_HIX_CHUNK_WORDS = 50;
 
+const REFERENCE_SECTION_HEADING_RE =
+  /^(?:\d+(?:\.\d+)*\.?\s+)?(references|bibliography|works cited|reference list|list of references|appendix(?:\s+[a-z0-9]+)?|appendices|tài liệu tham khảo|phụ lục)\s*[:.]?$/i;
+
+/**
+ * Finds the paragraph index where the References / Bibliography / Appendix section starts,
+ * or -1 if none is detected.
+ */
+export function detectReferenceSectionStartIndex(paragraphs: WordParagraph[]): number {
+  for (const para of paragraphs) {
+    if (para.isEmpty) continue;
+    const trimmed = para.text.trim();
+    if (trimmed.length <= 65 && REFERENCE_SECTION_HEADING_RE.test(trimmed)) {
+      return para.index;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Deterministic lightweight fingerprint for localStorage checkpoint matching.
+ */
+export function computeDocFingerprint(doc: ParsedWordDocument): string {
+  const nonEmpty = doc.paragraphs.filter((p) => !p.isEmpty);
+  const sample = nonEmpty
+    .slice(0, 4)
+    .map((p) => p.text.slice(0, 60))
+    .join('|') + '||' + (nonEmpty[nonEmpty.length - 1]?.text.slice(0, 60) || '');
+  let hash = 2166136261;
+  for (let i = 0; i < sample.length; i++) {
+    hash ^= sample.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const totalWords = nonEmpty.reduce((s, p) => s + countWords(p.text), 0);
+  return `${doc.fileName}__${nonEmpty.length}__${totalWords}__${(hash >>> 0).toString(16)}`;
+}
+
 /**
  * Group complete terminal-period sentences into chunks between `minWordsPerChunk` (50) and `maxWordsPerChunk`.
  * NEVER splits a sentence mid-way, NEVER includes sentences without a terminal period `.`,
@@ -367,7 +403,8 @@ export const MIN_HIX_CHUNK_WORDS = 50;
 export function buildSentenceBoundaryChunks(
   paragraphs: WordParagraph[],
   maxWordsPerChunk: number,
-  minWordsPerChunk: number = MIN_HIX_CHUNK_WORDS
+  minWordsPerChunk: number = MIN_HIX_CHUNK_WORDS,
+  excludedParagraphIndices?: Set<number>
 ): HumanizeChunk[] {
   const effectiveMax = Math.max(minWordsPerChunk, maxWordsPerChunk);
   const chunks: HumanizeChunk[] = [];
@@ -375,6 +412,7 @@ export function buildSentenceBoundaryChunks(
 
   for (const para of paragraphs) {
     if (para.isEmpty || para.isHeading) continue;
+    if (excludedParagraphIndices && excludedParagraphIndices.has(para.index)) continue;
 
     const sentences = splitParagraphIntoTerminalPeriodSentences(para.text).filter(
       (s) => s.endsWithPeriod && countWords(s.text) >= 3
@@ -481,13 +519,26 @@ const UI_LEAK_PATTERNS = [
   'try for free',
 ];
 
+function normalizeNumericValue(raw: string): string {
+  // Normalize decimal comma vs dot (e.g. "77,2%" and "77.2%" -> "77.2%") and strip thousand separators
+  return raw
+    .trim()
+    .replace(/(\d),(\d{1,2})(?!\d)/g, '$1.$2')
+    .replace(/,/g, '')
+    .replace(/\s+/g, '');
+}
+
 /**
- * Careful corrupted-output / gibberish detector for HIX Bypass responses.
+ * Careful corrupted-output, gibberish & citation/number guard for HIX Bypass responses.
  * Designed to avoid false positives on intentional humanizer grammar tweaks,
  * while catching actual garbled character strings, encoding glitches, stuck loops,
- * accidental UI text leakage, and abrupt mid-sentence truncation.
+ * accidental UI text leakage, abrupt truncation, and dropped citations/statistics/protected terms.
  */
-export function detectHixGlitch(originalText: string, outputText: string): GlitchCheckResult {
+export function detectHixGlitch(
+  originalText: string,
+  outputText: string,
+  protectedTerms: string[] = []
+): GlitchCheckResult {
   const reasons: string[] = [];
   const suspectTokens: string[] = [];
   const trimmedOut = outputText.trim();
@@ -590,6 +641,63 @@ export function detectHixGlitch(originalText: string, outputText: string): Glitc
       reasons.push(`Phát hiện cụm từ bị lặp kẹt: "${trigramA}".`);
       suspectTokens.push(trigramA);
       break;
+    }
+  }
+
+  // 6. Citation, Statistic/Number & Custom Protected Term Guard
+  // 6a. Percentages, decimals, 4-digit years, and bracketed numbers (e.g. 77.2%, 2023, [12])
+  const origMetricMatches = originalText.match(
+    /(?:\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d+)?%|\b(?:19|20)\d{2}[a-z]?\b|\[\d+(?:[,\s–-]+\d+)*\]/g
+  );
+  if (origMetricMatches && origMetricMatches.length > 0) {
+    const outMetricMatches =
+      trimmedOut.match(
+        /(?:\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d+)?%|\b(?:19|20)\d{2}[a-z]?\b|\[\d+(?:[,\s–-]+\d+)*\]/g
+      ) || [];
+    const normalizedOutSet = new Set(outMetricMatches.map(normalizeNumericValue));
+    const droppedMetrics: string[] = [];
+
+    for (const metric of origMetricMatches) {
+      const norm = normalizeNumericValue(metric);
+      if (!normalizedOutSet.has(norm) && !trimmedOut.includes(metric)) {
+        droppedMetrics.push(metric);
+      }
+    }
+
+    if (droppedMetrics.length > 0) {
+      const uniqueDropped = Array.from(new Set(droppedMetrics)).slice(0, 4);
+      reasons.push(
+        `Số liệu, năm trích dẫn hoặc ký hiệu bị mất/thay đổi so với bản gốc: ${uniqueDropped.join(', ')}.`
+      );
+      suspectTokens.push(...uniqueDropped);
+    }
+  }
+
+  // 6b. In-text parenthetical citations like (Smith, 2023) or (Nguyen & Tran, 2021)
+  const parentheticalCitationRe = /\(([A-Z][A-Za-zÀ-ỹ'\-]+(?:\s+(?:&|and|et al\.?)\s+[A-Z][A-Za-zÀ-ỹ'\-]+)*,?\s*(?:19|20)\d{2}[a-z]?)\)/g;
+  let citMatch: RegExpExecArray | null;
+  while ((citMatch = parentheticalCitationRe.exec(originalText)) !== null) {
+    const fullCit = citMatch[0];
+    const leadAuthorMatch = citMatch[1].match(/^([A-Z][A-Za-zÀ-ỹ'\-]+)/);
+    const yearMatch = citMatch[1].match(/(?:19|20)\d{2}[a-z]?/);
+    const hasAuthor = leadAuthorMatch ? trimmedOut.includes(leadAuthorMatch[1]) : true;
+    const hasYear = yearMatch ? trimmedOut.includes(yearMatch[0]) : true;
+    if (!hasAuthor || !hasYear) {
+      reasons.push(`Trích dẫn học thuật bị sai lệch hoặc biến mất: "${fullCit}".`);
+      suspectTokens.push(leadAuthorMatch?.[1] || fullCit);
+    }
+  }
+
+  // 6c. User-configured protected terms
+  for (const rawTerm of protectedTerms) {
+    const term = rawTerm.trim();
+    if (term.length < 2) continue;
+    if (
+      originalText.toLowerCase().includes(term.toLowerCase()) &&
+      !lowerOut.includes(term.toLowerCase())
+    ) {
+      reasons.push(`Thuật ngữ cần giữ nguyên đã bị đổi/mất: "${term}".`);
+      suspectTokens.push(term);
     }
   }
 

@@ -1,17 +1,32 @@
 import { useEffect, useState } from 'react';
-import { QrCode, Upload } from 'lucide-react';
-import { deleteServerFile, saveBankSettings, uploadFileToServer } from '../../services/firestoreService';
-import { buildVietQrUrl } from '../../lib/utils';
-import { BankSettings, OrderRecord } from '../../types/domain';
+import { Bell, QrCode, Send, Upload } from 'lucide-react';
+import {
+  DEFAULT_NOTIFICATION_SETTINGS,
+  deleteServerFile,
+  fetchTelegramServerStatus,
+  saveBankSettings,
+  saveNotificationSettings,
+  sendTelegramAdminAlert,
+  sendTelegramTestAlert,
+  uploadFileToServer,
+} from '../../services/firestoreService';
+import { buildVietQrUrl, evaluateDeadline, formatDateTime } from '../../lib/utils';
+import {
+  BankSettings,
+  NotificationSettings,
+  OrderRecord,
+} from '../../types/domain';
 
 interface BankSettingsViewProps {
   bankSettings: BankSettings;
+  notificationSettings?: NotificationSettings;
   orders: OrderRecord[];
   onToast: (msg: string) => void;
 }
 
 export function BankSettingsView({
   bankSettings,
+  notificationSettings = DEFAULT_NOTIFICATION_SETTINGS,
   orders,
   onToast,
 }: BankSettingsViewProps) {
@@ -30,6 +45,20 @@ export function BankSettingsView({
   const [uploadingQr, setUploadingQr] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Telegram Bot notification preferences (tokens strictly live on server env vars)
+  const [tgConfigured, setTgConfigured] = useState<boolean | null>(null);
+  const [tgNotifyRevision, setTgNotifyRevision] = useState(
+    notificationSettings.telegramNotifyRevision
+  );
+  const [tgNotifyMessage, setTgNotifyMessage] = useState(
+    notificationSettings.telegramNotifyMessage
+  );
+  const [tgNotifyDeadline, setTgNotifyDeadline] = useState(
+    notificationSettings.telegramNotifyDeadline
+  );
+  const [testingTg, setTestingTg] = useState(false);
+  const [sendingDigest, setSendingDigest] = useState(false);
+
   useEffect(() => {
     setQrMode(bankSettings.qrMode || 'uploaded_default');
     setUploadedQrUrl(bankSettings.uploadedQrUrl || '');
@@ -40,6 +69,26 @@ export function BankSettingsView({
     setVietqrBankBin(bankSettings.vietqrBankBin || '');
     setVietqrTemplate(bankSettings.vietqrTemplate || 'compact2');
   }, [bankSettings]);
+
+  useEffect(() => {
+    setTgNotifyRevision(notificationSettings.telegramNotifyRevision);
+    setTgNotifyMessage(notificationSettings.telegramNotifyMessage);
+    setTgNotifyDeadline(notificationSettings.telegramNotifyDeadline);
+  }, [notificationSettings]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchTelegramServerStatus()
+      .then((res) => {
+        if (!cancelled) setTgConfigured(res.configured);
+      })
+      .catch(() => {
+        if (!cancelled) setTgConfigured(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleUploadQrImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -60,22 +109,104 @@ export function BankSettingsView({
     }
   };
 
+  const handleToggleNotifPref = async (
+    field: 'revision' | 'message' | 'deadline',
+    checked: boolean
+  ) => {
+    const nextRevision = field === 'revision' ? checked : tgNotifyRevision;
+    const nextMessage = field === 'message' ? checked : tgNotifyMessage;
+    const nextDeadline = field === 'deadline' ? checked : tgNotifyDeadline;
+
+    setTgNotifyRevision(nextRevision);
+    setTgNotifyMessage(nextMessage);
+    setTgNotifyDeadline(nextDeadline);
+
+    try {
+      await saveNotificationSettings({
+        telegramNotifyRevision: nextRevision,
+        telegramNotifyMessage: nextMessage,
+        telegramNotifyDeadline: nextDeadline,
+      });
+      onToast('Đã cập nhật tùy chọn cảnh báo Telegram.');
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : 'Không thể lưu tùy chọn thông báo.');
+    }
+  };
+
+  const handleTestTelegram = async () => {
+    setTestingTg(true);
+    try {
+      await sendTelegramTestAlert();
+      onToast('Đã gửi tin thử nghiệm tới Telegram thành công!');
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : 'Gửi tin thử nghiệm Telegram thất bại.');
+    } finally {
+      setTestingTg(false);
+    }
+  };
+
+  const handleSendDeadlineDigest = async () => {
+    const now = Date.now();
+    const urgentOrders = orders.filter((o) => {
+      if (o.orderStatus !== 'active') return false;
+      const info = evaluateDeadline(o.deadlineAt, now, o.orderStatus);
+      return info.level === 'urgent' || info.level === 'overdue';
+    });
+
+    setSendingDigest(true);
+    try {
+      const lines =
+        urgentOrders.length > 0
+          ? urgentOrders.slice(0, 12).map((o) => {
+              const info = evaluateDeadline(o.deadlineAt, now, o.orderStatus);
+              return `• #${o.orderCode} (${o.subject}) — ${info.label} (${info.countdownText}) · Hạn: ${formatDateTime(
+                o.deadlineAt
+              )}`;
+            })
+          : ['Hiện không có đơn nào sắp hạn dưới 24h hoặc quá hạn.'];
+
+      const res = await sendTelegramAdminAlert({
+        title: `Tổng hợp Deadline khẩn (${urgentOrders.length} đơn)`,
+        lines,
+      });
+      if (!res.ok) {
+        throw new Error(res.error || 'Không thể gửi tổng hợp Deadline qua Telegram.');
+      }
+      onToast(
+        urgentOrders.length > 0
+          ? `Đã gửi tổng hợp ${urgentOrders.length} đơn sắp hạn lên Telegram.`
+          : 'Đã gửi báo cáo (hiện không có đơn khẩn) lên Telegram.'
+      );
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : 'Gửi tổng hợp Telegram thất bại.');
+    } finally {
+      setSendingDigest(false);
+    }
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     try {
-      await saveBankSettings(
-        {
-          qrMode,
-          uploadedQrUrl,
-          bankName,
-          accountNumber,
-          accountName,
-          vietqrBankBin,
-          vietqrTemplate,
-        },
-        orders
-      );
+      await Promise.all([
+        saveBankSettings(
+          {
+            qrMode,
+            uploadedQrUrl,
+            bankName,
+            accountNumber,
+            accountName,
+            vietqrBankBin,
+            vietqrTemplate,
+          },
+          orders
+        ),
+        saveNotificationSettings({
+          telegramNotifyRevision: tgNotifyRevision,
+          telegramNotifyMessage: tgNotifyMessage,
+          telegramNotifyDeadline: tgNotifyDeadline,
+        }),
+      ]);
       if (replacedQrUrls.length > 0) {
         await Promise.allSettled(
           replacedQrUrls
@@ -84,9 +215,9 @@ export function BankSettingsView({
         );
         setReplacedQrUrls([]);
       }
-      onToast('Đã lưu cấu hình ngân hàng & đồng bộ lên các trang theo dõi.');
+      onToast('Đã lưu cài đặt thanh toán & thông báo Telegram.');
     } catch (err) {
-      onToast(err instanceof Error ? err.message : 'Lưu cấu hình thất bại.');
+      onToast(err instanceof Error ? err.message : 'Lưu cài đặt thất bại.');
     } finally {
       setSaving(false);
     }
@@ -108,10 +239,10 @@ export function BankSettingsView({
     <form onSubmit={handleSave} className="max-w-3xl space-y-6">
       <div>
         <h2 className="text-lg font-bold text-slate-900">
-          Cài đặt Thanh toán & Mã QR Ngân hàng
+          Cài đặt Thanh toán, QR & Cảnh báo Telegram
         </h2>
         <p className="text-xs text-zinc-500 mt-0.5">
-          Tải lên ảnh mã QR mặc định cùng số tài khoản và tên chủ tài khoản để hiển thị cho khách hàng.
+          Cấu hình tài khoản nhận tiền, ảnh QR mặc định và quy tắc gửi thông báo tự động về Telegram.
         </p>
       </div>
 
@@ -262,6 +393,101 @@ export function BankSettingsView({
         )}
       </div>
 
+      {/* Telegram Bot Alerts */}
+      <div className="bg-white border border-zinc-200 rounded-xl p-6 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-start gap-2.5">
+            <Bell className="w-4 h-4 text-[#4338CA] shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Cảnh báo tự động qua Telegram Bot
+              </h3>
+              <p className="text-xs text-zinc-500 mt-0.5 max-w-[62ch]">
+                Gửi thông báo tức thời tới Telegram khi khách hàng nhắn tin, gửi yêu cầu sửa hoặc đơn sắp đến hạn.
+              </p>
+            </div>
+          </div>
+
+          <span
+            className={`text-xs font-medium whitespace-nowrap ${
+              tgConfigured === null
+                ? 'text-zinc-500'
+                : tgConfigured
+                ? 'text-[#16A34A]'
+                : 'text-[#D97706]'
+            }`}
+          >
+            {tgConfigured === null
+              ? 'Đang kiểm tra máy chủ...'
+              : tgConfigured
+              ? 'Đã cấu hình trên máy chủ'
+              : 'Chưa cấu hình biến môi trường'}
+          </span>
+        </div>
+
+        <div className="pt-3 border-t border-zinc-100 space-y-2.5 text-xs">
+          <label className="flex items-center gap-2.5 text-slate-800 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={tgNotifyRevision}
+              onChange={(e) => handleToggleNotifPref('revision', e.target.checked)}
+              className="w-4 h-4 accent-[#4338CA]"
+            />
+            <span>Thông báo ngay khi khách hàng gửi Yêu cầu chỉnh sửa (Revision)</span>
+          </label>
+          <label className="flex items-center gap-2.5 text-slate-800 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={tgNotifyMessage}
+              onChange={(e) => handleToggleNotifPref('message', e.target.checked)}
+              className="w-4 h-4 accent-[#4338CA]"
+            />
+            <span>Thông báo ngay khi khách hàng nhắn tin mới trong Chat 48h</span>
+          </label>
+          <label className="flex items-center gap-2.5 text-slate-800 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={tgNotifyDeadline}
+              onChange={(e) => handleToggleNotifPref('deadline', e.target.checked)}
+              className="w-4 h-4 accent-[#4338CA]"
+            />
+            <span>Tự động nhắc đơn sắp hạn (&lt;24h, &lt;6h hoặc quá hạn) khi mở cổng Admin</span>
+          </label>
+        </div>
+
+        {!tgConfigured && tgConfigured !== null && (
+          <p className="text-xs text-zinc-600 bg-zinc-50 px-3.5 py-2.5 rounded-lg leading-relaxed">
+            Để kích hoạt Bot bảo mật phía máy chủ, hãy thêm 2 biến môi trường{' '}
+            <span className="font-mono font-semibold text-slate-900">TELEGRAM_BOT_TOKEN</span> và{' '}
+            <span className="font-mono font-semibold text-slate-900">TELEGRAM_CHAT_ID</span> trên Vercel (Project Settings → Environment Variables) hoặc tệp <span className="font-mono">.env</span> của máy chủ.
+          </p>
+        )}
+
+        <div className="pt-2 border-t border-zinc-100 flex flex-wrap items-center gap-2.5">
+          <button
+            type="button"
+            disabled={testingTg}
+            onClick={handleTestTelegram}
+            className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium bg-[#0F172A] text-white rounded-lg hover:bg-slate-800 whitespace-nowrap disabled:opacity-45"
+          >
+            <Send className="w-3.5 h-3.5" />
+            <span>{testingTg ? 'Đang gửi thử...' : 'Gửi tin test Telegram'}</span>
+          </button>
+
+          <button
+            type="button"
+            disabled={sendingDigest}
+            onClick={handleSendDeadlineDigest}
+            className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium bg-indigo-50 text-[#4338CA] border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap disabled:opacity-45"
+          >
+            <Bell className="w-3.5 h-3.5" />
+            <span>
+              {sendingDigest ? 'Đang gửi tổng hợp...' : 'Gửi tổng hợp đơn sắp hạn ngay'}
+            </span>
+          </button>
+        </div>
+      </div>
+
       <div className="flex justify-end">
         <button
           type="submit"
@@ -274,3 +500,4 @@ export function BankSettingsView({
     </form>
   );
 }
+

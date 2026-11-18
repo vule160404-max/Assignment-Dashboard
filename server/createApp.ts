@@ -662,7 +662,201 @@ export function createApiApp(): express.Express {
       storageProvider: r2Config ? 'cloudflare-r2' : 'local-disk',
       r2Configured: Boolean(r2Config),
       r2Connected,
+      telegramConfigured: Boolean(
+        (process.env.TELEGRAM_BOT_TOKEN || '').trim() &&
+          (process.env.TELEGRAM_CHAT_ID || '').trim()
+      ),
     });
+  });
+
+  // --- Telegram Bot Notification Proxy Routes ---
+  function resolveTelegramConfig(): { botToken: string; chatId: string } | null {
+    const botToken = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+    const chatId = (process.env.TELEGRAM_CHAT_ID || '').trim();
+    if (!botToken || !chatId) return null;
+    return { botToken, chatId };
+  }
+
+  function escapeTelegramHtml(raw: string): string {
+    return raw
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  async function dispatchTelegramHtml(
+    htmlText: string
+  ): Promise<{ ok: boolean; error?: string }> {
+    const cfg = resolveTelegramConfig();
+    if (!cfg) {
+      return {
+        ok: false,
+        error:
+          'Chưa cấu hình TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID trong biến môi trường máy chủ.',
+      };
+    }
+
+    try {
+      const resp = await fetch(
+        `https://api.telegram.org/bot${encodeURIComponent(cfg.botToken)}/sendMessage`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: cfg.chatId,
+            text: htmlText.slice(0, 3800),
+            parse_mode: 'HTML',
+            disable_web_page_preview: true,
+          }),
+        }
+      );
+      if (!resp.ok) {
+        const errBody = (await resp.json().catch(() => null)) as {
+          description?: string;
+        } | null;
+        return {
+          ok: false,
+          error:
+            errBody?.description ||
+            `Telegram Bot API trả về lỗi HTTP ${resp.status}.`,
+        };
+      }
+      return { ok: true };
+    } catch (err) {
+      return {
+        ok: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : 'Không thể kết nối tới Telegram API.',
+      };
+    }
+  }
+
+  const clientTelegramCooldowns = new Map<string, number>();
+
+  app.get('/api/notifications/telegram/status', requireTeamAuth, (_req, res) => {
+    const cfg = resolveTelegramConfig();
+    res.json({ configured: Boolean(cfg) });
+  });
+
+  app.post('/api/notifications/telegram/test', requireTeamAuth, async (_req, res) => {
+    const result = await dispatchTelegramHtml(
+      [
+        '<b>AssignTrack · Kiểm tra kết nối Telegram Bot</b>',
+        `Thời gian: ${new Date().toLocaleString('vi-VN')}`,
+        'Hệ thống thông báo Deadline, Yêu cầu chỉnh sửa và Tin nhắn khách hàng đã sẵn sàng.',
+      ].join('\n')
+    );
+    if (!result.ok) {
+      res.status(400).json({ ok: false, error: result.error });
+      return;
+    }
+    res.json({ ok: true });
+  });
+
+  app.post('/api/notifications/telegram/notify', requireTeamAuth, async (req, res) => {
+    const cfg = resolveTelegramConfig();
+    if (!cfg) {
+      res.json({ ok: false, skipped: true });
+      return;
+    }
+    const title =
+      typeof req.body?.title === 'string' ? req.body.title.trim().slice(0, 180) : '';
+    const lines = Array.isArray(req.body?.lines)
+      ? req.body.lines
+          .filter((l: unknown): l is string => typeof l === 'string')
+          .slice(0, 20)
+          .map((l: string) => escapeTelegramHtml(l.trim().slice(0, 300)))
+      : [];
+
+    if (!title && lines.length === 0) {
+      res.status(400).json({ ok: false, error: 'Thiếu nội dung thông báo.' });
+      return;
+    }
+
+    const html = [`<b>${escapeTelegramHtml(title || 'AssignTrack Thông báo')}</b>`, ...lines].join('\n');
+    const result = await dispatchTelegramHtml(html);
+    if (!result.ok) {
+      res.status(502).json({ ok: false, error: result.error });
+      return;
+    }
+    res.json({ ok: true });
+  });
+
+  app.post('/api/notifications/telegram/client-event', async (req, res) => {
+    const cfg = resolveTelegramConfig();
+    if (!cfg) {
+      res.json({ ok: false, skipped: true });
+      return;
+    }
+
+    const orderCode =
+      typeof req.body?.orderCode === 'string'
+        ? req.body.orderCode.trim().toUpperCase()
+        : '';
+    const eventType =
+      req.body?.eventType === 'revision' || req.body?.eventType === 'message'
+        ? req.body.eventType
+        : '';
+    const senderName =
+      typeof req.body?.senderName === 'string'
+        ? req.body.senderName.trim().slice(0, 60)
+        : 'Khách hàng';
+    const summary =
+      typeof req.body?.summary === 'string'
+        ? req.body.summary.trim().slice(0, 600)
+        : '';
+
+    if (
+      !orderCode ||
+      !/^[A-Z0-9-]{4,32}$/.test(orderCode) ||
+      !eventType ||
+      !summary
+    ) {
+      res.status(400).json({ ok: false, error: 'Dữ liệu sự kiện không hợp lệ.' });
+      return;
+    }
+
+    const cooldownKey = `${orderCode}:${eventType}`;
+    const now = Date.now();
+    const lastSent = clientTelegramCooldowns.get(cooldownKey) || 0;
+    if (now - lastSent < 8000) {
+      res.json({ ok: true, throttled: true });
+      return;
+    }
+
+    // Verify tracking portal exists in Firestore before relaying alert
+    if (FIREBASE_PROJECT_ID) {
+      try {
+        const portalUrl = `https://firestore.googleapis.com/v1/projects/${encodeURIComponent(
+          FIREBASE_PROJECT_ID
+        )}/databases/${encodeURIComponent(
+          FIRESTORE_DATABASE_ID
+        )}/documents/trackingPortals/${encodeURIComponent(orderCode)}`;
+        const portalResp = await fetch(portalUrl);
+        if (!portalResp.ok) {
+          res.status(404).json({ ok: false, error: 'Không tìm thấy đơn hàng.' });
+          return;
+        }
+      } catch {
+        // Proceed best-effort if REST lookup encounters transient network hiccup
+      }
+    }
+
+    clientTelegramCooldowns.set(cooldownKey, now);
+    const header =
+      eventType === 'revision'
+        ? `Yêu cầu chỉnh sửa mới · Đơn #${orderCode}`
+        : `Tin nhắn mới từ khách · Đơn #${orderCode}`;
+    const html = [
+      `<b>${escapeTelegramHtml(header)}</b>`,
+      `Người gửi: ${escapeTelegramHtml(senderName || 'Khách hàng')}`,
+      `Nội dung: ${escapeTelegramHtml(summary)}`,
+    ].join('\n');
+
+    const result = await dispatchTelegramHtml(html);
+    res.json({ ok: result.ok });
   });
 
   app.get('/api/extension/hix-bridge.zip', async (_req, res) => {

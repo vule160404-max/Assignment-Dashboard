@@ -30,9 +30,11 @@ import {
   CHAT_TTL_MS,
   ClientRecord,
   FIELD_LIMITS,
+  NotificationSettings,
   OrderMessage,
   OrderRecord,
   RevisionRequest,
+  StaffPayoutStatus,
   TeamInvite,
   TrackingPortalRecord,
   UserProfile,
@@ -46,6 +48,13 @@ export const DEFAULT_BANK_SETTINGS: BankSettings = {
   accountName: '',
   vietqrBankBin: '',
   vietqrTemplate: 'compact2',
+  updatedAt: new Date().toISOString(),
+};
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  telegramNotifyRevision: true,
+  telegramNotifyMessage: true,
+  telegramNotifyDeadline: true,
   updatedAt: new Date().toISOString(),
 };
 
@@ -340,6 +349,82 @@ export async function saveBankSettings(
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'settings/bankConfig');
+  }
+}
+
+export function subscribeNotificationSettings(
+  onData: (settings: NotificationSettings) => void
+): () => void {
+  const ref = doc(db, 'settings', 'notifications');
+  return onSnapshot(
+    ref,
+    (snap) => {
+      if (snap.exists()) {
+        onData(snap.data() as NotificationSettings);
+      } else {
+        onData(DEFAULT_NOTIFICATION_SETTINGS);
+      }
+    },
+    (error) => handleFirestoreError(error, OperationType.GET, 'settings/notifications')
+  );
+}
+
+export async function saveNotificationSettings(
+  settings: Omit<NotificationSettings, 'updatedAt'>
+): Promise<void> {
+  const payload: NotificationSettings = {
+    telegramNotifyRevision: Boolean(settings.telegramNotifyRevision),
+    telegramNotifyMessage: Boolean(settings.telegramNotifyMessage),
+    telegramNotifyDeadline: Boolean(settings.telegramNotifyDeadline),
+    updatedAt: new Date().toISOString(),
+  };
+  try {
+    await setDoc(doc(db, 'settings', 'notifications'), payload);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'settings/notifications');
+  }
+}
+
+export async function fetchTelegramServerStatus(): Promise<{ configured: boolean }> {
+  const headers = await getAdminAuthHeaders();
+  const res = await fetch('/api/notifications/telegram/status', { headers });
+  if (!res.ok) return { configured: false };
+  return (await res.json()) as { configured: boolean };
+}
+
+export async function sendTelegramTestAlert(): Promise<void> {
+  const headers = await getAdminAuthHeaders();
+  const res = await fetch('/api/notifications/telegram/test', {
+    method: 'POST',
+    headers,
+  });
+  const body = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+  if (!res.ok || !body.ok) {
+    throw new Error(body.error || 'Không thể gửi tin thử nghiệm Telegram.');
+  }
+}
+
+export async function sendTelegramAdminAlert(params: {
+  title: string;
+  lines: string[];
+}): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  try {
+    const headers = await getAdminAuthHeaders();
+    const res = await fetch('/api/notifications/telegram/notify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...headers,
+      },
+      body: JSON.stringify(params),
+    });
+    return (await res.json().catch(() => ({ ok: false }))) as {
+      ok: boolean;
+      skipped?: boolean;
+      error?: string;
+    };
+  } catch {
+    return { ok: false };
   }
 }
 
@@ -887,6 +972,12 @@ export async function saveOrder(
     clientDisplayName: orderInput.clientDisplayName.slice(0, FIELD_LIMITS.clientNameMax),
     assignedStaffUid: (orderInput.assignedStaffUid || '').slice(0, 128),
     assignedStaffName: (orderInput.assignedStaffName || '').slice(0, FIELD_LIMITS.displayNameMax),
+    staffPayoutAmount: Math.max(0, Math.round(orderInput.staffPayoutAmount || 0)),
+    staffPayoutStatus: orderInput.staffPayoutStatus === 'paid' ? 'paid' : 'unpaid',
+    staffPayoutPaidAt:
+      orderInput.staffPayoutStatus === 'paid'
+        ? (orderInput.staffPayoutPaidAt || now).slice(0, 40)
+        : '',
     attachments: trimmedAttachments,
     createdAt: existingCreatedAt || now,
     updatedAt: now,
@@ -903,6 +994,25 @@ export async function saveOrder(
     return id;
   } catch (error) {
     handleFirestoreError(error, existingId ? OperationType.UPDATE : OperationType.CREATE, `orders/${id}`);
+  }
+}
+
+export async function updateOrderStaffPayout(params: {
+  orderId: string;
+  staffPayoutAmount: number;
+  staffPayoutStatus: StaffPayoutStatus;
+}): Promise<void> {
+  const now = new Date().toISOString();
+  const path = `orders/${params.orderId}`;
+  try {
+    await updateDoc(doc(db, 'orders', params.orderId), {
+      staffPayoutAmount: Math.max(0, Math.round(params.staffPayoutAmount || 0)),
+      staffPayoutStatus: params.staffPayoutStatus,
+      staffPayoutPaidAt: params.staffPayoutStatus === 'paid' ? now : '',
+      updatedAt: now,
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
   }
 }
 
@@ -1019,6 +1129,18 @@ export async function sendOrderMessage(params: {
 
   try {
     await setDoc(doc(db, 'trackingPortals', params.orderCode, 'messages', msgId), payload);
+    if (params.senderRole === 'client') {
+      fetch('/api/notifications/telegram/client-event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderCode: params.orderCode,
+          eventType: 'message',
+          senderName: payload.senderName,
+          summary: payload.body,
+        }),
+      }).catch(() => undefined);
+    }
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, colPath);
   }
@@ -1088,6 +1210,16 @@ export async function createRevisionRequest(
 
   try {
     await setDoc(doc(db, 'trackingPortals', orderCode, 'revisions', reqId), payload);
+    fetch('/api/notifications/telegram/client-event', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        orderCode,
+        eventType: 'revision',
+        senderName: 'Khách hàng',
+        summary: payload.message,
+      }),
+    }).catch(() => undefined);
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, path);
   }

@@ -21,6 +21,7 @@ const dirtyDozen: DirtyDozenCase[] = [
         'progressPercent', 'publicStatusNote', 'internalNotes', 'orderStatus',
         'totalAmount', 'depositAmount', 'paidAmount', 'paymentStatus',
         'clientId', 'clientDisplayName', 'assignedStaffUid', 'assignedStaffName',
+        'staffPayoutAmount', 'staffPayoutStatus', 'staffPayoutPaidAt',
         'attachments', 'createdAt', 'updatedAt',
       ]);
       const payload = { orderCode: 'ASG-2026-001', isAdminOverride: true };
@@ -64,13 +65,13 @@ const dirtyDozen: DirtyDozenCase[] = [
     },
   },
   {
-    name: '6. Staff attempting to mutate paidAmount on assigned order',
+    name: '6. Staff attempting to mutate paidAmount or staffPayoutAmount on assigned order',
     shouldDeny: true,
     validate: () => {
       const staffAllowedKeys = new Set([
         'stage', 'progressPercent', 'publicStatusNote', 'internalNotes', 'attachments', 'updatedAt',
       ]);
-      const affected = ['paidAmount', 'updatedAt'];
+      const affected = ['paidAmount', 'staffPayoutAmount', 'updatedAt'];
       return affected.every((k) => staffAllowedKeys.has(k));
     },
   },

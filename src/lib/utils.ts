@@ -274,3 +274,73 @@ export function sanitizeOrderForTracking(
     updatedAt: order.updatedAt,
   };
 }
+
+export type ZaloTemplateType = 'quote_deposit' | 'final_payment' | 'handover';
+
+export function buildClientZaloMessage(
+  template: ZaloTemplateType,
+  order: Pick<
+    OrderRecord,
+    | 'orderCode'
+    | 'subject'
+    | 'topic'
+    | 'wordCount'
+    | 'deadlineAt'
+    | 'totalAmount'
+    | 'depositAmount'
+    | 'paidAmount'
+    | 'progressPercent'
+    | 'clientDisplayName'
+  >,
+  bankSettings: BankSettings,
+  originUrl?: string
+): string {
+  const baseUrl =
+    (originUrl || (typeof window !== 'undefined' ? window.location.origin : '')).replace(
+      /\/$/,
+      ''
+    );
+  const trackingUrl = baseUrl
+    ? `${baseUrl}/?code=${encodeURIComponent(order.orderCode)}`
+    : `?code=${encodeURIComponent(order.orderCode)}`;
+  const remaining = Math.max(0, (order.totalAmount || 0) - (order.paidAmount || 0));
+  const bankLine =
+    bankSettings.bankName && bankSettings.accountNumber
+      ? `\nThông tin chuyển khoản:\n• Ngân hàng: ${bankSettings.bankName}\n• STK: ${bankSettings.accountNumber}\n• Chủ TK: ${bankSettings.accountName || ''}\n• Nội dung CK: ${order.orderCode}`
+      : '';
+
+  if (template === 'quote_deposit') {
+    return [
+      `Chào ${order.clientDisplayName || 'bạn'}, mình gửi thông tin xác nhận đơn & link theo dõi tiến độ bài làm:`,
+      `• Mã đơn: #${order.orderCode}`,
+      `• Môn / Chủ đề: ${order.subject} — ${order.topic} (${order.wordCount.toLocaleString('vi-VN')} từ)`,
+      `• Deadline: ${formatDateTime(order.deadlineAt)}`,
+      `• Tổng chi phí: ${formatVnd(order.totalAmount)} | Cần cọc trước: ${formatVnd(order.depositAmount)}`,
+      `• Link theo dõi tiến độ & xem QR cọc: ${trackingUrl}`,
+      bankLine.trim(),
+      `Sau khi chuyển khoản cọc xong bạn nhắn lại để bên mình bắt đầu triển khai ngay nhé!`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  if (template === 'final_payment') {
+    return [
+      `Chào ${order.clientDisplayName || 'bạn'}, bài #${order.orderCode} (${order.subject}) hiện đã hoàn thiện ${order.progressPercent}% và sẵn sàng bàn giao.`,
+      `• Tổng phí: ${formatVnd(order.totalAmount)} | Đã thanh toán: ${formatVnd(order.paidAmount)}`,
+      `• Số tiền còn lại cần tất toán: ${formatVnd(remaining)}`,
+      `• Bạn vào link sau để xem trước bản Turnitin/Draft và mở khóa tải bài Final: ${trackingUrl}`,
+      bankLine.trim(),
+      `Chuyển xong bạn báo mình xác nhận mở khóa tải file đầy đủ nhé!`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  return [
+    `Chào ${order.clientDisplayName || 'bạn'}, bên mình đã mở khóa toàn bộ file bài Final cho đơn #${order.orderCode} (${order.subject}).`,
+    `• Link tải bài hoàn chỉnh: ${trackingUrl}`,
+    `Nếu giảng viên có góp ý hoặc cần điều chỉnh điểm nào, bạn có thể nhắn trực tiếp hoặc bấm nút "Yêu cầu chỉnh sửa" ngay trên link theo dõi để team hỗ trợ nhanh nhất nhé!`,
+  ].join('\n');
+}
+

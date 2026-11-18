@@ -12,6 +12,8 @@ export type OrderStatus = 'active' | 'completed' | 'cancelled';
 
 export type PaymentStatus = 'unpaid' | 'deposit_paid' | 'fully_paid';
 
+export type StaffPayoutStatus = 'unpaid' | 'paid';
+
 export type ClientTier = 'new' | 'vip' | 'watchlist';
 
 export type AttachmentCategory = 'brief' | 'turnitin' | 'draft' | 'final';
@@ -89,6 +91,9 @@ export interface OrderRecord {
   clientDisplayName: string;
   assignedStaffUid?: string;
   assignedStaffName?: string;
+  staffPayoutAmount?: number;
+  staffPayoutStatus?: StaffPayoutStatus;
+  staffPayoutPaidAt?: string;
   attachments: AttachmentItem[];
   createdAt: string;
   updatedAt: string;
@@ -114,6 +119,13 @@ export interface BankSettings {
   accountName: string;
   vietqrBankBin?: string;
   vietqrTemplate?: 'compact2' | 'compact' | 'qr_only' | 'print';
+  updatedAt: string;
+}
+
+export interface NotificationSettings {
+  telegramNotifyRevision: boolean;
+  telegramNotifyMessage: boolean;
+  telegramNotifyDeadline: boolean;
   updatedAt: string;
 }
 

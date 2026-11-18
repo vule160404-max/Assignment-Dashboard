@@ -9,10 +9,13 @@ import {
   Eye,
   FileText,
   FolderUp,
+  Maximize2,
+  Minimize2,
   Pause,
   Play,
   RefreshCw,
   RotateCcw,
+  ShieldCheck,
   Square,
   Upload,
 } from 'lucide-react';
@@ -31,15 +34,72 @@ import {
   MIN_HIX_CHUNK_WORDS,
   ParsedWordDocument,
   buildSentenceBoundaryChunks,
+  computeDocFingerprint,
   computeWordDiff,
   countWords,
   createWordDocumentFromText,
   detectHixGlitch,
+  detectReferenceSectionStartIndex,
   exportPatchedDocx,
   parseDocxFile,
-  splitParagraphIntoTerminalPeriodSentences,
 } from '../../lib/wordHumanizer';
 import { OrderRecord } from '../../types/domain';
+
+const CHECKPOINT_STORAGE_KEY = 'assigntrack_hix_checkpoints_v1';
+
+interface SavedHumanizeCheckpoint {
+  fingerprint: string;
+  fileName: string;
+  maxWordsPerChunk: number;
+  hixMode: HixBypassMode;
+  protectedTermsInput: string;
+  excludedParagraphIndices: number[];
+  chunkResults: Record<string, { outputText: string; accepted: boolean }>;
+  pastedPlainText?: string;
+  updatedAt: string;
+}
+
+function readCheckpoints(): Record<string, SavedHumanizeCheckpoint> {
+  try {
+    const raw = window.localStorage.getItem(CHECKPOINT_STORAGE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object'
+      ? (parsed as Record<string, SavedHumanizeCheckpoint>)
+      : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeCheckpoint(entry: SavedHumanizeCheckpoint): void {
+  try {
+    const all = readCheckpoints();
+    all[entry.fingerprint] = entry;
+    // Keep up to 5 most recent checkpoints
+    const sorted = Object.values(all)
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+      .slice(0, 5);
+    const trimmed: Record<string, SavedHumanizeCheckpoint> = {};
+    sorted.forEach((item) => {
+      trimmed[item.fingerprint] = item;
+    });
+    window.localStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(trimmed));
+  } catch {
+    // Ignore storage quota errors
+  }
+}
+
+function removeCheckpoint(fingerprint: string): void {
+  try {
+    const all = readCheckpoints();
+    if (!all[fingerprint]) return;
+    delete all[fingerprint];
+    window.localStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(all));
+  } catch {
+    // Ignore
+  }
+}
 
 type PlaybackStatus =
   | 'idle'
@@ -121,6 +181,14 @@ export function WordHumanizerView({
 
   // Document & Chunks state
   const [wordDoc, setWordDoc] = useState<ParsedWordDocument | null>(null);
+  const [docFingerprint, setDocFingerprint] = useState<string>('');
+  const [isPastedDoc, setIsPastedDoc] = useState<boolean>(false);
+  const [pastedSourceText, setPastedSourceText] = useState<string>('');
+  const [excludedParaIndices, setExcludedParaIndices] = useState<number[]>([]);
+  const [refSectionIdx, setRefSectionIdx] = useState<number>(-1);
+  const [protectedTermsInput, setProtectedTermsInput] = useState<string>('');
+  const [cleanPresentationMode, setCleanPresentationMode] = useState<boolean>(false);
+  const [restoredFromCheckpoint, setRestoredFromCheckpoint] = useState<boolean>(false);
   const [chunks, setChunks] = useState<HumanizeChunk[]>([]);
   const [chunkResults, setChunkResults] = useState<Record<string, ChunkResult>>({});
   const [maxWordsPerChunk, setMaxWordsPerChunk] = useState<number>(115);
@@ -180,15 +248,72 @@ export function WordHumanizerView({
     void refreshBridge();
   }, [refreshBridge]);
 
-  // Rebuild chunks whenever wordDoc or maxWordsPerChunk changes (only before running)
+  const excludedParaSet = useMemo(
+    () => new Set(excludedParaIndices),
+    [excludedParaIndices]
+  );
+
+  const parsedProtectedTerms = useMemo(
+    () =>
+      protectedTermsInput
+        .split(/[,;\n]+/)
+        .map((t) => t.trim())
+        .filter((t) => t.length >= 2),
+    [protectedTermsInput]
+  );
+
+  const recentCheckpoints = useMemo(
+    () =>
+      Object.values(readCheckpoints())
+        .filter((cp) => Object.values(cp.chunkResults).some((r) => r.accepted))
+        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+    // Re-evaluate when returning to empty doc view
+    [wordDoc]
+  );
+
+  // Rebuild chunks whenever wordDoc, maxWordsPerChunk, or excluded paragraphs change
   useEffect(() => {
     if (!wordDoc) {
       setChunks([]);
       return;
     }
-    const built = buildSentenceBoundaryChunks(wordDoc.paragraphs, maxWordsPerChunk);
+    const built = buildSentenceBoundaryChunks(
+      wordDoc.paragraphs,
+      maxWordsPerChunk,
+      MIN_HIX_CHUNK_WORDS,
+      excludedParaSet
+    );
     setChunks(built);
-  }, [wordDoc, maxWordsPerChunk]);
+  }, [wordDoc, maxWordsPerChunk, excludedParaSet]);
+
+  // Auto-save checkpoint into localStorage whenever chunks complete
+  useEffect(() => {
+    if (!wordDoc || !docFingerprint) return;
+    const doneCount = Object.values(chunkResults).filter((r) => r.accepted).length;
+    if (doneCount === 0) return;
+
+    writeCheckpoint({
+      fingerprint: docFingerprint,
+      fileName: wordDoc.fileName,
+      maxWordsPerChunk,
+      hixMode,
+      protectedTermsInput,
+      excludedParagraphIndices: excludedParaIndices,
+      chunkResults,
+      pastedPlainText: isPastedDoc ? pastedSourceText : undefined,
+      updatedAt: new Date().toISOString(),
+    });
+  }, [
+    wordDoc,
+    docFingerprint,
+    chunkResults,
+    maxWordsPerChunk,
+    hixMode,
+    protectedTermsInput,
+    excludedParaIndices,
+    isPastedDoc,
+    pastedSourceText,
+  ]);
 
   // Smoothly scroll the currently highlighted sentence block into view during playback
   useEffect(() => {
@@ -234,6 +359,73 @@ export function WordHumanizerView({
     [chunks]
   );
 
+  const applyLoadedDocument = (
+    parsed: ParsedWordDocument,
+    options: { isPasted: boolean; pastedText?: string }
+  ) => {
+    runControlRef.current.aborted = true;
+    runControlRef.current.runId += 1;
+
+    const fp = computeDocFingerprint(parsed);
+    const refIdx = detectReferenceSectionStartIndex(parsed.paragraphs);
+    const defaultExcluded =
+      refIdx >= 0
+        ? parsed.paragraphs.filter((p) => p.index >= refIdx).map((p) => p.index)
+        : [];
+
+    const existingCp = readCheckpoints()[fp];
+    const existingDoneCount = existingCp
+      ? Object.values(existingCp.chunkResults).filter((r) => r.accepted).length
+      : 0;
+
+    setWordDoc(parsed);
+    setDocFingerprint(fp);
+    setIsPastedDoc(options.isPasted);
+    setPastedSourceText(options.pastedText || '');
+    setRefSectionIdx(refIdx);
+    setPlaybackError('');
+    setGlitchReview(null);
+    setInspectChunkId(null);
+
+    if (existingCp && existingDoneCount > 0) {
+      setMaxWordsPerChunk(existingCp.maxWordsPerChunk);
+      setHixMode(existingCp.hixMode);
+      setProtectedTermsInput(existingCp.protectedTermsInput || '');
+      setExcludedParaIndices(existingCp.excludedParagraphIndices || defaultExcluded);
+      setChunkResults(existingCp.chunkResults);
+      const previewChunks = buildSentenceBoundaryChunks(
+        parsed.paragraphs,
+        existingCp.maxWordsPerChunk,
+        MIN_HIX_CHUNK_WORDS,
+        new Set(existingCp.excludedParagraphIndices || defaultExcluded)
+      );
+      const firstPending = previewChunks.findIndex(
+        (c) => !existingCp.chunkResults[c.id]?.accepted
+      );
+      setCurrentChunkIdx(firstPending >= 0 ? firstPending : 0);
+      setRestoredFromCheckpoint(true);
+      setPlaybackStatus(firstPending >= 0 ? 'paused' : 'completed');
+      onToast(
+        `Đã khôi phục tiến trình dở của "${parsed.fileName}" (${existingDoneCount} đoạn đã xong).`
+      );
+    } else {
+      setExcludedParaIndices(defaultExcluded);
+      setChunkResults({});
+      setCurrentChunkIdx(0);
+      setRestoredFromCheckpoint(false);
+      setPlaybackStatus('ready');
+      const nonEmptyWords = countWords(
+        parsed.paragraphs
+          .filter((p) => !p.isEmpty)
+          .map((p) => p.text)
+          .join(' ')
+      );
+      const refNote =
+        refIdx >= 0 ? ' (đã tự động bỏ qua phần References/Phụ lục)' : '';
+      onToast(`Đã tải bài Word "${parsed.fileName}" (${nonEmptyWords} từ)${refNote}.`);
+    }
+  };
+
   const handleUploadDocx = async (file: File) => {
     if (!file.name.toLowerCase().endsWith('.docx')) {
       onToast('Vui lòng chọn tệp Word định dạng .docx.');
@@ -246,16 +438,7 @@ export function WordHumanizerView({
         onToast('File Word này không chứa văn bản.');
         return;
       }
-      runControlRef.current.aborted = true;
-      runControlRef.current.runId += 1;
-      setWordDoc(parsed);
-      setChunkResults({});
-      setCurrentChunkIdx(0);
-      setPlaybackError('');
-      setGlitchReview(null);
-      setInspectChunkId(null);
-      setPlaybackStatus('ready');
-      onToast(`Đã tải bài Word "${parsed.fileName}" (${countWords(nonEmpty.map((p) => p.text).join(' '))} từ).`);
+      applyLoadedDocument(parsed, { isPasted: false });
     } catch (err) {
       onToast(err instanceof Error ? err.message : 'Không thể đọc file Word.');
     }
@@ -269,19 +452,23 @@ export function WordHumanizerView({
     }
     try {
       const parsed = await createWordDocumentFromText(pasteDocTitle, pasteDocBody);
-      runControlRef.current.aborted = true;
-      runControlRef.current.runId += 1;
-      setWordDoc(parsed);
-      setChunkResults({});
-      setCurrentChunkIdx(0);
-      setPlaybackError('');
-      setGlitchReview(null);
-      setInspectChunkId(null);
       setShowPasteCreator(false);
-      setPlaybackStatus('ready');
-      onToast(`Đã khởi tạo bản trình chiếu Word "${parsed.fileName}".`);
+      applyLoadedDocument(parsed, { isPasted: true, pastedText: pasteDocBody });
     } catch (err) {
       onToast(err instanceof Error ? err.message : 'Không thể tạo tài liệu Word.');
+    }
+  };
+
+  const handleRestorePastedCheckpoint = async (cp: SavedHumanizeCheckpoint) => {
+    if (!cp.pastedPlainText) return;
+    try {
+      const parsed = await createWordDocumentFromText(cp.fileName, cp.pastedPlainText);
+      applyLoadedDocument(parsed, {
+        isPasted: true,
+        pastedText: cp.pastedPlainText,
+      });
+    } catch {
+      onToast('Không thể khôi phục bài dán đã lưu.');
     }
   };
 
@@ -386,8 +573,12 @@ export function WordHumanizerView({
         return;
       }
 
-      // Step 3: Check output for garbled characters / corrupted HIX generation
-      const glitchCheck = detectHixGlitch(chunk.text, res.outputText);
+      // Step 3: Check output for garbled characters, corrupted HIX generation, citations, numbers & locked terms
+      const glitchCheck = detectHixGlitch(
+        chunk.text,
+        res.outputText,
+        parsedProtectedTerms
+      );
       let finalOutputText = res.outputText;
 
       if (glitchCheck.hasGlitch) {
@@ -473,11 +664,37 @@ export function WordHumanizerView({
       glitchDecisionResolverRef.current = null;
       setGlitchReview(null);
     }
+    if (docFingerprint) {
+      removeCheckpoint(docFingerprint);
+    }
     setChunkResults({});
     setCurrentChunkIdx(0);
     setPlaybackError('');
     setInspectChunkId(null);
+    setRestoredFromCheckpoint(false);
     setPlaybackStatus(wordDoc ? 'ready' : 'idle');
+  };
+
+  const handleToggleParagraphInclusion = (paraIdx: number) => {
+    if (isRunning || playbackStatus === 'review_glitch' || completedCount > 0) return;
+    setExcludedParaIndices((prev) =>
+      prev.includes(paraIdx)
+        ? prev.filter((i) => i !== paraIdx)
+        : [...prev, paraIdx]
+    );
+  };
+
+  const handleSelectBodyOnly = () => {
+    if (!wordDoc || isRunning || completedCount > 0) return;
+    if (refSectionIdx >= 0) {
+      setExcludedParaIndices(
+        wordDoc.paragraphs.filter((p) => p.index >= refSectionIdx).map((p) => p.index)
+      );
+      onToast('Đã chọn lại toàn bộ thân bài & giữ nguyên bỏ qua phần References.');
+    } else {
+      setExcludedParaIndices([]);
+      onToast('Đã chọn toàn bộ các đoạn văn đủ điều kiện trong bài.');
+    }
   };
 
   // Reconstruct current text of every paragraph with accepted humanized chunks pasted in place
@@ -642,7 +859,8 @@ export function WordHumanizerView({
 
   return (
     <div className="space-y-5">
-      {/* 1. Extension & HIX Bypass Tab Connection Bar */}
+      {/* 1. Extension & HIX Bypass Tab Connection Bar (Hidden in Clean Presentation Mode) */}
+      {!cleanPresentationMode && (
       <section className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
@@ -744,8 +962,10 @@ export function WordHumanizerView({
           </div>
         )}
       </section>
+      )}
 
-      {/* 2. Upload Word (.docx) & Configuration Toolbar */}
+      {/* 2. Upload Word (.docx) & Configuration Toolbar (Hidden in Clean Presentation Mode) */}
+      {!cleanPresentationMode && (
       <section className="bg-white border border-zinc-200 rounded-xl p-4 sm:p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2.5">
@@ -829,13 +1049,29 @@ export function WordHumanizerView({
           </div>
         </div>
 
+        {/* Citation, Number & Custom Protected Terms Guard */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 pt-2 border-t border-zinc-100">
+          <div className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 shrink-0">
+            <ShieldCheck className="w-3.5 h-3.5 text-[#4338CA]" />
+            <span>Từ khóa bắt buộc giữ nguyên:</span>
+          </div>
+          <input
+            type="text"
+            value={protectedTermsInput}
+            onChange={(e) => setProtectedTermsInput(e.target.value)}
+            disabled={isRunning}
+            placeholder="VD: VinFast, SPayLater, Porter's Five Forces (tự động bảo vệ trích dẫn (Author, 2023) & số liệu %)"
+            className="flex-1 min-w-0 px-3 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+          />
+        </div>
+
         <p className="text-xs text-zinc-500 leading-relaxed">
           Quy tắc tách câu an toàn: Hệ thống chỉ copy những câu hoàn chỉnh kết thúc bằng dấu chấm{' '}
           <span className="font-mono font-semibold text-slate-800">(.)</span> và ghép mỗi lượt{' '}
           <span className="font-mono font-semibold text-slate-800">
             tối thiểu {MIN_HIX_CHUNK_WORDS} từ
           </span>{' '}
-          đúng yêu cầu của HIX Bypass (các đoạn ngắn dưới {MIN_HIX_CHUNK_WORDS} từ được giữ nguyên).
+          đúng yêu cầu của HIX Bypass (các đoạn ngắn dưới {MIN_HIX_CHUNK_WORDS} từ & mục Tài liệu tham khảo được giữ nguyên).
         </p>
 
         {showPasteCreator && (
@@ -880,6 +1116,7 @@ export function WordHumanizerView({
           </form>
         )}
       </section>
+      )}
 
       {/* 3. Word Presentation / Playback Stage */}
       {!wordDoc ? (
@@ -890,15 +1127,17 @@ export function WordHumanizerView({
             const f = e.dataTransfer.files?.[0];
             if (f) void handleUploadDocx(f);
           }}
-          className="bg-white border border-dashed border-zinc-300 rounded-xl py-16 px-6 text-center space-y-3"
+          className="bg-white border border-dashed border-zinc-300 rounded-xl py-14 px-6 text-center space-y-4"
         >
           <FolderUp className="w-8 h-8 text-zinc-400 mx-auto" />
-          <p className="text-sm font-semibold text-slate-900">
-            Kéo thả hoặc tải lên file Word (.docx) để bắt đầu trình chiếu
-          </p>
-          <p className="text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
-            Màn trình chiếu sẽ hiển thị nguyên bài Word gốc, tự động tô đen từng cụm câu hoàn chỉnh kết thúc bằng dấu chấm, gửi sang HIX Bypass và kiểm tra lỗi ký tự trước khi dán đè.
-          </p>
+          <div className="space-y-2">
+            <p className="text-sm font-semibold text-slate-900">
+              Kéo thả hoặc tải lên file Word (.docx) để bắt đầu trình chiếu
+            </p>
+            <p className="text-xs text-zinc-500 max-w-md mx-auto leading-relaxed">
+              Màn trình chiếu sẽ hiển thị nguyên bài Word gốc, tự động bỏ qua phần References/Phụ lục, tô đen từng cụm câu hoàn chỉnh kết thúc bằng dấu chấm, gửi sang HIX Bypass và kiểm tra lỗi ký tự / trích dẫn trước khi dán đè.
+            </p>
+          </div>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
@@ -907,11 +1146,57 @@ export function WordHumanizerView({
             <Upload className="w-3.5 h-3.5" />
             <span>Chọn file .docx từ máy</span>
           </button>
+
+          {recentCheckpoints.length > 0 && (
+            <div className="max-w-lg mx-auto mt-4 pt-4 border-t border-zinc-200/80 text-left space-y-2">
+              <p className="text-xs font-semibold text-slate-800">
+                Tiến trình trình chiếu đang lưu gần đây (Auto-save):
+              </p>
+              <div className="space-y-1.5">
+                {recentCheckpoints.slice(0, 3).map((cp) => {
+                  const done = Object.values(cp.chunkResults).filter((r) => r.accepted).length;
+                  return (
+                    <div
+                      key={cp.fingerprint}
+                      className="flex flex-wrap items-center justify-between gap-2 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-slate-900 truncate">{cp.fileName}</p>
+                        <p className="text-[11px] text-zinc-500 font-mono tabular-nums">
+                          Đã xong {done} đoạn · {new Date(cp.updatedAt).toLocaleString('vi-VN')}
+                        </p>
+                      </div>
+                      {cp.pastedPlainText ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleRestorePastedCheckpoint(cp)}
+                          className="btn-press px-2.5 py-1 text-xs font-medium bg-indigo-50 text-[#4338CA] hover:bg-indigo-100 rounded-md whitespace-nowrap"
+                        >
+                          Khôi phục ngay
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="btn-press px-2.5 py-1 text-xs font-medium bg-zinc-200/70 text-slate-800 hover:bg-zinc-200 rounded-md whitespace-nowrap"
+                        >
+                          Chọn lại file để chạy tiếp
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </section>
       ) : (
         <section className="relative bg-[#F4F4F5] border border-zinc-200 rounded-2xl p-4 sm:p-7 space-y-5">
-          {/* Corner Pause / Stop Floating Control ("Có 1 nút dừng ở góc để có thể tạm dừng quá trình làm") */}
-          {(isRunning || playbackStatus === 'paused' || playbackStatus === 'review_glitch') && (
+          {/* Corner Pause / Stop / Clean Presentation Dock */}
+          {(isRunning ||
+            playbackStatus === 'paused' ||
+            playbackStatus === 'review_glitch' ||
+            cleanPresentationMode) && (
             <div className="sticky top-16 z-30 flex justify-end pointer-events-none">
               <div className="pointer-events-auto inline-flex items-center gap-1.5 bg-white/95 backdrop-blur border border-zinc-200 rounded-xl p-1.5 shadow-[0_10px_28px_rgb(15,23,42,0.12)]">
                 {isRunning || playbackStatus === 'review_glitch' ? (
@@ -928,20 +1213,39 @@ export function WordHumanizerView({
                     <button
                       type="button"
                       onClick={handleStartOrResume}
-                      className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] whitespace-nowrap"
+                      disabled={
+                        chunks.length === 0 ||
+                        (playbackStatus === 'completed' && completedCount === chunks.length)
+                      }
+                      className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45 whitespace-nowrap"
                     >
                       <Play className="w-3.5 h-3.5" />
-                      <span>Tiếp tục</span>
+                      <span>
+                        {playbackStatus === 'paused' ? 'Tiếp tục' : 'Bắt đầu'}
+                      </span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={handleStopAndReset}
-                      className="btn-press inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-zinc-100 text-slate-800 hover:bg-zinc-200 rounded-lg whitespace-nowrap"
-                    >
-                      <Square className="w-3.5 h-3.5" />
-                      <span>Dừng hẳn</span>
-                    </button>
+                    {playbackStatus === 'paused' && (
+                      <button
+                        type="button"
+                        onClick={handleStopAndReset}
+                        className="btn-press inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-zinc-100 text-slate-800 hover:bg-zinc-200 rounded-lg whitespace-nowrap"
+                      >
+                        <Square className="w-3.5 h-3.5" />
+                        <span>Dừng hẳn</span>
+                      </button>
+                    )}
                   </>
+                )}
+
+                {cleanPresentationMode && (
+                  <button
+                    type="button"
+                    onClick={() => setCleanPresentationMode(false)}
+                    className="btn-press inline-flex items-center gap-1 px-2.5 py-2 text-xs font-medium bg-zinc-100 text-slate-700 hover:bg-zinc-200 rounded-lg whitespace-nowrap"
+                  >
+                    <Minimize2 className="w-3.5 h-3.5" />
+                    <span>Thoát trình chiếu gọn</span>
+                  </button>
                 )}
               </div>
             </div>
@@ -964,6 +1268,28 @@ export function WordHumanizerView({
               </div>
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setCleanPresentationMode((v) => !v)}
+                  className={`btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg whitespace-nowrap ${
+                    cleanPresentationMode
+                      ? 'bg-[#0F172A] text-white'
+                      : 'bg-zinc-100 hover:bg-zinc-200/80 text-slate-800'
+                  }`}
+                >
+                  {cleanPresentationMode ? (
+                    <>
+                      <Minimize2 className="w-3.5 h-3.5" />
+                      <span>Thoát trình chiếu gọn</span>
+                    </>
+                  ) : (
+                    <>
+                      <Maximize2 className="w-3.5 h-3.5" />
+                      <span>Trình chiếu gọn</span>
+                    </>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setShowOverwriteTint((v) => !v)}
@@ -1043,6 +1369,40 @@ export function WordHumanizerView({
               </div>
             </div>
 
+            {restoredFromCheckpoint && (
+              <div className="bg-indigo-50/80 border border-indigo-200 rounded-xl px-3.5 py-2.5 text-xs text-[#4338CA] flex flex-wrap items-center justify-between gap-2">
+                <span>
+                  Đã khôi phục tiến trình đang làm dở ({completedCount}/{chunks.length} đoạn đã xong). Bấm Tiếp tục để chạy nốt phần còn lại.
+                </span>
+                {!isRunning && (
+                  <button
+                    type="button"
+                    onClick={handleStopAndReset}
+                    className="btn-press px-2.5 py-1 text-xs font-semibold bg-white border border-indigo-200 rounded-md hover:bg-indigo-100"
+                  >
+                    Xóa bản lưu & chạy lại
+                  </button>
+                )}
+              </div>
+            )}
+
+            {!cleanPresentationMode && !isRunning && completedCount === 0 && (
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-zinc-100 text-xs text-zinc-600">
+                <span>
+                  {refSectionIdx >= 0
+                    ? 'Đã tự động bỏ qua phần Tài liệu tham khảo (References/Phụ lục). Bạn có thể tick chọn/bỏ từng đoạn bên dưới.'
+                    : 'Tick chọn hoặc bỏ chọn các đoạn văn bên dưới trước khi bấm Bắt đầu Humanize.'}
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSelectBodyOnly}
+                  className="btn-press px-2.5 py-1 text-xs font-medium bg-zinc-100 hover:bg-zinc-200/80 text-slate-800 rounded-md whitespace-nowrap"
+                >
+                  {refSectionIdx >= 0 ? 'Chỉ chọn phần thân bài' : 'Chọn lại tất cả'}
+                </button>
+              </div>
+            )}
+
             {playbackError && (
               <div
                 role="alert"
@@ -1064,7 +1424,7 @@ export function WordHumanizerView({
                 <div className="space-y-1">
                   <p className="text-sm font-bold text-[#D97706] flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 shrink-0" />
-                    Phát hiện đoạn văn từ HIX Bypass có dấu hiệu lỗi ký tự (Chưa dán đè)
+                    Phát hiện đoạn văn từ HIX Bypass có dấu hiệu lỗi ký tự hoặc sai lệch trích dẫn (Chưa dán đè)
                   </p>
                   <ul className="list-disc list-inside text-xs text-slate-700 space-y-0.5">
                     {glitchReview.check.reasons.map((reason, idx) => (
@@ -1153,24 +1513,55 @@ export function WordHumanizerView({
                 }
 
                 if (para.isHeading) {
+                  const isRefHeading = refSectionIdx >= 0 && para.index === refSectionIdx;
                   return (
                     <h3
                       key={para.index}
-                      className="text-base sm:text-lg font-bold text-slate-900 pt-2"
+                      className="text-base sm:text-lg font-bold text-slate-900 pt-2 flex items-center gap-2"
                     >
-                      {para.text}
+                      <span>{para.text}</span>
+                      {isRefHeading && !cleanPresentationMode && (
+                        <span className="text-[11px] font-normal text-zinc-500 font-mono">
+                          (Bỏ qua mặc định)
+                        </span>
+                      )}
                     </h3>
                   );
                 }
 
+                const isExcluded = excludedParaSet.has(para.index);
+                const canTogglePara =
+                  !cleanPresentationMode &&
+                  !isRunning &&
+                  playbackStatus !== 'review_glitch' &&
+                  completedCount === 0 &&
+                  countWords(para.text) >= MIN_HIX_CHUNK_WORDS;
+
                 const paraChunks = chunks.filter((c) => c.paragraphIndex === para.index);
                 if (paraChunks.length === 0) {
-                  // Paragraph had no complete terminal-period sentences (kept untouched)
-                  const rawSentences = splitParagraphIntoTerminalPeriodSentences(para.text);
+                  // Paragraph skipped (References / user unchecked / < 50w / no terminal period)
                   return (
-                    <p key={para.index} className="text-[15px] leading-[1.75] text-slate-800">
-                      {rawSentences.length > 0 ? para.text : para.text}
-                    </p>
+                    <div key={para.index} className="flex items-start gap-2.5 group">
+                      {canTogglePara && (
+                        <input
+                          type="checkbox"
+                          checked={!isExcluded}
+                          onChange={() => handleToggleParagraphInclusion(para.index)}
+                          title="Chọn / bỏ chọn đoạn này để Humanize"
+                          aria-label="Chọn đoạn văn để Humanize"
+                          className="mt-1.5 w-3.5 h-3.5 accent-[#4338CA] shrink-0 cursor-pointer"
+                        />
+                      )}
+                      <p
+                        className={`text-[15px] leading-[1.75] ${
+                          isExcluded && !cleanPresentationMode
+                            ? 'text-zinc-400'
+                            : 'text-slate-800'
+                        }`}
+                      >
+                        {para.text}
+                      </p>
+                    </div>
                   );
                 }
 
@@ -1280,9 +1671,21 @@ export function WordHumanizerView({
                 }
 
                 return (
-                  <p key={para.index} className="text-[15px] leading-[1.75] text-slate-900">
-                    {nodes}
-                  </p>
+                  <div key={para.index} className="flex items-start gap-2.5">
+                    {canTogglePara && (
+                      <input
+                        type="checkbox"
+                        checked={!isExcluded}
+                        onChange={() => handleToggleParagraphInclusion(para.index)}
+                        title="Chọn / bỏ chọn đoạn này để Humanize"
+                        aria-label="Chọn đoạn văn để Humanize"
+                        className="mt-1.5 w-3.5 h-3.5 accent-[#4338CA] shrink-0 cursor-pointer"
+                      />
+                    )}
+                    <p className="text-[15px] leading-[1.75] text-slate-900">
+                      {nodes}
+                    </p>
+                  </div>
                 );
               })}
             </div>

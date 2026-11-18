@@ -221,6 +221,19 @@
           "type": "string",
           "maxLength": 120
         },
+        "staffPayoutAmount": {
+          "type": "number",
+          "description": "Internal payout amount (VND) allocated to assigned staff/collaborator."
+        },
+        "staffPayoutStatus": {
+          "type": "string",
+          "enum": ["unpaid", "paid"],
+          "maxLength": 16
+        },
+        "staffPayoutPaidAt": {
+          "type": "string",
+          "format": "date-time"
+        },
         "attachments": {
           "type": "array",
           "description": "Bounded up to 20 attachment objects per order."
@@ -536,6 +549,27 @@
         }
       },
       "required": ["qrMode", "bankName", "accountNumber", "accountName", "updatedAt"]
+    },
+    "NotificationSettings": {
+      "title": "NotificationSettings",
+      "description": "Admin toggle preferences for server-side Telegram event notifications.",
+      "type": "object",
+      "properties": {
+        "telegramNotifyRevision": {
+          "type": "boolean"
+        },
+        "telegramNotifyMessage": {
+          "type": "boolean"
+        },
+        "telegramNotifyDeadline": {
+          "type": "boolean"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["telegramNotifyRevision", "telegramNotifyMessage", "telegramNotifyDeadline", "updatedAt"]
     }
   },
   "firestore": {
