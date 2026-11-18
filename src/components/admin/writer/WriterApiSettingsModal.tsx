@@ -6,14 +6,10 @@ import {
   EyeOff,
   KeyRound,
   Loader2,
-  RefreshCw,
   Sparkles,
   X,
 } from 'lucide-react';
-import {
-  callAiChatbot,
-  fetchOpenAiCompatibleModels,
-} from '../../../lib/aiWriterClient';
+import { callAiChatbot } from '../../../lib/aiWriterClient';
 import {
   AI_PROVIDER_SUGGESTED_MODELS,
   AiChatbotSettingsStore,
@@ -30,31 +26,17 @@ interface WriterApiSettingsModalProps {
 }
 
 const PROVIDER_TABS: { key: AiProviderType; shortLabel: string; badge: string }[] = [
+  { key: 'gemini', shortLabel: 'Google Gemini', badge: 'Gemini 2.5 Pro / Flash' },
+  { key: 'openai', shortLabel: 'OpenAI (ChatGPT)', badge: 'GPT-4.1 / GPT-4o / o3' },
+  {
+    key: 'anthropic',
+    shortLabel: 'Anthropic Claude',
+    badge: 'Claude 4 / 3.7 Sonnet',
+  },
   {
     key: 'custom_openai',
-    shortLabel: 'Trạm API Bên thứ 3 (XingChi / NewAPI)',
-    badge: 'Hỗ trợ mọi Endpoint sk-...',
-  },
-  { key: 'gemini', shortLabel: 'Google Gemini', badge: 'AI Studio' },
-  { key: 'openai', shortLabel: 'OpenAI (ChatGPT)', badge: 'GPT-4o / o3' },
-  { key: 'anthropic', shortLabel: 'Anthropic Claude', badge: 'Claude 3.7 / 3.5' },
-];
-
-const QUICK_ENDPOINT_PRESETS: { label: string; url: string; defaultModel: string }[] = [
-  {
-    label: 'XingChi API (api.xingchiapi.com)',
-    url: 'https://api.xingchiapi.com/v1',
-    defaultModel: 'gpt-4o-mini',
-  },
-  {
-    label: 'OpenRouter',
-    url: 'https://openrouter.ai/api/v1',
-    defaultModel: 'openai/gpt-4o-mini',
-  },
-  {
-    label: 'DeepSeek Official',
-    url: 'https://api.deepseek.com/v1',
-    defaultModel: 'deepseek-chat',
+    shortLabel: 'Custom API (OpenRouter / DeepSeek / Groq)',
+    badge: 'Tương thích OpenAI',
   },
 ];
 
@@ -68,8 +50,6 @@ export function WriterApiSettingsModal({
   const [draft, setDraft] = useState<AiChatbotSettingsStore>(settings);
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [fetchingModels, setFetchingModels] = useState(false);
-  const [fetchedModels, setFetchedModels] = useState<string[]>([]);
   const [testResult, setTestResult] = useState<{
     ok: boolean;
     message: string;
@@ -79,10 +59,7 @@ export function WriterApiSettingsModal({
 
   const activeProvider = draft.activeProvider;
   const currentProfile: AiProviderProfile = draft.profiles[activeProvider];
-  const suggestedModels =
-    fetchedModels.length > 0
-      ? fetchedModels
-      : AI_PROVIDER_SUGGESTED_MODELS[activeProvider] || [];
+  const suggestedModels = AI_PROVIDER_SUGGESTED_MODELS[activeProvider] || [];
 
   const updateCurrentProfile = (patch: Partial<AiProviderProfile>) => {
     setTestResult(null);
@@ -96,32 +73,6 @@ export function WriterApiSettingsModal({
         },
       },
     }));
-  };
-
-  const handleFetchModelsFromEndpoint = async () => {
-    setFetchingModels(true);
-    setTestResult(null);
-    try {
-      const models = await fetchOpenAiCompatibleModels(currentProfile);
-      setFetchedModels(models);
-      if (models.length > 0 && !models.includes(currentProfile.model)) {
-        updateCurrentProfile({ model: models[0] });
-      }
-      setTestResult({
-        ok: true,
-        message: `Đã tải thành công ${models.length} Model mà Key/Group của bạn được phép gọi! Hãy bấm chọn 1 Model bên dưới.`,
-      });
-    } catch (err) {
-      setTestResult({
-        ok: false,
-        message:
-          err instanceof Error
-            ? err.message
-            : 'Không thể tải danh sách Model từ Endpoint này.',
-      });
-    } finally {
-      setFetchingModels(false);
-    }
   };
 
   const handleTestConnection = async () => {
@@ -144,7 +95,7 @@ export function WriterApiSettingsModal({
         message:
           err instanceof Error
             ? err.message
-            : 'Kiểm tra kết nối thất bại. Vui lòng kiểm tra lại API Key, Base URL hoặc chọn đúng Model trong Group.',
+            : 'Kiểm tra kết nối thất bại. Vui lòng kiểm tra lại API Key hoặc URL.',
       });
     } finally {
       setTesting(false);
@@ -161,7 +112,7 @@ export function WriterApiSettingsModal({
 
   return (
     <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
-      <div className="modal-panel bg-white border border-zinc-200 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="modal-panel bg-white border border-zinc-200 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
         {/* Header */}
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/70">
           <div className="flex items-center gap-2.5">
@@ -173,7 +124,7 @@ export function WriterApiSettingsModal({
                 Cài đặt API Chatbot Nghiên cứu & Viết bài
               </h3>
               <p className="text-xs text-zinc-500">
-                Hỗ trợ các trạm API bên thứ 3 (`https://api.xingchiapi.com`), Gemini, OpenAI, Claude.
+                Chọn nền tảng AI, nhập API Key và phiên bản Model để tự động lập dàn ý & viết từng mục.
               </p>
             </div>
           </div>
@@ -187,13 +138,13 @@ export function WriterApiSettingsModal({
         </div>
 
         {/* Body */}
-        <div className="p-6 overflow-y-auto space-y-4">
+        <div className="p-6 overflow-y-auto space-y-5">
           {/* Provider selector */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
-              1. Chọn loại cổng API bạn đang dùng
+              1. Chọn Hãng AI Chatbot đang sử dụng
             </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {PROVIDER_TABS.map((tab) => {
                 const isSelected = activeProvider === tab.key;
                 const hasKey = Boolean(draft.profiles[tab.key]?.apiKey?.trim());
@@ -203,7 +154,6 @@ export function WriterApiSettingsModal({
                     type="button"
                     onClick={() => {
                       setTestResult(null);
-                      setFetchedModels([]);
                       setDraft((prev) => ({ ...prev, activeProvider: tab.key }));
                     }}
                     className={`btn-press p-3 rounded-xl border text-left flex items-start justify-between ${
@@ -213,21 +163,21 @@ export function WriterApiSettingsModal({
                     }`}
                   >
                     <div>
-                      <div className="text-xs font-bold text-slate-900">
-                        {tab.shortLabel}
+                      <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        <span>{tab.shortLabel}</span>
                       </div>
-                      <span className="inline-block mt-0.5 text-[11px] text-zinc-500">
+                      <span className="inline-block mt-1 text-[11px] text-zinc-500">
                         {tab.badge}
                       </span>
                     </div>
                     <span
-                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
+                      className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                         hasKey
                           ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                           : 'bg-zinc-100 text-zinc-500'
                       }`}
                     >
-                      {hasKey ? 'Đã có Key' : 'Chưa có Key'}
+                      {hasKey ? 'Đã có Key' : 'Chưa nhập Key'}
                     </span>
                   </button>
                 );
@@ -235,47 +185,10 @@ export function WriterApiSettingsModal({
             </div>
           </div>
 
-          {/* API Base URL (Moved up so user sets Endpoint first for 3rd-party stations) */}
-          <div>
-            <div className="flex flex-wrap items-center justify-between gap-1 mb-1.5">
-              <label className="text-xs font-semibold text-slate-800">
-                2. API Endpoint / Base URL (Hệ thống tự động thêm `/v1/chat/completions`)
-              </label>
-              {activeProvider === 'custom_openai' && (
-                <div className="flex flex-wrap items-center gap-1">
-                  {QUICK_ENDPOINT_PRESETS.map((p) => (
-                    <button
-                      key={p.url}
-                      type="button"
-                      onClick={() =>
-                        updateCurrentProfile({
-                          baseUrl: p.url,
-                          model: p.defaultModel,
-                        })
-                      }
-                      className="btn-press px-2 py-0.5 text-[11px] font-medium bg-indigo-50 text-[#4338CA] hover:bg-indigo-100 rounded border border-indigo-200/80"
-                    >
-                      Điền {p.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <input
-              type="text"
-              value={currentProfile.baseUrl}
-              onChange={(e) =>
-                updateCurrentProfile({ baseUrl: e.target.value })
-              }
-              placeholder="https://api.xingchiapi.com hoặc https://api.xingchiapi.com/v1"
-              className="w-full px-3 py-2 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#4338CA]"
-            />
-          </div>
-
           {/* API Key Input */}
           <div>
             <label className="block text-xs font-semibold text-slate-800 mb-1.5">
-              3. API Key ({currentProfile.label})
+              2. API Key ({currentProfile.label})
             </label>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -305,83 +218,81 @@ export function WriterApiSettingsModal({
                 )}
               </button>
             </div>
+            <p className="text-[11px] text-zinc-500 mt-1">
+              API Key được lưu cục bộ trên trình duyệt của bạn và gọi qua kết nối bảo mật.
+            </p>
           </div>
 
-          {/* Model Name + Auto-Fetch Button from 3rd party station */}
+          {/* Model Name + Suggested Chips */}
           <div>
-            <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
-              <label className="text-xs font-semibold text-slate-800">
-                4. Tên Model (Phải nằm trong Group của Key — VD: `gpt-4o-mini`, `gpt-4o`...)
-              </label>
-              {(activeProvider === 'custom_openai' ||
-                activeProvider === 'openai') && (
-                <button
-                  type="button"
-                  disabled={fetchingModels || !currentProfile.apiKey.trim()}
-                  onClick={() => void handleFetchModelsFromEndpoint()}
-                  className="btn-press px-2.5 py-1 text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100 rounded-md inline-flex items-center gap-1 disabled:opacity-40"
-                >
-                  {fetchingModels ? (
-                    <Loader2 className="w-3 h-3 animate-spin" />
-                  ) : (
-                    <RefreshCw className="w-3 h-3" />
-                  )}
-                  <span>Tải danh sách Model từ Trạm API này</span>
-                </button>
-              )}
-            </div>
-
+            <label className="block text-xs font-semibold text-slate-800 mb-1.5">
+              3. Phiên bản Model (Chọn nhanh bên dưới hoặc tự gõ tên Model mới)
+            </label>
             <input
               type="text"
               value={currentProfile.model}
               onChange={(e) => updateCurrentProfile({ model: e.target.value })}
-              placeholder="Nhập tên model (VD: gpt-4o-mini, gpt-4o, claude-3-5-sonnet...)"
+              placeholder="Nhập tên model (VD: gemini-2.5-pro, gpt-4.1, claude-sonnet-4-20250514...)"
               className="w-full px-3 py-2 text-sm font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#4338CA]"
             />
-
-            <div className="mt-2 max-h-28 overflow-y-auto p-2 bg-zinc-50 border border-zinc-200/80 rounded-lg">
-              <div className="text-[11px] text-zinc-500 mb-1.5">
-                {fetchedModels.length > 0
-                  ? `Danh sách ${fetchedModels.length} Model lấy trực tiếp từ Endpoint của bạn (Bấm để chọn):`
-                  : 'Chọn nhanh Model phổ biến (hoặc bấm nút "Tải danh sách Model" ở trên):'}
-              </div>
-              <div className="flex flex-wrap items-center gap-1.5">
-                {suggestedModels.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => updateCurrentProfile({ model: m })}
-                    className={`btn-press px-2 py-0.5 text-xs font-mono rounded-md border ${
-                      currentProfile.model === m
-                        ? 'bg-[#4338CA] text-white border-[#4338CA]'
-                        : 'bg-white text-zinc-700 border-zinc-200 hover:bg-zinc-100'
-                    }`}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <span className="text-[11px] text-zinc-500 mr-1">Phiên bản có sẵn:</span>
+              {suggestedModels.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => updateCurrentProfile({ model: m })}
+                  className={`btn-press px-2 py-0.5 text-xs font-mono rounded-md border ${
+                    currentProfile.model === m
+                      ? 'bg-[#4338CA] text-white border-[#4338CA]'
+                      : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Temperature */}
-          <div className="flex items-center justify-between gap-4 pt-1">
-            <label className="text-xs font-semibold text-slate-800">
-              5. Độ sáng tạo (Temperature: {currentProfile.temperature})
-            </label>
-            <input
-              type="range"
-              min={0.1}
-              max={1.0}
-              step={0.1}
-              value={currentProfile.temperature}
-              onChange={(e) =>
-                updateCurrentProfile({
-                  temperature: Number(e.target.value) || 0.4,
-                })
-              }
-              className="w-48 accent-[#4338CA]"
-            />
+          {/* Base URL & Temperature */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-slate-800 mb-1.5">
+                4. API Base URL (Tùy chỉnh cho OpenRouter / DeepSeek / Groq)
+              </label>
+              <input
+                type="text"
+                value={currentProfile.baseUrl}
+                onChange={(e) =>
+                  updateCurrentProfile({ baseUrl: e.target.value })
+                }
+                placeholder="https://api.openai.com/v1"
+                className="w-full px-3 py-2 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#4338CA]"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-800 mb-1.5">
+                Độ sáng tạo (Temp: {currentProfile.temperature})
+              </label>
+              <input
+                type="range"
+                min={0.1}
+                max={1.0}
+                step={0.1}
+                value={currentProfile.temperature}
+                onChange={(e) =>
+                  updateCurrentProfile({
+                    temperature: Number(e.target.value) || 0.4,
+                  })
+                }
+                className="w-full accent-[#4338CA] mt-2"
+              />
+              <div className="flex justify-between text-[10px] text-zinc-500 mt-0.5">
+                <span>0.1 (Chuẩn xác)</span>
+                <span>1.0 (Đa dạng)</span>
+              </div>
+            </div>
           </div>
 
           {/* Test Connection Result */}

@@ -1664,17 +1664,14 @@ export function createApiApp(): express.Express {
         return;
       }
 
-      // OpenAI or Custom OpenAI-Compatible (NewAPI / OneAPI / XingChi / OpenRouter / DeepSeek / Groq)
+      // OpenAI or Custom OpenAI-Compatible (OpenRouter, DeepSeek, Groq, Together, v.v.)
       const defaultOpenAiBase = 'https://api.openai.com/v1';
-      const cleanBase = (baseUrl || defaultOpenAiBase).replace(/\/+$/, '');
-      const candidateUrls = cleanBase.endsWith('/chat/completions')
-        ? [cleanBase]
-        : cleanBase.endsWith('/v1')
-        ? [`${cleanBase}/chat/completions`]
-        : [
-            `${cleanBase}/v1/chat/completions`,
-            `${cleanBase}/chat/completions`,
-          ];
+      const cleanBase = (baseUrl || defaultOpenAiBase)
+        .replace(/\/+$/, '')
+        .replace(/\/chat\/completions$/i, '');
+      const url = cleanBase.endsWith('/v1')
+        ? `${cleanBase}/chat/completions`
+        : `${cleanBase}/v1/chat/completions`;
 
       const messages: { role: string; content: string }[] = [];
       if (systemPrompt.trim()) {
@@ -1682,109 +1679,44 @@ export function createApiApp(): express.Express {
       }
       messages.push({ role: 'user', content: userPrompt });
 
-      let lastStatus = 500;
-      let lastErrMessage = '';
-
-      for (const url of candidateUrls) {
-        const resp = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model,
-            messages,
-            temperature,
-          }),
-        });
-        const data = (await resp.json().catch(() => ({}))) as Record<
-          string,
-          unknown
-        >;
-        if (resp.ok) {
-          const choices = Array.isArray(data.choices) ? data.choices : [];
-          const firstChoice = choices[0] as
-            | { message?: { content?: string } }
-            | undefined;
-          const text = (firstChoice?.message?.content || '').trim();
-          res.json({ text, model, provider });
-          return;
-        }
-        lastStatus = resp.status;
-        const errObj = data.error as { message?: string } | undefined;
-        lastErrMessage =
-          errObj?.message ||
-          (typeof data.message === 'string' ? data.message : '') ||
-          `API Chatbot (${provider}) trả về lỗi HTTP ${resp.status} tại ${url}.`;
-
-        if (resp.status !== 404) {
-          break;
-        }
-      }
-
-      res.status(lastStatus).json({
-        error: lastErrMessage,
+      const resp = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature,
+        }),
       });
+      const data = (await resp.json().catch(() => ({}))) as Record<
+        string,
+        unknown
+      >;
+      if (!resp.ok) {
+        const errObj = data.error as { message?: string } | undefined;
+        res.status(resp.status).json({
+          error:
+            errObj?.message ||
+            `API Chatbot (${provider}) trả về lỗi HTTP ${resp.status}.`,
+        });
+        return;
+      }
+      const choices = Array.isArray(data.choices) ? data.choices : [];
+      const firstChoice = choices[0] as
+        | { message?: { content?: string } }
+        | undefined;
+      const text = (firstChoice?.message?.content || '').trim();
+
+      res.json({ text, model, provider });
     } catch (err) {
       res.status(502).json({
         error:
           err instanceof Error
             ? `Lỗi kết nối tới API Chatbot: ${err.message}`
             : 'Không thể kết nối tới máy chủ AI Chatbot.',
-      });
-    }
-  });
-
-  // Fetch available models from OpenAI-Compatible 3rd-party endpoint (/v1/models)
-  app.post('/api/ai/models', async (req, res) => {
-    const apiKey =
-      typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
-    const baseUrl =
-      typeof req.body?.baseUrl === 'string' ? req.body.baseUrl.trim() : '';
-
-    if (!apiKey) {
-      res.status(400).json({ error: 'Vui lòng nhập API Key trước khi tải danh sách Model.' });
-      return;
-    }
-
-    const cleanBase = (baseUrl || 'https://api.openai.com/v1')
-      .replace(/\/+$/, '')
-      .replace(/\/chat\/completions$/i, '');
-
-    const candidateUrls = cleanBase.endsWith('/v1')
-      ? [`${cleanBase}/models`]
-      : [`${cleanBase}/v1/models`, `${cleanBase}/models`];
-
-    try {
-      for (const url of candidateUrls) {
-        const resp = await fetch(url, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-          },
-        });
-        const data = (await resp.json().catch(() => ({}))) as {
-          data?: Array<{ id?: string }>;
-        };
-        if (resp.ok && Array.isArray(data.data)) {
-          const models = data.data
-            .map((m) => (typeof m?.id === 'string' ? m.id.trim() : ''))
-            .filter(Boolean);
-          res.json({ models });
-          return;
-        }
-      }
-      res.status(404).json({
-        error:
-          'Không thể lấy danh sách Model tự động từ Endpoint này. Bạn vẫn có thể tự gõ tên Model (VD: gpt-4o, gpt-4o-mini).',
-      });
-    } catch (err) {
-      res.status(502).json({
-        error:
-          err instanceof Error
-            ? `Lỗi kết nối khi lấy danh sách Model: ${err.message}`
-            : 'Không thể kết nối tới Endpoint.',
       });
     }
   });

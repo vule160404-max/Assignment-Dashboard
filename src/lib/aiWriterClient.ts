@@ -197,133 +197,6 @@ async function callGeminiDirectBrowser(
   );
 }
 
-async function callOpenAiCompatibleDirectBrowser(
-  profile: AiProviderProfile,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<string> {
-  const apiKey = profile.apiKey.trim();
-  const defaultBase = 'https://api.openai.com/v1';
-  const cleanBase = (profile.baseUrl.trim() || defaultBase).replace(/\/+$/, '');
-  const candidateUrls = cleanBase.endsWith('/chat/completions')
-    ? [cleanBase]
-    : cleanBase.endsWith('/v1')
-    ? [`${cleanBase}/chat/completions`]
-    : [
-        `${cleanBase}/v1/chat/completions`,
-        `${cleanBase}/chat/completions`,
-      ];
-
-  const messages: { role: string; content: string }[] = [];
-  if (systemPrompt.trim()) {
-    messages.push({ role: 'system', content: systemPrompt });
-  }
-  messages.push({ role: 'user', content: userPrompt });
-
-  let lastErr = '';
-
-  for (const url of candidateUrls) {
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: profile.model.trim() || 'gpt-4o-mini',
-        messages,
-        temperature: profile.temperature,
-      }),
-    });
-
-    const data = (await resp.json().catch(() => ({}))) as Record<
-      string,
-      unknown
-    >;
-    if (resp.ok) {
-      const choices = Array.isArray(data.choices) ? data.choices : [];
-      const firstChoice = choices[0] as
-        | { message?: { content?: string } }
-        | undefined;
-      const text = (firstChoice?.message?.content || '').trim();
-      if (text) return text;
-    }
-
-    const errObj = data.error as { message?: string } | undefined;
-    lastErr =
-      errObj?.message ||
-      (typeof data.message === 'string' ? data.message : '') ||
-      `Không thể gọi ${profile.label} (HTTP ${resp.status} tại ${url}).`;
-
-    if (resp.status !== 404) {
-      break;
-    }
-  }
-
-  throw new Error(lastErr || 'Chatbot phản hồi rỗng. Vui lòng kiểm tra lại Model.');
-}
-
-export async function fetchOpenAiCompatibleModels(
-  profile: AiProviderProfile
-): Promise<string[]> {
-  const apiKey = profile.apiKey.trim();
-  if (!apiKey) {
-    throw new Error('Vui lòng nhập API Key trước khi tải danh sách Model.');
-  }
-
-  // 1. Try server proxy first (/api/ai/models) to avoid CORS
-  try {
-    const proxyResp = await fetch('/api/ai/models', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        apiKey,
-        baseUrl: profile.baseUrl.trim(),
-      }),
-    });
-    const proxyData = (await proxyResp.json().catch(() => ({}))) as {
-      models?: string[];
-      error?: string;
-    };
-    if (proxyResp.ok && Array.isArray(proxyData.models) && proxyData.models.length > 0) {
-      return proxyData.models;
-    }
-  } catch {
-    // fallback to direct browser fetch below
-  }
-
-  // 2. Direct browser fallback to /v1/models
-  const cleanBase = (profile.baseUrl.trim() || 'https://api.openai.com/v1')
-    .replace(/\/+$/, '')
-    .replace(/\/chat\/completions$/i, '');
-
-  const candidateUrls = cleanBase.endsWith('/v1')
-    ? [`${cleanBase}/models`]
-    : [`${cleanBase}/v1/models`, `${cleanBase}/models`];
-
-  for (const url of candidateUrls) {
-    const resp = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-      },
-    });
-    const data = (await resp.json().catch(() => ({}))) as {
-      data?: Array<{ id?: string }>;
-    };
-    if (resp.ok && Array.isArray(data.data)) {
-      const list = data.data
-        .map((m) => (typeof m?.id === 'string' ? m.id.trim() : ''))
-        .filter(Boolean);
-      if (list.length > 0) return list;
-    }
-  }
-
-  throw new Error(
-    'Không tải được danh sách Model tự động từ Endpoint này. Hãy kiểm tra lại API Key hoặc tự nhập tên Model.'
-  );
-}
-
 export async function callAiChatbot({
   profile,
   systemPrompt,
@@ -341,59 +214,33 @@ export async function callAiChatbot({
     return await callGeminiDirectBrowser(profile, systemPrompt, userPrompt);
   }
 
-  // For OpenAI / Custom OpenAI / Anthropic, try backend proxy first, then direct browser fallback
-  try {
-    const resp = await fetch('/api/ai/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        provider: profile.provider,
-        apiKey,
-        baseUrl: profile.baseUrl.trim(),
-        model: profile.model.trim(),
-        temperature: profile.temperature,
-        systemPrompt,
-        userPrompt,
-      }),
-    });
+  const resp = await fetch('/api/ai/generate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      provider: profile.provider,
+      apiKey,
+      baseUrl: profile.baseUrl.trim(),
+      model: profile.model.trim(),
+      temperature: profile.temperature,
+      systemPrompt,
+      userPrompt,
+    }),
+  });
 
-    const data = (await resp.json().catch(() => ({}))) as {
-      text?: string;
-      error?: string;
-    };
+  const data = (await resp.json().catch(() => ({}))) as {
+    text?: string;
+    model?: string;
+    error?: string;
+  };
 
-    if (resp.ok && data.text?.trim()) {
-      return data.text.trim();
-    }
-
-    // If backend endpoint returned 404 (e.g. static frontend server or old backend running), fall back to direct browser call
-    if (
-      resp.status === 404 &&
-      (profile.provider === 'openai' || profile.provider === 'custom_openai')
-    ) {
-      return await callOpenAiCompatibleDirectBrowser(
-        profile,
-        systemPrompt,
-        userPrompt
-      );
-    }
-
-    throw new Error(
-      data.error || `Không thể gọi ${profile.label} (HTTP ${resp.status}).`
-    );
-  } catch (err) {
-    if (
-      (profile.provider === 'openai' || profile.provider === 'custom_openai') &&
-      err instanceof TypeError
-    ) {
-      return await callOpenAiCompatibleDirectBrowser(
-        profile,
-        systemPrompt,
-        userPrompt
-      );
-    }
-    throw err;
+  if (resp.ok && data.text?.trim()) {
+    return data.text.trim();
   }
+
+  throw new Error(
+    data.error || `Không thể gọi ${profile.label} (HTTP ${resp.status}).`
+  );
 }
 
 export function buildSkillsAndContextSystemPrompt(
