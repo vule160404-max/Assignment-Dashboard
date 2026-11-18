@@ -98,6 +98,154 @@ export interface AiGenerateRequest {
   userPrompt: string;
 }
 
+const GEMINI_FALLBACK_MODELS = [
+  'gemini-2.5-flash',
+  'gemini-2.0-flash',
+  'gemini-1.5-flash-latest',
+  'gemini-1.5-flash',
+];
+
+async function callGeminiDirectBrowser(
+  profile: AiProviderProfile,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> {
+  const apiKey = profile.apiKey.trim();
+  const cleanBase = (
+    profile.baseUrl.trim() ||
+    'https://generativelanguage.googleapis.com/v1beta'
+  ).replace(/\/+$/, '');
+
+  const requestedModel = (profile.model.trim() || 'gemini-2.5-flash').replace(
+    /^models\//i,
+    ''
+  );
+  const candidateModels = Array.from(
+    new Set([requestedModel, ...GEMINI_FALLBACK_MODELS])
+  );
+
+  let lastError = '';
+
+  for (const modelName of candidateModels) {
+    const url = `${cleanBase}/models/${encodeURIComponent(
+      modelName
+    )}:generateContent?key=${encodeURIComponent(apiKey)}`;
+
+    const payload: Record<string, unknown> = {
+      contents: [
+        {
+          role: 'user',
+          parts: [{ text: userPrompt }],
+        },
+      ],
+      generationConfig: {
+        temperature: profile.temperature,
+      },
+    };
+    if (systemPrompt.trim()) {
+      payload.systemInstruction = {
+        parts: [{ text: systemPrompt }],
+      };
+    }
+
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    const data = (await resp.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+
+    if (resp.ok) {
+      const candidates = Array.isArray(data.candidates) ? data.candidates : [];
+      const firstCandidate = candidates[0] as
+        | { content?: { parts?: { text?: string }[] } }
+        | undefined;
+      const text = (firstCandidate?.content?.parts || [])
+        .map((p) => p.text || '')
+        .join('')
+        .trim();
+      if (text) return text;
+    }
+
+    const errObj = data.error as
+      | { message?: string; status?: string; code?: number }
+      | undefined;
+    const errMsg = errObj?.message || `HTTP ${resp.status}`;
+    lastError = errMsg;
+
+    // If model is not found (404), try the next fallback Gemini model
+    if (resp.status === 404) {
+      continue;
+    }
+
+    // If billing / quota / invalid key error (400, 403, 429), surface exact instructions
+    if (resp.status === 403 || resp.status === 429 || /billing|quota|payment/i.test(errMsg)) {
+      throw new Error(
+        `Google Gemini từ chối Key (${errMsg}). Lưu ý: Nếu trên Google AI Studio dự án đang báo "Payment required", bạn hãy bấm "Create API key in a new project" trên AI Studio để tạo Key Free Tier mới.`
+      );
+    }
+
+    throw new Error(`Google Gemini API lỗi: ${errMsg}`);
+  }
+
+  throw new Error(
+    `Không tìm thấy Model Gemini phù hợp hoặc Project Google Cloud của Key này đang bị khóa ("Payment required"). Chi tiết từ Google: ${lastError}`
+  );
+}
+
+async function callOpenAiCompatibleDirectBrowser(
+  profile: AiProviderProfile,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> {
+  const apiKey = profile.apiKey.trim();
+  const defaultBase = 'https://api.openai.com/v1';
+  const cleanBase = (profile.baseUrl.trim() || defaultBase).replace(/\/+$/, '');
+  const url = cleanBase.endsWith('/chat/completions')
+    ? cleanBase
+    : `${cleanBase}/chat/completions`;
+
+  const messages: { role: string; content: string }[] = [];
+  if (systemPrompt.trim()) {
+    messages.push({ role: 'system', content: systemPrompt });
+  }
+  messages.push({ role: 'user', content: userPrompt });
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: profile.model.trim() || 'gpt-4o',
+      messages,
+      temperature: profile.temperature,
+    }),
+  });
+
+  const data = (await resp.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!resp.ok) {
+    const errObj = data.error as { message?: string } | undefined;
+    throw new Error(
+      errObj?.message || `Không thể gọi ${profile.label} (HTTP ${resp.status}).`
+    );
+  }
+  const choices = Array.isArray(data.choices) ? data.choices : [];
+  const firstChoice = choices[0] as
+    | { message?: { content?: string } }
+    | undefined;
+  const text = (firstChoice?.message?.content || '').trim();
+  if (!text) {
+    throw new Error('Chatbot phản hồi rỗng. Vui lòng thử lại.');
+  }
+  return text;
+}
+
 export async function callAiChatbot({
   profile,
   systemPrompt,
@@ -106,40 +254,68 @@ export async function callAiChatbot({
   const apiKey = profile.apiKey.trim();
   if (!apiKey) {
     throw new Error(
-      `Chưa có API Key cho ${profile.label}. Hãy bấm nút "Cài đặt API Chatbot" ở góc trên để nhập key.`
+      `Chưa có API Key cho ${profile.label}. Hãy bấm nút "Cài đặt API" ở góc trên để nhập key.`
     );
   }
 
-  const resp = await fetch('/api/ai/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      provider: profile.provider,
-      apiKey,
-      baseUrl: profile.baseUrl.trim(),
-      model: profile.model.trim(),
-      temperature: profile.temperature,
-      systemPrompt,
-      userPrompt,
-    }),
-  });
+  // For Gemini, call Google's CORS-enabled endpoint directly first (with automatic model fallback)
+  if (profile.provider === 'gemini') {
+    return await callGeminiDirectBrowser(profile, systemPrompt, userPrompt);
+  }
 
-  const data = (await resp.json().catch(() => ({}))) as {
-    text?: string;
-    error?: string;
-  };
+  // For OpenAI / Custom OpenAI / Anthropic, try backend proxy first, then direct browser fallback
+  try {
+    const resp = await fetch('/api/ai/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: profile.provider,
+        apiKey,
+        baseUrl: profile.baseUrl.trim(),
+        model: profile.model.trim(),
+        temperature: profile.temperature,
+        systemPrompt,
+        userPrompt,
+      }),
+    });
 
-  if (!resp.ok) {
+    const data = (await resp.json().catch(() => ({}))) as {
+      text?: string;
+      error?: string;
+    };
+
+    if (resp.ok && data.text?.trim()) {
+      return data.text.trim();
+    }
+
+    // If backend endpoint returned 404 (e.g. static frontend server or old backend running), fall back to direct browser call
+    if (
+      resp.status === 404 &&
+      (profile.provider === 'openai' || profile.provider === 'custom_openai')
+    ) {
+      return await callOpenAiCompatibleDirectBrowser(
+        profile,
+        systemPrompt,
+        userPrompt
+      );
+    }
+
     throw new Error(
       data.error || `Không thể gọi ${profile.label} (HTTP ${resp.status}).`
     );
+  } catch (err) {
+    if (
+      (profile.provider === 'openai' || profile.provider === 'custom_openai') &&
+      err instanceof TypeError
+    ) {
+      return await callOpenAiCompatibleDirectBrowser(
+        profile,
+        systemPrompt,
+        userPrompt
+      );
+    }
+    throw err;
   }
-
-  if (!data.text || !data.text.trim()) {
-    throw new Error('Chatbot phản hồi rỗng. Vui lòng thử lại hoặc đổi Model.');
-  }
-
-  return data.text.trim();
 }
 
 export function buildSkillsAndContextSystemPrompt(
