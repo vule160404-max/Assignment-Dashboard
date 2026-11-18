@@ -111,6 +111,14 @@ export function removeCheckpoint(fingerprint: string): void {
   }
 }
 
+export function clearAllCheckpoints(): void {
+  try {
+    window.localStorage.removeItem(CHECKPOINT_STORAGE_KEY);
+  } catch {
+    // Ignore
+  }
+}
+
 export function computeSessionChunks(session: HumanizerSession): HumanizeChunk[] {
   return buildSentenceBoundaryChunks(
     session.wordDoc.paragraphs,

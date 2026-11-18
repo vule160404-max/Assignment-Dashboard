@@ -11,6 +11,7 @@ import {
   Play,
   RotateCcw,
   Square,
+  Trash2,
   Upload,
 } from 'lucide-react';
 import { countWords } from '../../lib/wordHumanizer';
@@ -69,6 +70,8 @@ export function WordHumanizerView({
     handleDownloadDocx,
     handleAttachToOrder,
     handleDownloadExtensionZip,
+    handleDeleteCheckpoint,
+    handleClearAllCheckpoints,
   } = useHumanizerSessions({
     orders,
     initialOrderCode,
@@ -226,9 +229,19 @@ export function WordHumanizerView({
 
           {recentCheckpoints.length > 0 && (
             <div className="max-w-lg mx-auto mt-4 pt-4 border-t border-zinc-200/80 text-left space-y-2">
-              <p className="text-xs font-semibold text-slate-800">
-                Tiến trình đang lưu gần đây (Auto-save):
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold text-slate-800">
+                  Tiến trình đang lưu gần đây (Auto-save):
+                </p>
+                <button
+                  type="button"
+                  onClick={handleClearAllCheckpoints}
+                  className="btn-press inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium text-rose-600 hover:bg-rose-50 rounded-md"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Xóa tất cả</span>
+                </button>
+              </div>
               <div className="space-y-1.5">
                 {recentCheckpoints.slice(0, 4).map((cp) => {
                   const done = Object.values(cp.chunkResults).filter((r) => r.accepted).length;
@@ -237,29 +250,42 @@ export function WordHumanizerView({
                       key={cp.fingerprint}
                       className="flex flex-wrap items-center justify-between gap-2 bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-xs"
                     >
-                      <div className="min-w-0">
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium text-slate-900 truncate">{cp.fileName}</p>
                         <p className="text-[11px] text-zinc-500 font-mono tabular-nums">
                           Đã xong {done} đoạn · {new Date(cp.updatedAt).toLocaleString('vi-VN')}
                         </p>
                       </div>
-                      {cp.pastedPlainText ? (
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {cp.pastedPlainText ? (
+                          <button
+                            type="button"
+                            onClick={() => void handleRestorePastedCheckpoint(cp)}
+                            className="btn-press px-2.5 py-1 text-xs font-medium bg-indigo-50 text-[#4338CA] hover:bg-indigo-100 rounded-md whitespace-nowrap"
+                          >
+                            Khôi phục ngay
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => emptyDropInputRef.current?.click()}
+                            className="btn-press px-2.5 py-1 text-xs font-medium bg-zinc-200/70 text-slate-800 hover:bg-zinc-200 rounded-md whitespace-nowrap"
+                          >
+                            Chọn lại file để chạy tiếp
+                          </button>
+                        )}
                         <button
                           type="button"
-                          onClick={() => void handleRestorePastedCheckpoint(cp)}
-                          className="btn-press px-2.5 py-1 text-xs font-medium bg-indigo-50 text-[#4338CA] hover:bg-indigo-100 rounded-md whitespace-nowrap"
+                          onClick={() =>
+                            handleDeleteCheckpoint(cp.fingerprint, cp.fileName)
+                          }
+                          title={`Xóa bản lưu tạm "${cp.fileName}"`}
+                          aria-label={`Xóa bản lưu tạm ${cp.fileName}`}
+                          className="btn-press p-1.5 text-zinc-400 hover:text-rose-600 hover:bg-rose-50 rounded-md"
                         >
-                          Khôi phục ngay
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => emptyDropInputRef.current?.click()}
-                          className="btn-press px-2.5 py-1 text-xs font-medium bg-zinc-200/70 text-slate-800 hover:bg-zinc-200 rounded-md whitespace-nowrap"
-                        >
-                          Chọn lại file để chạy tiếp
-                        </button>
-                      )}
+                      </div>
                     </div>
                   );
                 })}

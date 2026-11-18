@@ -21,6 +21,7 @@ import {
   GlitchReviewPayload,
   HumanizerSession,
   SavedHumanizeCheckpoint,
+  clearAllCheckpoints,
   computeSessionChunks,
   isSessionRunning,
   readCheckpoints,
@@ -69,6 +70,7 @@ export function useHumanizerSessions(params: {
   const [activeSessionId, setActiveSessionId] = useState<string>('');
   const [exportingDocx, setExportingDocx] = useState(false);
   const [attachingOrder, setAttachingOrder] = useState(false);
+  const [checkpointVersion, setCheckpointVersion] = useState(0);
 
   const sessionsRef = useRef<HumanizerSession[]>([]);
   const controlsRef = useRef<Map<string, SessionControl>>(new Map());
@@ -179,8 +181,27 @@ export function useHumanizerSessions(params: {
       Object.values(readCheckpoints())
         .filter((cp) => Object.values(cp.chunkResults).some((r) => r.accepted))
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
-    [sessions.length]
+    [sessions.length, checkpointVersion]
   );
+
+  const handleDeleteCheckpoint = useCallback(
+    (fingerprint: string, fileName?: string) => {
+      removeCheckpoint(fingerprint);
+      setCheckpointVersion((v) => v + 1);
+      onToast(
+        fileName
+          ? `Đã xóa bản lưu tạm "${fileName}".`
+          : 'Đã xóa bản lưu tạm.'
+      );
+    },
+    [onToast]
+  );
+
+  const handleClearAllCheckpoints = useCallback(() => {
+    clearAllCheckpoints();
+    setCheckpointVersion((v) => v + 1);
+    onToast('Đã xóa toàn bộ các bản lưu tạm (Auto-save).');
+  }, [onToast]);
 
   const addParsedDocumentAsSession = useCallback(
     (
@@ -1021,5 +1042,7 @@ export function useHumanizerSessions(params: {
     handleDownloadDocx,
     handleAttachToOrder,
     handleDownloadExtensionZip,
+    handleDeleteCheckpoint,
+    handleClearAllCheckpoints,
   };
 }
