@@ -201,6 +201,80 @@ async function callGeminiDirectBrowser(
   );
 }
 
+async function callOpenAiCompatibleDirectFromBrowser(
+  profile: AiProviderProfile,
+  systemPrompt: string,
+  userPrompt: string
+): Promise<string> {
+  const apiKey = profile.apiKey.trim();
+  const defaultBase =
+    profile.provider === 'perplexity'
+      ? 'https://api.perplexity.ai'
+      : 'https://api.openai.com/v1';
+  const cleanBase = (profile.baseUrl.trim() || defaultBase)
+    .replace(/\/+$/, '')
+    .replace(/\/chat\/completions$/i, '');
+  const url =
+    profile.provider === 'perplexity'
+      ? `${cleanBase.replace(/\/v1$/i, '')}/chat/completions`
+      : cleanBase.endsWith('/v1')
+      ? `${cleanBase}/chat/completions`
+      : `${cleanBase}/v1/chat/completions`;
+
+  const messages: { role: string; content: string }[] = [];
+  if (systemPrompt.trim()) {
+    messages.push({ role: 'system', content: systemPrompt });
+  }
+  messages.push({ role: 'user', content: userPrompt });
+
+  const resp = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: profile.model.trim() || 'gpt-4.1',
+      messages,
+      temperature: profile.temperature,
+    }),
+  });
+
+  const rawText = await resp.text().catch(() => '');
+  let data: Record<string, unknown> = {};
+  try {
+    data = JSON.parse(rawText) as Record<string, unknown>;
+  } catch {
+    // non-json
+  }
+
+  if (!resp.ok) {
+    const errObj = data.error as { message?: string } | undefined;
+    const detail =
+      errObj?.message ||
+      (typeof data.detail === 'string' ? data.detail : '') ||
+      (typeof data.title === 'string' ? data.title : '') ||
+      rawText.trim().slice(0, 180);
+    throw new Error(
+      detail ||
+        `API (${url}) trả về lỗi HTTP ${resp.status}.`
+    );
+  }
+
+  const choices = Array.isArray(data.choices) ? data.choices : [];
+  const firstChoice = choices[0] as
+    | { message?: { content?: string } }
+    | undefined;
+  const text = (firstChoice?.message?.content || '')
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .trim();
+
+  if (!text) {
+    throw new Error('Chatbot phản hồi rỗng. Vui lòng kiểm tra lại Model.');
+  }
+  return text;
+}
+
 export async function callAiChatbot({
   profile,
   systemPrompt,
@@ -218,33 +292,74 @@ export async function callAiChatbot({
     return await callGeminiDirectBrowser(profile, systemPrompt, userPrompt);
   }
 
-  const resp = await fetch('/api/ai/generate', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      provider: profile.provider,
-      apiKey,
-      baseUrl: profile.baseUrl.trim(),
-      model: profile.model.trim(),
-      temperature: profile.temperature,
-      systemPrompt,
-      userPrompt,
-    }),
-  });
+  try {
+    const resp = await fetch('/api/ai/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        provider: profile.provider,
+        apiKey,
+        baseUrl: profile.baseUrl.trim(),
+        model: profile.model.trim(),
+        temperature: profile.temperature,
+        systemPrompt,
+        userPrompt,
+      }),
+    });
 
-  const data = (await resp.json().catch(() => ({}))) as {
-    text?: string;
-    model?: string;
-    error?: string;
-  };
+    const data = (await resp.json().catch(() => ({}))) as {
+      text?: string;
+      model?: string;
+      error?: string;
+    };
 
-  if (resp.ok && data.text?.trim()) {
-    return data.text.trim();
+    if (resp.ok && data.text?.trim()) {
+      return data.text.trim();
+    }
+
+    // If the web app is currently hosted on a static-only host where /api/ai/generate returns 404
+    // (no JSON `data.error` from our Express route), try calling the OpenAI/Perplexity endpoint directly
+    if (
+      resp.status === 404 &&
+      (!data.error || data.error === 'API endpoint not found.')
+    ) {
+      if (profile.provider !== 'anthropic') {
+        try {
+          return await callOpenAiCompatibleDirectFromBrowser(
+            profile,
+            systemPrompt,
+            userPrompt
+          );
+        } catch (directErr) {
+          if (
+            directErr instanceof TypeError &&
+            /integrate\.api\.nvidia\.com/i.test(profile.baseUrl)
+          ) {
+            throw new Error(
+              'Máy chủ Web hiện tại chưa nạp route Backend (/api/ai/generate trả về 404) và NVIDIA NIM chặn gọi trực tiếp từ trình duyệt (CORS). Hãy đợi Vercel hoàn tất Build bản mới hoặc chạy lệnh `npm run dev` trên máy.'
+            );
+          }
+          throw directErr;
+        }
+      }
+    }
+
+    throw new Error(
+      data.error || `Không thể gọi ${profile.label} (HTTP ${resp.status}).`
+    );
+  } catch (err) {
+    if (
+      err instanceof TypeError &&
+      profile.provider !== 'anthropic'
+    ) {
+      return await callOpenAiCompatibleDirectFromBrowser(
+        profile,
+        systemPrompt,
+        userPrompt
+      );
+    }
+    throw err;
   }
-
-  throw new Error(
-    data.error || `Không thể gọi ${profile.label} (HTTP ${resp.status}).`
-  );
 }
 
 export function buildSkillsAndContextSystemPrompt(

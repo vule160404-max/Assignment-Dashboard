@@ -2,7 +2,7 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "functions": {
-    "api/[...path].ts": {
+    "api/**/*.ts": {
       "includeFiles": "{extension/hix-bridge/**,firebase-applet-config.json}"
     }
   },

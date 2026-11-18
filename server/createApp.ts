@@ -1739,6 +1739,13 @@ export function createApiApp(): express.Express {
           (typeof data.title === 'string' ? data.title : '') ||
           rawText.trim().slice(0, 180);
 
+        if (isNvidiaNim && (resp.status === 401 || resp.status === 403)) {
+          res.status(resp.status).json({
+            error: `NVIDIA NIM từ chối xác thực API Key (HTTP ${resp.status}: ${detailMsg}). Lưu ý: Một API Key NVIDIA NIM tiêu chuẩn có 70 ký tự (bắt đầu bằng "nvapi-" theo sau là 64 ký tự). Key bạn đang nhập có ${apiKey.length} ký tự — hãy kiểm tra xem khi Copy trên build.nvidia.com có bị thiếu vài ký tự ở cuối hoặc Key đã hết hạn không.`,
+          });
+          return;
+        }
+
         if (isNvidiaNim && (resp.status === 404 || resp.status === 410)) {
           res.status(resp.status).json({
             error: `NVIDIA NIM báo Model "${resolvedModel}" không tồn tại hoặc đã ngừng hỗ trợ (HTTP ${resp.status}: ${detailMsg}). Hãy chọn một Model NVIDIA NIM đang hoạt động như: mistralai/mistral-large-4-1t-a52b, moonshotai/kimi-k3.1-pro, nvidia/nemotron-3-ultra-550b-a55b, z-ai/glm-5.3-flash, google/gemma-4-31b-it.`,
