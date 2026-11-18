@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "AssignTrack HIX Bypass Bridge",
-  "version": "1.2.0",
-  "description": "Kết nối an toàn & hỗ trợ chạy song song nhiều tab hixbypass.com cùng lúc từ trình chiếu Word trên AssignTrack.",
+  "version": "1.3.0",
+  "description": "Kết nối an toàn & chạy song song nhiều tab hixbypass.com ở chế độ nền không cần chuyển tab.",
   "permissions": ["tabs", "scripting"],
   "host_permissions": [
     "https://hixbypass.com/*",

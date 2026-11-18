@@ -61,8 +61,14 @@ async function pickTargetHixTab(requestedTabId, excludeBusy = false) {
   }
 
   if (excludeBusy) {
-    const idleActive = tabs.find((t) => t.active && typeof t.id === 'number' && !isTabBusy(t.id));
+    const idleActive = tabs.find(
+      (t) => t.active && !t.discarded && typeof t.id === 'number' && !isTabBusy(t.id)
+    );
     if (idleActive) return idleActive;
+    const idleLoaded = tabs.find(
+      (t) => !t.discarded && typeof t.id === 'number' && !isTabBusy(t.id)
+    );
+    if (idleLoaded) return idleLoaded;
     const idleAny = tabs.find((t) => typeof t.id === 'number' && !isTabBusy(t.id));
     if (idleAny) return idleAny;
   }
@@ -140,6 +146,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       const jobId = String(message.jobId || message.requestId || `job_${Date.now()}`);
       busyTabJobs.set(tab.id, { jobId, startedAt: Date.now() });
       jobToTabMap.set(jobId, tab.id);
+      chrome.tabs.update(tab.id, { autoDiscardable: false }).catch(() => undefined);
 
       const targetMsgType =
         message.type === 'START_HUMANIZE' ? 'START_HUMANIZE' : 'EXECUTE_HUMANIZE';
@@ -188,6 +195,16 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
           status: 'error',
           errorCode: 'NO_HIX_TAB',
           error: 'Tab hixbypass.com đang chạy bài này đã bị đóng.',
+        });
+        return;
+      }
+      if (tab.discarded) {
+        releaseTabJob(tab.id, jobId);
+        sendResponse({
+          ok: false,
+          status: 'error',
+          errorCode: 'TAB_DISCARDED',
+          error: 'Tab hixbypass.com đã bị trình duyệt cho ngủ đông (Memory Saver). Hãy mở lại tab đó rồi bấm Tiếp tục.',
         });
         return;
       }

@@ -1,6 +1,6 @@
 (() => {
-  if (window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ === '1.2.0') return;
-  window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ = '1.2.0';
+  if (window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ === '1.3.0') return;
+  window.__ASSIGNTRACK_HIX_CONTENT_VERSION__ = '1.3.0';
   window.__ASSIGNTRACK_HIX_CONTENT_LOADED__ = true;
 
   let activeRunToken = 0;
@@ -44,10 +44,13 @@
       .toLowerCase();
   }
 
-  function isVisible(el, minW = 24, minH = 16) {
+  function isVisible(el, minW = 24, minH = 16, allowZeroOpacity = false) {
     if (!el || !el.isConnected) return false;
     const style = window.getComputedStyle(el);
-    if (style.display === 'none' || style.visibility === 'hidden' || style.opacity === '0') {
+    if (style.display === 'none' || style.visibility === 'hidden') {
+      return false;
+    }
+    if (!allowZeroOpacity && style.opacity === '0') {
       return false;
     }
     const rect = el.getBoundingClientRect();
@@ -415,7 +418,7 @@
       const siblings = Array.from(parent.children);
       for (const sib of siblings) {
         if (sib === current || sib.contains(inputEl) || inputEl.contains(sib)) continue;
-        if (!isVisible(sib, 160, 80)) continue;
+        if (!isVisible(sib, 160, 80, true)) continue;
         if (sib.tagName === 'HEADER' || sib.tagName === 'NAV' || sib.tagName === 'ASIDE') continue;
 
         const sibRect = sib.getBoundingClientRect();
@@ -438,9 +441,9 @@
     const inputRect = inputEl.getBoundingClientRect();
     const inputNorm = normText(readInputElementValue(inputEl));
 
-    // Strategy 1: Second visible textarea or readonly textbox/contenteditable
+    // Strategy 1: Second visible textarea or readonly textbox/contenteditable (allowOpacity=true for background tabs)
     const textareas = Array.from(document.querySelectorAll('textarea')).filter((ta) =>
-      isVisible(ta, 60, 40)
+      isVisible(ta, 60, 40, true)
     );
     const otherTextarea = textareas.find((ta) => ta !== inputEl);
     if (otherTextarea) {
@@ -454,7 +457,7 @@
       document.querySelectorAll('[role="textbox"], [contenteditable]')
     ).filter((el) => {
       if (el === inputEl || el.contains(inputEl) || inputEl.contains(el)) return false;
-      return isVisible(el, 60, 40);
+      return isVisible(el, 60, 40, true);
     });
     for (const ed of otherEditors) {
       const txt = cleanExtractedNodeText(ed);
@@ -470,7 +473,7 @@
         panel.querySelectorAll(
           '[data-testid*="output"], [data-testid*="result"], [class*="output"], [class*="result"], .prose, .ProseMirror, [class*="overflow-y"]'
         )
-      ).filter((n) => isVisible(n, 120, 40));
+      ).filter((n) => isVisible(n, 120, 40, true));
 
       for (const inner of innerCandidates) {
         const txt = cleanExtractedNodeText(inner);
@@ -489,7 +492,7 @@
     const copyButtons = Array.from(
       document.querySelectorAll('button, [role="button"]')
     ).filter((btn) => {
-      if (!isVisible(btn, 14, 14)) return false;
+      if (!isVisible(btn, 14, 14, true)) return false;
       const txt = stripDiacritics(normText(btn.textContent));
       const aria = stripDiacritics(
         normText(
@@ -542,7 +545,7 @@
       const nodes = Array.from(document.querySelectorAll(sel));
       for (const node of nodes) {
         if (node === inputEl || node.contains(inputEl) || inputEl.contains(node)) continue;
-        if (!isVisible(node, 120, 50)) continue;
+        if (!isVisible(node, 120, 50, true)) continue;
         const rect = node.getBoundingClientRect();
         const isRightOrBelow =
           rect.left >= inputRect.left + 60 || rect.top >= inputRect.bottom - 20;
@@ -643,205 +646,345 @@
     return null;
   }
 
-  async function runHumanizeJob(jobId, text, mode) {
+  let domObserver = null;
+  let fallbackTickTimer = null;
+
+  function stopBackgroundWatchers() {
+    if (domObserver) {
+      domObserver.disconnect();
+      domObserver = null;
+    }
+    if (fallbackTickTimer !== null) {
+      clearTimeout(fallbackTickTimer);
+      fallbackTickTimer = null;
+    }
+  }
+
+  function toPublicJobPayload(job) {
+    if (!job) {
+      return {
+        ok: false,
+        status: 'error',
+        errorCode: 'JOB_NOT_FOUND',
+        error: 'Không tìm thấy tác vụ đang chạy trên tab HIX Bypass này.',
+      };
+    }
+    return {
+      jobId: job.jobId,
+      status: job.status,
+      ok: job.ok,
+      step: job.step,
+      outputText: job.outputText,
+      errorCode: job.errorCode,
+      error: job.error,
+    };
+  }
+
+  function finishJobSuccess(job, outputText) {
+    job.phase = 'done';
+    job.status = 'done';
+    job.ok = true;
+    job.step = 'Đã lấy kết quả xong, chuẩn bị dán đè...';
+    job.outputText = outputText;
+    if (job.jobId === activeJobId) {
+      stopBackgroundWatchers();
+    }
+  }
+
+  function finishJobError(job, errorCode, errorMsg) {
+    job.phase = 'error';
+    job.status = 'error';
+    job.ok = false;
+    job.errorCode = errorCode;
+    job.error = errorMsg;
+    if (job.jobId === activeJobId) {
+      stopBackgroundWatchers();
+    }
+  }
+
+  function pasteTextAndEnterWaitingButton(job, now) {
+    setNativeTextValue(job.inputEl, job.text);
+    job.phase = 'waiting_button';
+    job.phaseSince = now;
+    job.repastedOnce = false;
+  }
+
+  /**
+   * Poll-driven + MutationObserver-driven synchronous state machine.
+   * Because AssignTrack foreground tab sends POLL_HUMANIZE every ~450ms,
+   * calling this inside POLL_HUMANIZE keeps background HIX tabs advancing
+   * immediately even when Chrome throttles background setTimeout/rAF timers!
+   */
+  function advanceAndEvaluateJob(jobId) {
+    const job = jobs.get(jobId);
+    if (!job) return null;
+    if (job.status !== 'running') return job;
+
+    if (job.runToken !== activeRunToken) {
+      finishJobError(job, 'CANCELLED', 'Đã tạm dừng thao tác trên tab HIX Bypass.');
+      return job;
+    }
+
+    const now = Date.now();
+
+    if (job.phase === 'init') {
+      const inputEl = findInputElement();
+      if (!inputEl) {
+        finishJobError(
+          job,
+          'INPUT_NOT_FOUND',
+          'Không tìm thấy ô nhập văn bản trên tab hixbypass.com. Hãy đảm bảo bạn đang mở trang công cụ chính của HIX Bypass (không thu nhỏ cửa sổ trình duyệt).'
+        );
+        return job;
+      }
+      job.inputEl = inputEl;
+      job.step = 'Đang kiểm tra chế độ & dán văn bản sang HIX Bypass...';
+      if (selectModeIfAvailable(job.mode)) {
+        job.phase = 'selecting_mode';
+        job.phaseSince = now;
+        return job;
+      }
+      pasteTextAndEnterWaitingButton(job, now);
+      return job;
+    }
+
+    if (job.phase === 'selecting_mode') {
+      if (now - job.phaseSince < 120) {
+        return job;
+      }
+      if (!job.inputEl || !job.inputEl.isConnected) {
+        job.inputEl = findInputElement();
+      }
+      if (!job.inputEl) {
+        finishJobError(
+          job,
+          'INPUT_NOT_FOUND',
+          'Không tìm thấy ô nhập văn bản trên tab hixbypass.com sau khi đổi chế độ.'
+        );
+        return job;
+      }
+      pasteTextAndEnterWaitingButton(job, now);
+      return job;
+    }
+
+    if (job.phase === 'waiting_button') {
+      if (now - job.phaseSince < 180) {
+        return job;
+      }
+      if (!job.inputEl || !job.inputEl.isConnected) {
+        job.inputEl = findInputElement();
+      }
+      if (!job.inputEl) {
+        finishJobError(
+          job,
+          'INPUT_NOT_FOUND',
+          'Ô nhập văn bản trên tab hixbypass.com bị mất kết nối.'
+        );
+        return job;
+      }
+
+      if (
+        !job.repastedOnce &&
+        normText(readInputElementValue(job.inputEl)).length < Math.min(20, job.inputNorm.length)
+      ) {
+        job.repastedOnce = true;
+        setNativeTextValue(job.inputEl, job.text);
+        job.phaseSince = now;
+        return job;
+      }
+
+      const humanizeBtn = findHumanizeButton() || job.humanizeBtn;
+      if (!humanizeBtn) {
+        if (now - job.phaseSince < 2500) {
+          return job;
+        }
+        finishJobError(
+          job,
+          'BUTTON_NOT_FOUND',
+          'Đã dán văn bản nhưng không tìm thấy nút "Humanize" hoặc "Nhân hóa" trên tab hixbypass.com.'
+        );
+        return job;
+      }
+
+      job.humanizeBtn = humanizeBtn;
+      if (isButtonDisabled(humanizeBtn) && now - job.phaseSince < 3000) {
+        return job;
+      }
+
+      job.prevOutputNorm = normText(readOutputText(job.inputEl));
+      job.step = 'Đang bấm nút Humanize / Nhân hóa trên HIX Bypass...';
+      triggerHumanClick(humanizeBtn);
+      job.phase = 'waiting_output';
+      job.startedWaitAt = now;
+      job.phaseSince = now;
+      job.step = 'Đang chờ HIX Bypass tạo văn bản mới...';
+      return job;
+    }
+
+    if (job.phase === 'waiting_output') {
+      if (!job.inputEl || !job.inputEl.isConnected) {
+        job.inputEl = findInputElement() || job.inputEl;
+      }
+      job.humanizeBtn = findHumanizeButton() || job.humanizeBtn;
+
+      const currentOutput = readOutputText(job.inputEl);
+      const normCurrent = normText(currentOutput);
+      const isDifferentFromPrev = Boolean(currentOutput) && normCurrent !== job.prevOutputNorm;
+      const isDifferentFromInput = Boolean(currentOutput) && normCurrent !== job.inputNorm;
+      const stillLoadingUi = isProcessingUiVisible(job.humanizeBtn);
+
+      if (isDifferentFromPrev && isDifferentFromInput) {
+        if (currentOutput !== job.lastSeenOutput) {
+          job.lastSeenOutput = currentOutput;
+          job.lastOutputChangeAt = now;
+          job.stablePolls = 0;
+          job.step = 'Đang nhận kết quả từ HIX Bypass...';
+        } else {
+          job.stablePolls += 1;
+        }
+
+        const settledMs = now - job.lastOutputChangeAt;
+        if (
+          (!stillLoadingUi && job.stablePolls >= 2 && settledMs >= 650) ||
+          (job.stablePolls >= 5 && settledMs >= 1800)
+        ) {
+          finishJobSuccess(job, currentOutput);
+          return job;
+        }
+
+        return job;
+      }
+
+      const elapsed = now - job.startedWaitAt;
+      const blocker = detectBlockerBanner(elapsed);
+      if (blocker === 'WORD_LIMIT_REACHED') {
+        finishJobError(
+          job,
+          'WORD_LIMIT_REACHED',
+          'Tài khoản hixbypass.com báo hết lượt từ (Word limit). Vui lòng kiểm tra gói hoặc đăng nhập tài khoản khác.'
+        );
+        return job;
+      }
+      if (blocker === 'MIN_WORDS_REQUIRED') {
+        finishJobError(
+          job,
+          'MIN_WORDS_REQUIRED',
+          'HIX Bypass yêu cầu tối thiểu 50 từ cho mỗi lượt. Hãy tăng giới hạn từ/lượt lên (~250 từ/lượt).'
+        );
+        return job;
+      }
+      if (blocker === 'CAPTCHA_REQUIRED') {
+        finishJobError(
+          job,
+          'CAPTCHA_REQUIRED',
+          'HIX Bypass đang yêu cầu xác minh CAPTCHA trên tab này. Vui lòng hoàn tất xác minh rồi bấm Tiếp tục.'
+        );
+        return job;
+      }
+
+      if (
+        !job.nudgedStalledClick &&
+        elapsed >= 4000 &&
+        !stillLoadingUi &&
+        !isButtonDisabled(job.humanizeBtn)
+      ) {
+        job.nudgedStalledClick = true;
+        if (normText(readInputElementValue(job.inputEl)) !== job.inputNorm) {
+          setNativeTextValue(job.inputEl, job.text);
+        }
+        job.step = 'Đang kích hoạt lại nút Humanize trên tab...';
+        triggerHumanClick(job.humanizeBtn);
+        return job;
+      }
+
+      if (elapsed >= 75000) {
+        if (job.lastSeenOutput) {
+          finishJobSuccess(job, job.lastSeenOutput);
+          return job;
+        }
+        finishJobError(
+          job,
+          'TIMEOUT',
+          'HIX Bypass phản hồi quá lâu (>75s) hoặc chưa thấy ô kết quả bên phải trên tab này.'
+        );
+      }
+    }
+
+    return job;
+  }
+
+  function scheduleLocalWatchers(jobId) {
+    stopBackgroundWatchers();
+
+    if (document.body) {
+      let mutScheduled = false;
+      domObserver = new MutationObserver(() => {
+        if (mutScheduled) return;
+        mutScheduled = true;
+        queueMicrotask(() => {
+          mutScheduled = false;
+          if (activeJobId === jobId) {
+            advanceAndEvaluateJob(jobId);
+          }
+        });
+      });
+      domObserver.observe(document.body, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+    }
+
+    const tick = () => {
+      const job = jobs.get(jobId);
+      if (!job || job.status !== 'running' || activeJobId !== jobId) {
+        stopBackgroundWatchers();
+        return;
+      }
+      advanceAndEvaluateJob(jobId);
+      if (job.status === 'running') {
+        fallbackTickTimer = setTimeout(tick, 260);
+      }
+    };
+    fallbackTickTimer = setTimeout(tick, 240);
+  }
+
+  function startStateMachineJob(jobId, text, mode) {
     const runToken = ++activeRunToken;
     activeJobId = jobId;
 
-    let inputEl = findInputElement();
-    if (!inputEl) {
-      updateJob(jobId, {
-        status: 'error',
-        ok: false,
-        errorCode: 'INPUT_NOT_FOUND',
-        error:
-          'Không tìm thấy ô nhập văn bản trên tab hixbypass.com. Hãy đảm bảo bạn đang mở trang công cụ chính của HIX Bypass.',
-      });
-      return;
+    const job = {
+      jobId,
+      runToken,
+      text,
+      mode,
+      phase: 'init',
+      status: 'running',
+      ok: true,
+      step: 'Đang kết nối tab HIX Bypass...',
+      outputText: '',
+      errorCode: '',
+      error: '',
+      inputEl: null,
+      humanizeBtn: null,
+      inputNorm: normText(text),
+      prevOutputNorm: '',
+      phaseSince: Date.now(),
+      startedWaitAt: 0,
+      lastSeenOutput: '',
+      lastOutputChangeAt: 0,
+      stablePolls: 0,
+      nudgedStalledClick: false,
+      repastedOnce: false,
+    };
+
+    jobs.set(jobId, job);
+    pruneOldJobs();
+    advanceAndEvaluateJob(jobId);
+    if (job.status === 'running') {
+      scheduleLocalWatchers(jobId);
     }
-
-    updateJob(jobId, { step: 'Đang kiểm tra chế độ & dán văn bản sang HIX Bypass...' });
-    if (selectModeIfAvailable(mode)) {
-      await sleep(140);
-    }
-
-    if (runToken !== activeRunToken) {
-      updateJob(jobId, {
-        status: 'error',
-        ok: false,
-        errorCode: 'CANCELLED',
-        error: 'Đã tạm dừng.',
-      });
-      return;
-    }
-
-    setNativeTextValue(inputEl, text);
-    await sleep(320);
-
-    // Re-verify React controlled editor retained pasted value
-    const expectedNorm = normText(text);
-    if (normText(readInputElementValue(inputEl)).length < Math.min(20, expectedNorm.length)) {
-      setNativeTextValue(inputEl, text);
-      await sleep(250);
-    }
-
-    let humanizeBtn = findHumanizeButton();
-    if (!humanizeBtn) {
-      updateJob(jobId, {
-        status: 'error',
-        ok: false,
-        errorCode: 'BUTTON_NOT_FOUND',
-        error:
-          'Đã dán văn bản nhưng không tìm thấy nút "Humanize" hoặc "Nhân hóa" trên tab hixbypass.com.',
-      });
-      return;
-    }
-
-    let enableWait = 0;
-    while (isButtonDisabled(humanizeBtn) && enableWait < 3000) {
-      if (runToken !== activeRunToken) {
-        updateJob(jobId, {
-          status: 'error',
-          ok: false,
-          errorCode: 'CANCELLED',
-          error: 'Đã tạm dừng.',
-        });
-        return;
-      }
-      await sleep(150);
-      enableWait += 150;
-      humanizeBtn = findHumanizeButton() || humanizeBtn;
-    }
-
-    const prevOutput = readOutputText(inputEl);
-    const normPrevOutput = normText(prevOutput);
-    const normInputText = expectedNorm;
-
-    updateJob(jobId, { step: 'Đang bấm nút Humanize / Nhân hóa trên HIX Bypass...' });
-    triggerHumanClick(humanizeBtn);
-
-    const startedWaitAt = Date.now();
-    const deadline = startedWaitAt + 75000;
-    let lastSeenOutput = '';
-    let stableChecks = 0;
-    let nudgedStalledClick = false;
-
-    updateJob(jobId, { step: 'Đang chờ HIX Bypass tạo văn bản mới...' });
-
-    while (Date.now() < deadline) {
-      if (runToken !== activeRunToken) {
-        updateJob(jobId, {
-          status: 'error',
-          ok: false,
-          errorCode: 'CANCELLED',
-          error: 'Đã tạm dừng thao tác trên tab HIX Bypass.',
-        });
-        return;
-      }
-
-      if (!inputEl.isConnected) {
-        inputEl = findInputElement() || inputEl;
-      }
-      humanizeBtn = findHumanizeButton() || humanizeBtn;
-
-      // 1. Check live output FIRST before checking blockers
-      const currentOutput = readOutputText(inputEl);
-      const normCurrent = normText(currentOutput);
-      const isDifferentFromPrev = Boolean(currentOutput) && normCurrent !== normPrevOutput;
-      const isDifferentFromInput = Boolean(currentOutput) && normCurrent !== normInputText;
-      const stillLoadingUi = isProcessingUiVisible(humanizeBtn);
-
-      if (isDifferentFromPrev && isDifferentFromInput) {
-        if (currentOutput === lastSeenOutput) {
-          stableChecks += 1;
-        } else {
-          lastSeenOutput = currentOutput;
-          stableChecks = 0;
-          updateJob(jobId, { step: 'Đang nhận kết quả từ HIX Bypass...' });
-        }
-
-        // Complete cleanly when output has stabilized and HIX is done streaming
-        if ((!stillLoadingUi && stableChecks >= 3) || stableChecks >= 6) {
-          updateJob(jobId, {
-            status: 'done',
-            ok: true,
-            step: 'Đã lấy kết quả xong, chuẩn bị dán đè...',
-            outputText: currentOutput,
-          });
-          return;
-        }
-
-        await sleep(350);
-        continue;
-      }
-
-      const elapsed = Date.now() - startedWaitAt;
-
-      // 2. Check genuine blockers (Word limit / Min 50 words / Blocking Captcha modal)
-      const blocker = detectBlockerBanner(elapsed);
-      if (blocker === 'WORD_LIMIT_REACHED') {
-        updateJob(jobId, {
-          status: 'error',
-          ok: false,
-          errorCode: 'WORD_LIMIT_REACHED',
-          error:
-            'Tài khoản hixbypass.com báo hết lượt từ (Word limit). Vui lòng kiểm tra gói hoặc đăng nhập tài khoản khác.',
-        });
-        return;
-      }
-      if (blocker === 'MIN_WORDS_REQUIRED') {
-        updateJob(jobId, {
-          status: 'error',
-          ok: false,
-          errorCode: 'MIN_WORDS_REQUIRED',
-          error:
-            'HIX Bypass yêu cầu tối thiểu 50 từ cho mỗi lượt. Hãy tăng giới hạn từ/lượt lên (~250 từ/lượt).',
-        });
-        return;
-      }
-      if (blocker === 'CAPTCHA_REQUIRED') {
-        updateJob(jobId, {
-          status: 'error',
-          ok: false,
-          errorCode: 'CAPTCHA_REQUIRED',
-          error:
-            'HIX Bypass đang yêu cầu xác minh CAPTCHA trên tab này. Vui lòng hoàn tất xác minh rồi bấm Tiếp tục.',
-        });
-        return;
-      }
-
-      // 3. Anti-stall self-healing: if after 4.5s HIX neither started loading nor produced output,
-      // re-sync input text and click Humanize once more so silent React click misses never stall!
-      if (!nudgedStalledClick && elapsed >= 4500 && !stillLoadingUi && !isButtonDisabled(humanizeBtn)) {
-        nudgedStalledClick = true;
-        if (normText(readInputElementValue(inputEl)) !== normInputText) {
-          setNativeTextValue(inputEl, text);
-          await sleep(220);
-        }
-        updateJob(jobId, { step: 'Đang kích hoạt lại nút Humanize trên tab...' });
-        triggerHumanClick(humanizeBtn);
-      }
-
-      await sleep(350);
-    }
-
-    const finalCheck = readOutputText(inputEl);
-    if (lastSeenOutput || (finalCheck && normText(finalCheck) !== normPrevOutput && normText(finalCheck) !== normInputText)) {
-      updateJob(jobId, {
-        status: 'done',
-        ok: true,
-        step: 'Đã lấy kết quả xong, chuẩn bị dán đè...',
-        outputText: lastSeenOutput || finalCheck,
-      });
-      return;
-    }
-
-    updateJob(jobId, {
-      status: 'error',
-      ok: false,
-      errorCode: 'TIMEOUT',
-      error:
-        'HIX Bypass phản hồi quá lâu (>75s) hoặc chưa thấy ô kết quả bên phải trên tab này.',
-    });
+    return job;
   }
 
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -851,15 +994,11 @@
       const targetJobId = message.jobId ? String(message.jobId) : '';
       if (!targetJobId || targetJobId === activeJobId) {
         activeRunToken += 1;
+        stopBackgroundWatchers();
         if (activeJobId && jobs.has(activeJobId)) {
           const cur = jobs.get(activeJobId);
           if (cur && cur.status === 'running') {
-            updateJob(activeJobId, {
-              status: 'error',
-              ok: false,
-              errorCode: 'CANCELLED',
-              error: 'Đã tạm dừng thao tác.',
-            });
+            finishJobError(cur, 'CANCELLED', 'Đã tạm dừng thao tác.');
           }
         }
       }
@@ -869,45 +1008,32 @@
 
     if (message.type === 'START_HUMANIZE') {
       const jobId = String(message.jobId || `job_${Date.now()}`);
-      jobs.set(jobId, {
-        jobId,
-        status: 'running',
-        step: 'Đang kết nối tab HIX Bypass...',
-        ok: true,
-      });
-      pruneOldJobs();
-      void runHumanizeJob(jobId, String(message.text || ''), String(message.mode || 'Balanced'));
+      startStateMachineJob(jobId, String(message.text || ''), String(message.mode || 'Balanced'));
       sendResponse({ ok: true, jobId });
       return false;
     }
 
     if (message.type === 'POLL_HUMANIZE') {
-      const jobId = String(message.jobId || '');
-      const job = jobId ? jobs.get(jobId) : jobs.get(activeJobId);
-      if (!job) {
-        sendResponse({
-          ok: false,
-          status: 'error',
-          errorCode: 'JOB_NOT_FOUND',
-          error: 'Không tìm thấy tác vụ đang chạy trên tab HIX Bypass này.',
-        });
-        return false;
-      }
-      sendResponse(job);
+      const jobId = String(message.jobId || activeJobId || '');
+      const updated = jobId ? advanceAndEvaluateJob(jobId) : null;
+      sendResponse(toPublicJobPayload(updated));
       return false;
     }
 
     if (message.type === 'EXECUTE_HUMANIZE') {
       const jobId = String(message.jobId || `job_${Date.now()}`);
-      jobs.set(jobId, {
-        jobId,
-        status: 'running',
-        step: 'Đang thực thi...',
-        ok: true,
-      });
-      pruneOldJobs();
-      runHumanizeJob(jobId, String(message.text || ''), String(message.mode || 'Balanced'))
-        .then(() => sendResponse(jobs.get(jobId)))
+      startStateMachineJob(jobId, String(message.text || ''), String(message.mode || 'Balanced'));
+      const waitLoop = async () => {
+        while (true) {
+          const cur = advanceAndEvaluateJob(jobId);
+          if (!cur || cur.status !== 'running') {
+            return toPublicJobPayload(cur);
+          }
+          await sleep(260);
+        }
+      };
+      waitLoop()
+        .then((payload) => sendResponse(payload))
         .catch((err) =>
           sendResponse({
             ok: false,

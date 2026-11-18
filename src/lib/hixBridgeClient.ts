@@ -1,6 +1,6 @@
 export type HixBypassMode = 'Fast' | 'Balanced' | 'Aggressive';
 
-export const EXPECTED_EXTENSION_VERSION = '1.2.0';
+export const EXPECTED_EXTENSION_VERSION = '1.3.0';
 
 export interface HixTabInfo {
   tabId: number;
@@ -227,7 +227,7 @@ export async function humanizeChunkViaExtension(
         };
       }
 
-      await sleep(700);
+      await sleep(450);
 
       if (options?.signal?.aborted) {
         return {
@@ -251,10 +251,10 @@ export async function humanizeChunkViaExtension(
         consecutivePollFailures = 0;
       } catch (pollErr) {
         consecutivePollFailures += 1;
-        // Tolerate up to 3 transient SW wakeups / background-tab throttles before failing
-        if (consecutivePollFailures <= 3) {
+        // Tolerate up to 4 transient SW wakeups / background-tab throttles before failing
+        if (consecutivePollFailures <= 4) {
           options?.onStepUpdate?.('Đang giữ kết nối tới tab HIX Bypass...');
-          await sleep(450);
+          await sleep(400);
           continue;
         }
         throw pollErr;
