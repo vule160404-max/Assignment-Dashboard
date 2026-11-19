@@ -64,7 +64,7 @@ export function OrderChatPanel({
     <section className="bg-white border border-zinc-200 rounded-xl flex flex-col overflow-hidden">
       <div className="px-4 py-3 border-b border-zinc-200/80 bg-zinc-50/70 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          <MessageSquare className="w-4 h-4 text-[#4338CA] shrink-0" />
+          <MessageSquare className="w-4 h-4 text-[#12489B] shrink-0" />
           <h3 className="text-sm font-semibold text-slate-900 truncate">
             Trao đổi trực tiếp theo đơn
           </h3>
@@ -134,12 +134,12 @@ export function OrderChatPanel({
           onChange={(e) => setDraft(e.target.value)}
           maxLength={FIELD_LIMITS.messageBodyMax}
           placeholder="Nhập nội dung trao đổi (lưu 48h)..."
-          className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA] transition-colors"
+          className="flex-1 min-w-0 px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B] transition-colors"
         />
         <button
           type="submit"
           disabled={!draft.trim() || sending}
-          className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45 whitespace-nowrap shrink-0"
+          className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] disabled:opacity-45 whitespace-nowrap shrink-0"
         >
           <Send className="w-3.5 h-3.5" />
           Gửi

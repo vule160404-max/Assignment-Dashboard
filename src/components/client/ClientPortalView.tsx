@@ -312,7 +312,7 @@ export function ClientPortalView({
   const isFullyPaid = portal?.paymentStatus === 'fully_paid';
   const currentStageMeta = portal ? getStageMeta(portal.stage) : null;
   const inputFieldCls =
-    'w-full px-3.5 py-2.5 text-sm bg-zinc-50/90 border border-zinc-200 rounded-xl text-slate-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA] transition-colors';
+    'w-full px-3.5 py-2.5 text-sm bg-zinc-50/90 border border-zinc-200 rounded-xl text-slate-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B] transition-colors';
 
   const displayName =
     userProfile?.displayName || user?.displayName || user?.email || 'Khách hàng';
@@ -353,7 +353,7 @@ export function ClientPortalView({
                   : 'text-zinc-600 hover:text-slate-900'
               }`}
             >
-              <Search className="w-3.5 h-3.5 text-[#4338CA]" />
+              <Search className="w-3.5 h-3.5 text-[#12489B]" />
               <span>Tra cứu đơn hàng</span>
             </button>
             <button
@@ -364,7 +364,7 @@ export function ClientPortalView({
               }}
               className={`btn-press px-4 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap ${
                 homeTab === 'checker' && !portal
-                  ? 'bg-white text-[#4338CA] shadow-xs ring-1 ring-indigo-500/15'
+                  ? 'bg-white text-[#12489B] shadow-xs ring-1 ring-[#12489B]/15'
                   : 'text-zinc-600 hover:text-slate-900'
               }`}
             >
@@ -385,12 +385,12 @@ export function ClientPortalView({
                   }}
                   className={`btn-press inline-flex items-center gap-2 pr-1.5 py-0.5 rounded-lg text-xs ${
                     homeTab === 'auth' && !portal
-                      ? 'text-[#4338CA] font-semibold'
-                      : 'text-slate-800 hover:text-[#4338CA] font-medium'
+                      ? 'text-[#12489B] font-semibold'
+                      : 'text-slate-800 hover:text-[#12489B] font-medium'
                   }`}
                   title="Xem tài khoản & đơn hàng đã lưu"
                 >
-                  <span className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-200/80 text-[#4338CA] text-[11px] font-bold flex items-center justify-center shrink-0">
+                  <span className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-200/80 text-[#0B2559] text-[11px] font-bold flex items-center justify-center shrink-0">
                     {avatarInitial}
                   </span>
                   <span className="max-w-[110px] sm:max-w-[140px] truncate">
@@ -416,8 +416,8 @@ export function ClientPortalView({
                 }}
                 className={`btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl whitespace-nowrap ${
                   homeTab === 'auth' && !portal
-                    ? 'bg-[#4338CA] text-white shadow-2xs'
-                    : 'text-[#4338CA] bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/70'
+                    ? 'bg-[#0B2559] text-white shadow-2xs'
+                    : 'text-[#0B2559] bg-blue-50 hover:bg-blue-100 border border-blue-200/80'
                 }`}
               >
                 <LogIn className="w-3.5 h-3.5" />
@@ -451,7 +451,7 @@ export function ClientPortalView({
                   : 'text-zinc-600'
               }`}
             >
-              <Search className="w-3.5 h-3.5 text-[#4338CA]" />
+              <Search className="w-3.5 h-3.5 text-[#12489B]" />
               <span>Tra cứu đơn</span>
             </button>
             <button
@@ -462,7 +462,7 @@ export function ClientPortalView({
               }}
               className={`btn-press py-2 px-3 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1.5 ${
                 homeTab === 'checker' && !portal
-                  ? 'bg-white text-[#4338CA] shadow-2xs'
+                  ? 'bg-white text-[#12489B] shadow-2xs'
                   : 'text-zinc-600'
               }`}
             >
@@ -508,21 +508,21 @@ export function ClientPortalView({
                 <div className="surface-enter space-y-4">
                   {/* Row 1: 2-Column Hero Split — Tra cứu đơn hàng (Left) + Cam kết cốt lõi (Right) */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-                    <section className="relative overflow-hidden lg:col-span-7 bg-white/95 backdrop-blur-xs border border-slate-200/85 rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-[0_12px_34px_-14px_rgba(15,23,42,0.09)] space-y-4">
+                    <section className="relative overflow-hidden lg:col-span-7 bg-white/95 backdrop-blur-xs border border-slate-200/85 rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-[0_12px_34px_-14px_rgba(11,37,89,0.1)] space-y-4">
                       <span
                         aria-hidden="true"
-                        className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#4338CA] via-[#6366F1] to-[#10B981]"
+                        className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#0B2559] via-[#12489B] to-[#F5B700]"
                       />
 
                       <div className="space-y-3.5">
                         <div className="space-y-1.5">
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[11px] font-semibold">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200/80 text-[#12489B] text-[11px] font-semibold">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                             Tra cứu thời gian thực · 24/7
                           </span>
                           <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                             Tra cứu tiến độ{' '}
-                            <span className="bg-gradient-to-r from-[#4338CA] to-[#059669] bg-clip-text text-transparent">
+                            <span className="bg-gradient-to-r from-[#0B2559] via-[#12489B] to-[#D97706] bg-clip-text text-transparent">
                               đơn hàng
                             </span>
                           </h1>
@@ -535,7 +535,7 @@ export function ClientPortalView({
                           <label className="block text-xs font-medium text-slate-700">
                             Mã đơn hàng *
                           </label>
-                          <div className="flex flex-col sm:flex-row gap-2 p-1.5 bg-slate-100/80 border border-slate-200/90 rounded-2xl focus-within:bg-white focus-within:border-[#4338CA]/70 focus-within:ring-4 focus-within:ring-[#4338CA]/10 transition-colors">
+                          <div className="flex flex-col sm:flex-row gap-2 p-1.5 bg-slate-100/80 border border-slate-200/90 rounded-2xl focus-within:bg-white focus-within:border-[#12489B]/75 focus-within:ring-4 focus-within:ring-[#12489B]/10 transition-colors">
                             <div className="relative flex-1">
                               <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                               <input
@@ -549,7 +549,7 @@ export function ClientPortalView({
                             <button
                               type="submit"
                               disabled={loading || !codeInput.trim()}
-                              className="btn-press sm:w-auto w-full py-2 px-5 text-sm font-semibold bg-gradient-to-r from-[#4338CA] to-[#4F46E5] hover:from-[#3730A3] hover:to-[#4338CA] text-white rounded-xl shadow-[0_6px_16px_-6px_rgba(67,56,202,0.55)] disabled:opacity-75 whitespace-nowrap shrink-0"
+                              className="btn-press sm:w-auto w-full py-2 px-5 text-sm font-semibold bg-gradient-to-r from-[#0B2559] to-[#12489B] hover:from-[#081B42] hover:to-[#0E3A7D] text-white rounded-xl shadow-[0_6px_16px_-6px_rgba(11,37,89,0.5)] disabled:opacity-75 whitespace-nowrap shrink-0"
                             >
                               {loading ? 'Đang kiểm tra...' : 'Xem tiến độ'}
                             </button>
@@ -568,7 +568,7 @@ export function ClientPortalView({
                         <div className="pt-3 border-t border-slate-100 space-y-2">
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                              <Bookmark className="w-3.5 h-3.5 text-[#4338CA]" />
+                              <Bookmark className="w-3.5 h-3.5 text-[#12489B]" />
                               Đơn hàng đã lưu của {userProfile.displayName}
                             </span>
                             <span className="text-[11px] font-mono text-zinc-400 tabular-nums">
@@ -585,12 +585,12 @@ export function ClientPortalView({
                               {(userProfile.savedOrderCodes || []).map((savedCode) => (
                                 <div
                                   key={savedCode}
-                                  className="inline-flex items-center bg-indigo-50/60 border border-indigo-200/70 rounded-lg overflow-hidden"
+                                  className="inline-flex items-center bg-blue-50/60 border border-blue-200/70 rounded-lg overflow-hidden"
                                 >
                                   <button
                                     type="button"
                                     onClick={() => void openOrderByCode(savedCode)}
-                                    className="btn-press px-2.5 py-1 text-xs font-mono font-semibold text-[#4338CA] hover:bg-indigo-100/70"
+                                    className="btn-press px-2.5 py-1 text-xs font-mono font-semibold text-[#12489B] hover:bg-blue-100/70"
                                   >
                                     #{savedCode}
                                   </button>
@@ -604,7 +604,7 @@ export function ClientPortalView({
                                       )
                                     }
                                     aria-label={`Bỏ lưu ${savedCode}`}
-                                    className="px-1.5 py-1 text-indigo-400 hover:text-[#DC2626] hover:bg-red-50 border-l border-indigo-200/70"
+                                    className="px-1.5 py-1 text-blue-400 hover:text-[#DC2626] hover:bg-red-50 border-l border-blue-200/70"
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
@@ -619,7 +619,7 @@ export function ClientPortalView({
                           <button
                             type="button"
                             onClick={() => setHomeTab('auth')}
-                            className="btn-press font-semibold text-[#4338CA] hover:underline whitespace-nowrap shrink-0"
+                            className="btn-press font-semibold text-[#12489B] hover:underline whitespace-nowrap shrink-0"
                           >
                             Đăng nhập →
                           </button>
@@ -671,7 +671,7 @@ export function ClientPortalView({
                               <button
                                 type="button"
                                 onClick={() => setHomeTab('lookup')}
-                                className="btn-press px-4 py-2 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3]"
+                                className="btn-press px-4 py-2 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559]"
                               >
                                 Tra cứu & Xem đơn đã lưu
                               </button>
@@ -707,7 +707,7 @@ export function ClientPortalView({
                                 }}
                                 className={`pb-2.5 px-3 border-b-2 transition-colors ${
                                   authMode === 'login'
-                                    ? 'border-[#4338CA] text-[#4338CA]'
+                                    ? 'border-[#12489B] text-[#12489B]'
                                     : 'border-transparent text-zinc-500 hover:text-slate-900'
                                 }`}
                               >
@@ -721,7 +721,7 @@ export function ClientPortalView({
                                 }}
                                 className={`pb-2.5 px-3 border-b-2 transition-colors ${
                                   authMode === 'register'
-                                    ? 'border-[#4338CA] text-[#4338CA]'
+                                    ? 'border-[#12489B] text-[#12489B]'
                                     : 'border-transparent text-zinc-500 hover:text-slate-900'
                                 }`}
                               >
@@ -816,7 +816,7 @@ export function ClientPortalView({
                                     <button
                                       type="button"
                                       onClick={handleForgotPassword}
-                                      className="text-xs font-medium text-[#4338CA] hover:underline"
+                                      className="text-xs font-medium text-[#12489B] hover:underline"
                                     >
                                       Quên mật khẩu?
                                     </button>
@@ -883,7 +883,7 @@ export function ClientPortalView({
                               <button
                                 type="submit"
                                 disabled={authLoading}
-                                className="btn-press w-full py-2.5 px-4 text-sm font-semibold bg-[#4338CA] text-white rounded-xl hover:bg-[#3730A3] disabled:opacity-45"
+                                className="btn-press w-full py-2.5 px-4 text-sm font-semibold bg-[#12489B] text-white rounded-xl hover:bg-[#0B2559] disabled:opacity-45"
                               >
                                 {(() => {
                                   if (authLoading) return 'Đang xử lý...';
@@ -929,7 +929,7 @@ export function ClientPortalView({
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div className="space-y-1.5 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap text-xs text-zinc-600">
-                    <span className="font-mono font-semibold text-[#4338CA]">
+                    <span className="font-mono font-semibold text-[#12489B]">
                       #{portal.orderCode}
                     </span>
                     <span aria-hidden="true" className="text-zinc-300">·</span>
@@ -964,14 +964,14 @@ export function ClientPortalView({
                   <span className="text-sm font-semibold text-slate-900">
                     {currentStageMeta?.step}. {currentStageMeta?.label}
                   </span>
-                  <span className="font-mono text-sm font-bold text-[#4338CA] tabular-nums">
+                  <span className="font-mono text-sm font-bold text-[#12489B] tabular-nums">
                     {portal.progressPercent}%
                   </span>
                 </div>
 
                 <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
                   <div
-                    className="progress-fill h-full w-full bg-[#4338CA]"
+                    className="progress-fill h-full w-full bg-[#12489B]"
                     style={{ transform: `scaleX(${portal.progressPercent / 100})` }}
                   />
                 </div>
@@ -984,7 +984,7 @@ export function ClientPortalView({
                     let stepCardClass = 'bg-white border-zinc-100 text-zinc-400';
                     if (isCurrent) {
                       stepCardClass =
-                        'bg-indigo-50/70 border-[#4338CA]/40 text-[#4338CA] font-semibold';
+                        'bg-blue-50/80 border-[#12489B]/40 text-[#12489B] font-semibold';
                     } else if (done) {
                       stepCardClass = 'bg-zinc-50 border-zinc-200 text-slate-800';
                     }
@@ -1119,7 +1119,7 @@ export function ClientPortalView({
                                   target={downloadTarget}
                                   rel="noopener noreferrer"
                                   download={downloadName}
-                                  className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] whitespace-nowrap"
+                                  className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] whitespace-nowrap"
                                 >
                                   {att.sourceType === 'url' ? (
                                     <>
@@ -1174,7 +1174,7 @@ export function ClientPortalView({
                         onChange={(e) => setRevisionMsg(e.target.value)}
                         maxLength={FIELD_LIMITS.revisionMessageMax}
                         placeholder="Mô tả chi tiết phần cần chỉnh sửa theo góp ý của giảng viên..."
-                        className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                        className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                       />
                       <div className="flex items-center justify-end gap-2">
                         <button
@@ -1187,7 +1187,7 @@ export function ClientPortalView({
                         <button
                           type="submit"
                           disabled={revisionMsg.trim().length < 3 || submittingRev}
-                          className="btn-press inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45"
+                          className="btn-press inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] disabled:opacity-45"
                         >
                           <Send className="w-3.5 h-3.5" />
                           Gửi yêu cầu
@@ -1202,7 +1202,7 @@ export function ClientPortalView({
                         const revColorMap: Record<RevisionRequest['status'], string> = {
                           resolved: 'bg-emerald-50 text-[#16A34A] border-emerald-200',
                           in_progress: 'bg-amber-50 text-[#D97706] border-amber-200',
-                          open: 'bg-indigo-50 text-[#4338CA] border-indigo-200',
+                          open: 'bg-blue-50 text-[#12489B] border-blue-200',
                         };
                         const revLabelMap: Record<RevisionRequest['status'], string> = {
                           resolved: 'Đã sửa xong',

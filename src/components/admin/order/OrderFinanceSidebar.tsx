@@ -70,7 +70,7 @@ export function OrderFinanceSidebar({
               step={10000}
               value={totalAmount}
               onChange={(e) => onChangeTotalAmount(Number(e.target.value))}
-              className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+              className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
             />
           </div>
           <div>
@@ -83,7 +83,7 @@ export function OrderFinanceSidebar({
               step={10000}
               value={depositAmount}
               onChange={(e) => onChangeDepositAmount(Number(e.target.value))}
-              className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+              className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
             />
           </div>
           <div>
@@ -96,7 +96,7 @@ export function OrderFinanceSidebar({
               step={10000}
               value={paidAmount}
               onChange={(e) => onChangePaidAmount(Number(e.target.value))}
-              className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+              className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
             />
           </div>
         </div>
@@ -148,7 +148,7 @@ export function OrderFinanceSidebar({
                 step={10000}
                 value={staffPayoutAmount}
                 onChange={(e) => onChangeStaffPayoutAmount(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
               />
             </div>
             <div className="flex items-center gap-1 flex-wrap">

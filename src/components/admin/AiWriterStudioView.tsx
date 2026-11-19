@@ -1356,7 +1356,7 @@ export function AiWriterStudioView({
       {/* Current Paper Action Bar */}
       <div className="bg-white border border-zinc-200/90 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
         <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-[#4338CA] px-2.5 py-1.5 rounded-lg text-xs font-bold">
+          <div className="inline-flex items-center gap-1.5 bg-blue-50 text-[#12489B] px-2.5 py-1.5 rounded-lg text-xs font-bold">
             <Wand2 className="w-3.5 h-3.5" />
             <span className="truncate max-w-[200px]">
               {activeSession.title || 'Bài nghiên cứu'}
@@ -1367,7 +1367,7 @@ export function AiWriterStudioView({
             aria-label="Nạp đề bài từ mã đơn cho tab hiện tại"
             value={activeSession.linkedOrderCode}
             onChange={(e) => handleLoadFromOrder(e.target.value)}
-            className="px-2.5 py-1.5 text-xs font-mono font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#4338CA]"
+            className="px-2.5 py-1.5 text-xs font-mono font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#12489B]"
           >
             <option value="">-- Nạp đề từ Đơn hàng cho tab này --</option>
             {orders.map((o) => (
@@ -1413,7 +1413,7 @@ export function AiWriterStudioView({
           <button
             type="button"
             onClick={() => setShowSkillModal(true)}
-            className="btn-press px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-indigo-200/80 bg-indigo-50/60 text-[#4338CA] hover:bg-indigo-100 inline-flex items-center gap-1.5"
+            className="btn-press px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-blue-200/80 bg-blue-50/60 text-[#12489B] hover:bg-blue-100 inline-flex items-center gap-1.5"
           >
             <BookOpen className="w-3.5 h-3.5" />
             <span>Skills ({enabledSkillsCount})</span>
@@ -1443,7 +1443,7 @@ export function AiWriterStudioView({
               onClick={() => void handleAttachToLinkedOrder()}
               className="btn-press px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 bg-white text-slate-800 hover:bg-zinc-50 disabled:opacity-40 inline-flex items-center gap-1.5"
             >
-              <Paperclip className="w-3.5 h-3.5 text-[#4338CA]" />
+              <Paperclip className="w-3.5 h-3.5 text-[#12489B]" />
               <span>
                 {attachingToOrder
                   ? 'Đang lưu...'
@@ -1469,7 +1469,7 @@ export function AiWriterStudioView({
             type="button"
             disabled={exportingDocx}
             onClick={() => void handleExportDocx()}
-            className="btn-press px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#4338CA] text-white hover:bg-indigo-700 shadow-2xs inline-flex items-center gap-1.5"
+            className="btn-press px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#12489B] text-white hover:bg-[#0B2559] shadow-2xs inline-flex items-center gap-1.5"
           >
             <Download className="w-3.5 h-3.5" />
             <span>{exportingDocx ? 'Đang xuất...' : 'Tải .DOCX'}</span>
@@ -1512,7 +1512,7 @@ export function AiWriterStudioView({
                 onClick={() => setLeftTab('brief')}
                 className={`btn-press py-1.5 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 ${
                   leftTab === 'brief'
-                    ? 'bg-white text-[#4338CA] shadow-2xs'
+                    ? 'bg-white text-[#12489B] shadow-2xs'
                     : 'text-zinc-600 hover:text-slate-900'
                 }`}
               >
@@ -1525,7 +1525,7 @@ export function AiWriterStudioView({
                 onClick={() => setLeftTab('outline')}
                 className={`btn-press py-1.5 px-2.5 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 ${
                   leftTab === 'outline'
-                    ? 'bg-white text-[#4338CA] shadow-2xs'
+                    ? 'bg-white text-[#12489B] shadow-2xs'
                     : 'text-zinc-600 hover:text-slate-900'
                 }`}
               >

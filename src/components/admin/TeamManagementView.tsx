@@ -40,7 +40,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 };
 
 function getRoleBadgeStyle(role: UserRole): string {
-  if (role === 'owner') return 'bg-indigo-50 text-[#4338CA] border-indigo-200';
+  if (role === 'owner') return 'bg-blue-50 text-[#12489B] border-blue-200';
   if (role === 'admin') return 'bg-emerald-50 text-[#16A34A] border-emerald-200';
   if (role === 'staff') return 'bg-amber-50 text-[#D97706] border-amber-200';
   return 'bg-zinc-100 text-zinc-600 border-zinc-200';
@@ -212,7 +212,7 @@ export function TeamManagementView({
   };
 
   const inputCls =
-    'w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]';
+    'w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]';
 
   return (
     <div className="space-y-6">
@@ -226,7 +226,7 @@ export function TeamManagementView({
         </div>
         <div className="p-4 sm:px-5">
           <p className="text-xs text-zinc-500">Lời mời đang chờ kích hoạt</p>
-          <p className="text-2xl font-bold font-mono tabular-nums text-[#4338CA] mt-1">
+          <p className="text-2xl font-bold font-mono tabular-nums text-[#12489B] mt-1">
             {pendingInvites.length}
           </p>
         </div>
@@ -243,7 +243,7 @@ export function TeamManagementView({
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <UserPlus className="w-4 h-4 text-[#4338CA]" />
+              <UserPlus className="w-4 h-4 text-[#12489B]" />
               Mời người làm cùng / Nhân sự mới
             </h2>
             <p className="text-xs text-zinc-500 mt-1 max-w-[65ch]">
@@ -334,7 +334,7 @@ export function TeamManagementView({
             <button
               type="submit"
               disabled={creating}
-              className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45 shrink-0"
+              className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] disabled:opacity-45 shrink-0"
             >
               <UserPlus className="w-3.5 h-3.5" />
               {creating ? 'Đang tạo mã...' : 'Tạo mã mời nhân sự'}
@@ -343,9 +343,9 @@ export function TeamManagementView({
         </form>
 
         {latestCreatedCode && (
-          <div className="surface-enter bg-indigo-50/70 border border-indigo-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="surface-enter bg-blue-50/70 border border-blue-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-0.5">
-              <p className="text-xs font-semibold text-[#4338CA]">
+              <p className="text-xs font-semibold text-[#12489B]">
                 Mã mời nhân sự mới đã sẵn sàng — Gửi mã này cho cộng tác viên:
               </p>
               <p className="font-mono text-base font-bold text-slate-900">
@@ -355,7 +355,7 @@ export function TeamManagementView({
             <button
               type="button"
               onClick={() => handleCopyInvite(latestCreatedCode)}
-              className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium bg-white border border-indigo-200 text-[#4338CA] rounded-lg hover:bg-indigo-50"
+              className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium bg-white border border-blue-200 text-[#12489B] rounded-lg hover:bg-blue-50"
             >
               {copiedCode === latestCreatedCode ? (
                 <>
@@ -377,7 +377,7 @@ export function TeamManagementView({
       <section className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
         <div className="px-5 py-4 border-b border-zinc-200/80 flex items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-[#4338CA]" />
+            <ShieldCheck className="w-4 h-4 text-[#12489B]" />
             Đội ngũ Quản trị & Nhân sự ({teamMembers.length})
           </h3>
         </div>
@@ -444,7 +444,7 @@ export function TeamManagementView({
                           onChange={(e) =>
                             handleRoleChange(member, e.target.value as UserRole)
                           }
-                          className="text-xs font-medium px-2.5 py-1 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 disabled:opacity-60"
+                          className="text-xs font-medium px-2.5 py-1 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 disabled:opacity-60"
                         >
                           <option value="staff">Nhân sự / Writer</option>
                           <option value="admin">Admin quản lý</option>
@@ -538,7 +538,7 @@ export function TeamManagementView({
               );
               if (inv.status === 'pending') {
                 statusBadge = (
-                  <span className="px-2 py-0.5 text-xs font-medium rounded-md border bg-indigo-50 text-[#4338CA] border-indigo-200">
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-md border bg-blue-50 text-[#12489B] border-blue-200">
                     Đang chờ kích hoạt
                   </span>
                 );
@@ -557,7 +557,7 @@ export function TeamManagementView({
                 >
                   <div className="space-y-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-mono text-xs font-bold text-[#4338CA]">
+                      <span className="font-mono text-xs font-bold text-[#12489B]">
                         #{inv.inviteCode}
                       </span>
                       <span className="text-sm font-medium text-slate-900">
@@ -636,7 +636,7 @@ export function TeamManagementView({
                   type="button"
                   disabled={updatingUid === cli.uid}
                   onClick={() => handleRoleChange(cli, 'staff')}
-                  className="btn-press px-3 py-1.5 text-xs font-medium bg-indigo-50 text-[#4338CA] hover:bg-indigo-100 rounded-lg"
+                  className="btn-press px-3 py-1.5 text-xs font-medium bg-blue-50 text-[#12489B] hover:bg-blue-100 rounded-lg"
                 >
                   Chuyển thành Nhân sự (Staff)
                 </button>

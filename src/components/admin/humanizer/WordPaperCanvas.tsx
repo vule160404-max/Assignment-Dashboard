@@ -105,7 +105,7 @@ export function WordPaperCanvas({
                     onChange={() => onToggleParagraphInclusion(para.index)}
                     title="Chọn / bỏ chọn đoạn này để Humanize"
                     aria-label="Chọn đoạn văn để Humanize"
-                    className="mt-1.5 w-3.5 h-3.5 accent-[#4338CA] shrink-0 cursor-pointer"
+                    className="mt-1.5 w-3.5 h-3.5 accent-[#12489B] shrink-0 cursor-pointer"
                   />
                 )}
                 <p
@@ -176,9 +176,9 @@ export function WordPaperCanvas({
                 <span
                   key={chk.id}
                   ref={activeSpanRef}
-                  className="relative inline bg-indigo-100/95 text-slate-900 px-1 py-0.5 rounded ring-1 ring-[#4338CA]/45"
+                  className="relative inline bg-blue-100/95 text-slate-900 px-1 py-0.5 rounded ring-1 ring-[#12489B]/45"
                 >
-                  <span className="inline-flex items-center gap-1 mr-1.5 px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-[#4338CA] text-white rounded align-middle">
+                  <span className="inline-flex items-center gap-1 mr-1.5 px-1.5 py-0.5 text-[10px] font-mono font-semibold bg-[#12489B] text-white rounded align-middle">
                     {actionBadge}
                   </span>
                   {doneResult?.accepted ? doneResult.outputText : chk.text}
@@ -234,7 +234,7 @@ export function WordPaperCanvas({
                   onChange={() => onToggleParagraphInclusion(para.index)}
                   title="Chọn / bỏ chọn đoạn này để Humanize"
                   aria-label="Chọn đoạn văn để Humanize"
-                  className="mt-1.5 w-3.5 h-3.5 accent-[#4338CA] shrink-0 cursor-pointer"
+                  className="mt-1.5 w-3.5 h-3.5 accent-[#12489B] shrink-0 cursor-pointer"
                 />
               )}
               <p className="text-[15px] leading-[1.75] text-slate-900">{nodes}</p>

@@ -581,7 +581,7 @@ export function AdminPortalView({
       <aside className="hidden md:flex md:w-60 md:flex-col md:fixed md:inset-y-0 bg-white border-r border-zinc-200/80">
         <div className="px-4 h-14 border-b border-zinc-200/80 flex items-center justify-between gap-2">
           <BrandLogo className="min-w-0" />
-          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 text-[#4338CA] shrink-0">
+          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-[#12489B] shrink-0">
             {roleLabel}
           </span>
         </div>
@@ -597,7 +597,7 @@ export function AdminPortalView({
                 onClick={() => setActiveTab(item.key)}
                 className={`btn-press w-full flex items-center justify-between gap-2 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap ${
                   active
-                    ? 'bg-indigo-50 text-[#4338CA]'
+                    ? 'bg-blue-50 text-[#12489B]'
                     : 'text-zinc-600 hover:bg-zinc-100/80 hover:text-slate-900'
                 }`}
               >
@@ -678,7 +678,7 @@ export function AdminPortalView({
                       }}
                       className={`btn-press w-full flex items-center gap-2.5 px-3 py-2 text-sm font-medium rounded-lg ${
                         activeTab === item.key
-                          ? 'bg-indigo-50 text-[#4338CA]'
+                          ? 'bg-blue-50 text-[#12489B]'
                           : 'text-zinc-600'
                       }`}
                     >
@@ -737,7 +737,7 @@ export function AdminPortalView({
             <button
               type="button"
               onClick={openNewOrder}
-              className="btn-press inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] whitespace-nowrap shrink-0"
+              className="btn-press inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] whitespace-nowrap shrink-0"
             >
               <Plus className="w-3.5 h-3.5" />
               Tạo đơn mới
@@ -770,7 +770,7 @@ export function AdminPortalView({
                   <>
                     <div className="p-4 sm:px-5">
                       <p className="text-xs text-zinc-500">Yêu cầu sửa chưa xong</p>
-                      <p className="text-2xl font-bold font-mono tabular-nums text-[#4338CA] mt-1">
+                      <p className="text-2xl font-bold font-mono tabular-nums text-[#12489B] mt-1">
                         {metrics.openRevisionsCount}
                       </p>
                     </div>
@@ -791,7 +791,7 @@ export function AdminPortalView({
                     </div>
                     <div className="p-4 sm:px-5">
                       <p className="text-xs text-zinc-500">Tổng đơn được phân công</p>
-                      <p className="text-2xl font-bold font-mono tabular-nums text-[#4338CA] mt-1">
+                      <p className="text-2xl font-bold font-mono tabular-nums text-[#12489B] mt-1">
                         {orders.length}
                       </p>
                     </div>
@@ -839,7 +839,7 @@ export function AdminPortalView({
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder="Tìm mã đơn, môn học, chủ đề, người làm..."
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                    className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                   />
                 </div>
 
@@ -894,7 +894,7 @@ export function AdminPortalView({
                       <button
                         type="button"
                         onClick={openNewOrder}
-                        className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3]"
+                        className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559]"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         Tạo đơn hàng đầu tiên
@@ -933,7 +933,7 @@ export function AdminPortalView({
                                   <button
                                     type="button"
                                     onClick={() => openEditOrder(ord)}
-                                    className="font-mono text-xs font-semibold text-[#4338CA] hover:underline"
+                                    className="font-mono text-xs font-semibold text-[#12489B] hover:underline"
                                   >
                                     #{ord.orderCode}
                                   </button>
@@ -965,7 +965,7 @@ export function AdminPortalView({
                                   · {ord.citationStyle}
                                 </p>
                                 {ord.assignedStaffName && (
-                                  <p className="text-[11px] text-[#4338CA] font-medium mt-0.5 truncate">
+                                  <p className="text-[11px] text-[#12489B] font-medium mt-0.5 truncate">
                                     Phụ trách: {ord.assignedStaffName}
                                   </p>
                                 )}
@@ -991,7 +991,7 @@ export function AdminPortalView({
                                 </div>
                                 <div className="h-1.5 bg-zinc-100 rounded-full overflow-hidden">
                                   <div
-                                    className="progress-fill h-full w-full bg-[#4338CA]"
+                                    className="progress-fill h-full w-full bg-[#12489B]"
                                     style={{ transform: `scaleX(${ord.progressPercent / 100})` }}
                                   />
                                 </div>
@@ -1023,7 +1023,7 @@ export function AdminPortalView({
                                       }}
                                       title="Chép nhanh tin nhắn Zalo gửi khách"
                                       aria-label={`Chép tin nhắn Zalo cho đơn ${ord.orderCode}`}
-                                      className="btn-press p-1.5 text-zinc-500 hover:text-[#4338CA] hover:bg-indigo-50 rounded-md"
+                                      className="btn-press p-1.5 text-zinc-500 hover:text-[#12489B] hover:bg-blue-50 rounded-md"
                                     >
                                       <MessageSquare className="w-3.5 h-3.5" />
                                     </button>
@@ -1034,7 +1034,7 @@ export function AdminPortalView({
                                       e.stopPropagation();
                                       openEditOrder(ord);
                                     }}
-                                    className="btn-press px-2.5 py-1 text-xs font-medium text-[#4338CA] bg-indigo-50 hover:bg-indigo-100 rounded-md whitespace-nowrap"
+                                    className="btn-press px-2.5 py-1 text-xs font-medium text-[#12489B] bg-blue-50 hover:bg-blue-100 rounded-md whitespace-nowrap"
                                   >
                                     Chi tiết
                                   </button>

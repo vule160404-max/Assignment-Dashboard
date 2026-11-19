@@ -70,7 +70,7 @@ export function EmailVerificationBanner({
           type="button"
           onClick={handleCheckVerified}
           disabled={checking}
-          className="btn-press w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 text-sm font-medium bg-[#4338CA] text-white rounded-xl hover:bg-[#3730A3] disabled:opacity-45"
+          className="btn-press w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 text-sm font-medium bg-[#12489B] text-white rounded-xl hover:bg-[#0B2559] disabled:opacity-45"
         >
           <RefreshCw className="w-4 h-4" />
           {checking ? 'Đang kiểm tra...' : 'Tôi đã xác minh, tiếp tục'}

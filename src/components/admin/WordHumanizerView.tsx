@@ -221,7 +221,7 @@ export function WordHumanizerView({
           <button
             type="button"
             onClick={() => emptyDropInputRef.current?.click()}
-            className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3]"
+            className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559]"
           >
             <Upload className="w-3.5 h-3.5" />
             <span>Chọn file .docx từ máy (hỗ trợ chọn nhiều file)</span>
@@ -261,7 +261,7 @@ export function WordHumanizerView({
                           <button
                             type="button"
                             onClick={() => void handleRestorePastedCheckpoint(cp)}
-                            className="btn-press px-2.5 py-1 text-xs font-medium bg-indigo-50 text-[#4338CA] hover:bg-indigo-100 rounded-md whitespace-nowrap"
+                            className="btn-press px-2.5 py-1 text-xs font-medium bg-blue-50 text-[#12489B] hover:bg-blue-100 rounded-md whitespace-nowrap"
                           >
                             Khôi phục ngay
                           </button>
@@ -320,7 +320,7 @@ export function WordHumanizerView({
                         (activeSession.playbackStatus === 'completed' &&
                           completedCount === chunks.length)
                       }
-                      className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45 whitespace-nowrap"
+                      className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] disabled:opacity-45 whitespace-nowrap"
                     >
                       <Play className="w-3.5 h-3.5" />
                       <span>
@@ -422,7 +422,7 @@ export function WordHumanizerView({
                         completedCount === chunks.length)
                     }
                     onClick={() => handleStartOrResume(activeSession.sessionId)}
-                    className="btn-press inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45 whitespace-nowrap"
+                    className="btn-press inline-flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] disabled:opacity-45 whitespace-nowrap"
                   >
                     <Play className="w-3.5 h-3.5" />
                     <span>
@@ -450,7 +450,7 @@ export function WordHumanizerView({
                         type="button"
                         disabled={attachingOrder}
                         onClick={() => void handleAttachToOrder(activeSession.sessionId)}
-                        className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-50 text-[#4338CA] hover:bg-indigo-100 rounded-lg disabled:opacity-45 whitespace-nowrap"
+                        className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-50 text-[#12489B] hover:bg-blue-100 rounded-lg disabled:opacity-45 whitespace-nowrap"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         <span>
@@ -483,14 +483,14 @@ export function WordHumanizerView({
               </div>
               <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
                 <div
-                  className="progress-fill h-full w-full bg-[#4338CA]"
+                  className="progress-fill h-full w-full bg-[#12489B]"
                   style={{ transform: `scaleX(${progressPercent / 100})` }}
                 />
               </div>
             </div>
 
             {activeSession.restoredFromCheckpoint && (
-              <div className="bg-indigo-50/80 border border-indigo-200 rounded-xl px-3.5 py-2.5 text-xs text-[#4338CA] flex flex-wrap items-center justify-between gap-2">
+              <div className="bg-blue-50/80 border border-blue-200 rounded-xl px-3.5 py-2.5 text-xs text-[#12489B] flex flex-wrap items-center justify-between gap-2">
                 <span>
                   Đã khôi phục tiến trình đang làm dở ({completedCount}/{chunks.length} đoạn đã xong). Bấm Tiếp tục để chạy nốt phần còn lại.
                 </span>
@@ -498,7 +498,7 @@ export function WordHumanizerView({
                   <button
                     type="button"
                     onClick={() => handleStopAndReset(activeSession.sessionId)}
-                    className="btn-press px-2.5 py-1 text-xs font-semibold bg-white border border-indigo-200 rounded-md hover:bg-indigo-100"
+                    className="btn-press px-2.5 py-1 text-xs font-semibold bg-white border border-blue-200 rounded-md hover:bg-blue-100"
                   >
                     Xóa bản lưu & chạy lại
                   </button>

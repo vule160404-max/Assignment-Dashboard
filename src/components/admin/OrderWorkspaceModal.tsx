@@ -584,7 +584,7 @@ export function OrderWorkspaceModal({
   };
 
   const inputCls =
-    'w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]';
+    'w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]';
 
   const submitLabel = (() => {
     if (saving) return 'Đang lưu...';
@@ -627,7 +627,7 @@ export function OrderWorkspaceModal({
                   void handleCloseModal();
                   onOpenAiWriter(code);
                 }}
-                className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#4338CA] hover:bg-indigo-700 text-white rounded-lg whitespace-nowrap shadow-2xs"
+                className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#12489B] hover:bg-[#0B2559] text-white rounded-lg whitespace-nowrap shadow-2xs"
               >
                 <Wand2 className="w-3.5 h-3.5" />
                 <span>Mở AI Writer Studio</span>
@@ -641,7 +641,7 @@ export function OrderWorkspaceModal({
                   void handleCloseModal();
                   onOpenWordHumanizer(code);
                 }}
-                className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 text-[#4338CA] rounded-lg whitespace-nowrap"
+                className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-50 border border-blue-200 hover:bg-blue-100 text-[#12489B] rounded-lg whitespace-nowrap"
               >
                 <FileText className="w-3.5 h-3.5" />
                 <span>Humanize bài Word</span>
@@ -684,7 +684,7 @@ export function OrderWorkspaceModal({
             onClick={() => setActiveTab('details')}
             className={`py-3 border-b-2 font-medium transition-colors whitespace-nowrap ${
               activeTab === 'details'
-                ? 'border-[#4338CA] text-[#4338CA]'
+                ? 'border-[#12489B] text-[#12489B]'
                 : 'border-transparent text-zinc-500 hover:text-slate-900'
             }`}
           >
@@ -695,7 +695,7 @@ export function OrderWorkspaceModal({
             onClick={() => setActiveTab('files')}
             className={`py-3 border-b-2 font-medium transition-colors whitespace-nowrap ${
               activeTab === 'files'
-                ? 'border-[#4338CA] text-[#4338CA]'
+                ? 'border-[#12489B] text-[#12489B]'
                 : 'border-transparent text-zinc-500 hover:text-slate-900'
             }`}
           >
@@ -707,7 +707,7 @@ export function OrderWorkspaceModal({
               onClick={() => setActiveTab('chat_revisions')}
               className={`py-3 border-b-2 font-medium transition-colors whitespace-nowrap ${
                 activeTab === 'chat_revisions'
-                  ? 'border-[#4338CA] text-[#4338CA]'
+                  ? 'border-[#12489B] text-[#12489B]'
                   : 'border-transparent text-zinc-500 hover:text-slate-900'
               }`}
             >
@@ -722,7 +722,7 @@ export function OrderWorkspaceModal({
               {activeTab === 'details' && (
             <div className="space-y-4">
               {isStaffMode && (
-                <div className="bg-indigo-50/70 border border-indigo-200 rounded-xl px-4 py-2.5 text-xs text-[#4338CA]">
+                <div className="bg-blue-50/70 border border-blue-200 rounded-xl px-4 py-2.5 text-xs text-[#12489B]">
                   <span className="font-semibold">Chế độ Nhân sự:</span> Bạn có thể cập nhật giai đoạn, tiến độ (%), ghi chú, tải tệp đính kèm, chat 48h và phản hồi yêu cầu sửa. Thông tin đề bài, giá tiền và khách hàng do Admin quản lý.
                 </div>
               )}
@@ -774,7 +774,7 @@ export function OrderWorkspaceModal({
                         setAssignedStaffUid(uid);
                         setAssignedStaffName(matched ? matched.displayName : '');
                       }}
-                      className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                      className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                     >
                       <option value="">-- Chưa phân công (Admin tự xử lý) --</option>
                       {teamMembers
@@ -803,7 +803,7 @@ export function OrderWorkspaceModal({
                       <button
                         type="button"
                         onClick={() => setShowNewClientInline((v) => !v)}
-                        className="btn-press inline-flex items-center gap-1 text-xs font-medium text-[#4338CA] hover:underline"
+                        className="btn-press inline-flex items-center gap-1 text-xs font-medium text-[#12489B] hover:underline"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         {showNewClientInline ? 'Chọn khách có sẵn' : 'Thêm khách mới nhanh'}
@@ -814,7 +814,7 @@ export function OrderWorkspaceModal({
                       <select
                         value={clientId}
                         onChange={(e) => setClientId(e.target.value)}
-                        className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                        className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                       >
                         <option value="">-- Chọn khách hàng --</option>
                         {clients.map((c) => (
@@ -830,26 +830,26 @@ export function OrderWorkspaceModal({
                           placeholder="Tên / Nickname *"
                           value={newClientName}
                           onChange={(e) => setNewClientName(e.target.value)}
-                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                         />
                         <input
                           type="text"
                           placeholder="Số Zalo"
                           value={newClientZalo}
                           onChange={(e) => setNewClientZalo(e.target.value)}
-                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                         />
                         <input
                           type="text"
                           placeholder="Trường / Chuyên ngành"
                           value={newClientSchool}
                           onChange={(e) => setNewClientSchool(e.target.value)}
-                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                         />
                         <select
                           value={newClientTier}
                           onChange={(e) => setNewClientTier(e.target.value as ClientTier)}
-                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                         >
                           {CLIENT_TIERS.map((t) => (
                             <option key={t.key} value={t.key}>
@@ -977,7 +977,7 @@ export function OrderWorkspaceModal({
                       disabled={isStaffMode}
                       value={orderStatus}
                       onChange={(e) => setOrderStatus(e.target.value as OrderStatus)}
-                      className="text-xs font-medium px-2.5 py-1 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA] disabled:opacity-70"
+                      className="text-xs font-medium px-2.5 py-1 bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B] disabled:opacity-70"
                     >
                       <option value="active">Đang làm</option>
                       <option value="completed">Hoàn thành</option>
@@ -993,7 +993,7 @@ export function OrderWorkspaceModal({
                         onClick={() => handleStageSelect(st.key)}
                         className={`btn-press w-full text-left px-3 py-2 text-xs rounded-lg border flex items-center justify-between ${
                           stage === st.key
-                            ? 'bg-indigo-50 border-[#4338CA] text-[#4338CA] font-semibold'
+                            ? 'bg-blue-50 border-[#12489B] text-[#12489B] font-semibold'
                             : 'bg-white border-zinc-200 text-zinc-700 hover:bg-zinc-50'
                         }`}
                       >
@@ -1010,7 +1010,7 @@ export function OrderWorkspaceModal({
                       <span className="font-medium text-zinc-700">
                         Thanh kéo tiến độ (10% – 100%)
                       </span>
-                      <span className="font-mono font-bold text-[#4338CA] tabular-nums">
+                      <span className="font-mono font-bold text-[#12489B] tabular-nums">
                         {progressPercent}%
                       </span>
                     </div>
@@ -1021,7 +1021,7 @@ export function OrderWorkspaceModal({
                       step={5}
                       value={progressPercent}
                       onChange={(e) => setProgressPercent(Number(e.target.value))}
-                      className="w-full accent-[#4338CA]"
+                      className="w-full accent-[#12489B]"
                     />
                   </div>
 
@@ -1181,7 +1181,7 @@ export function OrderWorkspaceModal({
                 form={activeTab === 'chat_revisions' ? undefined : 'order-workspace-form'}
                 onClick={activeTab === 'chat_revisions' ? () => void handleSave() : undefined}
                 disabled={saving}
-                className="btn-press px-5 py-2 text-sm font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45"
+                className="btn-press px-5 py-2 text-sm font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] disabled:opacity-45"
               >
                 {submitLabel}
               </button>

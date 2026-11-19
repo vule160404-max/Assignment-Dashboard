@@ -68,7 +68,7 @@ export function WriterOutlinePanel({
           type="button"
           disabled={generatingOutline || runningAllSections}
           onClick={onAiGenerateOutline}
-          className="btn-press px-2.5 py-1.5 text-xs font-semibold bg-white border border-indigo-200 text-[#4338CA] hover:bg-indigo-50 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
+          className="btn-press px-2.5 py-1.5 text-xs font-semibold bg-white border border-blue-200 text-[#12489B] hover:bg-blue-50 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
         >
           {generatingOutline ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -93,7 +93,7 @@ export function WriterOutlinePanel({
             type="button"
             disabled={generatingOutline}
             onClick={onWriteAllSequentially}
-            className="btn-press px-3 py-1.5 text-xs font-semibold bg-[#4338CA] text-white hover:bg-indigo-700 rounded-lg inline-flex items-center gap-1.5 shadow-2xs"
+            className="btn-press px-3 py-1.5 text-xs font-semibold bg-[#12489B] text-white hover:bg-[#0B2559] rounded-lg inline-flex items-center gap-1.5 shadow-2xs"
           >
             <Play className="w-3 h-3" />
             <span>Viết tuần tự cả bài</span>
@@ -117,7 +117,7 @@ export function WriterOutlinePanel({
         </div>
         <div className="h-1 bg-zinc-100 rounded-full overflow-hidden">
           <div
-            className="progress-fill h-full w-full bg-[#4338CA]"
+            className="progress-fill h-full w-full bg-[#12489B]"
             style={{ transform: `scaleX(${progressRatio})` }}
           />
         </div>
@@ -136,7 +136,7 @@ export function WriterOutlinePanel({
               onClick={() => onSelectSection(sec.id)}
               className={`card-interactive rounded-xl border p-2.5 cursor-pointer ${
                 isSelected
-                  ? 'border-[#4338CA] bg-indigo-50/35 ring-2 ring-indigo-500/10'
+                  ? 'border-[#12489B] bg-blue-50/35 ring-2 ring-blue-500/10'
                   : 'border-zinc-200/90 bg-white'
               }`}
             >
@@ -160,7 +160,7 @@ export function WriterOutlinePanel({
                       onChange={(e) =>
                         onUpdateSection(sec.id, { title: e.target.value })
                       }
-                      className="flex-1 px-2 py-0.5 text-xs font-bold text-slate-900 bg-white border border-indigo-200 rounded focus:outline-none focus:border-[#4338CA]"
+                      className="flex-1 px-2 py-0.5 text-xs font-bold text-slate-900 bg-white border border-blue-200 rounded focus:outline-none focus:border-[#12489B]"
                     />
                   ) : (
                     <span className="text-xs font-semibold text-slate-800 truncate">
@@ -183,8 +183,8 @@ export function WriterOutlinePanel({
                     }}
                     className={`btn-press px-2 py-1 text-[11px] font-semibold rounded-md inline-flex items-center gap-1 ${
                       actualWords > 0
-                        ? 'bg-white border border-indigo-200 text-[#4338CA] hover:bg-indigo-50'
-                        : 'bg-[#4338CA] text-white hover:bg-indigo-700'
+                        ? 'bg-white border border-blue-200 text-[#12489B] hover:bg-blue-50'
+                        : 'bg-[#12489B] text-white hover:bg-[#0B2559]'
                     } disabled:opacity-50`}
                   >
                     {isGenerating ? (
@@ -205,7 +205,7 @@ export function WriterOutlinePanel({
               {/* Expanded Detail Controls ONLY for active selected section */}
               {isSelected && (
                 <div
-                  className="popover-enter mt-2.5 pt-2.5 border-t border-indigo-100/80 space-y-2"
+                  className="popover-enter mt-2.5 pt-2.5 border-t border-blue-100/80 space-y-2"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between gap-2">
@@ -287,7 +287,7 @@ export function WriterOutlinePanel({
                       })
                     }
                     placeholder="Ghi chú luận điểm, lý thuyết, trích dẫn cần triển khai trong mục này..."
-                    className="w-full p-2 text-[11px] text-zinc-700 bg-white border border-indigo-200/70 rounded-lg focus:outline-none focus:border-[#4338CA]"
+                    className="w-full p-2 text-[11px] text-zinc-700 bg-white border border-blue-200/70 rounded-lg focus:outline-none focus:border-[#12489B]"
                   />
 
                   {actualWords > 0 && (
@@ -311,7 +311,7 @@ export function WriterOutlinePanel({
         <button
           type="button"
           onClick={onAddSection}
-          className="btn-press w-full py-2 text-xs font-semibold text-[#4338CA] bg-indigo-50/50 hover:bg-indigo-100/70 border border-dashed border-indigo-300 rounded-xl inline-flex items-center justify-center gap-1.5"
+          className="btn-press w-full py-2 text-xs font-semibold text-[#12489B] bg-blue-50/50 hover:bg-blue-100/70 border border-dashed border-blue-300 rounded-xl inline-flex items-center justify-center gap-1.5"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>Thêm mục dàn ý</span>

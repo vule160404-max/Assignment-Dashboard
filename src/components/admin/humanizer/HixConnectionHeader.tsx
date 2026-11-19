@@ -80,7 +80,7 @@ export function HixConnectionHeader({
             href="https://hixbypass.com/"
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-indigo-50 hover:bg-indigo-100 text-[#4338CA] rounded-lg whitespace-nowrap"
+            className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-blue-50 hover:bg-blue-100 text-[#12489B] rounded-lg whitespace-nowrap"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>{hixCount > 0 ? 'Mở thêm tab HIX' : 'Mở HIX Bypass'}</span>
@@ -123,7 +123,7 @@ export function HixConnectionHeader({
               >
                 <span
                   className={`w-1.5 h-1.5 rounded-full ${
-                    isBusy ? 'bg-[#4338CA]' : 'bg-[#16A34A]'
+                    isBusy ? 'bg-[#12489B]' : 'bg-[#16A34A]'
                   }`}
                 />
                 <span>Tab #{index + 1}</span>

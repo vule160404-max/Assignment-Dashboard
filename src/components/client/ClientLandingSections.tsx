@@ -18,17 +18,17 @@ const VALUE_PROPS = [
   {
     icon: GraduationCap,
     title: 'Hỗ trợ Tiểu luận | Báo cáo thực tập | Khóa luận',
-    iconClass: 'bg-indigo-400/20 text-indigo-200 ring-1 ring-indigo-300/25',
+    iconClass: 'bg-sky-400/20 text-sky-200 ring-1 ring-sky-300/30',
   },
   {
     icon: ShieldCheck,
     title: 'Chuẩn học thuật – Có báo cáo check đạo văn & AI (Turnitin)',
-    iconClass: 'bg-emerald-400/20 text-emerald-300 ring-1 ring-emerald-300/25',
+    iconClass: 'bg-[#F5B700]/20 text-[#FDE047] ring-1 ring-[#F5B700]/35',
   },
   {
     icon: Clock,
     title: 'Đúng deadline – Cập nhật tiến độ rõ ràng',
-    iconClass: 'bg-amber-400/20 text-amber-300 ring-1 ring-amber-300/25',
+    iconClass: 'bg-blue-400/25 text-blue-100 ring-1 ring-blue-300/30',
   },
 ] as const;
 
@@ -37,15 +37,15 @@ const SOCIAL_PROOF_STATS = [
     value: 'Top 2 Việt Nam',
     label: 'Nền tảng hỗ trợ học thuật uy tín',
     icon: Award,
-    iconWrapClass: 'bg-amber-50 text-amber-600 ring-1 ring-amber-200/80',
-    valueClass: 'text-slate-900',
+    iconWrapClass: 'bg-amber-50 text-[#D97706] ring-1 ring-amber-200/90',
+    valueClass: 'text-[#0B2559]',
   },
   {
     value: '5.202+',
     label: 'Sinh viên đã tin dùng',
     icon: Users,
-    iconWrapClass: 'bg-indigo-50 text-[#4338CA] ring-1 ring-indigo-200/80',
-    valueClass: 'text-[#312E81]',
+    iconWrapClass: 'bg-blue-50 text-[#12489B] ring-1 ring-blue-200/90',
+    valueClass: 'text-[#12489B]',
   },
   {
     value: '100%',
@@ -58,8 +58,8 @@ const SOCIAL_PROOF_STATS = [
     value: '70%',
     label: 'Bài đạt điểm xuất sắc',
     icon: Sparkles,
-    iconWrapClass: 'bg-violet-50 text-violet-600 ring-1 ring-violet-200/80',
-    valueClass: 'text-slate-900',
+    iconWrapClass: 'bg-amber-50/90 text-[#B45309] ring-1 ring-amber-300/70',
+    valueClass: 'text-[#0B2559]',
   },
 ] as const;
 
@@ -89,11 +89,11 @@ const SERVICES: readonly ServiceItem[] = [
     ctaLabel: 'Nhận tư vấn ngay',
     icon: PenLine,
     href: ZALO_CONSULT_URL,
-    topBarClass: 'bg-gradient-to-r from-indigo-500 to-violet-500',
-    iconBoxClass: 'bg-indigo-50 text-[#4338CA] ring-1 ring-indigo-200/70',
-    priceClass: 'text-[#4338CA]',
+    topBarClass: 'bg-gradient-to-r from-[#0B2559] to-[#12489B]',
+    iconBoxClass: 'bg-blue-50 text-[#12489B] ring-1 ring-blue-200/80',
+    priceClass: 'text-[#12489B]',
     ctaClass:
-      'bg-indigo-50 text-[#4338CA] border border-indigo-200/80 hover:bg-[#4338CA] hover:text-white hover:border-[#4338CA]',
+      'bg-blue-50 text-[#0B2559] border border-blue-200/90 hover:bg-[#0B2559] hover:text-white hover:border-[#0B2559]',
   },
   {
     id: 'turnitin',
@@ -105,11 +105,12 @@ const SERVICES: readonly ServiceItem[] = [
     ctaLabel: 'Check ngay',
     icon: ShieldCheck,
     featured: true,
-    topBarClass: 'bg-gradient-to-r from-[#4338CA] via-[#6366F1] to-[#10B981]',
-    iconBoxClass: 'bg-gradient-to-br from-[#4338CA] to-[#6366F1] text-white shadow-sm',
-    priceClass: 'text-[#4338CA]',
+    topBarClass: 'bg-gradient-to-r from-[#0B2559] via-[#12489B] to-[#F5B700]',
+    iconBoxClass:
+      'bg-gradient-to-br from-[#0B2559] to-[#12489B] text-[#FDE047] shadow-sm',
+    priceClass: 'text-[#12489B]',
     ctaClass:
-      'bg-gradient-to-r from-[#4338CA] to-[#4F46E5] text-white hover:from-[#3730A3] hover:to-[#4338CA] shadow-[0_6px_18px_-6px_rgba(67,56,202,0.55)]',
+      'bg-gradient-to-r from-[#0B2559] to-[#12489B] text-white hover:from-[#081B42] hover:to-[#0E3A7D] shadow-[0_6px_18px_-6px_rgba(11,37,89,0.5)]',
   },
   {
     id: 'reduce',
@@ -120,40 +121,40 @@ const SERVICES: readonly ServiceItem[] = [
     ctaLabel: 'Nhận tư vấn ngay',
     icon: FileCheck2,
     href: ZALO_CONSULT_URL,
-    topBarClass: 'bg-gradient-to-r from-emerald-500 to-teal-500',
-    iconBoxClass: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200/70',
-    priceClass: 'text-emerald-700',
+    topBarClass: 'bg-gradient-to-r from-[#D97706] to-[#F5B700]',
+    iconBoxClass: 'bg-amber-50 text-[#D97706] ring-1 ring-amber-200/90',
+    priceClass: 'text-[#B45309]',
     ctaClass:
-      'bg-emerald-50/90 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-600 hover:text-white hover:border-emerald-600',
+      'bg-amber-50/90 text-[#92400E] border border-amber-200/90 hover:bg-[#D97706] hover:text-white hover:border-[#D97706]',
   },
 ];
 
 /**
- * 1. Khối Cam kết cốt lõi — Thẻ điểm nhấn Navy-Indigo chiều sâu đặt bên phải khung Tra cứu
+ * 1. Khối Cam kết cốt lõi — Thẻ điểm nhấn Academic Navy + Scholar Gold đặt bên phải khung Tra cứu
  */
 export function ClientValuePropCard() {
   return (
     <aside
       aria-label="Cam kết cốt lõi"
-      className="relative overflow-hidden bg-gradient-to-br from-[#0F172A] via-[#1E1B4B] to-[#312E81] text-white rounded-2xl p-5 flex flex-col justify-between h-full shadow-[0_16px_38px_-14px_rgba(30,27,75,0.45)] ring-1 ring-white/10"
+      className="relative overflow-hidden bg-gradient-to-br from-[#07183B] via-[#0B2559] to-[#12489B] text-white rounded-2xl p-5 flex flex-col justify-between h-full shadow-[0_16px_38px_-14px_rgba(11,37,89,0.45)] ring-1 ring-white/10"
     >
-      {/* Subtle ambient glow blobs */}
+      {/* Subtle ambient glow blobs aligned with logo gold + royal blue */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -top-14 -right-14 w-44 h-44 rounded-full bg-indigo-400/20 blur-2xl"
+        className="pointer-events-none absolute -top-14 -right-14 w-44 h-44 rounded-full bg-[#F5B700]/20 blur-2xl"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute -bottom-16 -left-10 w-40 h-40 rounded-full bg-emerald-400/15 blur-2xl"
+        className="pointer-events-none absolute -bottom-16 -left-10 w-40 h-40 rounded-full bg-sky-400/20 blur-2xl"
       />
 
       <div className="relative z-10 flex items-center justify-between gap-2 mb-3">
-        <span className="inline-flex items-center gap-1.5 bg-white/10 border border-white/15 text-indigo-200 px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider">
+        <span className="inline-flex items-center gap-1.5 bg-[#F5B700]/15 border border-[#F5B700]/30 text-[#FDE047] px-2.5 py-1 rounded-full text-[11px] font-semibold uppercase tracking-wider">
           <Sparkles className="w-3.5 h-3.5" />
           Cam kết cốt lõi
         </span>
-        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-300">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-sky-200">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#F5B700]" />
           Minh bạch · Bảo mật
         </span>
       </div>
@@ -164,7 +165,7 @@ export function ClientValuePropCard() {
           return (
             <li
               key={item.title}
-              className="flex items-center gap-3 bg-white/[0.08] border border-white/12 hover:bg-white/[0.12] transition-colors rounded-xl px-3.5 py-2.5"
+              className="flex items-center gap-3 bg-white/[0.08] border border-white/12 hover:bg-white/[0.13] transition-colors rounded-xl px-3.5 py-2.5"
             >
               <span
                 className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${item.iconClass}`}
@@ -198,10 +199,10 @@ export function ClientLandingSections({ onOpenChecker }: ClientLandingSectionsPr
 
   return (
     <div className="space-y-4">
-      {/* 2. Dải chỉ số niềm tin — 1 thanh ngang 4 ô với điểm nhấn màu theo ngữ nghĩa */}
+      {/* 2. Dải chỉ số niềm tin — 1 thanh ngang 4 ô đồng bộ bảng màu Navy · Blue · Gold */}
       <section
         aria-label="Chỉ số uy tín"
-        className="bg-white/95 backdrop-blur-xs border border-slate-200/80 rounded-2xl shadow-[0_6px_24px_-12px_rgba(15,23,42,0.08)] overflow-hidden"
+        className="bg-white/95 backdrop-blur-xs border border-slate-200/80 rounded-2xl shadow-[0_6px_24px_-12px_rgba(11,37,89,0.09)] overflow-hidden"
       >
         <div className="grid grid-cols-2 lg:grid-cols-4 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
           {SOCIAL_PROOF_STATS.map((stat) => {
@@ -236,8 +237,8 @@ export function ClientLandingSections({ onOpenChecker }: ClientLandingSectionsPr
       <section aria-label="Dịch vụ và bảng giá nhanh" className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#4338CA]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#4338CA]" />
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[#0B2559]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#F5B700]" />
               Dịch vụ &amp; Bảng giá nhanh
             </span>
             <span className="hidden sm:inline text-xs text-zinc-400">·</span>
@@ -257,8 +258,8 @@ export function ClientLandingSections({ onOpenChecker }: ClientLandingSectionsPr
                 key={service.id}
                 className={`card-interactive relative overflow-hidden rounded-2xl p-4 sm:p-5 flex flex-col justify-between ${
                   service.featured
-                    ? 'bg-gradient-to-b from-[#EEF2FF]/70 via-white to-white border border-indigo-300/80 shadow-[0_14px_34px_-14px_rgba(67,56,202,0.22)] ring-1 ring-indigo-500/10'
-                    : 'bg-white/95 border border-slate-200/85 shadow-[0_8px_24px_-14px_rgba(15,23,42,0.08)]'
+                    ? 'bg-gradient-to-b from-[#EFF6FF]/85 via-white to-white border border-blue-300/85 shadow-[0_14px_34px_-14px_rgba(18,72,155,0.22)] ring-1 ring-[#12489B]/10'
+                    : 'bg-white/95 border border-slate-200/85 shadow-[0_8px_24px_-14px_rgba(11,37,89,0.08)]'
                 }`}
               >
                 <span
@@ -287,7 +288,7 @@ export function ClientLandingSections({ onOpenChecker }: ClientLandingSectionsPr
                     </div>
 
                     {service.badge && (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-[#4338CA] to-[#6366F1] text-white shadow-2xs shrink-0">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-gradient-to-r from-[#F59E0B] to-[#D97706] text-white shadow-2xs shrink-0">
                         {service.badge}
                       </span>
                     )}

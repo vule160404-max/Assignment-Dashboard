@@ -203,10 +203,10 @@
 .client-ambient-bg {
   background-color: #f8fafc;
   background-image:
-    radial-gradient(ellipse 65% 45% at 12% 0%, rgba(79, 70, 229, 0.08), transparent 60%),
-    radial-gradient(ellipse 55% 45% at 92% 4%, rgba(16, 185, 129, 0.07), transparent 58%),
-    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(139, 92, 246, 0.05), transparent 65%),
-    radial-gradient(rgba(15, 23, 42, 0.04) 1px, transparent 1px);
+    radial-gradient(ellipse 65% 45% at 12% 0%, rgba(18, 72, 155, 0.09), transparent 60%),
+    radial-gradient(ellipse 55% 45% at 92% 4%, rgba(245, 183, 0, 0.11), transparent 58%),
+    radial-gradient(ellipse 60% 45% at 50% 100%, rgba(37, 99, 235, 0.05), transparent 65%),
+    radial-gradient(rgba(11, 37, 89, 0.045) 1px, transparent 1px);
   background-size: 100% 100%, 100% 100%, 100% 100%, 24px 24px;
 }
 
@@ -220,8 +220,8 @@
 @media (hover: hover) and (pointer: fine) {
   .card-interactive:hover {
     transform: translateY(-2px);
-    border-color: rgb(165 180 252 / 0.85);
-    box-shadow: 0 14px 32px -12px rgba(67, 56, 202, 0.16);
+    border-color: rgba(18, 72, 155, 0.35);
+    box-shadow: 0 14px 32px -12px rgba(11, 37, 89, 0.16);
   }
 }
 

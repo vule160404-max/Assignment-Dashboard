@@ -62,12 +62,12 @@ export function WriterPaperCanvas({
           >
             {focusPaperMode ? (
               <>
-                <Minimize2 className="w-3.5 h-3.5 text-[#4338CA]" />
+                <Minimize2 className="w-3.5 h-3.5 text-[#12489B]" />
                 <span>Hiện cột Đề bài & Dàn ý</span>
               </>
             ) : (
               <>
-                <Maximize2 className="w-3.5 h-3.5 text-[#4338CA]" />
+                <Maximize2 className="w-3.5 h-3.5 text-[#12489B]" />
                 <span>Chế độ Tập trung A4</span>
               </>
             )}
@@ -85,7 +85,7 @@ export function WriterPaperCanvas({
             onClick={() => onUpdateViewMode('sections')}
             className={`btn-press px-2.5 py-1 text-xs font-medium rounded-md ${
               session.viewMode === 'sections'
-                ? 'bg-[#4338CA] text-white'
+                ? 'bg-[#12489B] text-white'
                 : 'text-zinc-600 hover:text-slate-900'
             }`}
           >
@@ -96,7 +96,7 @@ export function WriterPaperCanvas({
             onClick={() => onUpdateViewMode('full_paper')}
             className={`btn-press px-2.5 py-1 text-xs font-medium rounded-md ${
               session.viewMode === 'full_paper'
-                ? 'bg-[#4338CA] text-white'
+                ? 'bg-[#12489B] text-white'
                 : 'text-zinc-600 hover:text-slate-900'
             }`}
           >
@@ -138,7 +138,7 @@ export function WriterPaperCanvas({
             value={session.topic}
             onChange={(e) => onUpdateTopic(e.target.value)}
             placeholder="NHẬP TIÊU ĐỀ BÀI NGHIÊN CỨU TẠI ĐÂY..."
-            className="w-full text-center font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-zinc-200 focus:border-[#4338CA] focus:outline-none pb-1"
+            className="w-full text-center font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-zinc-200 focus:border-[#12489B] focus:outline-none pb-1"
             style={{
               fontFamily: `"${format.fontFamily}", serif`,
               fontSize: `${Math.round(
@@ -172,7 +172,7 @@ export function WriterPaperCanvas({
                 className={`rounded-lg transition-colors duration-150 ${
                   session.viewMode === 'sections'
                     ? isCurrent
-                      ? 'ring-1 ring-[#4338CA]/35 bg-indigo-50/15 p-3 -mx-3'
+                      ? 'ring-1 ring-[#12489B]/35 bg-blue-50/15 p-3 -mx-3'
                       : 'hover:bg-zinc-50/80 p-3 -mx-3'
                     : 'py-1'
                 }`}
@@ -218,7 +218,7 @@ export function WriterPaperCanvas({
                     )
                   }
                   placeholder={`Bấm "Viết" ở mục "${sec.title}" hoặc gõ nội dung trực tiếp tại đây...`}
-                  className="w-full bg-transparent text-slate-900 focus:outline-none resize-y border border-transparent focus:border-indigo-200/80 rounded p-1"
+                  className="w-full bg-transparent text-slate-900 focus:outline-none resize-y border border-transparent focus:border-blue-200/80 rounded p-1"
                   style={{
                     fontFamily: `"${format.fontFamily}", serif`,
                     fontSize: `${Math.round(

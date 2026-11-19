@@ -321,7 +321,7 @@ export function RevenueDashboardView({ orders, onToast }: RevenueDashboardViewPr
                   </div>
                   <div className="h-2 bg-zinc-100 rounded-full overflow-hidden">
                     <div
-                      className="progress-fill h-full w-full bg-[#4338CA] rounded-full"
+                      className="progress-fill h-full w-full bg-[#12489B] rounded-full"
                       style={{ transform: `scaleX(${pct / 100})` }}
                     />
                   </div>
@@ -427,7 +427,7 @@ export function RevenueDashboardView({ orders, onToast }: RevenueDashboardViewPr
                   return (
                     <tr key={ord.id} className="hover-row">
                       <td className="py-3 px-5">
-                        <span className="font-mono font-semibold text-[#4338CA]">
+                        <span className="font-mono font-semibold text-[#12489B]">
                           #{ord.orderCode}
                         </span>
                         <span className="text-zinc-600 ml-2">

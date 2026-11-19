@@ -149,7 +149,7 @@ export function openPrintableIntegrityReport(
                 src.authorOrVenue
               )}${src.year ? ` (${escapeHtml(src.year)})` : ''} · <a href="${escapeHtml(
               src.url
-            )}" style="color:#4338ca;">${escapeHtml(src.url)}</a></div>
+            )}" style="color:#12489B;">${escapeHtml(src.url)}</a></div>
             </td>
             <td style="padding:8px 10px;border-bottom:1px solid #e4e4e7;text-align:right;font-family:monospace;font-weight:700;color:#0f172a;">
               ${src.similarityPercent}%
@@ -172,7 +172,7 @@ export function openPrintableIntegrityReport(
 <body>
   <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f172a;padding-bottom:16px;margin-bottom:16px;">
     <div>
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#4338ca;">AssignTrack Integrity Check (For Reference Only)</div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#12489B;">AssignTrack Integrity Check (For Reference Only)</div>
       <h1 style="margin:4px 0 6px 0;font-size:20px;">${escapeHtml(report.title)}</h1>
       <div style="font-size:12px;color:#52525b;">Mã báo cáo: <strong>${escapeHtml(
         report.reportId
@@ -180,7 +180,7 @@ export function openPrintableIntegrityReport(
     new Date(report.analyzedAt).toLocaleString('vi-VN')
   )}</div>
     </div>
-    <button class="no-print" onclick="window.print()" style="padding:8px 16px;background:#4338ca;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">In / Lưu PDF</button>
+    <button class="no-print" onclick="window.print()" style="padding:8px 16px;background:#12489B;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">In / Lưu PDF</button>
   </div>
 
   <div style="background:#fffbeb;border:1px solid #fcd34d;border-left:4px solid #f59e0b;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:12px;color:#78350f;line-height:1.5;">

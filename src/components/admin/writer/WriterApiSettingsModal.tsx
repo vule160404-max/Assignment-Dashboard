@@ -146,7 +146,7 @@ export function WriterApiSettingsModal({
         {/* Header */}
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/70">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#4338CA]">
+            <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-[#12489B]">
               <Bot className="w-5 h-5" />
             </div>
             <div>
@@ -181,20 +181,20 @@ export function WriterApiSettingsModal({
                 onClick={() => selectMainCategory('perplexity')}
                 className={`btn-press p-3.5 rounded-xl border text-left flex flex-col justify-between gap-2 ${
                   isPerplexityMode
-                    ? 'border-[#4338CA] bg-indigo-50/60 ring-2 ring-indigo-500/15'
+                    ? 'border-[#12489B] bg-blue-50/60 ring-2 ring-blue-500/15'
                     : 'border-zinc-200 hover:border-zinc-300 bg-white'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2 w-full">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                    <Globe className="w-4 h-4 text-[#4338CA] shrink-0" />
+                    <Globe className="w-4 h-4 text-[#12489B] shrink-0" />
                     <span>Perplexity Academic (Sonar)</span>
                   </div>
                   <span
                     className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
                       hasPerplexityKey
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : 'bg-indigo-100/80 text-[#4338CA]'
+                        : 'bg-blue-100/80 text-[#12489B]'
                     }`}
                   >
                     {hasPerplexityKey ? 'Đã có Key' : 'Khuyên dùng Học thuật'}
@@ -211,13 +211,13 @@ export function WriterApiSettingsModal({
                 onClick={() => selectMainCategory('other')}
                 className={`btn-press p-3.5 rounded-xl border text-left flex flex-col justify-between gap-2 ${
                   !isPerplexityMode
-                    ? 'border-[#4338CA] bg-indigo-50/60 ring-2 ring-indigo-500/15'
+                    ? 'border-[#12489B] bg-blue-50/60 ring-2 ring-blue-500/15'
                     : 'border-zinc-200 hover:border-zinc-300 bg-white'
                 }`}
               >
                 <div className="flex items-start justify-between gap-2 w-full">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
-                    <Sparkles className="w-4 h-4 text-[#4338CA] shrink-0" />
+                    <Sparkles className="w-4 h-4 text-[#12489B] shrink-0" />
                     <span>Các Mô hình AI khác (Gộp chung)</span>
                   </div>
                   <span
@@ -250,7 +250,7 @@ export function WriterApiSettingsModal({
                     e.target.value as Exclude<AiProviderType, 'perplexity'>
                   )
                 }
-                className="w-full px-3 py-2 text-xs font-semibold bg-white border border-zinc-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#4338CA]"
+                className="w-full px-3 py-2 text-xs font-semibold bg-white border border-zinc-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#12489B]"
               >
                 {OTHER_PROVIDERS.map((p) => (
                   <option key={p.key} value={p.key}>
@@ -281,7 +281,7 @@ export function WriterApiSettingsModal({
                     ? 'sk-ant-api03-...'
                     : 'sk-...'
                 }
-                className="w-full pl-9 pr-10 py-2 text-sm font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#4338CA]"
+                className="w-full pl-9 pr-10 py-2 text-sm font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
               />
               <button
                 type="button"
@@ -317,7 +317,7 @@ export function WriterApiSettingsModal({
                   ? 'sonar-deep-research, sonar-reasoning-pro, sonar-pro...'
                   : 'Nhập tên model (VD: gemini-2.5-pro, gpt-4.1, claude-sonnet-4-20250514...)'
               }
-              className="w-full px-3 py-2 text-sm font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#4338CA]"
+              className="w-full px-3 py-2 text-sm font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
             />
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
               <span className="text-[11px] text-zinc-500 mr-1">Chọn nhanh phiên bản:</span>
@@ -328,7 +328,7 @@ export function WriterApiSettingsModal({
                   onClick={() => updateCurrentProfile({ model: m })}
                   className={`btn-press px-2 py-0.5 text-xs font-mono rounded-md border ${
                     currentProfile.model === m
-                      ? 'bg-[#4338CA] text-white border-[#4338CA]'
+                      ? 'bg-[#12489B] text-white border-[#12489B]'
                       : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
                   }`}
                 >
@@ -355,7 +355,7 @@ export function WriterApiSettingsModal({
                     ? 'https://api.perplexity.ai'
                     : 'https://api.openai.com/v1'
                 }
-                className="w-full px-3 py-2 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#4338CA]"
+                className="w-full px-3 py-2 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
               />
             </div>
 
@@ -374,7 +374,7 @@ export function WriterApiSettingsModal({
                     temperature: Number(e.target.value) || 0.2,
                   })
                 }
-                className="w-full accent-[#4338CA] mt-2"
+                className="w-full accent-[#12489B] mt-2"
               />
               <div className="flex justify-between text-[10px] text-zinc-500 mt-0.5">
                 <span>0.1 (Chuẩn xác)</span>
@@ -404,7 +404,7 @@ export function WriterApiSettingsModal({
             type="button"
             disabled={testing || !currentProfile.apiKey.trim()}
             onClick={() => void handleTestConnection()}
-            className="btn-press px-3.5 py-2 text-xs font-semibold rounded-lg border border-indigo-200 bg-indigo-50 text-[#4338CA] hover:bg-indigo-100 disabled:opacity-40 inline-flex items-center gap-1.5"
+            className="btn-press px-3.5 py-2 text-xs font-semibold rounded-lg border border-blue-200 bg-blue-50 text-[#12489B] hover:bg-blue-100 disabled:opacity-40 inline-flex items-center gap-1.5"
           >
             {testing ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -425,7 +425,7 @@ export function WriterApiSettingsModal({
             <button
               type="button"
               onClick={handleSave}
-              className="btn-press px-5 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-indigo-700 shadow-xs"
+              className="btn-press px-5 py-2 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] shadow-xs"
             >
               Lưu & Sử dụng Mô hình này
             </button>

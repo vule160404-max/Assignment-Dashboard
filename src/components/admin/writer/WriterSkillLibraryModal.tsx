@@ -143,7 +143,7 @@ export function WriterSkillLibraryModal({
         {/* Header */}
         <div className="px-6 py-4 border-b border-zinc-200 flex items-center justify-between bg-zinc-50/80">
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#4338CA]">
+            <div className="w-9 h-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-[#12489B]">
               <BookOpen className="w-5 h-5" />
             </div>
             <div>
@@ -180,7 +180,7 @@ export function WriterSkillLibraryModal({
               type="button"
               disabled={uploading}
               onClick={() => fileInputRef.current?.click()}
-              className="px-3.5 py-1.5 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-indigo-700 inline-flex items-center gap-1.5 shadow-2xs"
+              className="px-3.5 py-1.5 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] inline-flex items-center gap-1.5 shadow-2xs"
             >
               <FolderUp className="w-3.5 h-3.5" />
               <span>
@@ -222,7 +222,7 @@ export function WriterSkillLibraryModal({
                   onClick={() => setSelectedSkillId(skill.id)}
                   className={`p-3 rounded-xl border cursor-pointer transition-all ${
                     isSelected
-                      ? 'border-[#4338CA] bg-indigo-50/70 shadow-2xs'
+                      ? 'border-[#12489B] bg-blue-50/70 shadow-2xs'
                       : 'border-zinc-200 bg-white hover:border-zinc-300'
                   }`}
                 >
@@ -241,7 +241,7 @@ export function WriterSkillLibraryModal({
                         }
                         className={`mt-0.5 w-4 h-4 rounded flex items-center justify-center border transition-colors shrink-0 ${
                           skill.enabled
-                            ? 'bg-[#4338CA] border-[#4338CA] text-white'
+                            ? 'bg-[#12489B] border-[#12489B] text-white'
                             : 'bg-white border-zinc-300'
                         }`}
                       >
@@ -296,7 +296,7 @@ export function WriterSkillLibraryModal({
                       onChange={(e) =>
                         updateSelectedSkill({ name: e.target.value })
                       }
-                      className="w-full px-3 py-1.5 text-xs font-semibold border border-zinc-300 rounded-lg focus:outline-none focus:border-[#4338CA]"
+                      className="w-full px-3 py-1.5 text-xs font-semibold border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
                     />
                   </div>
                   <div>
@@ -309,7 +309,7 @@ export function WriterSkillLibraryModal({
                       onChange={(e) =>
                         updateSelectedSkill({ fileName: e.target.value })
                       }
-                      className="w-full px-3 py-1.5 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#4338CA]"
+                      className="w-full px-3 py-1.5 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
                     />
                   </div>
                 </div>
@@ -324,7 +324,7 @@ export function WriterSkillLibraryModal({
                     onChange={(e) =>
                       updateSelectedSkill({ description: e.target.value })
                     }
-                    className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded-lg focus:outline-none focus:border-[#4338CA]"
+                    className="w-full px-3 py-1.5 text-xs border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
                   />
                 </div>
 
@@ -343,7 +343,7 @@ export function WriterSkillLibraryModal({
                       updateSelectedSkill({ content: e.target.value })
                     }
                     rows={12}
-                    className="w-full flex-1 p-3 text-xs font-mono leading-relaxed border border-zinc-300 rounded-xl focus:outline-none focus:border-[#4338CA] bg-zinc-50/50"
+                    className="w-full flex-1 p-3 text-xs font-mono leading-relaxed border border-zinc-300 rounded-xl focus:outline-none focus:border-[#12489B] bg-zinc-50/50"
                   />
                 </div>
               </div>
@@ -358,12 +358,12 @@ export function WriterSkillLibraryModal({
         {/* Footer */}
         <div className="px-6 py-3.5 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between">
           <span className="text-xs text-zinc-600">
-            Mọi Skill được tích chọn (<strong className="text-[#4338CA]">{activeCount}</strong>) sẽ tự động được gửi kèm khi AI lập dàn ý và viết từng mục.
+            Mọi Skill được tích chọn (<strong className="text-[#12489B]">{activeCount}</strong>) sẽ tự động được gửi kèm khi AI lập dàn ý và viết từng mục.
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-indigo-700"
+            className="px-5 py-2 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559]"
           >
             Hoàn tất & Áp dụng Skill
           </button>

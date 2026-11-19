@@ -40,7 +40,7 @@ export function ChunkDiffDrawer({
             <button
               type="button"
               onClick={() => onRetryChunk(chunk.id)}
-              className="btn-press inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-indigo-50 text-[#4338CA] hover:bg-indigo-100 rounded-md"
+              className="btn-press inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium bg-blue-50 text-[#12489B] hover:bg-blue-100 rounded-md"
             >
               <RefreshCw className="w-3 h-3" />
               <span>Chạy lại đoạn này</span>

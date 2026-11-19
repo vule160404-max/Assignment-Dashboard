@@ -39,7 +39,7 @@ export function WriterBriefPanel({
               }))
             }
             placeholder="VD: Strategic Management / MBA701"
-            className="w-full px-2.5 py-1.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#4338CA]"
+            className="w-full px-2.5 py-1.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
           />
         </div>
 
@@ -63,7 +63,7 @@ export function WriterBriefPanel({
                   ),
                 }))
               }
-              className="w-full px-2.5 py-1.5 text-xs font-mono tabular-nums bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#4338CA]"
+              className="w-full px-2.5 py-1.5 text-xs font-mono tabular-nums bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
             />
           </div>
 
@@ -79,7 +79,7 @@ export function WriterBriefPanel({
                   citationStyle: e.target.value as CitationStyle,
                 }))
               }
-              className="w-full px-2 py-1.5 text-xs font-medium bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#4338CA]"
+              className="w-full px-2 py-1.5 text-xs font-medium bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
             >
               {CITATION_STYLES.map((c) => (
                 <option key={c} value={c}>
@@ -108,7 +108,7 @@ export function WriterBriefPanel({
             }))
           }
           placeholder="Nhập tên đề tài hoặc câu hỏi nghiên cứu..."
-          className="w-full px-2.5 py-1.5 text-xs font-medium bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#4338CA]"
+          className="w-full px-2.5 py-1.5 text-xs font-medium bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
         />
       </div>
 
@@ -126,7 +126,7 @@ export function WriterBriefPanel({
                   .value as WriterSession['writingLanguage'],
               }))
             }
-            className="w-full px-2.5 py-1.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#4338CA]"
+            className="w-full px-2.5 py-1.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
           >
             <option value="English">Academic English</option>
             <option value="Vietnamese">Tiếng Việt học thuật</option>
@@ -148,7 +148,7 @@ export function WriterBriefPanel({
               }))
             }
             placeholder="VD: Master / High Distinction"
-            className="w-full px-2.5 py-1.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#4338CA]"
+            className="w-full px-2.5 py-1.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
           />
         </div>
       </div>
@@ -167,7 +167,7 @@ export function WriterBriefPanel({
             }))
           }
           placeholder="Dán yêu cầu chi tiết của giảng viên, cấu trúc bắt buộc, case study..."
-          className="w-full p-2.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#4338CA]"
+          className="w-full p-2.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
         />
       </div>
 
@@ -185,7 +185,7 @@ export function WriterBriefPanel({
             }))
           }
           placeholder="Dán tiêu chí Rubric (VD: Critical Analysis 40%, Literature 30%, APA 30%)..."
-          className="w-full p-2.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#4338CA]"
+          className="w-full p-2.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
         />
       </div>
 
@@ -211,7 +211,7 @@ export function WriterBriefPanel({
           <button
             type="button"
             onClick={() => contextFileInputRef.current?.click()}
-            className="btn-press px-2.5 py-1 text-[11px] font-semibold text-[#4338CA] bg-indigo-50 hover:bg-indigo-100 rounded-md inline-flex items-center gap-1"
+            className="btn-press px-2.5 py-1 text-[11px] font-semibold text-[#12489B] bg-blue-50 hover:bg-blue-100 rounded-md inline-flex items-center gap-1"
           >
             <FolderUp className="w-3 h-3" />
             <span>+ Đính kèm tệp</span>
@@ -225,7 +225,7 @@ export function WriterBriefPanel({
                 key={cf.id}
                 className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] bg-zinc-100 text-zinc-700 rounded-md"
               >
-                <FileText className="w-3 h-3 text-[#4338CA]" />
+                <FileText className="w-3 h-3 text-[#12489B]" />
                 <span className="truncate max-w-[140px]">{cf.name}</span>
                 <span className="text-zinc-400 font-mono">
                   ({cf.wordCount}w)
@@ -255,7 +255,7 @@ export function WriterBriefPanel({
           <button
             type="button"
             onClick={onSwitchToOutlineWithAi}
-            className="btn-press w-full py-2 text-xs font-semibold bg-[#4338CA] text-white hover:bg-indigo-700 rounded-lg inline-flex items-center justify-center gap-1.5 shadow-2xs"
+            className="btn-press w-full py-2 text-xs font-semibold bg-[#12489B] text-white hover:bg-[#0B2559] rounded-lg inline-flex items-center justify-center gap-1.5 shadow-2xs"
           >
             <Sparkles className="w-3.5 h-3.5" />
             <span>Chuyển sang Dàn ý & Để AI Lập Dàn Ý →</span>

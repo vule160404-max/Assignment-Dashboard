@@ -149,7 +149,7 @@ export function ClientsCrmView({
         <button
           type="button"
           onClick={openNew}
-          className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] whitespace-nowrap"
+          className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] whitespace-nowrap"
         >
           <Plus className="w-3.5 h-3.5" />
           Thêm khách hàng
@@ -165,7 +165,7 @@ export function ClientsCrmView({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Tìm tên, số Zalo, trường học..."
-            className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+            className="w-full pl-9 pr-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
           />
         </div>
 
@@ -258,7 +258,7 @@ export function ClientsCrmView({
                           <button
                             type="button"
                             onClick={() => openEdit(c)}
-                            className="btn-press text-xs font-medium text-[#4338CA] hover:underline"
+                            className="btn-press text-xs font-medium text-[#12489B] hover:underline"
                           >
                             Sửa
                           </button>
@@ -319,7 +319,7 @@ export function ClientsCrmView({
                   maxLength={FIELD_LIMITS.clientNameMax}
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                  className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                 />
               </div>
 
@@ -333,7 +333,7 @@ export function ClientsCrmView({
                     maxLength={FIELD_LIMITS.zaloMax}
                     value={zaloNumber}
                     onChange={(e) => setZaloNumber(e.target.value)}
-                    className="w-full px-3 py-2 text-sm font-mono bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                    className="w-full px-3 py-2 text-sm font-mono bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                   />
                 </div>
                 <div>
@@ -343,7 +343,7 @@ export function ClientsCrmView({
                   <select
                     value={tier}
                     onChange={(e) => setTier(e.target.value as ClientTier)}
-                    className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                    className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                   >
                     {CLIENT_TIERS.map((t) => (
                       <option key={t.key} value={t.key}>
@@ -363,7 +363,7 @@ export function ClientsCrmView({
                   maxLength={FIELD_LIMITS.socialLinkMax}
                   value={socialLink}
                   onChange={(e) => setSocialLink(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                  className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                 />
               </div>
 
@@ -376,7 +376,7 @@ export function ClientsCrmView({
                   maxLength={FIELD_LIMITS.schoolMax}
                   value={schoolMajor}
                   onChange={(e) => setSchoolMajor(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                  className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                 />
               </div>
 
@@ -389,7 +389,7 @@ export function ClientsCrmView({
                   maxLength={FIELD_LIMITS.clientNotesMax}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                  className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                 />
               </div>
             </div>
@@ -405,7 +405,7 @@ export function ClientsCrmView({
               <button
                 type="submit"
                 disabled={saving}
-                className="btn-press px-4 py-2 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45"
+                className="btn-press px-4 py-2 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] disabled:opacity-45"
               >
                 {saving ? 'Đang lưu...' : 'Lưu khách hàng'}
               </button>

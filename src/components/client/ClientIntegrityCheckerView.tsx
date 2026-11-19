@@ -340,7 +340,7 @@ export function ClientIntegrityCheckerView({
         {/* Card Header */}
         <div className="px-6 py-5 sm:px-8 sm:py-6 border-b border-zinc-100 flex flex-wrap items-end justify-between gap-4 bg-gradient-to-b from-slate-50/80 to-white">
           <div className="space-y-1.5 max-w-2xl">
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#4338CA]">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#12489B]">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Academic Similarity &amp; AI Forensics</span>
             </div>
@@ -353,7 +353,7 @@ export function ClientIntegrityCheckerView({
                 href="https://zalo.me/0916045202"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-press inline-flex items-center gap-1 font-semibold text-[#4338CA] bg-indigo-50 hover:bg-[#4338CA] hover:text-white border border-indigo-200/80 px-2 py-0.5 rounded-md align-baseline"
+                className="btn-press inline-flex items-center gap-1 font-semibold text-[#12489B] bg-blue-50 hover:bg-[#0B2559] hover:text-white border border-blue-200/80 px-2 py-0.5 rounded-md align-baseline"
               >
                 <span>tại đây</span>
                 <ExternalLink className="w-3 h-3" />
@@ -409,10 +409,10 @@ export function ClientIntegrityCheckerView({
             }}
             className={`rounded-2xl border-2 border-dashed px-6 py-10 sm:py-12 flex flex-col items-center justify-center text-center gap-4 cursor-pointer transition-colors duration-150 ${
               isDraggingFile
-                ? 'border-[#4338CA] bg-indigo-50/70'
+                ? 'border-[#12489B] bg-blue-50/70'
                 : uploadedFileName
                 ? 'border-emerald-300 bg-emerald-50/35 hover:border-emerald-400'
-                : 'border-zinc-200/90 bg-zinc-50/60 hover:border-indigo-300 hover:bg-indigo-50/25'
+                : 'border-zinc-200/90 bg-zinc-50/60 hover:border-blue-300 hover:bg-blue-50/25'
             }`}
           >
             <input
@@ -427,7 +427,7 @@ export function ClientIntegrityCheckerView({
               className={`w-14 h-14 rounded-2xl border shadow-2xs flex items-center justify-center ${
                 uploadedFileName
                   ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
-                  : 'bg-white border-zinc-200/90 text-[#4338CA]'
+                  : 'bg-white border-zinc-200/90 text-[#12489B]'
               }`}
             >
               {loadingFile ? (
@@ -472,9 +472,9 @@ export function ClientIntegrityCheckerView({
                 e.stopPropagation();
                 fileInputRef.current?.click();
               }}
-              className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-white text-slate-900 border border-zinc-200 hover:border-indigo-300 hover:text-[#4338CA] rounded-xl shadow-2xs disabled:opacity-50"
+              className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-white text-slate-900 border border-zinc-200 hover:border-blue-300 hover:text-[#12489B] rounded-xl shadow-2xs disabled:opacity-50"
             >
-              <FolderUp className="w-3.5 h-3.5 text-[#4338CA]" />
+              <FolderUp className="w-3.5 h-3.5 text-[#12489B]" />
               <span>{uploadedFileName ? 'Đổi tệp khác' : 'Chọn tệp từ máy tính'}</span>
             </button>
           </div>
@@ -487,7 +487,7 @@ export function ClientIntegrityCheckerView({
                   type="checkbox"
                   checked={excludeReferences}
                   onChange={(e) => setExcludeReferences(e.target.checked)}
-                  className="w-4 h-4 rounded border-zinc-300 text-[#4338CA] focus:ring-[#4338CA]"
+                  className="w-4 h-4 rounded border-zinc-300 text-[#12489B] focus:ring-[#12489B]"
                 />
                 <span>Loại trừ Tài liệu tham khảo (Bibliography)</span>
               </label>
@@ -497,7 +497,7 @@ export function ClientIntegrityCheckerView({
                   type="checkbox"
                   checked={excludeQuotes}
                   onChange={(e) => setExcludeQuotes(e.target.checked)}
-                  className="w-4 h-4 rounded border-zinc-300 text-[#4338CA] focus:ring-[#4338CA]"
+                  className="w-4 h-4 rounded border-zinc-300 text-[#12489B] focus:ring-[#12489B]"
                 />
                 <span>Loại trừ Trích dẫn trong ngoặc kép (Quotes)</span>
               </label>
@@ -507,7 +507,7 @@ export function ClientIntegrityCheckerView({
               type="button"
               disabled={analyzing || textInput.trim().length < 40}
               onClick={() => void handleRunScan()}
-              className="btn-press inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold bg-[#4338CA] text-white rounded-xl hover:bg-[#3730A3] disabled:opacity-45 shadow-[0_6px_18px_rgb(67,56,202,0.22)] min-w-[230px]"
+              className="btn-press inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold bg-gradient-to-r from-[#0B2559] to-[#12489B] text-white rounded-xl hover:from-[#081B42] hover:to-[#0E3A7D] disabled:opacity-45 shadow-[0_6px_18px_rgb(11,37,89,0.28)] min-w-[230px]"
             >
               {analyzing ? (
                 <>
@@ -525,7 +525,7 @@ export function ClientIntegrityCheckerView({
 
           {/* Live 3-Step Scanning Progress Strip */}
           {analyzing && (
-            <div className="popover-enter bg-indigo-50/60 border border-indigo-200/80 rounded-xl p-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="popover-enter bg-blue-50/60 border border-blue-200/80 rounded-xl p-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
               {scanStepsMeta.map((item) => {
                 const isDone = scanStep > item.step;
                 const isCurrent = scanStep === item.step;
@@ -534,7 +534,7 @@ export function ClientIntegrityCheckerView({
                     key={item.step}
                     className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${
                       isCurrent
-                        ? 'bg-white border-indigo-300 text-[#4338CA] font-semibold shadow-2xs'
+                        ? 'bg-white border-blue-300 text-[#12489B] font-semibold shadow-2xs'
                         : isDone
                         ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 font-medium'
                         : 'bg-white/60 border-zinc-200/70 text-zinc-500'
@@ -674,7 +674,7 @@ export function ClientIntegrityCheckerView({
                   onClick={() => setLayerMode(opt.key)}
                   className={`btn-press px-3 py-1.5 text-xs font-semibold rounded-lg ${
                     layerMode === opt.key
-                      ? 'bg-[#4338CA] text-white shadow-2xs'
+                      ? 'bg-[#12489B] text-white shadow-2xs'
                       : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200/80'
                   }`}
                 >
@@ -705,7 +705,7 @@ export function ClientIntegrityCheckerView({
             <div className="lg:col-span-7 bg-white border border-zinc-200/90 rounded-2xl p-6 sm:p-9 shadow-[0_6px_24px_rgb(15,23,42,0.03)] space-y-5">
               <div className="flex items-center justify-between gap-3 pb-4 border-b border-zinc-100">
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-[#4338CA] shrink-0">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center text-[#12489B] shrink-0">
                     <FileText className="w-4 h-4" />
                   </div>
                   <div className="min-w-0">
@@ -721,7 +721,7 @@ export function ClientIntegrityCheckerView({
                   <button
                     type="button"
                     onClick={() => setActiveSourceFilterId(null)}
-                    className="btn-press px-2.5 py-1 text-[11px] font-semibold bg-indigo-50 text-[#4338CA] border border-indigo-200 rounded-lg shrink-0"
+                    className="btn-press px-2.5 py-1 text-[11px] font-semibold bg-blue-50 text-[#12489B] border border-blue-200 rounded-lg shrink-0"
                   >
                     Đang lọc Nguồn #{activeSourceFilterId} · Bỏ lọc
                   </button>
@@ -772,7 +772,7 @@ export function ClientIntegrityCheckerView({
                       }
 
                       if (isSelected) {
-                        extraCls += ' ring-2 ring-[#4338CA]';
+                        extraCls += ' ring-2 ring-[#12489B]';
                       }
 
                       return (
@@ -812,9 +812,9 @@ export function ClientIntegrityCheckerView({
             {/* RIGHT: Sticky Inspector Sidebar (Sources & AI Forensics) */}
             <div className="lg:col-span-5 lg:sticky lg:top-20 space-y-4">
               {selectedSentence && (
-                <div className="popover-enter bg-white border border-indigo-200 rounded-2xl p-4 shadow-2xs space-y-2.5">
+                <div className="popover-enter bg-white border border-blue-200 rounded-2xl p-4 shadow-2xs space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-bold text-[#4338CA]">
+                    <span className="text-xs font-bold text-[#12489B]">
                       Phân tích chi tiết câu đang chọn
                     </span>
                     <button
@@ -874,7 +874,7 @@ export function ClientIntegrityCheckerView({
                     onClick={() => setSidebarTab('sources')}
                     className={`btn-press py-2 px-3 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 ${
                       sidebarTab === 'sources'
-                        ? 'bg-white text-[#4338CA] shadow-2xs'
+                        ? 'bg-white text-[#12489B] shadow-2xs'
                         : 'text-zinc-600 hover:text-slate-900'
                     }`}
                   >
@@ -886,7 +886,7 @@ export function ClientIntegrityCheckerView({
                     onClick={() => setSidebarTab('ai_forensics')}
                     className={`btn-press py-2 px-3 text-xs font-semibold rounded-xl flex items-center justify-center gap-1.5 ${
                       sidebarTab === 'ai_forensics'
-                        ? 'bg-white text-[#4338CA] shadow-2xs'
+                        ? 'bg-white text-[#12489B] shadow-2xs'
                         : 'text-zinc-600 hover:text-slate-900'
                     }`}
                   >
@@ -922,7 +922,7 @@ export function ClientIntegrityCheckerView({
                             }
                             className={`card-interactive p-3.5 rounded-xl border cursor-pointer space-y-2 ${
                               isFiltered
-                                ? 'border-[#4338CA] bg-indigo-50/40 ring-2 ring-indigo-500/10'
+                                ? 'border-[#12489B] bg-blue-50/40 ring-2 ring-blue-500/10'
                                 : 'border-zinc-200 bg-white'
                             }`}
                           >
@@ -962,7 +962,7 @@ export function ClientIntegrityCheckerView({
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 onClick={(e) => e.stopPropagation()}
-                                className="inline-flex items-center gap-1 font-semibold text-[#4338CA] hover:underline shrink-0"
+                                className="inline-flex items-center gap-1 font-semibold text-[#12489B] hover:underline shrink-0"
                               >
                                 <span>Xem nguồn</span>
                                 <ExternalLink className="w-3 h-3" />
@@ -986,7 +986,7 @@ export function ClientIntegrityCheckerView({
                       <MetricProgressBar
                         label="Độ đa dạng từ vựng (Lexical Entropy)"
                         value={report.forensics.lexicalDiversityScore}
-                        barColor="#4338CA"
+                        barColor="#12489B"
                         hint="Mức độ phong phú vốn từ tự nhiên so với độ dài toàn bài."
                       />
 

@@ -98,7 +98,7 @@ export function GlitchReviewPanel({
             rows={4}
             value={review.editedOutput}
             onChange={(e) => onChangeEditedOutput(e.target.value)}
-            className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+            className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
           />
         </div>
       </div>
@@ -107,7 +107,7 @@ export function GlitchReviewPanel({
         <button
           type="button"
           onClick={onRetry}
-          className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3]"
+          className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559]"
         >
           <RefreshCw className="w-3.5 h-3.5" />
           <span>Không dán & Thử lại (Retry) ở HIX Bypass</span>

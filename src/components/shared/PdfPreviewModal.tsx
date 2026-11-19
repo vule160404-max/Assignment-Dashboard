@@ -259,7 +259,7 @@ export function PdfPreviewModal({
               <button
                 type="button"
                 onClick={handleDownload}
-                className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] whitespace-nowrap"
+                className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] whitespace-nowrap"
               >
                 {attachment.sourceType === 'url' ? (
                   <>
@@ -326,7 +326,7 @@ export function PdfPreviewModal({
                   {p.blurred && (
                     <div className="absolute inset-0 bg-white/45 flex flex-col items-center justify-center p-6 text-center">
                       <div className="bg-white border border-zinc-200 rounded-xl px-5 py-4 max-w-sm space-y-2 shadow-sm">
-                        <Lock className="w-5 h-5 text-[#4338CA] mx-auto" />
+                        <Lock className="w-5 h-5 text-[#12489B] mx-auto" />
                         <p className="text-sm font-semibold text-slate-900">
                           {isTurnitinCappedForViewer && !isPaymentLockedForViewer
                             ? 'Giới hạn xem báo cáo Turnitin / AI'
@@ -371,7 +371,7 @@ export function PdfPreviewModal({
 
           {isImage && isPaymentLockedForViewer && (
             <div className="bg-white border border-zinc-200 rounded-xl p-8 max-w-lg mx-auto text-center space-y-2">
-              <Lock className="w-6 h-6 text-[#4338CA] mx-auto" />
+              <Lock className="w-6 h-6 text-[#12489B] mx-auto" />
               <p className="text-sm font-semibold text-slate-900">
                 Hình ảnh đang được khóa bảo vệ
               </p>

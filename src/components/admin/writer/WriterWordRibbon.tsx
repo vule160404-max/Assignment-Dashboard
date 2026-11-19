@@ -130,7 +130,7 @@ export function WriterWordRibbon({
             aria-label="Chuẩn định dạng học thuật"
             value={format.preset}
             onChange={(e) => handlePresetChange(e.target.value)}
-            className="px-2 py-1 text-xs font-semibold bg-indigo-50/70 text-[#4338CA] border border-indigo-200/80 rounded-md focus:outline-none focus:border-[#4338CA]"
+            className="px-2 py-1 text-xs font-semibold bg-blue-50/70 text-[#12489B] border border-blue-200/80 rounded-md focus:outline-none focus:border-[#12489B]"
           >
             {(Object.keys(ACADEMIC_FORMAT_PRESETS) as Array<
               Exclude<AcademicPresetKey, 'CUSTOM'>
@@ -163,7 +163,7 @@ export function WriterWordRibbon({
                 preset: 'CUSTOM',
               })
             }
-            className="px-2 py-1 text-xs font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-slate-900 focus:outline-none focus:border-[#4338CA]"
+            className="px-2 py-1 text-xs font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-slate-900 focus:outline-none focus:border-[#12489B]"
           >
             {FONT_FAMILIES.map((f) => (
               <option key={f} value={f} style={{ fontFamily: f }}>
@@ -181,7 +181,7 @@ export function WriterWordRibbon({
                 preset: 'CUSTOM',
               })
             }
-            className="px-1.5 py-1 text-xs font-mono font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-slate-900 focus:outline-none focus:border-[#4338CA]"
+            className="px-1.5 py-1 text-xs font-mono font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-slate-900 focus:outline-none focus:border-[#12489B]"
           >
             {FONT_SIZES.map((sz) => (
               <option key={sz} value={sz}>
@@ -241,7 +241,7 @@ export function WriterWordRibbon({
               onBlockPrefix(val);
               e.target.value = 'body';
             }}
-            className="px-2 py-1 text-xs font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-zinc-700 focus:outline-none focus:border-[#4338CA]"
+            className="px-2 py-1 text-xs font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-zinc-700 focus:outline-none focus:border-[#12489B]"
           >
             <option value="body">Kiểu chữ: Normal</option>
             <option value="# ">Heading 1 (H1)</option>
@@ -288,7 +288,7 @@ export function WriterWordRibbon({
                 title={label}
                 className={`btn-press p-1.5 rounded-md ${
                   active
-                    ? 'bg-indigo-50 text-[#4338CA]'
+                    ? 'bg-blue-50 text-[#12489B]'
                     : 'text-zinc-600 hover:bg-zinc-100'
                 }`}
               >
@@ -308,7 +308,7 @@ export function WriterWordRibbon({
             title="Thụt đầu dòng 0.5 inch (First-line indent)"
             className={`btn-press p-1.5 rounded-md ${
               format.firstLineIndent
-                ? 'bg-indigo-50 text-[#4338CA]'
+                ? 'bg-blue-50 text-[#12489B]'
                 : 'text-zinc-600 hover:bg-zinc-100'
             }`}
           >
@@ -328,7 +328,7 @@ export function WriterWordRibbon({
                 preset: 'CUSTOM',
               })
             }
-            className="px-1.5 py-1 text-xs font-mono bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-zinc-700 focus:outline-none focus:border-[#4338CA]"
+            className="px-1.5 py-1 text-xs font-mono bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-zinc-700 focus:outline-none focus:border-[#12489B]"
           >
             {LINE_SPACINGS.map((ls) => (
               <option key={ls.value} value={ls.value}>
@@ -347,7 +347,7 @@ export function WriterWordRibbon({
                 preset: 'CUSTOM',
               })
             }
-            className="px-1.5 py-1 text-xs bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-zinc-700 focus:outline-none focus:border-[#4338CA]"
+            className="px-1.5 py-1 text-xs bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-zinc-700 focus:outline-none focus:border-[#12489B]"
           >
             {MARGIN_OPTIONS.map((m) => (
               <option key={m.value} value={m.value}>
@@ -364,8 +364,8 @@ export function WriterWordRibbon({
             onClick={() => setShowAiBar((v) => !v)}
             className={`btn-press px-2.5 py-1 text-xs font-semibold rounded-md inline-flex items-center gap-1 border ${
               showAiBar
-                ? 'bg-[#4338CA] text-white border-[#4338CA]'
-                : 'bg-indigo-50/80 text-[#4338CA] border-indigo-200/80 hover:bg-indigo-100'
+                ? 'bg-[#12489B] text-white border-[#12489B]'
+                : 'bg-blue-50/80 text-[#12489B] border-blue-200/80 hover:bg-blue-100'
             }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
@@ -383,7 +383,7 @@ export function WriterWordRibbon({
             title="Tìm kiếm & Thay thế"
             className={`btn-press p-1.5 rounded-md border ${
               showFindBar
-                ? 'bg-indigo-50 text-[#4338CA] border-indigo-200'
+                ? 'bg-blue-50 text-[#12489B] border-blue-200'
                 : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
             }`}
           >
@@ -416,12 +416,12 @@ export function WriterWordRibbon({
 
       {/* Collapsible Row: AI Co-Pilot Refine Bar (Only visible when toggled) */}
       {showAiBar && (
-        <div className="popover-enter px-3 py-2 bg-indigo-50/45 border-t border-indigo-100 flex flex-wrap items-center gap-1.5">
+        <div className="popover-enter px-3 py-2 bg-blue-50/45 border-t border-blue-100 flex flex-wrap items-center gap-1.5">
           <button
             type="button"
             disabled={aiBusy}
             onClick={() => onAiRefineSection('rewrite_academic')}
-            className="btn-press px-2.5 py-1 text-xs font-medium bg-white border border-indigo-200/80 text-[#4338CA] hover:bg-indigo-50 rounded-md disabled:opacity-50"
+            className="btn-press px-2.5 py-1 text-xs font-medium bg-white border border-blue-200/80 text-[#12489B] hover:bg-blue-50 rounded-md disabled:opacity-50"
           >
             Nâng cấp văn phong Học thuật
           </button>
@@ -430,7 +430,7 @@ export function WriterWordRibbon({
             type="button"
             disabled={aiBusy}
             onClick={() => onAiRefineSection('expand_depth')}
-            className="btn-press px-2.5 py-1 text-xs font-medium bg-white border border-indigo-200/80 text-[#4338CA] hover:bg-indigo-50 rounded-md disabled:opacity-50"
+            className="btn-press px-2.5 py-1 text-xs font-medium bg-white border border-blue-200/80 text-[#12489B] hover:bg-blue-50 rounded-md disabled:opacity-50"
           >
             + Mở rộng & Tăng số từ
           </button>
@@ -439,7 +439,7 @@ export function WriterWordRibbon({
             type="button"
             disabled={aiBusy}
             onClick={() => onAiRefineSection('add_citations')}
-            className="btn-press px-2.5 py-1 text-xs font-medium bg-white border border-indigo-200/80 text-[#4338CA] hover:bg-indigo-50 rounded-md disabled:opacity-50"
+            className="btn-press px-2.5 py-1 text-xs font-medium bg-white border border-blue-200/80 text-[#12489B] hover:bg-blue-50 rounded-md disabled:opacity-50"
           >
             + Bổ sung Citations
           </button>
@@ -474,7 +474,7 @@ export function WriterWordRibbon({
                 }
               }}
               placeholder="Yêu cầu AI sửa riêng mục đang chọn..."
-              className="flex-1 px-2.5 py-1 text-xs bg-white border border-indigo-200 rounded-md focus:outline-none focus:border-[#4338CA]"
+              className="flex-1 px-2.5 py-1 text-xs bg-white border border-blue-200 rounded-md focus:outline-none focus:border-[#12489B]"
             />
             <button
               type="button"
@@ -483,7 +483,7 @@ export function WriterWordRibbon({
                 onAiRefineSection('rewrite_academic', customAiPrompt);
                 setCustomAiPrompt('');
               }}
-              className="btn-press px-2.5 py-1 text-xs font-semibold bg-[#4338CA] text-white rounded-md hover:bg-indigo-700 disabled:opacity-40 whitespace-nowrap"
+              className="btn-press px-2.5 py-1 text-xs font-semibold bg-[#12489B] text-white rounded-md hover:bg-[#0B2559] disabled:opacity-40 whitespace-nowrap"
             >
               Chạy AI
             </button>
@@ -495,7 +495,7 @@ export function WriterWordRibbon({
       {showFindBar && (
         <div className="popover-enter px-3 py-2 bg-zinc-50 border-t border-zinc-200 flex flex-wrap items-center gap-2">
           <div className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-700">
-            <Replace className="w-3.5 h-3.5 text-[#4338CA]" />
+            <Replace className="w-3.5 h-3.5 text-[#12489B]" />
             <span>Tìm & Thay thế:</span>
           </div>
           <input
@@ -503,14 +503,14 @@ export function WriterWordRibbon({
             value={findQuery}
             onChange={(e) => setFindQuery(e.target.value)}
             placeholder="Tìm từ..."
-            className="px-2.5 py-1 text-xs bg-white border border-zinc-300 rounded-md focus:outline-none focus:border-[#4338CA]"
+            className="px-2.5 py-1 text-xs bg-white border border-zinc-300 rounded-md focus:outline-none focus:border-[#12489B]"
           />
           <input
             type="text"
             value={replaceQuery}
             onChange={(e) => setReplaceQuery(e.target.value)}
             placeholder="Thay bằng..."
-            className="px-2.5 py-1 text-xs bg-white border border-zinc-300 rounded-md focus:outline-none focus:border-[#4338CA]"
+            className="px-2.5 py-1 text-xs bg-white border border-zinc-300 rounded-md focus:outline-none focus:border-[#12489B]"
           />
           <button
             type="button"
@@ -524,7 +524,7 @@ export function WriterWordRibbon({
             type="button"
             disabled={!findQuery}
             onClick={() => onFindReplace(findQuery, replaceQuery, true)}
-            className="btn-press px-2.5 py-1 text-xs font-semibold bg-[#4338CA] text-white rounded-md hover:bg-indigo-700 disabled:opacity-40"
+            className="btn-press px-2.5 py-1 text-xs font-semibold bg-[#12489B] text-white rounded-md hover:bg-[#0B2559] disabled:opacity-40"
           >
             Thay tất cả
           </button>

@@ -274,7 +274,7 @@ export function BankSettingsView({
               value={bankName}
               onChange={(e) => setBankName(e.target.value)}
               placeholder="VD: Vietcombank / MB Bank"
-              className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+              className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
             />
           </div>
           <div>
@@ -286,7 +286,7 @@ export function BankSettingsView({
               value={accountNumber}
               onChange={(e) => setAccountNumber(e.target.value)}
               placeholder="VD: 1029384756"
-              className="w-full px-3 py-2 text-sm font-mono bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+              className="w-full px-3 py-2 text-sm font-mono bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
             />
           </div>
           <div>
@@ -298,7 +298,7 @@ export function BankSettingsView({
               value={accountName}
               onChange={(e) => setAccountName(e.target.value)}
               placeholder="VD: NGUYEN VAN A"
-              className="w-full px-3 py-2 text-sm uppercase bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+              className="w-full px-3 py-2 text-sm uppercase bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
             />
           </div>
         </div>
@@ -361,7 +361,7 @@ export function BankSettingsView({
             onChange={(e) =>
               setQrMode(e.target.value as 'uploaded_default' | 'vietqr_dynamic')
             }
-            className="px-3 py-1.5 text-xs font-medium bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+            className="px-3 py-1.5 text-xs font-medium bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
           >
             <option value="uploaded_default">Dùng ảnh QR mặc định đã tải lên</option>
             <option value="vietqr_dynamic">Bật VietQR.io tự động theo số tiền</option>
@@ -378,7 +378,7 @@ export function BankSettingsView({
               value={vietqrBankBin}
               onChange={(e) => setVietqrBankBin(e.target.value)}
               placeholder="VD: VCB, MB, TCB, ICB hoặc 970436"
-              className="w-full px-3 py-2 text-sm font-mono bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+              className="w-full px-3 py-2 text-sm font-mono bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
             />
           </div>
           <div>
@@ -392,7 +392,7 @@ export function BankSettingsView({
                   e.target.value as 'compact2' | 'compact' | 'qr_only' | 'print'
                 )
               }
-              className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+              className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
             >
               <option value="compact2">compact2 (Đầy đủ thông tin)</option>
               <option value="compact">compact</option>
@@ -413,7 +413,7 @@ export function BankSettingsView({
       <div className="bg-white border border-zinc-200 rounded-xl p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-start gap-2.5">
-            <Bell className="w-4 h-4 text-[#4338CA] shrink-0 mt-0.5" />
+            <Bell className="w-4 h-4 text-[#12489B] shrink-0 mt-0.5" />
             <div>
               <h3 className="text-sm font-semibold text-slate-900">
                 Cảnh báo tự động qua Telegram Bot
@@ -465,7 +465,7 @@ export function BankSettingsView({
               type="checkbox"
               checked={tgNotifyRevision}
               onChange={(e) => handleToggleNotifPref('revision', e.target.checked)}
-              className="w-4 h-4 accent-[#4338CA]"
+              className="w-4 h-4 accent-[#12489B]"
             />
             <span>Thông báo ngay khi khách hàng gửi Yêu cầu chỉnh sửa (Revision)</span>
           </label>
@@ -474,7 +474,7 @@ export function BankSettingsView({
               type="checkbox"
               checked={tgNotifyMessage}
               onChange={(e) => handleToggleNotifPref('message', e.target.checked)}
-              className="w-4 h-4 accent-[#4338CA]"
+              className="w-4 h-4 accent-[#12489B]"
             />
             <span>Thông báo ngay khi khách hàng nhắn tin mới trong Chat 48h</span>
           </label>
@@ -483,7 +483,7 @@ export function BankSettingsView({
               type="checkbox"
               checked={tgNotifyDeadline}
               onChange={(e) => handleToggleNotifPref('deadline', e.target.checked)}
-              className="w-4 h-4 accent-[#4338CA]"
+              className="w-4 h-4 accent-[#12489B]"
             />
             <span>Tự động nhắc đơn sắp hạn (&lt;24h, &lt;6h hoặc quá hạn) khi mở cổng Admin</span>
           </label>
@@ -537,7 +537,7 @@ export function BankSettingsView({
             type="button"
             disabled={sendingDigest}
             onClick={handleSendDeadlineDigest}
-            className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium bg-indigo-50 text-[#4338CA] border border-indigo-200 rounded-lg hover:bg-indigo-100 whitespace-nowrap disabled:opacity-45"
+            className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium bg-blue-50 text-[#12489B] border border-blue-200 rounded-lg hover:bg-blue-100 whitespace-nowrap disabled:opacity-45"
           >
             <Bell className="w-3.5 h-3.5" />
             <span>
@@ -551,7 +551,7 @@ export function BankSettingsView({
         <button
           type="submit"
           disabled={saving}
-          className="btn-press px-5 py-2.5 text-sm font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] disabled:opacity-45"
+          className="btn-press px-5 py-2.5 text-sm font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] disabled:opacity-45"
         >
           {saving ? 'Đang lưu...' : 'Lưu cài đặt thanh toán'}
         </button>

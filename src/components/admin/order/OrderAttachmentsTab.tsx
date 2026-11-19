@@ -66,7 +66,7 @@ export function OrderAttachmentsTab({
                 onChangeCategory(cat);
                 onChangeLocked(cat === 'draft' || cat === 'final');
               }}
-              className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+              className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
             >
               <option value="brief">Đề bài & Tài liệu khách</option>
               <option value="turnitin">Báo cáo Turnitin / AI Check</option>
@@ -103,7 +103,7 @@ export function OrderAttachmentsTab({
                   type="checkbox"
                   checked={attLocked}
                   onChange={(e) => onChangeLocked(e.target.checked)}
-                  className="w-4 h-4 accent-[#4338CA]"
+                  className="w-4 h-4 accent-[#12489B]"
                 />
                 <label htmlFor="lockToggle" className="text-xs font-medium text-slate-800">
                   Khóa tải xuống cho tới khi thanh toán đủ
@@ -135,7 +135,7 @@ export function OrderAttachmentsTab({
             <span className="text-xs font-semibold text-slate-800 block">
               Cách 1: Tải file từ máy (PDF, DOCX, Ảnh...)
             </span>
-            <label className="btn-press inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] cursor-pointer">
+            <label className="btn-press inline-flex items-center gap-2 px-3.5 py-2 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] cursor-pointer">
               <Upload className="w-3.5 h-3.5" />
               {uploadingFile ? 'Đang tải lên...' : 'Chọn tệp để tải lên'}
               <input

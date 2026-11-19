@@ -101,7 +101,7 @@ export function PaymentQrCard({
       <Copy
         key="copy"
         className={`icon-morph w-3.5 h-3.5 shrink-0 ${
-          accent ? 'text-[#4338CA]' : 'text-zinc-400'
+          accent ? 'text-[#12489B]' : 'text-zinc-400'
         }`}
       />
     );
@@ -172,7 +172,7 @@ export function PaymentQrCard({
           <div className="flex-1 w-full space-y-2.5 text-xs">
             <div>
               <span className="text-zinc-500 block">Số tiền cần chuyển đợt này</span>
-              <p className="text-lg font-mono font-bold text-[#4338CA] tabular-nums mt-0.5">
+              <p className="text-lg font-mono font-bold text-[#12489B] tabular-nums mt-0.5">
                 {formatVnd(amountToPayNow)}
               </p>
             </div>
@@ -192,7 +192,7 @@ export function PaymentQrCard({
                   onClick={() =>
                     copyValue('acc', bankSnapshot.accountNumber, 'số tài khoản')
                   }
-                  className="btn-press inline-flex items-center gap-1.5 font-mono font-semibold text-slate-900 hover:text-[#4338CA] tabular-nums"
+                  className="btn-press inline-flex items-center gap-1.5 font-mono font-semibold text-slate-900 hover:text-[#12489B] tabular-nums"
                 >
                   <span>{bankSnapshot.accountNumber || '—'}</span>
                   {bankSnapshot.accountNumber && renderCopyIcon('acc')}
@@ -213,7 +213,7 @@ export function PaymentQrCard({
                   onClick={() =>
                     copyValue('memo', transferMemo, 'nội dung chuyển khoản')
                   }
-                  className="btn-press inline-flex items-center gap-1.5 font-mono font-semibold text-[#4338CA] hover:underline"
+                  className="btn-press inline-flex items-center gap-1.5 font-mono font-semibold text-[#12489B] hover:underline"
                 >
                   <span>{transferMemo}</span>
                   {renderCopyIcon('memo', true)}

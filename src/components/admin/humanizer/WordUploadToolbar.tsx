@@ -73,7 +73,7 @@ export function WordUploadToolbar({
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3] whitespace-nowrap"
+            className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] whitespace-nowrap"
           >
             <Upload className="w-3.5 h-3.5" />
             <span>
@@ -179,7 +179,7 @@ export function WordUploadToolbar({
       {activeSession && (
         <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 pt-2 border-t border-zinc-100">
           <div className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700 shrink-0">
-            <ShieldCheck className="w-3.5 h-3.5 text-[#4338CA]" />
+            <ShieldCheck className="w-3.5 h-3.5 text-[#12489B]" />
             <span>Từ khóa bắt buộc giữ nguyên:</span>
           </div>
           <input
@@ -192,7 +192,7 @@ export function WordUploadToolbar({
             }
             disabled={isRunning}
             placeholder="VD: VinFast, SPayLater, Porter's Five Forces (tự động bảo vệ trích dẫn (Author, 2023) & số liệu %)"
-            className="flex-1 min-w-0 px-3 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+            className="flex-1 min-w-0 px-3 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
           />
         </div>
       )}
@@ -228,7 +228,7 @@ export function WordUploadToolbar({
             value={pasteDocBody}
             onChange={(e) => setPasteDocBody(e.target.value)}
             placeholder="Dán các đoạn văn tiếng Anh học thuật vào đây..."
-            className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+            className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
           />
           <div className="flex items-center justify-end gap-2">
             <button
@@ -240,7 +240,7 @@ export function WordUploadToolbar({
             </button>
             <button
               type="submit"
-              className="btn-press px-3.5 py-1.5 text-xs font-semibold bg-[#4338CA] text-white rounded-lg hover:bg-[#3730A3]"
+              className="btn-press px-3.5 py-1.5 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559]"
             >
               Thêm vào màn trình chiếu Word
             </button>

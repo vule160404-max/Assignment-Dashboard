@@ -129,7 +129,7 @@ export function WriterWorkspaceTabs({
             <button
               type="button"
               onClick={onRunAllParallel}
-              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#4338CA] hover:bg-indigo-700 text-white rounded-lg whitespace-nowrap shadow-2xs"
+              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#12489B] hover:bg-[#0B2559] text-white rounded-lg whitespace-nowrap shadow-2xs"
             >
               <Play className="w-3.5 h-3.5" />
               <span>
@@ -158,11 +158,11 @@ export function WriterWorkspaceTabs({
             onClick={() => setShowOrderPicker((v) => !v)}
             className={`btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold rounded-lg border whitespace-nowrap ${
               showOrderPicker
-                ? 'bg-indigo-50 text-[#4338CA] border-indigo-200'
+                ? 'bg-blue-50 text-[#12489B] border-blue-200'
                 : 'bg-white text-slate-800 border-zinc-200 hover:bg-zinc-50'
             }`}
           >
-            <FolderPlus className="w-3.5 h-3.5 text-[#4338CA]" />
+            <FolderPlus className="w-3.5 h-3.5 text-[#12489B]" />
             <span>+ Nạp nhiều Đơn cùng lúc</span>
           </button>
 
@@ -197,7 +197,7 @@ export function WriterWorkspaceTabs({
 
       {/* Collapsible Multi-Order Batch Picker */}
       {showOrderPicker && (
-        <div className="popover-enter p-3 rounded-xl bg-indigo-50/45 border border-indigo-200/80 space-y-2.5">
+        <div className="popover-enter p-3 rounded-xl bg-blue-50/45 border border-blue-200/80 space-y-2.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-bold text-slate-900">
               Tích chọn các Đơn hàng muốn mở thành nhiều tab bài viết cùng lúc:
@@ -220,7 +220,7 @@ export function WriterWorkspaceTabs({
                 type="button"
                 disabled={pickedCodes.length === 0}
                 onClick={handleConfirmBatchOrders}
-                className="btn-press px-3 py-1 text-xs font-semibold bg-[#4338CA] text-white rounded-md hover:bg-indigo-700 disabled:opacity-40"
+                className="btn-press px-3 py-1 text-xs font-semibold bg-[#12489B] text-white rounded-md hover:bg-[#0B2559] disabled:opacity-40"
               >
                 Mở {pickedCodes.length} đơn đã chọn
               </button>
@@ -249,14 +249,14 @@ export function WriterWorkspaceTabs({
                     onClick={() => togglePickCode(ord.orderCode)}
                     className={`p-2 rounded-lg border text-xs cursor-pointer flex items-start gap-2 ${
                       isChecked
-                        ? 'border-[#4338CA] bg-white shadow-2xs'
+                        ? 'border-[#12489B] bg-white shadow-2xs'
                         : 'border-zinc-200 bg-white/80 hover:border-zinc-300'
                     }`}
                   >
                     <div
                       className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
                         isChecked
-                          ? 'bg-[#4338CA] border-[#4338CA] text-white'
+                          ? 'bg-[#12489B] border-[#12489B] text-white'
                           : 'border-zinc-300 bg-white'
                       }`}
                     >
@@ -304,10 +304,10 @@ export function WriterWorkspaceTabs({
           let statusBadge = '';
 
           if (sess.batchStatus === 'outlining') {
-            dotClass = 'bg-[#4338CA] animate-pulse';
+            dotClass = 'bg-[#12489B] animate-pulse';
             statusBadge = 'Đang lập dàn ý...';
           } else if (busy) {
-            dotClass = 'bg-[#4338CA] animate-pulse';
+            dotClass = 'bg-[#12489B] animate-pulse';
             statusBadge = `Đang viết (${completedSections}/${totalSections})`;
           } else if (sess.batchStatus === 'queued') {
             dotClass = 'bg-amber-400 animate-pulse';
@@ -332,7 +332,7 @@ export function WriterWorkspaceTabs({
               key={sess.id}
               className={`card-interactive group inline-flex items-center gap-2 rounded-xl border pl-3 pr-1.5 py-1.5 text-xs ${
                 isActive
-                  ? 'border-[#4338CA] bg-indigo-50/75 text-slate-900 ring-2 ring-indigo-500/10'
+                  ? 'border-[#12489B] bg-blue-50/75 text-slate-900 ring-2 ring-blue-500/10'
                   : 'border-zinc-200 bg-zinc-50/70 text-zinc-700 hover:bg-zinc-100/80'
               }`}
             >
@@ -342,7 +342,7 @@ export function WriterWorkspaceTabs({
                 className="flex items-center gap-2 text-left min-w-0"
               >
                 {busy ? (
-                  <Loader2 className="w-3.5 h-3.5 text-[#4338CA] animate-spin shrink-0" />
+                  <Loader2 className="w-3.5 h-3.5 text-[#12489B] animate-spin shrink-0" />
                 ) : (
                   <span
                     className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`}
@@ -358,7 +358,7 @@ export function WriterWorkspaceTabs({
                   {draftedWords.toLocaleString('vi-VN')}w
                 </span>
                 {statusBadge && (
-                  <span className="text-[11px] font-semibold text-[#4338CA]">
+                  <span className="text-[11px] font-semibold text-[#12489B]">
                     · {statusBadge}
                   </span>
                 )}

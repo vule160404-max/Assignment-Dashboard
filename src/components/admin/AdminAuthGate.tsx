@@ -368,7 +368,7 @@ export function AdminAuthGate({
 
   if (!user) {
     const inputFieldCls =
-      'w-full px-3.5 py-2.5 text-sm bg-zinc-50/90 border border-zinc-200 rounded-xl text-slate-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA] transition-colors';
+      'w-full px-3.5 py-2.5 text-sm bg-zinc-50/90 border border-zinc-200 rounded-xl text-slate-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B] transition-colors';
 
     const loginSubmitLabel = authBusy
       ? 'Đang xác thực...'
@@ -401,7 +401,7 @@ export function AdminAuthGate({
                 }}
                 className={`whitespace-nowrap shrink-0 transition-colors ${
                   authTab === 'login'
-                    ? 'text-[#4338CA] font-semibold'
+                    ? 'text-[#12489B] font-semibold'
                     : 'hover:text-slate-900'
                 }`}
               >
@@ -415,7 +415,7 @@ export function AdminAuthGate({
                 }}
                 className={`whitespace-nowrap shrink-0 transition-colors ${
                   authTab === 'staff_register'
-                    ? 'text-[#4338CA] font-semibold'
+                    ? 'text-[#12489B] font-semibold'
                     : 'hover:text-slate-900'
                 }`}
               >
@@ -426,7 +426,7 @@ export function AdminAuthGate({
             <button
               type="button"
               onClick={onSwitchToClientPortal}
-              className="btn-press px-3.5 py-1.5 text-xs font-medium text-[#4338CA] bg-indigo-50 hover:bg-indigo-100 rounded-lg whitespace-nowrap shrink-0"
+              className="btn-press px-3.5 py-1.5 text-xs font-medium text-[#12489B] bg-blue-50 hover:bg-blue-100 rounded-lg whitespace-nowrap shrink-0"
             >
               Cổng Khách hàng →
             </button>
@@ -461,7 +461,7 @@ export function AdminAuthGate({
                     }}
                     className={`btn-press py-2.5 px-3 text-xs font-semibold rounded-lg flex items-center justify-center gap-2 ${
                       authTab === 'staff_register'
-                        ? 'bg-white text-[#4338CA] shadow-xs'
+                        ? 'bg-white text-[#12489B] shadow-xs'
                         : 'text-zinc-600 hover:text-slate-900'
                     }`}
                   >
@@ -545,7 +545,7 @@ export function AdminAuthGate({
                           <button
                             type="button"
                             onClick={handleForgotPassword}
-                            className="text-xs font-medium text-[#4338CA] hover:underline"
+                            className="text-xs font-medium text-[#12489B] hover:underline"
                           >
                             Quên mật khẩu?
                           </button>
@@ -579,7 +579,7 @@ export function AdminAuthGate({
                       <button
                         type="submit"
                         disabled={authBusy}
-                        className="btn-press w-full py-2.5 px-4 text-sm font-semibold bg-[#4338CA] text-white rounded-xl hover:bg-[#3730A3] disabled:opacity-45"
+                        className="btn-press w-full py-2.5 px-4 text-sm font-semibold bg-[#12489B] text-white rounded-xl hover:bg-[#0B2559] disabled:opacity-45"
                       >
                         {loginSubmitLabel}
                       </button>
@@ -592,7 +592,7 @@ export function AdminAuthGate({
                           setAuthTab('staff_register');
                           setAuthError('');
                         }}
-                        className="btn-press font-semibold text-[#4338CA] hover:underline"
+                        className="btn-press font-semibold text-[#12489B] hover:underline"
                       >
                         Có mã mời nhân sự? Đăng ký ngay →
                       </button>
@@ -684,7 +684,7 @@ export function AdminAuthGate({
                               type="button"
                               disabled={checkingInvite || authBusy}
                               onClick={handleVerifyInvitePreview}
-                              className="btn-press px-3 py-2.5 text-xs font-semibold bg-indigo-50 text-[#4338CA] border border-indigo-200 rounded-xl hover:bg-indigo-100 whitespace-nowrap shrink-0 disabled:opacity-45"
+                              className="btn-press px-3 py-2.5 text-xs font-semibold bg-blue-50 text-[#12489B] border border-blue-200 rounded-xl hover:bg-blue-100 whitespace-nowrap shrink-0 disabled:opacity-45"
                             >
                               {checkingInvite ? 'Đang kiểm...' : 'Kiểm tra mã'}
                             </button>
@@ -796,7 +796,7 @@ export function AdminAuthGate({
                       <button
                         type="submit"
                         disabled={authBusy}
-                        className="btn-press w-full py-2.5 px-4 text-sm font-semibold bg-[#4338CA] text-white rounded-xl hover:bg-[#3730A3] disabled:opacity-45"
+                        className="btn-press w-full py-2.5 px-4 text-sm font-semibold bg-[#12489B] text-white rounded-xl hover:bg-[#0B2559] disabled:opacity-45"
                       >
                         {authBusy
                           ? 'Đang kiểm tra Mã mời & Tạo tài khoản...'
@@ -812,7 +812,7 @@ export function AdminAuthGate({
                 <button
                   type="button"
                   onClick={onSwitchToClientPortal}
-                  className="btn-press font-medium text-[#4338CA] hover:underline"
+                  className="btn-press font-medium text-[#12489B] hover:underline"
                 >
                   Bạn là Khách hàng? Mở cổng Tra cứu & Đăng nhập Khách hàng →
                 </button>
@@ -872,7 +872,7 @@ export function AdminAuthGate({
             <button
               type="button"
               onClick={onSwitchToClientPortal}
-              className="btn-press px-4 py-2 text-xs font-medium bg-[#4338CA] text-white rounded-lg"
+              className="btn-press px-4 py-2 text-xs font-medium bg-[#12489B] text-white rounded-lg"
             >
               Mở Cổng Khách hàng
             </button>
@@ -893,7 +893,7 @@ export function AdminAuthGate({
     <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center p-6">
       <div className="surface-enter max-w-md w-full bg-white border border-zinc-200 rounded-2xl p-6 sm:p-7 space-y-5 shadow-[0_12px_32px_rgb(15,23,42,0.04)]">
         <div className="space-y-1.5">
-          <p className="text-xs font-mono font-semibold uppercase tracking-wider text-[#4338CA]">
+          <p className="text-xs font-mono font-semibold uppercase tracking-wider text-[#12489B]">
             Kích hoạt quyền Nhân sự
           </p>
           <h2 className="text-lg font-bold text-slate-900">
@@ -918,7 +918,7 @@ export function AdminAuthGate({
               value={claimInviteCode}
               onChange={(e) => setClaimInviteCode(e.target.value.toUpperCase())}
               placeholder="TEAM-XXXXXX"
-              className="w-full px-3 py-2 text-sm font-mono uppercase bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+              className="w-full px-3 py-2 text-sm font-mono uppercase bg-zinc-50 border border-zinc-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
             />
           </div>
 
@@ -952,7 +952,7 @@ export function AdminAuthGate({
           <button
             type="submit"
             disabled={claimingInvite}
-            className="btn-press w-full py-2.5 px-4 text-sm font-medium bg-[#4338CA] text-white rounded-xl hover:bg-[#3730A3] disabled:opacity-45"
+            className="btn-press w-full py-2.5 px-4 text-sm font-medium bg-[#12489B] text-white rounded-xl hover:bg-[#0B2559] disabled:opacity-45"
           >
             {claimingInvite ? 'Đang kích hoạt...' : 'Xác nhận kích hoạt Nhân sự'}
           </button>
@@ -962,7 +962,7 @@ export function AdminAuthGate({
           <button
             type="button"
             onClick={onSwitchToClientPortal}
-            className="btn-press text-xs font-medium text-[#4338CA] hover:underline"
+            className="btn-press text-xs font-medium text-[#12489B] hover:underline"
           >
             Sang Cổng Khách hàng →
           </button>

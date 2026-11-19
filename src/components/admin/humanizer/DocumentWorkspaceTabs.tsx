@@ -63,7 +63,7 @@ export function DocumentWorkspaceTabs({
             <button
               type="button"
               onClick={onRunAllParallel}
-              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#4338CA] hover:bg-[#3730A3] text-white rounded-lg whitespace-nowrap"
+              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-[#12489B] hover:bg-[#0B2559] text-white rounded-lg whitespace-nowrap"
             >
               <Play className="w-3.5 h-3.5" />
               <span>Chạy tất cả song song ({runnableCount} bài)</span>
@@ -102,7 +102,7 @@ export function DocumentWorkspaceTabs({
           let dotClass = 'bg-zinc-300';
           let statusLabel = '';
           if (running) {
-            dotClass = 'bg-[#4338CA] animate-pulse';
+            dotClass = 'bg-[#12489B] animate-pulse';
             statusLabel = 'Đang chạy';
           } else if (sess.playbackStatus === 'review_glitch') {
             dotClass = 'bg-[#D97706]';
@@ -120,7 +120,7 @@ export function DocumentWorkspaceTabs({
               key={sess.sessionId}
               className={`group inline-flex items-center gap-2 rounded-lg border pl-3 pr-1.5 py-1.5 text-xs transition-colors ${
                 isActive
-                  ? 'border-[#4338CA] bg-indigo-50/70 text-slate-900'
+                  ? 'border-[#12489B] bg-blue-50/70 text-slate-900'
                   : 'border-zinc-200 bg-zinc-50/70 text-zinc-700 hover:bg-zinc-100/80'
               }`}
             >

@@ -135,7 +135,7 @@ export function CalendarView({
                       <span
                         className={`text-xs font-mono tabular-nums px-1.5 py-0.5 rounded ${
                           isToday
-                            ? 'bg-[#4338CA] text-white font-semibold'
+                            ? 'bg-[#12489B] text-white font-semibold'
                             : 'text-zinc-600'
                         }`}
                       >

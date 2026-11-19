@@ -11,9 +11,9 @@ export function RoleSelectionGate({
   onSelectAdmin,
 }: RoleSelectionGateProps) {
   return (
-    <div className="min-h-screen bg-[#FAFAFA] text-[#0F172A] flex flex-col">
+    <div className="min-h-screen client-ambient-bg text-[#0F172A] flex flex-col">
       {/* Top Bar Contract: 1-row, clean zones separated by gap-8 */}
-      <header className="sticky top-0 z-20 sticky-glass border-b border-zinc-200/80 px-4 sm:px-8 h-14 flex items-center">
+      <header className="sticky top-0 z-20 sticky-glass border-b border-zinc-200/80 px-4 sm:px-8 h-16 flex items-center">
         <div className="max-w-4xl w-full mx-auto flex items-center justify-between gap-8">
           <BrandLogo />
 
@@ -40,10 +40,10 @@ export function RoleSelectionGate({
             <button
               type="button"
               onClick={onSelectClient}
-              className="btn-press group text-left bg-white border border-zinc-200 hover:border-[#4338CA] rounded-2xl p-6 flex flex-col justify-between gap-6 shadow-[0_8px_28px_rgb(15,23,42,0.03)] transition-colors"
+              className="btn-press group text-left bg-white border border-zinc-200 hover:border-[#12489B] rounded-2xl p-6 flex flex-col justify-between gap-6 shadow-[0_8px_28px_rgb(15,23,42,0.03)] transition-colors"
             >
               <div className="space-y-4">
-                <div className="w-11 h-11 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-[#4338CA]">
+                <div className="w-11 h-11 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#12489B]">
                   <Search className="w-5 h-5" />
                 </div>
 
@@ -57,7 +57,7 @@ export function RoleSelectionGate({
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-zinc-100 flex items-center justify-between text-xs font-semibold text-[#4338CA]">
+              <div className="pt-4 border-t border-zinc-100 flex items-center justify-between text-xs font-semibold text-[#12489B]">
                 <span>Vào Cổng Khách hàng</span>
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
               </div>
@@ -67,10 +67,10 @@ export function RoleSelectionGate({
             <button
               type="button"
               onClick={onSelectAdmin}
-              className="btn-press group text-left bg-white border border-zinc-200 hover:border-[#4338CA] rounded-2xl p-6 flex flex-col justify-between gap-6 shadow-[0_8px_28px_rgb(15,23,42,0.03)] transition-colors"
+              className="btn-press group text-left bg-white border border-zinc-200 hover:border-[#12489B] rounded-2xl p-6 flex flex-col justify-between gap-6 shadow-[0_8px_28px_rgb(15,23,42,0.03)] transition-colors"
             >
               <div className="space-y-4">
-                <div className="w-11 h-11 rounded-xl bg-slate-100 border border-zinc-200 flex items-center justify-center text-slate-900">
+                <div className="w-11 h-11 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-[#B45309]">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
 
@@ -84,7 +84,7 @@ export function RoleSelectionGate({
                 </div>
               </div>
 
-              <div className="pt-4 border-t border-zinc-100 flex items-center justify-between text-xs font-semibold text-slate-900 group-hover:text-[#4338CA]">
+              <div className="pt-4 border-t border-zinc-100 flex items-center justify-between text-xs font-semibold text-[#0B2559] group-hover:text-[#12489B]">
                 <span>Vào Cổng Quản trị</span>
                 <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
               </div>

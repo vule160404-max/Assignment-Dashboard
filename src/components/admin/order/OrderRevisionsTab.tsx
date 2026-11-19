@@ -55,7 +55,7 @@ export function OrderRevisionsTab({
                   value={revReplies[rev.id] || ''}
                   onChange={(e) => onChangeReply(rev.id, e.target.value)}
                   placeholder="Phản hồi cho khách (VD: Đã up Final v2)..."
-                  className="w-full px-2.5 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
+                  className="w-full px-2.5 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                 />
                 <div className="flex items-center gap-2">
                   <button
