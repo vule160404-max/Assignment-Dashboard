@@ -61,7 +61,10 @@ import { BrandLogo } from '../shared/BrandLogo';
 import { OrderChatPanel } from '../shared/OrderChatPanel';
 import { PdfPreviewModal } from '../shared/PdfPreviewModal';
 import { ClientIntegrityCheckerView } from './ClientIntegrityCheckerView';
-import { ClientLandingSections } from './ClientLandingSections';
+import {
+  ClientLandingSections,
+  ClientValuePropCard,
+} from './ClientLandingSections';
 import { PaymentQrCard } from './PaymentQrCard';
 
 interface ClientPortalViewProps {
@@ -472,8 +475,12 @@ export function ClientPortalView({
 
       <main
         className={`${
-          !portal && homeTab === 'checker' ? 'max-w-6xl' : 'max-w-5xl'
-        } mx-auto px-4 sm:px-8 py-8 sm:py-10`}
+          !portal && (homeTab === 'checker' || homeTab === 'lookup')
+            ? 'max-w-6xl'
+            : 'max-w-5xl'
+        } mx-auto px-4 sm:px-8 ${
+          !portal && homeTab === 'lookup' ? 'py-5 sm:py-6' : 'py-8 sm:py-10'
+        }`}
       >
         {(() => {
           if (activeCode && loading && !portal) {
@@ -496,33 +503,28 @@ export function ClientPortalView({
               );
             }
 
-            return (
-              <div className="surface-enter space-y-6 sm:space-y-8">
-                <div
-                  className={`${
-                    homeTab === 'lookup' ? 'max-w-2xl' : 'max-w-xl'
-                  } w-full mx-auto`}
-                >
-                  <section className="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 flex flex-col justify-between shadow-[0_8px_28px_rgb(15,23,42,0.03)] space-y-6">
-                  <div className="space-y-6">
-
-                    {homeTab === 'lookup' && (
-                      <div className="space-y-6">
-                        <div className="space-y-1.5">
-                          <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+            if (homeTab === 'lookup') {
+              return (
+                <div className="surface-enter space-y-4">
+                  {/* Row 1: 2-Column Hero Split — Tra cứu đơn hàng (Left) + Cam kết cốt lõi (Right) */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+                    <section className="lg:col-span-7 bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-[0_4px_20px_rgb(15,23,42,0.03)] space-y-4">
+                      <div className="space-y-4">
+                        <div className="space-y-1">
+                          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
                             Tra cứu tiến độ đơn hàng
                           </h1>
-                          <p className="text-xs text-zinc-600 leading-relaxed max-w-[65ch]">
+                          <p className="text-xs text-zinc-600 leading-relaxed">
                             Nhập mã đơn hàng được cung cấp (không bắt buộc đăng nhập) để xem tiến độ thời gian thực, tải tài liệu và thanh toán.
                           </p>
                         </div>
 
-                        <form onSubmit={handleLookup} className="space-y-3.5">
-                          <div>
-                            <label className="block text-xs font-medium text-zinc-700 mb-1.5">
-                              Mã đơn hàng *
-                            </label>
-                            <div className="relative">
+                        <form onSubmit={handleLookup} className="space-y-2.5">
+                          <label className="block text-xs font-medium text-zinc-700">
+                            Mã đơn hàng *
+                          </label>
+                          <div className="flex flex-col sm:flex-row gap-2.5">
+                            <div className="relative flex-1">
                               <Search className="w-4 h-4 text-zinc-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                               <input
                                 type="text"
@@ -532,6 +534,13 @@ export function ClientPortalView({
                                 className="w-full pl-10 pr-3.5 py-2.5 text-sm font-mono uppercase bg-zinc-50 border border-zinc-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA] transition-colors"
                               />
                             </div>
+                            <button
+                              type="submit"
+                              disabled={loading || !codeInput.trim()}
+                              className="btn-press sm:w-auto w-full py-2.5 px-5 text-sm font-semibold bg-[#4338CA] text-white rounded-xl hover:bg-[#3730A3] disabled:opacity-45 whitespace-nowrap shrink-0"
+                            >
+                              {loading ? 'Đang kiểm tra...' : 'Xem tiến độ'}
+                            </button>
                           </div>
 
                           {lookupError && (
@@ -539,70 +548,97 @@ export function ClientPortalView({
                               {lookupError}
                             </p>
                           )}
-
-                          <button
-                            type="submit"
-                            disabled={loading || !codeInput.trim()}
-                            className="btn-press w-full py-2.5 px-4 text-sm font-semibold bg-[#4338CA] text-white rounded-xl hover:bg-[#3730A3] disabled:opacity-45"
-                          >
-                            {loading ? 'Đang kiểm tra...' : 'Xem tiến độ đơn hàng'}
-                          </button>
                         </form>
-
-                        {/* Saved Orders for Signed-In Client */}
-                        {user && userProfile && (
-                          <div className="pt-4 border-t border-zinc-100 space-y-3">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                                <Bookmark className="w-3.5 h-3.5 text-[#4338CA]" />
-                                Đơn hàng đã lưu của {userProfile.displayName}
-                              </span>
-                              <span className="text-[11px] font-mono text-zinc-400 tabular-nums">
-                                {(userProfile.savedOrderCodes || []).length} đơn
-                              </span>
-                            </div>
-
-                            {(userProfile.savedOrderCodes || []).length === 0 ? (
-                              <p className="text-xs text-zinc-500">
-                                Mỗi khi bạn tra cứu một mã đơn hợp lệ, mã đó sẽ tự động lưu tại đây để mở lại nhanh chóng.
-                              </p>
-                            ) : (
-                              <div className="flex flex-wrap gap-2">
-                                {(userProfile.savedOrderCodes || []).map((savedCode) => (
-                                  <div
-                                    key={savedCode}
-                                    className="inline-flex items-center bg-zinc-50 border border-zinc-200 rounded-lg overflow-hidden"
-                                  >
-                                    <button
-                                      type="button"
-                                      onClick={() => void openOrderByCode(savedCode)}
-                                      className="btn-press px-2.5 py-1.5 text-xs font-mono font-semibold text-[#4338CA] hover:bg-indigo-50"
-                                    >
-                                      #{savedCode}
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        void removeClientOrderBookmark(
-                                          user.uid,
-                                          userProfile.savedOrderCodes,
-                                          savedCode
-                                        )
-                                      }
-                                      aria-label={`Bỏ lưu ${savedCode}`}
-                                      className="px-1.5 py-1.5 text-zinc-400 hover:text-[#DC2626] hover:bg-red-50 border-l border-zinc-200"
-                                    >
-                                      <X className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        )}
                       </div>
-                    )}
 
+                      {/* Compact Saved Orders or Sign-in Hint */}
+                      {user && userProfile ? (
+                        <div className="pt-3 border-t border-zinc-100 space-y-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                              <Bookmark className="w-3.5 h-3.5 text-[#4338CA]" />
+                              Đơn hàng đã lưu của {userProfile.displayName}
+                            </span>
+                            <span className="text-[11px] font-mono text-zinc-400 tabular-nums">
+                              {(userProfile.savedOrderCodes || []).length} đơn
+                            </span>
+                          </div>
+
+                          {(userProfile.savedOrderCodes || []).length === 0 ? (
+                            <p className="text-[11px] text-zinc-500">
+                              Mã đơn hợp lệ sau khi tra cứu sẽ tự động lưu tại đây để mở lại nhanh.
+                            </p>
+                          ) : (
+                            <div className="flex flex-wrap gap-1.5">
+                              {(userProfile.savedOrderCodes || []).map((savedCode) => (
+                                <div
+                                  key={savedCode}
+                                  className="inline-flex items-center bg-zinc-50 border border-zinc-200 rounded-lg overflow-hidden"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => void openOrderByCode(savedCode)}
+                                    className="btn-press px-2.5 py-1 text-xs font-mono font-semibold text-[#4338CA] hover:bg-indigo-50"
+                                  >
+                                    #{savedCode}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      void removeClientOrderBookmark(
+                                        user.uid,
+                                        userProfile.savedOrderCodes,
+                                        savedCode
+                                      )
+                                    }
+                                    aria-label={`Bỏ lưu ${savedCode}`}
+                                    className="px-1.5 py-1 text-zinc-400 hover:text-[#DC2626] hover:bg-red-50 border-l border-zinc-200"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="pt-3 border-t border-zinc-100 flex items-center justify-between gap-2 text-xs text-zinc-500">
+                          <span>Đăng nhập để tự động lưu lịch sử các mã đơn hàng của bạn.</span>
+                          <button
+                            type="button"
+                            onClick={() => setHomeTab('auth')}
+                            className="btn-press font-semibold text-[#4338CA] hover:underline whitespace-nowrap shrink-0"
+                          >
+                            Đăng nhập →
+                          </button>
+                        </div>
+                      )}
+                    </section>
+
+                    <div className="lg:col-span-5">
+                      <ClientValuePropCard />
+                    </div>
+                  </div>
+
+                  {/* Row 2 (Social Proof Strip) + Row 3 (3 Service Cards) */}
+                  <ClientLandingSections
+                    onOpenChecker={(hintToast) => {
+                      handleResetLookup();
+                      setHomeTab('checker');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      if (hintToast) {
+                        onToast(hintToast);
+                      }
+                    }}
+                  />
+                </div>
+              );
+            }
+
+            return (
+              <div className="surface-enter max-w-xl w-full mx-auto">
+                <section className="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 flex flex-col justify-between shadow-[0_8px_28px_rgb(15,23,42,0.03)] space-y-6">
+                  <div className="space-y-6">
                     {homeTab === 'auth' && (
                       <div className="space-y-5">
                         {user && userProfile ? (
@@ -853,31 +889,8 @@ export function ClientPortalView({
 
                   <div className="pt-4 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
                     <span>Chỉ sử dụng Email & Mật khẩu nội bộ.</span>
-                    {homeTab === 'lookup' && !user && (
-                      <button
-                        type="button"
-                        onClick={() => setHomeTab('auth')}
-                        className="btn-press font-medium text-[#4338CA] hover:underline"
-                      >
-                        Đăng nhập / Đăng ký để lưu mã đơn →
-                      </button>
-                    )}
                   </div>
-                  </section>
-                </div>
-
-                {homeTab === 'lookup' && (
-                  <ClientLandingSections
-                    onOpenChecker={(hintToast) => {
-                      handleResetLookup();
-                      setHomeTab('checker');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                      if (hintToast) {
-                        onToast(hintToast);
-                      }
-                    }}
-                  />
-                )}
+                </section>
               </div>
             );
           }
