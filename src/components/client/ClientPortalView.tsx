@@ -24,7 +24,6 @@ import {
   Search,
   Send,
   ShieldCheck,
-  UserPlus,
   X,
 } from 'lucide-react';
 import {
@@ -87,7 +86,6 @@ export function ClientPortalView({
   initialOrderCode = '',
   nowMs,
   onSwitchToAdmin,
-  onBackToRoleSelect,
   onToast,
 }: ClientPortalViewProps) {
   const [codeInput, setCodeInput] = useState(initialOrderCode);
@@ -312,49 +310,47 @@ export function ClientPortalView({
   const inputFieldCls =
     'w-full px-3.5 py-2.5 text-sm bg-zinc-50/90 border border-zinc-200 rounded-xl text-slate-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA] transition-colors';
 
+  const displayName =
+    userProfile?.displayName || user?.displayName || user?.email || 'Khách hàng';
+  const avatarInitial = displayName.trim().charAt(0).toUpperCase() || 'K';
+
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-[#0F172A]">
-      {/* Top Bar Contract: 1-row, 3 clean translucent zones separated by gap-8 */}
-      <header className="sticky top-0 z-20 sticky-glass border-b border-zinc-200/80 px-4 sm:px-8 h-14 flex items-center">
-        <div className="max-w-5xl w-full mx-auto flex items-center justify-between gap-8">
-          <div className="flex items-center gap-3 shrink-0">
-            {onBackToRoleSelect && (
-              <button
-                type="button"
-                onClick={onBackToRoleSelect}
-                className="btn-press inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-zinc-600 hover:text-slate-900 bg-zinc-100 hover:bg-zinc-200/80 rounded-lg"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Chọn vai trò</span>
-              </button>
-            )}
-            <a
-              href="/"
-              onClick={(e) => {
-                e.preventDefault();
-                handleResetLookup();
-                setHomeTab('lookup');
-              }}
-              className="whitespace-nowrap shrink-0"
-            >
-              <BrandLogo />
-            </a>
-          </div>
+      {/* Streamlined, Beginner-Friendly Sticky Header */}
+      <header className="sticky top-0 z-20 sticky-glass border-b border-zinc-200/80">
+        <div className="max-w-6xl w-full mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
+          {/* Left: Clean Brand Logo */}
+          <a
+            href="/"
+            onClick={(e) => {
+              e.preventDefault();
+              handleResetLookup();
+              setHomeTab('lookup');
+            }}
+            className="whitespace-nowrap shrink-0"
+          >
+            <BrandLogo />
+          </a>
 
-          <nav className="hidden sm:flex items-center gap-6 text-xs font-medium text-zinc-600">
+          {/* Center: Single Clear Pill Switcher for the 2 Primary Client Tools (Desktop) */}
+          <nav
+            aria-label="Chức năng chính"
+            className="hidden md:inline-flex items-center bg-zinc-100/90 border border-zinc-200/70 p-1 rounded-xl gap-1"
+          >
             <button
               type="button"
               onClick={() => {
                 handleResetLookup();
                 setHomeTab('lookup');
               }}
-              className={`whitespace-nowrap shrink-0 transition-colors ${
+              className={`btn-press px-4 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap ${
                 homeTab === 'lookup' && !portal
-                  ? 'text-[#4338CA] font-semibold'
-                  : 'hover:text-slate-900'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-zinc-600 hover:text-slate-900'
               }`}
             >
-              Tra cứu đơn hàng
+              <Search className="w-3.5 h-3.5 text-[#4338CA]" />
+              <span>Tra cứu đơn hàng</span>
             </button>
             <button
               type="button"
@@ -362,43 +358,47 @@ export function ClientPortalView({
                 handleResetLookup();
                 setHomeTab('checker');
               }}
-              className={`whitespace-nowrap shrink-0 transition-colors inline-flex items-center gap-1 ${
+              className={`btn-press px-4 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap ${
                 homeTab === 'checker' && !portal
-                  ? 'text-[#4338CA] font-semibold'
-                  : 'hover:text-slate-900'
+                  ? 'bg-white text-[#4338CA] shadow-xs'
+                  : 'text-zinc-600 hover:text-slate-900'
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Check Đạo văn &amp; AI</span>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                handleResetLookup();
-                setHomeTab('auth');
-              }}
-              className={`whitespace-nowrap shrink-0 transition-colors ${
-                homeTab === 'auth' && !portal
-                  ? 'text-[#4338CA] font-semibold'
-                  : 'hover:text-slate-900'
-              }`}
-            >
-              Tài khoản Khách hàng
-            </button>
           </nav>
 
-          <div className="flex items-center gap-2 shrink-0">
+          {/* Right: Unified Account Control + Subtle Admin Link */}
+          <div className="flex items-center gap-2.5 shrink-0">
             {user ? (
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-zinc-100 rounded-lg text-xs text-slate-800">
-                <span className="max-w-[120px] truncate font-medium">
-                  {userProfile?.displayName || user.displayName || user.email}
-                </span>
+              <div className="inline-flex items-center bg-white border border-zinc-200/90 rounded-xl p-1 pl-1.5 gap-1.5 shadow-2xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    handleResetLookup();
+                    setHomeTab('auth');
+                  }}
+                  className={`btn-press inline-flex items-center gap-2 pr-1.5 py-0.5 rounded-lg text-xs ${
+                    homeTab === 'auth' && !portal
+                      ? 'text-[#4338CA] font-semibold'
+                      : 'text-slate-800 hover:text-[#4338CA] font-medium'
+                  }`}
+                  title="Xem tài khoản & đơn hàng đã lưu"
+                >
+                  <span className="w-6 h-6 rounded-lg bg-indigo-50 border border-indigo-200/80 text-[#4338CA] text-[11px] font-bold flex items-center justify-center shrink-0">
+                    {avatarInitial}
+                  </span>
+                  <span className="max-w-[110px] sm:max-w-[140px] truncate">
+                    {displayName}
+                  </span>
+                </button>
                 <button
                   type="button"
                   onClick={handleClientSignOut}
                   title="Đăng xuất"
                   aria-label="Đăng xuất"
-                  className="btn-press p-1 text-zinc-500 hover:text-[#DC2626] rounded"
+                  className="btn-press p-1.5 text-zinc-400 hover:text-[#DC2626] hover:bg-red-50 rounded-lg border-l border-zinc-100"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                 </button>
@@ -410,19 +410,60 @@ export function ClientPortalView({
                   handleResetLookup();
                   setHomeTab('auth');
                 }}
-                className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#4338CA] bg-indigo-50 hover:bg-indigo-100 rounded-lg whitespace-nowrap"
+                className={`btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl whitespace-nowrap ${
+                  homeTab === 'auth' && !portal
+                    ? 'bg-[#4338CA] text-white shadow-2xs'
+                    : 'text-[#4338CA] bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/70'
+                }`}
               >
                 <LogIn className="w-3.5 h-3.5" />
-                Đăng nhập
+                <span>Đăng nhập</span>
               </button>
             )}
 
             <button
               type="button"
               onClick={onSwitchToAdmin}
-              className="btn-press px-3 py-1.5 text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200/80 rounded-lg whitespace-nowrap shrink-0"
+              className="btn-press hidden sm:inline-flex items-center px-2.5 py-1.5 text-[11px] font-medium text-zinc-400 hover:text-slate-800 hover:bg-zinc-100 rounded-lg whitespace-nowrap border-l border-zinc-200/80 ml-0.5 pl-3"
+              title="Chuyển sang cổng dành cho Admin / Nhân sự"
             >
-              Cổng Admin / Nhân sự
+              Quản trị
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Compact 2-Tab Bar (Only visible below md) */}
+        <div className="md:hidden px-4 pb-2.5">
+          <div className="bg-zinc-100/90 border border-zinc-200/70 p-1 rounded-xl grid grid-cols-2 gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                handleResetLookup();
+                setHomeTab('lookup');
+              }}
+              className={`btn-press py-2 px-3 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1.5 ${
+                homeTab === 'lookup' && !portal
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-zinc-600'
+              }`}
+            >
+              <Search className="w-3.5 h-3.5 text-[#4338CA]" />
+              <span>Tra cứu đơn</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleResetLookup();
+                setHomeTab('checker');
+              }}
+              className={`btn-press py-2 px-3 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1.5 ${
+                homeTab === 'checker' && !portal
+                  ? 'bg-white text-[#4338CA] shadow-2xs'
+                  : 'text-zinc-600'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Check Đạo văn &amp; AI</span>
             </button>
           </div>
         </div>
@@ -446,53 +487,9 @@ export function ClientPortalView({
           }
 
           if (!activeCode || !portal) {
-            const segmentedBar = (
-              <div className="bg-zinc-100 p-1 rounded-xl grid grid-cols-3 gap-1">
-                <button
-                  type="button"
-                  onClick={() => setHomeTab('lookup')}
-                  className={`btn-press py-2.5 px-2.5 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 ${
-                    homeTab === 'lookup'
-                      ? 'bg-white text-slate-900 shadow-xs'
-                      : 'text-zinc-600 hover:text-slate-900'
-                  }`}
-                >
-                  <Search className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">Tra cứu đơn</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHomeTab('checker')}
-                  className={`btn-press py-2.5 px-2.5 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 ${
-                    homeTab === 'checker'
-                      ? 'bg-white text-[#4338CA] shadow-xs'
-                      : 'text-zinc-600 hover:text-slate-900'
-                  }`}
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">Check Đạo văn &amp; AI</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHomeTab('auth')}
-                  className={`btn-press py-2.5 px-2.5 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 ${
-                    homeTab === 'auth'
-                      ? 'bg-white text-[#4338CA] shadow-xs'
-                      : 'text-zinc-600 hover:text-slate-900'
-                  }`}
-                >
-                  <UserPlus className="w-3.5 h-3.5 shrink-0" />
-                  <span className="truncate">
-                    {user ? 'Tài khoản' : 'Đăng nhập'}
-                  </span>
-                </button>
-              </div>
-            );
-
             if (homeTab === 'checker') {
               return (
-                <div className="surface-enter space-y-6">
-                  <div className="max-w-xl mx-auto">{segmentedBar}</div>
+                <div className="surface-enter">
                   <ClientIntegrityCheckerView onToast={onToast} />
                 </div>
               );
@@ -502,8 +499,6 @@ export function ClientPortalView({
               <div className="surface-enter max-w-xl w-full mx-auto">
                 <section className="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 flex flex-col justify-between shadow-[0_8px_28px_rgb(15,23,42,0.03)] space-y-6">
                   <div className="space-y-6">
-                    {/* Segmented Mode Switcher */}
-                    {segmentedBar}
 
                     {homeTab === 'lookup' && (
                       <div className="space-y-6">
