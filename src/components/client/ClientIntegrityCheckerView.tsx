@@ -348,7 +348,16 @@ export function ClientIntegrityCheckerView({
               Kiểm tra Đạo văn &amp; Nhận diện AI
             </h1>
             <p className="text-xs sm:text-[13px] text-zinc-600 leading-relaxed">
-              Kéo thả, dán tệp (`Ctrl + V`) hoặc chọn tệp Word (`.docx`), `.txt`, `.md` từ máy tính để hệ thống đối chiếu nguồn học thuật và đánh giá xác suất AI theo từng câu.
+              Lưu ý đây không phải là check Turnitin. Nếu bạn cần check Turnitin vui lòng liên hệ Admin{' '}
+              <a
+                href="https://zalo.me/0916045202"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-press inline-flex items-center gap-1 font-semibold text-[#4338CA] bg-indigo-50 hover:bg-[#4338CA] hover:text-white border border-indigo-200/80 px-2 py-0.5 rounded-md align-baseline"
+              >
+                <span>tại đây</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
             </p>
           </div>
 
