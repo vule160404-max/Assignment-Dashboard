@@ -11,13 +11,13 @@ import {
   Loader2,
   Printer,
   RotateCcw,
+  ShieldAlert,
   ShieldCheck,
-  Sparkles,
+  UploadCloud,
 } from 'lucide-react';
 import {
   AnalyzedSentence,
   IntegrityAnalysisReport,
-  SAMPLE_ACADEMIC_TEXT,
   openPrintableIntegrityReport,
   runIntegrityCheck,
 } from '../../lib/integrityCheckerClient';
@@ -39,40 +39,42 @@ function RadialScoreRing({
   colorHex: string;
   label: string;
 }) {
-  const radius = 34;
+  const radius = 35;
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.max(0, Math.min(100, percent));
   const strokeDashoffset = circumference - (clamped / 100) * circumference;
 
   return (
-    <div className="relative w-22 h-22 shrink-0 flex items-center justify-center">
-      <svg className="w-22 h-22 -rotate-90" viewBox="0 0 84 84">
+    <div className="relative w-24 h-24 shrink-0 flex items-center justify-center">
+      <svg className="w-24 h-24 -rotate-90" viewBox="0 0 88 88" aria-hidden="true">
         <circle
-          cx="42"
-          cy="42"
+          cx="44"
+          cy="44"
           r={radius}
           fill="none"
-          stroke="#E4E4E7"
-          strokeWidth="7"
+          stroke="#F4F4F5"
+          strokeWidth="7.5"
         />
         <circle
-          cx="42"
-          cy="42"
+          cx="44"
+          cy="44"
           r={radius}
           fill="none"
           stroke={colorHex}
-          strokeWidth="7"
+          strokeWidth="7.5"
           strokeLinecap="round"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
-          style={{ transition: 'stroke-dashoffset 550ms cubic-bezier(0.23, 1, 0.32, 1)' }}
+          style={{
+            transition: 'stroke-dashoffset 520ms cubic-bezier(0.23, 1, 0.32, 1)',
+          }}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-lg font-extrabold font-mono tabular-nums text-slate-900">
+        <span className="text-xl font-extrabold font-mono tabular-nums text-slate-900 leading-none">
           {clamped}%
         </span>
-        <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500">
+        <span className="text-[9px] font-semibold uppercase tracking-wider text-zinc-500 mt-1">
           {label}
         </span>
       </div>
@@ -93,7 +95,7 @@ function MetricProgressBar({
 }) {
   const clamped = Math.max(0, Math.min(100, value));
   return (
-    <div className="space-y-1">
+    <div className="space-y-1.5">
       <div className="flex items-center justify-between text-xs">
         <span className="font-semibold text-slate-800">{label}</span>
         <span className="font-mono font-bold text-slate-900 tabular-nums">
@@ -109,7 +111,7 @@ function MetricProgressBar({
           }}
         />
       </div>
-      <p className="text-[11px] text-zinc-500">{hint}</p>
+      <p className="text-[11px] text-zinc-500 leading-relaxed">{hint}</p>
     </div>
   );
 }
@@ -119,21 +121,23 @@ export function ClientIntegrityCheckerView({
 }: ClientIntegrityCheckerViewProps) {
   const [title, setTitle] = useState('');
   const [textInput, setTextInput] = useState('');
+  const [uploadedFileName, setUploadedFileName] = useState('');
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [excludeReferences, setExcludeReferences] = useState(true);
   const [excludeQuotes, setExcludeQuotes] = useState(true);
   const [loadingFile, setLoadingFile] = useState(false);
 
   const [analyzing, setAnalyzing] = useState(false);
-  const [scanStageText, setScanStageText] = useState('');
+  const [scanStep, setScanStep] = useState<0 | 1 | 2 | 3>(0);
   const [report, setReport] = useState<IntegrityAnalysisReport | null>(null);
   const [layerMode, setLayerMode] = useState<HighlightLayerMode>('combined');
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>('sources');
   const [selectedSentenceId, setSelectedSentenceId] = useState<string | null>(
     null
   );
-  const [activeSourceFilterId, setActiveSourceFilterId] = useState<number | null>(
-    null
-  );
+  const [activeSourceFilterId, setActiveSourceFilterId] = useState<
+    number | null
+  >(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const inputWords = useMemo(() => countWords(textInput), [textInput]);
@@ -162,6 +166,7 @@ export function ClientIntegrityCheckerView({
       }
 
       setTextInput(extracted.trim());
+      setUploadedFileName(file.name);
       if (!title.trim()) {
         setTitle(file.name.replace(/\.(docx|txt|md)$/i, ''));
       }
@@ -189,17 +194,9 @@ export function ClientIntegrityCheckerView({
     }
 
     setAnalyzing(true);
-    setScanStageText('1/3 Đang tách đoạn, nhận diện câu & lọc trích dẫn...');
-    const t1 = window.setTimeout(() => {
-      setScanStageText(
-        '2/3 Đang đối chiếu Crossref, OpenAlex & cơ sở dữ liệu Internet...'
-      );
-    }, 650);
-    const t2 = window.setTimeout(() => {
-      setScanStageText(
-        '3/3 Đang chấm điểm Burstiness, Lexical Entropy & AI Forensics...'
-      );
-    }, 1500);
+    setScanStep(1);
+    const t1 = window.setTimeout(() => setScanStep(2), 600);
+    const t2 = window.setTimeout(() => setScanStep(3), 1450);
 
     try {
       const result = await runIntegrityCheck({
@@ -213,7 +210,7 @@ export function ClientIntegrityCheckerView({
       setActiveSourceFilterId(null);
       setSidebarTab(result.sources.length > 0 ? 'sources' : 'ai_forensics');
       onToast(
-        `Hoàn tất kiểm định (${result.overallSimilarityPercent}% Trùng lặp · ${result.overallAiPercent}% AI).`
+        `Hoàn tất kiểm tra tham khảo (${result.overallSimilarityPercent}% Trùng lặp · ${result.overallAiPercent}% AI).`
       );
     } catch (err) {
       onToast(
@@ -225,7 +222,7 @@ export function ClientIntegrityCheckerView({
       window.clearTimeout(t1);
       window.clearTimeout(t2);
       setAnalyzing(false);
-      setScanStageText('');
+      setScanStep(0);
     }
   };
 
@@ -233,7 +230,9 @@ export function ClientIntegrityCheckerView({
     if (!report) return;
     const opened = openPrintableIntegrityReport(report);
     if (!opened) {
-      onToast('Trình duyệt đang chặn cửa sổ bật lên (Pop-up). Hãy cho phép mở tab in.');
+      onToast(
+        'Trình duyệt đang chặn cửa sổ bật lên (Pop-up). Hãy cho phép mở tab in.'
+      );
     }
   };
 
@@ -265,7 +264,7 @@ export function ClientIntegrityCheckerView({
     if (score >= 25) {
       return {
         color: '#DC2626',
-        badge: 'Mức độ trùng lặp Cao',
+        badge: 'Mức trùng lặp Cao',
         badgeCls: 'bg-rose-50 text-rose-700 border-rose-200',
       };
     }
@@ -278,7 +277,7 @@ export function ClientIntegrityCheckerView({
     }
     return {
       color: '#16A34A',
-      badge: 'Mức trùng lặp An toàn',
+      badge: 'Mức trùng lặp Thấp',
       badgeCls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     };
   }, [report?.overallSimilarityPercent]);
@@ -288,7 +287,7 @@ export function ClientIntegrityCheckerView({
     if (score >= 60) {
       return {
         color: '#D97706',
-        badge: 'Khả năng cao do AI tạo',
+        badge: 'Dấu hiệu AI Cao',
         badgeCls: 'bg-amber-50 text-amber-800 border-amber-200',
       };
     }
@@ -301,31 +300,99 @@ export function ClientIntegrityCheckerView({
     }
     return {
       color: '#16A34A',
-      badge: 'Văn phong Tự nhiên (Người viết)',
+      badge: 'Văn phong Tự nhiên',
       badgeCls: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     };
   }, [report?.overallAiPercent]);
 
+  const scanStepsMeta = [
+    { step: 1, label: 'Tách câu & lọc trích dẫn' },
+    { step: 2, label: 'Đối chiếu Crossref, OpenAlex & Web' },
+    { step: 3, label: 'Phân tích AI Forensics' },
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Top Hero & Input Workbench */}
-      <section className="bg-white border border-zinc-200/90 rounded-2xl p-5 sm:p-7 shadow-[0_8px_28px_rgb(15,23,42,0.03)] space-y-5">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      {/* Prominent Reference-Only Advisory Banner (Always Visible & High Contrast) */}
+      <div
+        role="note"
+        className="bg-amber-50/95 border border-amber-300/90 border-l-4 border-l-amber-500 rounded-2xl px-4 py-3.5 sm:px-5 sm:py-4 flex items-start gap-3.5 shadow-[0_2px_10px_rgb(217,119,6,0.06)]"
+      >
+        <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200/80 flex items-center justify-center text-amber-700 shrink-0 mt-0.5">
+          <ShieldAlert className="w-5 h-5" />
+        </div>
+        <div className="space-y-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs sm:text-sm font-bold text-amber-950 tracking-tight">
+              LƯU Ý QUAN TRỌNG: Dữ liệu kiểm tra Đạo văn &amp; AI chỉ mang tính chất tham khảo sơ bộ
+            </span>
+            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-200/80 text-amber-950 rounded-md">
+              Chỉ tham khảo · Có sai lệch
+            </span>
+          </div>
+          <p className="text-xs text-amber-900/90 leading-relaxed">
+            Hệ thống sử dụng nguồn dữ liệu học thuật mở (<strong>Crossref, OpenAlex, Wikipedia</strong>) kết hợp phân tích thống kê ngôn ngữ học, do đó{' '}
+            <strong>kết quả chắc chắn sẽ có độ sai lệch nhất định</strong> so với báo cáo Turnitin nội bộ của từng trường đại học (do khác biệt kho bài sinh viên và thuật toán độc quyền). Nếu bạn cần báo cáo Turnitin chính thức, vui lòng trao đổi với Admin trong đơn hàng.
+          </p>
+        </div>
+      </div>
+
+      {/* Main Input & Upload Studio Card */}
+      <section className="bg-white border border-zinc-200/90 rounded-2xl overflow-hidden shadow-[0_10px_32px_rgb(15,23,42,0.04)]">
+        {/* Card Header */}
+        <div className="px-6 py-5 sm:px-8 sm:py-6 border-b border-zinc-100 flex flex-wrap items-end justify-between gap-4 bg-gradient-to-b from-slate-50/80 to-white">
           <div className="space-y-1.5 max-w-2xl">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 border border-indigo-200/80 text-[11px] font-semibold text-[#4338CA]">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#4338CA]">
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Hệ thống Đối chiếu Học thuật & AI Forensics</span>
+              <span>Academic Similarity &amp; AI Forensics</span>
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              Kiểm tra Đạo văn (Similarity) & Nhận diện Văn bản AI
+            <h1 className="text-2xl sm:text-[26px] font-bold tracking-tight text-slate-900">
+              Kiểm tra Đạo văn &amp; Nhận diện AI
             </h1>
-            <p className="text-xs text-zinc-600 leading-relaxed">
-              Tải lên file Word (`.docx`) hoặc dán trực tiếp bài viết. Hệ thống tự động truy vấn đối chiếu với hàng trăm triệu bài báo khoa học trên{' '}
-              <strong className="text-slate-800">Crossref, OpenAlex &amp; Internet</strong>, đồng thời phân tích độ biến thiên câu (Burstiness) và dấu vết ngôn ngữ AI ở cấp độ từng câu.
+            <p className="text-xs sm:text-[13px] text-zinc-600 leading-relaxed">
+              Tải tệp Word (`.docx`), tệp văn bản (`.txt`, `.md`) hoặc dán nội dung bài viết vào khung bên dưới để xem đối chiếu nguồn học thuật và đánh giá xác suất AI theo từng câu.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 shrink-0">
+          {textInput.trim() && (
+            <button
+              type="button"
+              disabled={analyzing}
+              onClick={() => {
+                setTitle('');
+                setTextInput('');
+                setUploadedFileName('');
+                setReport(null);
+                setSelectedSentenceId(null);
+              }}
+              className="btn-press inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-600 hover:text-slate-900 bg-zinc-100 hover:bg-zinc-200/80 rounded-xl shrink-0"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Làm mới nội dung</span>
+            </button>
+          )}
+        </div>
+
+        {/* Workspace Body */}
+        <div className="p-6 sm:p-8 space-y-5">
+          {/* Drag-and-Drop File Upload Bar */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDraggingFile(true);
+            }}
+            onDragLeave={() => setIsDraggingFile(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setIsDraggingFile(false);
+              void handleUploadDocument(e.dataTransfer.files);
+            }}
+            className={`rounded-2xl border-2 border-dashed px-5 py-4 flex flex-wrap items-center justify-between gap-4 transition-colors duration-150 ${
+              isDraggingFile
+                ? 'border-[#4338CA] bg-indigo-50/60'
+                : 'border-zinc-200/90 bg-zinc-50/60 hover:border-zinc-300'
+            }`}
+          >
             <input
               ref={fileInputRef}
               type="file"
@@ -333,164 +400,205 @@ export function ClientIntegrityCheckerView({
               className="hidden"
               onChange={(e) => void handleUploadDocument(e.target.files)}
             />
+            <div className="flex items-center gap-3.5 min-w-0">
+              <div className="w-10 h-10 rounded-xl bg-white border border-zinc-200/90 shadow-2xs flex items-center justify-center text-[#4338CA] shrink-0">
+                <UploadCloud className="w-5 h-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-xs sm:text-sm font-semibold text-slate-900 truncate">
+                  {uploadedFileName
+                    ? `Đã nạp tệp: ${uploadedFileName}`
+                    : 'Kéo thả tệp Word (.docx) hoặc .txt / .md vào đây'}
+                </p>
+                <p className="text-[11px] text-zinc-500 mt-0.5">
+                  Tự động trích xuất nguyên văn các đoạn văn bản · Tối đa 150.000 ký tự mỗi lượt kiểm tra
+                </p>
+              </div>
+            </div>
+
             <button
               type="button"
               disabled={loadingFile || analyzing}
               onClick={() => fileInputRef.current?.click()}
-              className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-indigo-50 text-[#4338CA] border border-indigo-200 hover:bg-indigo-100 rounded-xl disabled:opacity-50"
+              className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-white text-slate-900 border border-zinc-200 hover:border-indigo-300 hover:text-[#4338CA] rounded-xl shadow-2xs disabled:opacity-50 shrink-0"
             >
               {loadingFile ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <FolderUp className="w-3.5 h-3.5" />
+                <FolderUp className="w-3.5 h-3.5 text-[#4338CA]" />
               )}
-              <span>Tải file .DOCX / .TXT</span>
+              <span>Chọn tệp từ máy tính</span>
             </button>
+          </div>
+
+          {/* Document Title & Content Editor */}
+          <div className="space-y-3">
+            <div>
+              <label
+                htmlFor="checker-doc-title"
+                className="block text-xs font-semibold text-slate-700 mb-1.5"
+              >
+                Tiêu đề tài liệu (Tùy chọn)
+              </label>
+              <input
+                id="checker-doc-title"
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Ví dụ: Strategic Expansion of Retail Banking Services..."
+                className="w-full px-4 py-2.5 text-sm font-medium bg-zinc-50/70 border border-zinc-200 rounded-xl text-slate-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4338CA]/15 focus:border-[#4338CA] transition-colors"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label
+                  htmlFor="checker-doc-body"
+                  className="text-xs font-semibold text-slate-700"
+                >
+                  Nội dung văn bản cần kiểm tra *
+                </label>
+                <span className="text-[11px] font-mono text-zinc-500 tabular-nums">
+                  {inputWords.toLocaleString('vi-VN')} từ ·{' '}
+                  {textInput.length.toLocaleString('vi-VN')} ký tự
+                </span>
+              </div>
+              <textarea
+                id="checker-doc-body"
+                rows={9}
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder="Dán trực tiếp nội dung bài viết tại đây hoặc tải tệp .docx ở khung phía trên (tối thiểu 40 ký tự)..."
+                className="w-full p-4 text-sm leading-relaxed bg-zinc-50/70 border border-zinc-200 rounded-xl text-slate-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4338CA]/15 focus:border-[#4338CA] transition-colors"
+              />
+            </div>
+          </div>
+
+          {/* Filter Options + Primary Action Bar */}
+          <div className="pt-2 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-700">
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={excludeReferences}
+                  onChange={(e) => setExcludeReferences(e.target.checked)}
+                  className="w-4 h-4 rounded border-zinc-300 text-[#4338CA] focus:ring-[#4338CA]"
+                />
+                <span>Loại trừ Tài liệu tham khảo (Bibliography)</span>
+              </label>
+
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={excludeQuotes}
+                  onChange={(e) => setExcludeQuotes(e.target.checked)}
+                  className="w-4 h-4 rounded border-zinc-300 text-[#4338CA] focus:ring-[#4338CA]"
+                />
+                <span>Loại trừ Trích dẫn trong ngoặc kép (Quotes)</span>
+              </label>
+            </div>
 
             <button
               type="button"
-              disabled={analyzing}
-              onClick={() => {
-                setTitle('Financial Inclusion in Southeast Asian Rural Areas');
-                setTextInput(SAMPLE_ACADEMIC_TEXT);
-                setReport(null);
-              }}
-              className="btn-press inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-zinc-100 text-slate-800 hover:bg-zinc-200/80 rounded-xl"
+              disabled={analyzing || textInput.trim().length < 40}
+              onClick={() => void handleRunScan()}
+              className="btn-press inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold bg-[#4338CA] text-white rounded-xl hover:bg-[#3730A3] disabled:opacity-45 shadow-[0_6px_18px_rgb(67,56,202,0.22)] min-w-[230px]"
             >
-              <Sparkles className="w-3.5 h-3.5 text-[#4338CA]" />
-              <span>Thử bằng bài mẫu</span>
+              {analyzing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Đang phân tích tài liệu...</span>
+                </>
+              ) : (
+                <>
+                  <FileCheck2 className="w-4 h-4" />
+                  <span>Quét Đạo văn &amp; Kiểm định AI</span>
+                </>
+              )}
             </button>
-
-            {textInput.trim() && (
-              <button
-                type="button"
-                disabled={analyzing}
-                onClick={() => {
-                  setTitle('');
-                  setTextInput('');
-                  setReport(null);
-                  setSelectedSentenceId(null);
-                }}
-                className="btn-press inline-flex items-center gap-1 px-2.5 py-2 text-xs font-medium text-zinc-500 hover:text-slate-900 hover:bg-zinc-100 rounded-xl"
-              >
-                <RotateCcw className="w-3.5 h-3.5" />
-                <span>Xóa trắng</span>
-              </button>
-            )}
           </div>
-        </div>
 
-        {/* Title + Textarea */}
-        <div className="space-y-3">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Tiêu đề bài viết / Tên tài liệu (không bắt buộc)..."
-            className="w-full px-3.5 py-2 text-xs sm:text-sm font-semibold bg-zinc-50/90 border border-zinc-200 rounded-xl text-slate-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-          />
-
-          <div className="relative">
-            <textarea
-              rows={8}
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              placeholder="Dán nội dung bài làm hoặc nhấn nút 'Tải file .DOCX / .TXT' ở góc trên (tối thiểu 40 ký tự)..."
-              className="w-full p-4 text-xs sm:text-sm leading-relaxed bg-zinc-50/80 border border-zinc-200 rounded-xl text-slate-900 placeholder:text-zinc-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-            />
-            <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500">
-              <div className="flex flex-wrap items-center gap-4">
-                <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={excludeReferences}
-                    onChange={(e) => setExcludeReferences(e.target.checked)}
-                    className="rounded border-zinc-300 text-[#4338CA] focus:ring-[#4338CA]"
-                  />
-                  <span>Loại trừ Danh mục Tài liệu tham khảo (Bibliography)</span>
-                </label>
-
-                <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={excludeQuotes}
-                    onChange={(e) => setExcludeQuotes(e.target.checked)}
-                    className="rounded border-zinc-300 text-[#4338CA] focus:ring-[#4338CA]"
-                  />
-                  <span>Loại trừ Trích dẫn trong ngoặc kép (Quotes)</span>
-                </label>
-              </div>
-
-              <span className="font-mono tabular-nums">
-                {inputWords.toLocaleString('vi-VN')} từ ·{' '}
-                {textInput.length.toLocaleString('vi-VN')} ký tự
-              </span>
+          {/* Live 3-Step Scanning Progress Strip */}
+          {analyzing && (
+            <div className="popover-enter bg-indigo-50/60 border border-indigo-200/80 rounded-xl p-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {scanStepsMeta.map((item) => {
+                const isDone = scanStep > item.step;
+                const isCurrent = scanStep === item.step;
+                return (
+                  <div
+                    key={item.step}
+                    className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${
+                      isCurrent
+                        ? 'bg-white border-indigo-300 text-[#4338CA] font-semibold shadow-2xs'
+                        : isDone
+                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 font-medium'
+                        : 'bg-white/60 border-zinc-200/70 text-zinc-500'
+                    }`}
+                  >
+                    {isDone ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    ) : isCurrent ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
+                    ) : (
+                      <span className="w-4 h-4 rounded-full bg-zinc-200 text-[10px] font-mono flex items-center justify-center shrink-0">
+                        {item.step}
+                      </span>
+                    )}
+                    <span className="truncate">{item.label}</span>
+                  </div>
+                );
+              })}
             </div>
-          </div>
-        </div>
-
-        {/* Submit CTA & Progress */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-          <div className="text-xs text-zinc-500 flex items-center gap-1.5">
-            <Info className="w-3.5 h-3.5 text-[#4338CA] shrink-0" />
-            <span>
-              {analyzing && scanStageText
-                ? scanStageText
-                : 'Kết quả hiển thị trực quan từng câu trùng nguồn và điểm AI giống báo cáo Turnitin.'}
-            </span>
-          </div>
-
-          <button
-            type="button"
-            disabled={analyzing || textInput.trim().length < 40}
-            onClick={() => void handleRunScan()}
-            className="btn-press inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-[#4338CA] text-white rounded-xl hover:bg-[#3730A3] disabled:opacity-45 shadow-xs"
-          >
-            {analyzing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Đang kiểm định...</span>
-              </>
-            ) : (
-              <>
-                <FileCheck2 className="w-4 h-4" />
-                <span>Quét Đạo văn &amp; Kiểm định AI</span>
-              </>
-            )}
-          </button>
+          )}
         </div>
       </section>
 
       {/* Dual Integrity Studio Report */}
       {report && (
         <div className="surface-enter space-y-5">
+          {/* Report Top Reference Disclaimer Ribbon */}
+          <div className="bg-slate-900 text-slate-100 rounded-2xl px-5 py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+            <div className="flex items-center gap-2.5 text-xs">
+              <Info className="w-4 h-4 text-amber-400 shrink-0" />
+              <span>
+                <strong className="text-amber-300">Báo cáo tham khảo sơ bộ:</strong>{' '}
+                Các chỉ số phần trăm bên dưới chỉ dùng để tham khảo nhanh, có thể chênh lệch so với Turnitin bản quyền của trường học.
+              </span>
+            </div>
+            <span className="font-mono text-[11px] text-slate-400 tabular-nums shrink-0">
+              ID: {report.reportId}
+            </span>
+          </div>
+
           {/* Executive Summary Strip */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Card 1: Similarity Index */}
-            <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 flex items-center gap-4 shadow-2xs">
+            <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 flex items-center gap-4 shadow-[0_4px_16px_rgb(15,23,42,0.03)]">
               <RadialScoreRing
                 percent={report.overallSimilarityPercent}
                 colorHex={simStatusMeta.color}
                 label="Similarity"
               />
               <div className="min-w-0 space-y-1.5">
-                <div className="text-xs font-bold text-slate-900">
-                  Chỉ số Trùng lặp (Đạo văn)
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-900">
+                    Trùng lặp (Tham khảo)
+                  </span>
                 </div>
                 <span
-                  className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full border ${simStatusMeta.badgeCls}`}
+                  className={`inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${simStatusMeta.badgeCls}`}
                 >
                   {simStatusMeta.badge}
                 </span>
                 <div className="text-[11px] text-zinc-500 font-mono tabular-nums">
-                  Tạp chí/Sách: {report.publicationsSimilarityPercent}% · Web:{' '}
+                  Học thuật: {report.publicationsSimilarityPercent}% · Web:{' '}
                   {report.internetSimilarityPercent}%
                 </div>
               </div>
             </div>
 
             {/* Card 2: AI Probability */}
-            <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 flex items-center gap-4 shadow-2xs">
+            <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 flex items-center gap-4 shadow-[0_4px_16px_rgb(15,23,42,0.03)]">
               <RadialScoreRing
                 percent={report.overallAiPercent}
                 colorHex={aiStatusMeta.color}
@@ -498,15 +606,15 @@ export function ClientIntegrityCheckerView({
               />
               <div className="min-w-0 space-y-1.5">
                 <div className="text-xs font-bold text-slate-900">
-                  Xác suất Văn bản AI
+                  Xác suất AI (Tham khảo)
                 </div>
                 <span
-                  className={`inline-block text-[11px] font-semibold px-2 py-0.5 rounded-full border ${aiStatusMeta.badgeCls}`}
+                  className={`inline-block text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${aiStatusMeta.badgeCls}`}
                 >
                   {aiStatusMeta.badge}
                 </span>
                 <div className="text-[11px] text-zinc-500 font-mono tabular-nums">
-                  {report.forensics.highAiSentenceCount} câu AI cao ·{' '}
+                  {report.forensics.highAiSentenceCount} AI cao ·{' '}
                   {report.forensics.mixedAiSentenceCount} pha trộn ·{' '}
                   {report.forensics.humanSentenceCount} tự nhiên
                 </div>
@@ -514,44 +622,44 @@ export function ClientIntegrityCheckerView({
             </div>
 
             {/* Card 3: Report Meta & Print PDF */}
-            <div className="bg-white border border-zinc-200 rounded-2xl p-4 sm:p-5 flex flex-col justify-between gap-3 shadow-2xs">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="text-[11px] font-mono text-zinc-500">
-                    Mã báo cáo: <strong className="text-slate-900">{report.reportId}</strong>
-                  </div>
-                  <div className="text-xs font-semibold text-slate-900 mt-0.5">
-                    Đã phân tích {report.analyzedWords.toLocaleString('vi-VN')} /{' '}
-                    {report.totalWords.toLocaleString('vi-VN')} từ
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5">
-                    {report.sources.length} nguồn đối chiếu ·{' '}
-                    {new Date(report.analyzedAt).toLocaleString('vi-VN')}
-                  </div>
+            <div className="bg-white border border-zinc-200/90 rounded-2xl p-5 flex flex-col justify-between gap-3.5 shadow-[0_4px_16px_rgb(15,23,42,0.03)]">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between text-[11px] text-zinc-500">
+                  <span>Quy mô phân tích</span>
+                  <span className="font-mono tabular-nums">
+                    {new Date(report.analyzedAt).toLocaleTimeString('vi-VN')}
+                  </span>
+                </div>
+                <div className="text-sm font-bold text-slate-900 font-mono tabular-nums">
+                  {report.analyzedWords.toLocaleString('vi-VN')} /{' '}
+                  {report.totalWords.toLocaleString('vi-VN')} từ
+                </div>
+                <div className="text-[11px] text-zinc-500">
+                  {report.totalSentences} câu · {report.sources.length} nguồn đối chiếu phát hiện
                 </div>
               </div>
 
               <button
                 type="button"
                 onClick={handlePrintReport}
-                className="btn-press w-full py-2 px-3 text-xs font-semibold bg-zinc-900 text-white hover:bg-slate-800 rounded-xl inline-flex items-center justify-center gap-1.5"
+                className="btn-press w-full py-2.5 px-3.5 text-xs font-semibold bg-slate-900 text-white hover:bg-slate-800 rounded-xl inline-flex items-center justify-center gap-1.5"
               >
                 <Printer className="w-3.5 h-3.5" />
-                <span>In / Xuất Báo cáo PDF chuẩn</span>
+                <span>In / Xuất Báo cáo PDF (Tham khảo)</span>
               </button>
             </div>
           </div>
 
           {/* Layer Filter Bar */}
-          <div className="bg-white border border-zinc-200 rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
+          <div className="bg-white border border-zinc-200/90 rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 shadow-2xs">
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-xs font-semibold text-zinc-600 mr-1">
+              <span className="text-xs font-semibold text-zinc-500 mr-1.5">
                 Lớp hiển thị:
               </span>
               {(
                 [
                   { key: 'combined', label: 'Kết hợp (Đạo văn + AI)' },
-                  { key: 'similarity', label: 'Chỉ lớp Đạo văn (Similarity)' },
+                  { key: 'similarity', label: 'Chỉ lớp Đạo văn' },
                   { key: 'ai', label: 'Chỉ lớp AI Detection' },
                 ] as { key: HighlightLayerMode; label: string }[]
               ).map((opt) => (
@@ -559,9 +667,9 @@ export function ClientIntegrityCheckerView({
                   key={opt.key}
                   type="button"
                   onClick={() => setLayerMode(opt.key)}
-                  className={`btn-press px-3 py-1 text-xs font-semibold rounded-lg transition-colors ${
+                  className={`btn-press px-3 py-1.5 text-xs font-semibold rounded-lg ${
                     layerMode === opt.key
-                      ? 'bg-[#4338CA] text-white'
+                      ? 'bg-[#4338CA] text-white shadow-2xs'
                       : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200/80'
                   }`}
                 >
@@ -570,45 +678,52 @@ export function ClientIntegrityCheckerView({
               ))}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3 text-[11px] text-zinc-600">
-              <span className="inline-flex items-center gap-1">
+            <div className="flex flex-wrap items-center gap-4 text-[11px] text-zinc-600">
+              <span className="inline-flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-xs bg-rose-500/25 border border-rose-500" />
                 Trùng nguồn
               </span>
-              <span className="inline-flex items-center gap-1">
+              <span className="inline-flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-xs bg-amber-300/60 border border-amber-500" />
                 AI cao (&ge;65%)
               </span>
-              <span className="inline-flex items-center gap-1">
-                <span className="w-2.5 h-2.5 rounded-xs bg-violet-200/70 border border-violet-400" />
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-xs bg-violet-200/75 border border-violet-400" />
                 Pha trộn (38–64%)
               </span>
             </div>
           </div>
 
-          {/* 2-Column Studio Grid: Highlighted Document (Left) + Inspector Sidebar (Right) */}
+          {/* 2-Column Studio Grid: Highlighted Document (Left 7) + Sticky Inspector Sidebar (Right 5) */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
-            {/* LEFT: Interactive Highlighted Document Viewer */}
-            <div className="lg:col-span-7 bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 shadow-2xs space-y-4">
-              <div className="flex items-center justify-between gap-2 pb-3 border-b border-zinc-100">
-                <div className="flex items-center gap-2 min-w-0">
-                  <FileText className="w-4 h-4 text-[#4338CA] shrink-0" />
-                  <h2 className="text-sm font-bold text-slate-900 truncate">
-                    {report.title}
-                  </h2>
+            {/* LEFT: Interactive Highlighted A4 Document Viewer */}
+            <div className="lg:col-span-7 bg-white border border-zinc-200/90 rounded-2xl p-6 sm:p-9 shadow-[0_6px_24px_rgb(15,23,42,0.03)] space-y-5">
+              <div className="flex items-center justify-between gap-3 pb-4 border-b border-zinc-100">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-[#4338CA] shrink-0">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-sm font-bold text-slate-900 truncate">
+                      {report.title}
+                    </h2>
+                    <p className="text-[11px] text-zinc-500">
+                      Bấm vào từng câu bất kỳ để xem chi tiết phân tích bên cột phải
+                    </p>
+                  </div>
                 </div>
                 {activeSourceFilterId !== null && (
                   <button
                     type="button"
                     onClick={() => setActiveSourceFilterId(null)}
-                    className="btn-press px-2 py-0.5 text-[11px] font-medium bg-indigo-50 text-[#4338CA] rounded-md shrink-0"
+                    className="btn-press px-2.5 py-1 text-[11px] font-semibold bg-indigo-50 text-[#4338CA] border border-indigo-200 rounded-lg shrink-0"
                   >
                     Đang lọc Nguồn #{activeSourceFilterId} · Bỏ lọc
                   </button>
                 )}
               </div>
 
-              <div className="space-y-4 text-[13.5px] leading-[1.8] text-slate-900">
+              <div className="space-y-4 text-[14px] leading-[1.85] text-slate-900">
                 {paragraphsGrouped.map((sents, pIdx) => (
                   <p key={pIdx}>
                     {sents.map((s) => {
@@ -616,7 +731,8 @@ export function ClientIntegrityCheckerView({
                         s.isExcludedReference || s.isExcludedQuote;
                       const isSelected = selectedSentenceId === s.id;
                       const showSim =
-                        (layerMode === 'combined' || layerMode === 'similarity') &&
+                        (layerMode === 'combined' ||
+                          layerMode === 'similarity') &&
                         s.matchedSourceId !== null &&
                         (activeSourceFilterId === null ||
                           activeSourceFilterId === s.matchedSourceId);
@@ -632,7 +748,7 @@ export function ClientIntegrityCheckerView({
 
                       let inlineStyle: React.CSSProperties | undefined;
                       let extraCls =
-                        'rounded px-0.5 py-0.5 transition-colors cursor-pointer ';
+                        'rounded px-0.5 py-0.5 transition-colors duration-150 cursor-pointer ';
 
                       if (isExcluded) {
                         extraCls += 'text-zinc-400 italic';
@@ -663,7 +779,7 @@ export function ClientIntegrityCheckerView({
                             title={
                               isExcluded
                                 ? 'Đã loại trừ khỏi tỷ lệ kiểm tra'
-                                : `AI: ${s.aiProbability}%${
+                                : `AI (tham khảo): ${s.aiProbability}%${
                                     s.matchedSourceId !== null
                                       ? ` · Trùng Nguồn #${s.matchedSourceId} (${s.matchSimilarity}%)`
                                       : ''
@@ -688,24 +804,23 @@ export function ClientIntegrityCheckerView({
               </div>
             </div>
 
-            {/* RIGHT: Inspector Sidebar (Sources & AI Forensics) */}
-            <div className="lg:col-span-5 space-y-4">
-              {/* Selected Sentence Inspector (when user clicks any sentence) */}
+            {/* RIGHT: Sticky Inspector Sidebar (Sources & AI Forensics) */}
+            <div className="lg:col-span-5 lg:sticky lg:top-20 space-y-4">
               {selectedSentence && (
                 <div className="popover-enter bg-white border border-indigo-200 rounded-2xl p-4 shadow-2xs space-y-2.5">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-xs font-bold text-[#4338CA]">
-                      Chi tiết câu đang chọn
+                      Phân tích chi tiết câu đang chọn
                     </span>
                     <button
                       type="button"
                       onClick={() => setSelectedSentenceId(null)}
-                      className="text-[11px] text-zinc-400 hover:text-zinc-700"
+                      className="text-[11px] font-medium text-zinc-400 hover:text-zinc-700"
                     >
                       Đóng
                     </button>
                   </div>
-                  <p className="text-xs text-slate-800 bg-zinc-50 border border-zinc-200/80 rounded-lg p-2.5 leading-relaxed">
+                  <p className="text-xs text-slate-800 bg-zinc-50 border border-zinc-200/80 rounded-xl p-3 leading-relaxed">
                     "{selectedSentence.text}"
                   </p>
                   {selectedSentence.isExcludedReference ||
@@ -715,26 +830,28 @@ export function ClientIntegrityCheckerView({
                       {selectedSentence.isExcludedReference
                         ? 'Tài liệu tham khảo'
                         : 'Trích dẫn trong ngoặc kép'}{' '}
-                      nên được loại trừ theo bộ lọc.
+                      nên đã được loại trừ theo bộ lọc.
                     </p>
                   ) : (
                     <div className="space-y-1.5 text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="text-zinc-600">Xác suất AI của câu:</span>
-                        <span className="font-mono font-bold text-slate-900">
+                        <span className="text-zinc-600">
+                          Xác suất AI (tham khảo):
+                        </span>
+                        <span className="font-mono font-bold text-slate-900 tabular-nums">
                           {selectedSentence.aiProbability}%
                         </span>
                       </div>
                       {selectedSentence.matchedSourceId !== null && (
                         <div className="flex items-center justify-between">
-                          <span className="text-zinc-600">Trùng khớp nguồn:</span>
-                          <span className="font-mono font-bold text-rose-600">
+                          <span className="text-zinc-600">Nguồn đối chiếu:</span>
+                          <span className="font-mono font-bold text-rose-600 tabular-nums">
                             Nguồn #{selectedSentence.matchedSourceId} (
                             {selectedSentence.matchSimilarity}%)
                           </span>
                         </div>
                       )}
-                      <ul className="list-disc pl-4 text-[11px] text-zinc-600 space-y-0.5 pt-1">
+                      <ul className="list-disc pl-4 text-[11px] text-zinc-600 space-y-1 pt-1">
                         {selectedSentence.aiReasons.map((reason, rIdx) => (
                           <li key={rIdx}>{reason}</li>
                         ))}
@@ -745,7 +862,7 @@ export function ClientIntegrityCheckerView({
               )}
 
               {/* Sidebar Tabs */}
-              <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-2xs">
+              <div className="bg-white border border-zinc-200/90 rounded-2xl overflow-hidden shadow-[0_4px_16px_rgb(15,23,42,0.03)]">
                 <div className="p-1.5 bg-zinc-100/80 border-b border-zinc-200 grid grid-cols-2 gap-1">
                   <button
                     type="button"
@@ -774,15 +891,17 @@ export function ClientIntegrityCheckerView({
                 </div>
 
                 {sidebarTab === 'sources' ? (
-                  <div className="tab-panel-enter p-4 space-y-3 max-h-[640px] overflow-y-auto">
+                  <div className="tab-panel-enter p-4 space-y-3 max-h-[600px] overflow-y-auto">
                     {report.sources.length === 0 ? (
-                      <div className="py-10 text-center space-y-2">
-                        <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto" />
-                        <p className="text-xs font-semibold text-slate-900">
-                          Không tìm thấy đoạn trùng lặp nguyên văn
+                      <div className="py-10 text-center space-y-2.5">
+                        <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-200/80 flex items-center justify-center text-emerald-600 mx-auto">
+                          <CheckCircle2 className="w-5 h-5" />
+                        </div>
+                        <p className="text-xs font-bold text-slate-900">
+                          Không phát hiện đoạn trùng lặp đáng kể
                         </p>
-                        <p className="text-[11px] text-zinc-500 max-w-xs mx-auto">
-                          Hệ thống đã đối chiếu câu trích xuất với Crossref, OpenAlex và Wikipedia nhưng không có đoạn nào vượt ngưỡng trùng lặp.
+                        <p className="text-[11px] text-zinc-500 max-w-xs mx-auto leading-relaxed">
+                          Hệ thống đã đối chiếu với nguồn mở Crossref, OpenAlex và Wikipedia. Kết quả chỉ mang tính tham khảo sơ bộ.
                         </p>
                       </div>
                     ) : (
@@ -792,16 +911,18 @@ export function ClientIntegrityCheckerView({
                           <div
                             key={src.id}
                             onClick={() =>
-                              setActiveSourceFilterId(isFiltered ? null : src.id)
+                              setActiveSourceFilterId(
+                                isFiltered ? null : src.id
+                              )
                             }
-                            className={`card-interactive p-3 rounded-xl border cursor-pointer space-y-1.5 ${
+                            className={`card-interactive p-3.5 rounded-xl border cursor-pointer space-y-2 ${
                               isFiltered
                                 ? 'border-[#4338CA] bg-indigo-50/40 ring-2 ring-indigo-500/10'
                                 : 'border-zinc-200 bg-white'
                             }`}
                           >
                             <div className="flex items-start justify-between gap-2">
-                              <div className="flex items-start gap-2 min-w-0">
+                              <div className="flex items-start gap-2.5 min-w-0">
                                 <span
                                   style={{ backgroundColor: src.badgeColor }}
                                   className="text-white text-[11px] font-bold px-2 py-0.5 rounded-md shrink-0"
@@ -809,7 +930,7 @@ export function ClientIntegrityCheckerView({
                                   {src.id}
                                 </span>
                                 <div className="min-w-0">
-                                  <h3 className="text-xs font-bold text-slate-900 line-clamp-2">
+                                  <h3 className="text-xs font-bold text-slate-900 line-clamp-2 leading-snug">
                                     {src.title}
                                   </h3>
                                   <p className="text-[11px] text-zinc-500 truncate mt-0.5">
@@ -823,12 +944,13 @@ export function ClientIntegrityCheckerView({
                               </span>
                             </div>
 
-                            <div className="flex items-center justify-between gap-2 pt-1 text-[11px]">
+                            <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-zinc-100 text-[11px]">
                               <span className="text-zinc-500">
                                 {src.sourceType === 'internet'
                                   ? 'Nguồn Internet'
                                   : 'Tạp chí / Học thuật'}{' '}
-                                · {src.matchedWordCount} từ ({src.matchedSentenceCount} câu)
+                                · {src.matchedWordCount} từ (
+                                {src.matchedSentenceCount} câu)
                               </span>
                               <a
                                 href={src.url}
@@ -848,7 +970,7 @@ export function ClientIntegrityCheckerView({
                   </div>
                 ) : (
                   <div className="tab-panel-enter p-4 space-y-4">
-                    <div className="space-y-3">
+                    <div className="space-y-3.5">
                       <MetricProgressBar
                         label="Độ biến thiên độ dài câu (Burstiness)"
                         value={report.forensics.burstinessScore}
@@ -860,7 +982,7 @@ export function ClientIntegrityCheckerView({
                         label="Độ đa dạng từ vựng (Lexical Entropy)"
                         value={report.forensics.lexicalDiversityScore}
                         barColor="#4338CA"
-                        hint="Tỷ lệ từ vựng phong phú tự nhiên so với độ dài toàn bài."
+                        hint="Mức độ phong phú vốn từ tự nhiên so với độ dài toàn bài."
                       />
 
                       <MetricProgressBar
@@ -874,12 +996,12 @@ export function ClientIntegrityCheckerView({
                         label="Mật độ cụm từ đặc trưng AI"
                         value={report.forensics.aiPhraseDensityScore}
                         barColor="#DC2626"
-                        hint="Tần suất xuất hiện các cụm từ chuyển ý/sáo rỗng phổ biến của LLM."
+                        hint="Tần suất xuất hiện các cụm từ chuyển ý/khuôn mẫu thường gặp ở LLM."
                       />
                     </div>
 
                     {report.detectedAiPhrases.length > 0 && (
-                      <div className="pt-3 border-t border-zinc-100 space-y-2">
+                      <div className="pt-3.5 border-t border-zinc-100 space-y-2">
                         <div className="text-xs font-bold text-slate-900">
                           Cụm từ dấu hiệu AI phát hiện trong bài:
                         </div>

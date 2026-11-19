@@ -170,9 +170,9 @@ export function openPrintableIntegrityReport(
   </style>
 </head>
 <body>
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f172a;padding-bottom:16px;margin-bottom:20px;">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f172a;padding-bottom:16px;margin-bottom:16px;">
     <div>
-      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#4338ca;">AssignTrack Integrity Verification Report</div>
+      <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#4338ca;">AssignTrack Integrity Check (For Reference Only)</div>
       <h1 style="margin:4px 0 6px 0;font-size:20px;">${escapeHtml(report.title)}</h1>
       <div style="font-size:12px;color:#52525b;">Mã báo cáo: <strong>${escapeHtml(
         report.reportId
@@ -181,6 +181,10 @@ export function openPrintableIntegrityReport(
   )}</div>
     </div>
     <button class="no-print" onclick="window.print()" style="padding:8px 16px;background:#4338ca;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;">In / Lưu PDF</button>
+  </div>
+
+  <div style="background:#fffbeb;border:1px solid #fcd34d;border-left:4px solid #f59e0b;border-radius:8px;padding:12px 14px;margin-bottom:20px;font-size:12px;color:#78350f;line-height:1.5;">
+    <strong>LƯU Ý QUAN TRỌNG (CHỈ MANG TÍNH CHẤT THAM KHẢO):</strong> Kết quả kiểm tra Đạo văn và AI này chỉ mang tính chất tham khảo sơ bộ dựa trên nguồn dữ liệu mở (Crossref, OpenAlex, Internet) và phân tích thống kê ngôn ngữ học, do đó <strong>có thể có sai lệch nhất định</strong> so với báo cáo Turnitin chính thức của nhà trường.
   </div>
 
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;">
