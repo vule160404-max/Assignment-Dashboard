@@ -876,7 +876,6 @@ export function ClientPortalView({
                         onToast(hintToast);
                       }
                     }}
-                    onToast={onToast}
                   />
                 )}
               </div>

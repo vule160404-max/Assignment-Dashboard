@@ -1,26 +1,22 @@
-import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import {
   ArrowRight,
   Award,
-  Check,
   CheckCircle2,
   Clock,
-  Copy,
+  ExternalLink,
   FileCheck2,
   GraduationCap,
-  MessageSquareText,
   PenLine,
   ShieldCheck,
   Sparkles,
   Users,
-  X,
 } from 'lucide-react';
 
 interface ClientLandingSectionsProps {
   onOpenChecker: (hintToast?: string) => void;
-  onToast: (msg: string) => void;
 }
+
+const ZALO_CONSULT_URL = 'https://zalo.me/0916045202';
 
 const VALUE_PROPS = [
   {
@@ -72,6 +68,7 @@ interface ServiceItem {
   ctaLabel: string;
   icon: typeof PenLine;
   featured?: boolean;
+  href?: string;
 }
 
 const SERVICES: readonly ServiceItem[] = [
@@ -83,6 +80,7 @@ const SERVICES: readonly ServiceItem[] = [
       'Hỗ trợ trọn gói Tiểu luận, Báo cáo thực tập, Khóa luận tốt nghiệp. Kèm báo cáo Turnitin minh bạch.',
     ctaLabel: 'Nhận tư vấn ngay',
     icon: PenLine,
+    href: ZALO_CONSULT_URL,
   },
   {
     id: 'turnitin',
@@ -106,16 +104,7 @@ const SERVICES: readonly ServiceItem[] = [
   },
 ];
 
-export function ClientLandingSections({
-  onOpenChecker,
-  onToast,
-}: ClientLandingSectionsProps) {
-  const [consultOpen, setConsultOpen] = useState(false);
-  const [consultTopic, setConsultTopic] = useState('Tiểu luận / Báo cáo thực tập');
-  const [consultDeadline, setConsultDeadline] = useState('');
-  const [consultNote, setConsultNote] = useState('');
-  const [copiedTemplate, setCopiedTemplate] = useState(false);
-
+export function ClientLandingSections({ onOpenChecker }: ClientLandingSectionsProps) {
   const handleServiceAction = (id: ServiceItem['id']) => {
     if (id === 'turnitin') {
       onOpenChecker();
@@ -125,30 +114,6 @@ export function ClientLandingSections({
       onOpenChecker(
         'Tải file bài viết lên để kiểm tra sơ bộ tỷ lệ trùng lặp & AI trước khi nhận báo giá chỉnh sửa.'
       );
-      return;
-    }
-    setConsultOpen(true);
-  };
-
-  const buildConsultMessage = () => {
-    const lines = [
-      'Chào đội ngũ AssignTrack, mình cần tư vấn dịch vụ học thuật:',
-      `- Loại bài: ${consultTopic}`,
-      consultDeadline.trim() ? `- Deadline dự kiến: ${consultDeadline.trim()}` : null,
-      consultNote.trim() ? `- Yêu cầu chi tiết: ${consultNote.trim()}` : null,
-      'Nhờ đội ngũ tư vấn lộ trình và báo giá giúp mình nhé!',
-    ].filter(Boolean);
-    return lines.join('\n');
-  };
-
-  const handleCopyConsultMessage = async () => {
-    try {
-      await navigator.clipboard.writeText(buildConsultMessage());
-      setCopiedTemplate(true);
-      onToast('Đã sao chép mẫu yêu cầu tư vấn — bạn chỉ cần dán gửi qua Zalo/Messenger.');
-      window.setTimeout(() => setCopiedTemplate(false), 2500);
-    } catch {
-      onToast('Không thể sao chép tự động. Vui lòng chọn và sao chép nội dung mẫu.');
     }
   };
 
@@ -242,6 +207,12 @@ export function ClientLandingSections({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
           {SERVICES.map((service) => {
             const Icon = service.icon;
+            const ctaClasses = `btn-press w-full py-2.5 px-4 text-xs sm:text-sm font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 ${
+              service.featured
+                ? 'bg-[#4338CA] text-white hover:bg-[#3730A3] shadow-2xs'
+                : 'bg-[#EEF2FF] text-[#4338CA] hover:bg-[#4338CA] hover:text-white border border-indigo-200/80'
+            }`;
+
             return (
               <article
                 key={service.id}
@@ -285,145 +256,32 @@ export function ClientLandingSections({
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-zinc-100">
-                  <button
-                    type="button"
-                    onClick={() => handleServiceAction(service.id)}
-                    className={`btn-press w-full py-2.5 px-4 text-xs sm:text-sm font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 ${
-                      service.featured
-                        ? 'bg-[#4338CA] text-white hover:bg-[#3730A3] shadow-2xs'
-                        : 'bg-[#EEF2FF] text-[#4338CA] hover:bg-[#4338CA] hover:text-white border border-indigo-200/80'
-                    }`}
-                  >
-                    <span>{service.ctaLabel}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                  {service.href ? (
+                    <a
+                      href={service.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={ctaClasses}
+                    >
+                      <span>{service.ctaLabel}</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleServiceAction(service.id)}
+                      className={ctaClasses}
+                    >
+                      <span>{service.ctaLabel}</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
                 </div>
               </article>
             );
           })}
         </div>
       </section>
-
-      {/* Quick Consultation Modal (Portaled to document.body) */}
-      {consultOpen &&
-        createPortal(
-          <div
-            className="fixed inset-0 z-50 bg-slate-900/45 backdrop-blur-[2px] flex items-center justify-center p-4"
-            onClick={() => setConsultOpen(false)}
-          >
-            <div
-              className="popover-enter bg-white border border-zinc-200 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-5"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-9 h-9 rounded-xl bg-[#F5F3FF] text-[#4338CA] flex items-center justify-center shrink-0">
-                    <MessageSquareText className="w-4 h-4" />
-                  </span>
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      Nhận tư vấn &amp; Báo giá nhanh
-                    </h3>
-                    <p className="text-xs text-zinc-500">
-                      Điền nhanh thông tin để tạo mẫu tin nhắn gửi tư vấn viên.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setConsultOpen(false)}
-                  aria-label="Đóng"
-                  className="btn-press p-1.5 text-zinc-400 hover:text-slate-800 hover:bg-zinc-100 rounded-lg"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="space-y-3.5">
-                <div>
-                  <label className="block text-xs font-medium text-zinc-700 mb-1.5">
-                    Loại bài cần hỗ trợ
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {[
-                      'Tiểu luận / Báo cáo thực tập',
-                      'Khóa luận tốt nghiệp',
-                      'Check Turnitin chính hãng',
-                      'Giảm tỷ lệ Đạo văn & AI',
-                    ].map((opt) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        onClick={() => setConsultTopic(opt)}
-                        className={`btn-press px-3 py-2 text-xs font-medium rounded-xl border text-left ${
-                          consultTopic === opt
-                            ? 'bg-[#EEF2FF] border-[#4338CA] text-[#4338CA]'
-                            : 'bg-zinc-50 border-zinc-200 text-zinc-700 hover:bg-zinc-100'
-                        }`}
-                      >
-                        {opt}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-zinc-700 mb-1">
-                    Deadline dự kiến (tùy chọn)
-                  </label>
-                  <input
-                    type="text"
-                    value={consultDeadline}
-                    onChange={(e) => setConsultDeadline(e.target.value)}
-                    placeholder="Ví dụ: 25/11/2026 hoặc còn 5 ngày"
-                    className="w-full px-3.5 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA]"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-zinc-700 mb-1">
-                    Đề tài / số trang dự kiến (tùy chọn)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={consultNote}
-                    onChange={(e) => setConsultNote(e.target.value)}
-                    placeholder="Ví dụ: Tiểu luận môn Marketing căn bản, khoảng 15 trang..."
-                    className="w-full px-3.5 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#4338CA]/20 focus:border-[#4338CA] resize-none"
-                  />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2.5 pt-1">
-                <button
-                  type="button"
-                  onClick={() => void handleCopyConsultMessage()}
-                  className="btn-press flex-1 py-2.5 px-4 text-xs sm:text-sm font-semibold bg-[#4338CA] text-white rounded-xl hover:bg-[#3730A3] inline-flex items-center justify-center gap-1.5"
-                >
-                  {copiedTemplate ? (
-                    <>
-                      <Check className="w-4 h-4" />
-                      <span>Đã sao chép mẫu tin nhắn</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-4 h-4" />
-                      <span>Sao chép mẫu gửi tư vấn</span>
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setConsultOpen(false)}
-                  className="btn-press px-4 py-2.5 text-xs sm:text-sm font-medium text-zinc-600 bg-zinc-100 hover:bg-zinc-200 rounded-xl"
-                >
-                  Đóng
-                </button>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
     </div>
   );
 }
