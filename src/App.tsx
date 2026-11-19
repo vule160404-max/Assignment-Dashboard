@@ -202,6 +202,7 @@ export default function App() {
       <ClientPortalView
         user={user}
         userProfile={userProfile}
+        authReady={authReady}
         initialOrderCode={clientInitialCode}
         nowMs={nowMs}
         onSwitchToAdmin={handleSwitchToAdmin}

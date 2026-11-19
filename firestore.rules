@@ -555,9 +555,9 @@ service cloud.firestore {
       allow get, list: if isAdmin();
     }
 
-    // Public non-PII tracking projection accessed strictly by exact Order Code
+    // Authenticated non-PII tracking projection accessed strictly by exact Order Code
     match /trackingPortals/{orderCode} {
-      allow get: if isValidOrderCode(orderCode);
+      allow get: if isSignedIn() && isValidOrderCode(orderCode);
       allow list: if false;
       allow create: if isAdmin() && isValidOrderCode(orderCode) && isValidTrackingPortal(incoming(), orderCode);
       allow update: if isValidOrderCode(orderCode) && isValidTrackingPortal(incoming(), orderCode)
@@ -585,9 +585,10 @@ service cloud.firestore {
 
       // 48-hour ephemeral chat messages scoped under trackingPortals/{orderCode}
       match /messages/{msgId} {
-        allow get: if (isAdmin() || isAssignedToPortal(orderCode) || isValidOrderCode(orderCode)) && isValidId(msgId);
-        allow list: if isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode);
-        allow create: if isValidId(msgId)
+        allow get: if isSignedIn() && (isAdmin() || isAssignedToPortal(orderCode) || isValidOrderCode(orderCode)) && isValidId(msgId);
+        allow list: if isSignedIn() && (isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode));
+        allow create: if isSignedIn()
+          && isValidId(msgId)
           && isValidOrderCode(orderCode)
           && isValidOrderMessage(incoming(), orderCode)
           && exists(/databases/$(database)/documents/trackingPortals/$(orderCode))
@@ -601,9 +602,10 @@ service cloud.firestore {
 
       // Revision requests scoped under trackingPortals/{orderCode}
       match /revisions/{reqId} {
-        allow get: if (isAdmin() || isAssignedToPortal(orderCode) || isValidOrderCode(orderCode)) && isValidId(reqId);
-        allow list: if isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode);
-        allow create: if isValidId(reqId)
+        allow get: if isSignedIn() && (isAdmin() || isAssignedToPortal(orderCode) || isValidOrderCode(orderCode)) && isValidId(reqId);
+        allow list: if isSignedIn() && (isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode));
+        allow create: if isSignedIn()
+          && isValidId(reqId)
           && isValidOrderCode(orderCode)
           && isValidRevisionRequest(incoming(), orderCode)
           && incoming().status == 'open'

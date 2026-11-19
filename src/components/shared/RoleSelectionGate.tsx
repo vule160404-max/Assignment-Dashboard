@@ -52,7 +52,7 @@ export function RoleSelectionGate({
                     Tôi là Khách hàng
                   </h2>
                   <p className="text-xs text-zinc-600 leading-relaxed">
-                    Tra cứu tiến độ bài làm bằng mã đơn hàng, xem trước báo cáo Turnitin & PDF, thanh toán QR hoặc đăng nhập/đăng ký tài khoản Khách hàng.
+                    Đăng nhập tài khoản Khách hàng để nhận tư vấn làm bài, giảm tỷ lệ Đạo văn – AI, tra cứu tiến độ đơn hàng và xem báo cáo Turnitin.
                   </p>
                 </div>
               </div>

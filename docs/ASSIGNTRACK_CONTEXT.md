@@ -2,7 +2,7 @@
 
 > **Mục đích:** Tài liệu tham chiếu chuẩn xác duy nhất (Single Source of Truth) đóng gói toàn bộ quy trình nghiệp vụ, quyết định thiết kế, bảng màu thương hiệu, cấu trúc hạ tầng và các bẫy kỹ thuật của **AssignTrack**. Mọi phiên làm việc mới (kể cả workflow Spec Kit hoặc Elephant-Goldfish Model) phải đọc và tuân thủ tài liệu này trước khi sửa mã nguồn.
 >
-> **Cập nhật lần cuối:** 2026-11-19 (sau commit `e77080c`).
+> **Cập nhật lần cuối:** 2026-11-20 (bắt buộc đăng nhập Khách hàng + màn hình "Bạn muốn làm gì?" `ClientIntentHubView.tsx`).
 
 ---
 
@@ -16,25 +16,26 @@
   - Chủ hệ thống bootstrap mặc định (`isBootstrappedOwner()` trong `firestore.rules`): `vule160404@gmail.com`.
   - Mọi thao tác Admin/Staff đều yêu cầu Firebase Auth đã xác thực email (`email_verified === true`).
 
-### 1.2. Cổng Khách hàng (`ClientPortalView.tsx` + `ClientLandingSections.tsx`)
-- **Thanh điều hướng Header (3 vùng cố định, không lặp lại thanh tab trong thân trang):**
-  - **Trái:** `<BrandLogo />` bấm về trang chủ tra cứu.
-  - **Giữa (Desktop `md+`):** Đúng 1 pill chuyển đổi 2 chức năng cốt lõi của khách hàng: `Tra cứu đơn hàng` (`lookup`) và `Check Đạo văn & AI` (`checker`), kèm thanh 2 tab gọn dưới header trên màn hình `<md`.
-  - **Phải:** Cụm tài khoản hợp nhất (Avatar chữ cái đầu + tên hiển thị bấm mở trang tài khoản `auth` + nút đăng xuất; hoặc nút `Đăng nhập` khi chưa đăng nhập) và nút phụ `Quản trị` tách biệt nhẹ.
-- **Bố cục Landing 1 màn hình desktop (`max-w-6xl`, tối ưu không phải cuộn nhiều trên 1366×768+):**
-  - **Hàng 1 (Bento 7:5):**
-    - *Trái (`lg:col-span-7`):* Khung **Tra cứu tiến độ đơn hàng** (ô nhập mã + nút **Xem tiến độ** nằm cùng hàng; tự động lưu bookmark mã đơn nếu khách đã đăng nhập).
-    - *Phải (`lg:col-span-5`):* `<ClientValuePropCard />` nền Deep Academic Navy nổi bật 3 tiêu chí cốt lõi:
-      1. `Hỗ trợ Tiểu luận | Báo cáo thực tập | Khóa luận`
-      2. `Chuẩn học thuật – Có báo cáo check đạo văn & AI (Turnitin)`
-      3. `Đúng deadline – Cập nhật tiến độ rõ ràng`
-  - **Hàng 2:** Thanh chỉ số niềm tin 4 cột (`Top 2 Việt Nam` · `5.202+` Sinh viên đã tin dùng · `100%` Tỷ lệ sinh viên qua môn · `70%` Bài đạt điểm xuất sắc).
-  - **Hàng 3 — 3 thẻ Dịch vụ & Bảng giá nhanh (nguồn chuẩn):**
-    1. **Hỗ trợ viết bài & Luận văn** — Giá: **`Chỉ từ 299K`** — Nút **`Nhận tư vấn ngay`** → mở tab mới `https://zalo.me/0916045202`.
-    2. **Check Đạo văn & AI (Turnitin)** (`Phổ biến`) — Giá: **`Free`** — Nút **`Check ngay`** → chuyển sang tab `Check Đạo văn & AI`.
-    3. **Giảm tỷ lệ Đạo văn & AI** — Giá: **`Báo giá theo số trang`** — Nút **`Nhận tư vấn ngay`** → mở tab mới `https://zalo.me/0916045202`.
+### 1.2. Cổng Khách hàng (`ClientPortalView.tsx` + `ClientIntentHubView.tsx` + `ClientLandingSections.tsx`)
+- **Cổng đăng nhập bắt buộc (Mandatory Client Auth Gate):**
+  - Khách hàng **BẮT BUỘC đăng nhập / đăng ký tài khoản** trước khi truy cập BẤT KỲ tính năng nào (kể cả tra cứu tiến độ đơn hàng, link `?code=`, tab Check Đạo văn & AI, hay nhắn tin/yêu cầu sửa bài).
+  - Giao diện chặn tải trước toàn bộ tab và không subscribe Firestore khi `!user`; ở tầng backend `firestore.rules`, mọi quyền `get`/`list`/`create` trên `trackingPortals/{orderCode}` cùng subcollections `messages` và `revisions` đều yêu cầu `isSignedIn()` (không ép `isVerifiedEmail()` để tài khoản khách vừa đăng ký dùng được ngay).
+  - Sau khi đăng nhập xong, khách mặc định vào trang **`"Bạn muốn làm gì?"`** (`homeTab = 'hub'` — trừ trường hợp mở sẵn link `?code=` thì mở thẳng đơn đó).
+- **Trang lựa chọn `"Bạn muốn làm gì?"` (`ClientIntentHubView.tsx` — Mặc định sau khi đăng nhập):**
+  - Hiển thị lời chào theo tên khách + tiêu đề **"Bạn muốn làm gì?"** + 3 thẻ dịch vụ chính:
+    1. **Nhận tư vấn hỗ trợ làm luận văn - báo cáo** (`Chỉ từ 299K`) — Nút **`Nhận tư vấn qua Zalo`** → `https://zalo.me/0916045202`.
+    2. **Kiểm tra tiến độ bài làm** *(Đối với khách đã tạo đơn thành công)* (thẻ trung tâm nổi bật, hiển thị số đơn đã lưu) — Nút **`Kiểm tra tiến độ ngay`** → mở tab tra cứu mã đơn (`lookup`).
+    3. **Nhận tư vấn hỗ trợ giảm tỉ lệ đạo văn - AI** (`Báo giá theo số trang`) — Nút **`Nhận tư vấn qua Zalo`** → `https://zalo.me/0916045202`.
+  - Hàng dưới cùng gồm thanh truy cập nhanh **Check Đạo văn & AI sơ bộ (`Free`)** và dải 4 chỉ số uy tín (`Top 2 Việt Nam` · `5.202+` · `100%` · `70%`).
+- **Thanh điều hướng Header khi đã đăng nhập (3 vùng cố định, không lặp lại thanh tab trong thân trang):**
+  - **Trái:** `<BrandLogo />` bấm quay về trang `"Bạn muốn làm gì?"` (`hub`).
+  - **Giữa (Desktop `md+` & mobile bar):** 1 pill chuyển đổi 3 mục: `Trang chủ` (`hub`), `Tra cứu tiến độ` (`lookup`) và `Check Đạo văn & AI` (`checker`).
+  - **Phải:** Cụm tài khoản hợp nhất (Avatar + tên hiển thị bấm mở trang tài khoản `auth` + nút đăng xuất) và nút phụ `Quản trị`.
+- **Tab Tra cứu đơn hàng (`lookup` — Bento 1 màn hình desktop `max-w-6xl`):**
+  - **Hàng 1:** Ô nhập mã đơn + nút **Xem tiến độ** (trái) đặt ngang hàng với `<ClientValuePropCard />` (phải).
+  - **Hàng 2 & 3:** `<ClientLandingSections />` hiển thị dải 4 chỉ số + 3 thẻ dịch vụ (`299K`, `Free`, `Báo giá theo số trang`).
 - **Chi tiết đơn hàng (khi tra cứu mã hợp lệ):**
-  - Đọc từ collection công khai không chứa PII `trackingPortals/{orderCode}` (`allow list: if false` trong `firestore.rules`).
+  - Đọc từ collection `trackingPortals/{orderCode}` (`allow get: if isSignedIn() && isValidOrderCode(orderCode)`, `allow list: if false` trong `firestore.rules`, không chứa PII).
   - Khóa tải các tệp gắn cờ `isPaymentLocked` cho tới khi `paymentStatus === 'fully_paid'`; trình xem PDF chỉ mở trang `1..2` (mờ trang `3+`), riêng báo cáo `turnitin` mở đến `turnitinScorePage + 2`.
   - Hỗ trợ QR thanh toán (`PaymentQrCard.tsx`), chat 48 giờ tự hủy (`OrderChatPanel.tsx`), và gửi yêu cầu sửa bài (`revisions`).
 
@@ -113,7 +114,7 @@ Cloudflare R2 lưu các **tệp nhị phân nặng và metadata gắn với file
 
 - **App & Auth:** `src/App.tsx`, `src/lib/firebase.ts`, `src/types/domain.ts`, `src/lib/utils.ts`
 - **Services (Firestore + API):** `src/services/firestoreService.ts`, `ordersService.ts`, `teamService.ts`, `crmSettingsService.ts`, `apiClient.ts`, `writerSyncService.ts`
-- **Client Portal:** `src/components/client/ClientPortalView.tsx`, `ClientLandingSections.tsx`, `ClientIntegrityCheckerView.tsx`, `PaymentQrCard.tsx`, `src/lib/integrityCheckerClient.ts`
+- **Client Portal:** `src/components/client/ClientPortalView.tsx`, `ClientIntentHubView.tsx`, `ClientLandingSections.tsx`, `ClientIntegrityCheckerView.tsx`, `PaymentQrCard.tsx`, `src/lib/integrityCheckerClient.ts`
 - **Admin Portal & CRM:** `src/components/admin/AdminPortalView.tsx`, `AdminAuthGate.tsx`, `OrderWorkspaceModal.tsx`, `ClientsCrmView.tsx`, `CalendarView.tsx`, `RevenueDashboardView.tsx`, `TeamManagementView.tsx`, `BankSettingsView.tsx`
 - **AI Writer Studio:** `src/components/admin/AiWriterStudioView.tsx`, `src/components/admin/writer/*`, `src/lib/aiWriterClient.ts`, `src/lib/docxBuilder.ts`
   - Hỗ trợ đa tab viết song song nhiều bài, ưu tiên Perplexity Academic + các AI Provider khác (Gemini, OpenAI, Claude, Custom OpenAI/NVIDIA NIM).

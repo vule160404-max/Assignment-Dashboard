@@ -265,9 +265,16 @@ export function triggerClientTelegramNotification(params: {
   eventType: 'message' | 'revision';
   recordId: string;
 }): void {
-  fetch('/api/notifications/telegram/client-event', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  }).catch(() => undefined);
+  void (async () => {
+    const token = await auth.currentUser?.getIdToken().catch(() => '');
+    if (!token) return;
+    await fetch('/api/notifications/telegram/client-event', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(params),
+    });
+  })().catch(() => undefined);
 }

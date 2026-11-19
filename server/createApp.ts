@@ -993,6 +993,19 @@ export function createApiApp(): express.Express {
       return;
     }
 
+    const authHeader =
+      typeof req.headers.authorization === 'string' &&
+      req.headers.authorization.startsWith('Bearer ')
+        ? req.headers.authorization.trim()
+        : '';
+    if (!authHeader) {
+      res.status(401).json({
+        ok: false,
+        error: 'Yêu cầu đăng nhập để gửi thông báo sự kiện.',
+      });
+      return;
+    }
+
     const orderCode =
       typeof req.body?.orderCode === 'string'
         ? req.body.orderCode.trim().toUpperCase()
@@ -1060,7 +1073,9 @@ export function createApiApp(): express.Express {
       )}/documents/trackingPortals/${encodeURIComponent(
         orderCode
       )}/${subCol}/${encodeURIComponent(recordId)}`;
-      const recordResp = await fetch(recordUrl);
+      const recordResp = await fetch(recordUrl, {
+        headers: { Authorization: authHeader },
+      });
       if (!recordResp.ok) {
         res.status(404).json({ ok: false, error: 'Không tìm thấy bản ghi sự kiện hợp lệ.' });
         return;

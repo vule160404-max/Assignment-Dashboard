@@ -17,8 +17,8 @@ import {
   Eye,
   EyeOff,
   FileText,
+  Home,
   Lock,
-  LogIn,
   LogOut,
   RefreshCw,
   Search,
@@ -61,6 +61,7 @@ import { BrandLogo } from '../shared/BrandLogo';
 import { OrderChatPanel } from '../shared/OrderChatPanel';
 import { PdfPreviewModal } from '../shared/PdfPreviewModal';
 import { ClientIntegrityCheckerView } from './ClientIntegrityCheckerView';
+import { ClientIntentHubView } from './ClientIntentHubView';
 import {
   ClientLandingSections,
   ClientValuePropCard,
@@ -70,6 +71,7 @@ import { PaymentQrCard } from './PaymentQrCard';
 interface ClientPortalViewProps {
   user: User | null;
   userProfile: UserProfile | null;
+  authReady?: boolean;
   initialOrderCode?: string;
   nowMs: number;
   onSwitchToAdmin: () => void;
@@ -87,9 +89,11 @@ const CATEGORY_LABELS: Record<AttachmentItem['category'], string> = {
 export function ClientPortalView({
   user,
   userProfile,
+  authReady = true,
   initialOrderCode = '',
   nowMs,
   onSwitchToAdmin,
+  onBackToRoleSelect,
   onToast,
 }: ClientPortalViewProps) {
   const [codeInput, setCodeInput] = useState(initialOrderCode);
@@ -102,16 +106,16 @@ export function ClientPortalView({
   const [lookupError, setLookupError] = useState('');
   const [previewAttachment, setPreviewAttachment] = useState<AttachmentItem | null>(null);
 
-  // Client home tab state ('lookup' | 'checker' | 'auth')
-  const [homeTab, setHomeTabState] = useState<'lookup' | 'checker' | 'auth'>(() => {
+  // Client home tab state ('hub' | 'lookup' | 'checker' | 'auth')
+  const [homeTab, setHomeTabState] = useState<'hub' | 'lookup' | 'checker' | 'auth'>(() => {
     const urlTab = new URLSearchParams(window.location.search).get('tab');
-    if (urlTab === 'checker' || urlTab === 'auth' || urlTab === 'lookup') {
+    if (urlTab === 'hub' || urlTab === 'lookup' || urlTab === 'checker' || urlTab === 'auth') {
       return urlTab;
     }
-    return 'lookup';
+    return 'hub';
   });
 
-  const setHomeTab = (nextTab: 'lookup' | 'checker' | 'auth') => {
+  const setHomeTab = (nextTab: 'hub' | 'lookup' | 'checker' | 'auth') => {
     setHomeTabState(nextTab);
     const url = new URL(window.location.href);
     url.searchParams.set('tab', nextTab);
@@ -135,7 +139,7 @@ export function ClientPortalView({
   const [submittingRev, setSubmittingRev] = useState(false);
 
   useEffect(() => {
-    if (!activeCode) {
+    if (!activeCode || !user) {
       setPortal(null);
       setRevisions([]);
       return;
@@ -160,9 +164,13 @@ export function ClientPortalView({
       unsubPortal();
       unsubRevs();
     };
-  }, [activeCode]);
+  }, [activeCode, user]);
 
   const openOrderByCode = async (rawCode: string) => {
+    if (!user) {
+      onToast('Vui lòng đăng nhập tài khoản Khách hàng để tra cứu tiến độ đơn hàng.');
+      return;
+    }
     const normalized = normalizeOrderCode(rawCode);
     if (!isValidOrderCode(normalized)) {
       setLookupError('Mã đơn hàng không hợp lệ (ví dụ: ASG-2026-001).');
@@ -246,12 +254,16 @@ export function ClientPortalView({
         const cred = await createUserWithEmailAndPassword(auth, email, authPassword);
         await updateProfile(cred.user, { displayName: authName.trim() });
         await registerClientProfile(cred.user, authName.trim(), authPhone.trim());
-        setHomeTab('lookup');
+        if (!activeCode) {
+          setHomeTab('hub');
+        }
         onToast('Đã đăng ký và đăng nhập tài khoản Khách hàng thành công!');
       } else {
         const cred = await signInWithEmailAndPassword(auth, email, authPassword);
         await registerClientProfile(cred.user);
-        setHomeTab('lookup');
+        if (!activeCode) {
+          setHomeTab('hub');
+        }
         onToast('Đã đăng nhập tài khoản Khách hàng.');
       }
     } catch (err) {
@@ -286,6 +298,8 @@ export function ClientPortalView({
 
   const handleClientSignOut = async () => {
     try {
+      handleResetLookup();
+      setHomeTab('hub');
       await signOut(auth);
       onToast('Đã đăng xuất tài khoản Khách hàng.');
     } catch (err) {
@@ -318,9 +332,287 @@ export function ClientPortalView({
     userProfile?.displayName || user?.displayName || user?.email || 'Khách hàng';
   const avatarInitial = displayName.trim().charAt(0).toUpperCase() || 'K';
 
+  const authGateHeader = (
+    <header className="sticky top-0 z-20 sticky-glass border-b border-slate-200/80">
+      <div className="max-w-6xl w-full mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
+        <BrandLogo />
+        <div className="flex items-center gap-2 shrink-0">
+          {onBackToRoleSelect && (
+            <button
+              type="button"
+              onClick={onBackToRoleSelect}
+              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-zinc-600 hover:text-slate-900 bg-zinc-100/90 hover:bg-zinc-200/80 rounded-xl whitespace-nowrap"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Chọn vai trò</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onSwitchToAdmin}
+            className="btn-press hidden sm:inline-flex items-center px-2.5 py-1.5 text-[11px] font-medium text-zinc-400 hover:text-slate-800 hover:bg-zinc-100 rounded-lg whitespace-nowrap border-l border-zinc-200/80 ml-0.5 pl-3"
+            title="Chuyển sang cổng dành cho Admin / Nhân sự"
+          >
+            Quản trị
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+
+  if (!authReady) {
+    return (
+      <div className="min-h-screen client-ambient-bg text-[#0F172A] flex flex-col">
+        {authGateHeader}
+        <main className="flex-1 flex items-center justify-center px-4 sm:px-8 py-12">
+          <div className="surface-enter max-w-sm w-full bg-white border border-slate-200/90 rounded-2xl p-8 text-center shadow-[0_8px_28px_rgb(11,37,89,0.06)] space-y-2">
+            <p className="text-sm font-semibold text-slate-900">
+              Đang kiểm tra trạng thái đăng nhập...
+            </p>
+            <p className="text-xs text-zinc-500">Vui lòng chờ trong giây lát.</p>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen client-ambient-bg text-[#0F172A] flex flex-col">
+        {authGateHeader}
+        <main className="flex-1 flex items-center justify-center px-4 sm:px-8 py-8 sm:py-12">
+          <section className="surface-enter relative overflow-hidden max-w-md w-full bg-white/95 backdrop-blur-xs border border-slate-200/90 rounded-2xl p-6 sm:p-8 shadow-[0_14px_38px_-14px_rgba(11,37,89,0.14)] space-y-5">
+            <span
+              aria-hidden="true"
+              className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#0B2559] via-[#12489B] to-[#F5B700]"
+            />
+
+            <div className="space-y-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200/80 text-[#0B2559] text-[11px] font-semibold">
+                <Lock className="w-3 h-3 text-[#12489B]" />
+                Yêu cầu đăng nhập Khách hàng
+              </span>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">
+                {authMode === 'login'
+                  ? 'Đăng nhập tài khoản Khách hàng'
+                  : 'Đăng ký tài khoản Khách hàng'}
+              </h1>
+              <p className="text-xs text-zinc-600 leading-relaxed">
+                {activeCode
+                  ? `Vui lòng đăng nhập hoặc tạo tài khoản Khách hàng để xem tiến độ đơn #${activeCode} và sử dụng các dịch vụ của AssignTrack.`
+                  : 'Vui lòng đăng nhập hoặc tạo tài khoản Khách hàng để nhận tư vấn, check đạo văn – AI và kiểm tra tiến độ bài làm.'}
+              </p>
+            </div>
+
+            {/* Auth Mode Sub-tabs */}
+            <div className="flex border-b border-zinc-200 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('login');
+                  setAuthError('');
+                }}
+                className={`pb-2.5 px-3 border-b-2 transition-colors ${
+                  authMode === 'login'
+                    ? 'border-[#12489B] text-[#12489B]'
+                    : 'border-transparent text-zinc-500 hover:text-slate-900'
+                }`}
+              >
+                Đăng nhập
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthMode('register');
+                  setAuthError('');
+                }}
+                className={`pb-2.5 px-3 border-b-2 transition-colors ${
+                  authMode === 'register'
+                    ? 'border-[#12489B] text-[#12489B]'
+                    : 'border-transparent text-zinc-500 hover:text-slate-900'
+                }`}
+              >
+                Tạo tài khoản mới
+              </button>
+            </div>
+
+            {providerDisabledError && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2 text-xs text-slate-800">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-semibold text-[#D97706]">
+                    Cần bật Email/Password trong Firebase Console
+                  </p>
+                  <a
+                    href={FIREBASE_AUTH_PROVIDERS_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-press inline-flex items-center gap-1 px-2.5 py-1 font-semibold bg-[#D97706] text-white rounded-lg shrink-0"
+                  >
+                    <span>Mở Firebase Console</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
+                <p className="text-zinc-600 leading-relaxed">
+                  Vào Authentication → Sign-in method → bật Email/Password rồi nhấn Save.
+                </p>
+              </div>
+            )}
+
+            {authError && (
+              <div className="text-xs text-[#DC2626] bg-red-50 border border-red-200 rounded-xl p-3.5 flex items-start gap-2 leading-relaxed">
+                <AlertCircle className="w-4 h-4 text-[#DC2626] shrink-0 mt-0.5" />
+                <span>{authError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleClientEmailSubmit} className="space-y-3.5">
+              {authMode === 'register' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">
+                      Họ tên / Nickname *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={FIELD_LIMITS.displayNameMax}
+                      value={authName}
+                      onChange={(e) => setAuthName(e.target.value)}
+                      placeholder="VD: Hoàng Anh"
+                      className={inputFieldCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-zinc-700 mb-1">
+                      Số điện thoại *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      maxLength={FIELD_LIMITS.phoneMax}
+                      value={authPhone}
+                      onChange={(e) => setAuthPhone(e.target.value)}
+                      placeholder="0912 345 678"
+                      className={`${inputFieldCls} font-mono tabular-nums`}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">
+                  Địa chỉ Email *
+                </label>
+                <input
+                  type="email"
+                  required
+                  maxLength={FIELD_LIMITS.emailMax}
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="email@example.com"
+                  className={inputFieldCls}
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-zinc-700">
+                    Mật khẩu *
+                  </label>
+                  {authMode === 'login' && (
+                    <button
+                      type="button"
+                      onClick={handleForgotPassword}
+                      className="text-xs font-medium text-[#12489B] hover:underline"
+                    >
+                      Quên mật khẩu?
+                    </button>
+                  )}
+                </div>
+                <div className="relative">
+                  <input
+                    type={showAuthPassword ? 'text' : 'password'}
+                    required
+                    minLength={6}
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="Tối thiểu 6 ký tự"
+                    className={`${inputFieldCls} pr-10`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAuthPassword((v) => !v)}
+                    aria-label={showAuthPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                    className="p-1.5 text-zinc-400 hover:text-slate-700 absolute right-2.5 top-1/2 -translate-y-1/2"
+                  >
+                    {showAuthPassword ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {authMode === 'register' && (
+                <div>
+                  <label className="block text-xs font-medium text-zinc-700 mb-1">
+                    Nhập lại mật khẩu *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showAuthConfirmPassword ? 'text' : 'password'}
+                      required
+                      minLength={6}
+                      value={authConfirmPassword}
+                      onChange={(e) => setAuthConfirmPassword(e.target.value)}
+                      placeholder="Nhập lại đúng mật khẩu"
+                      className={`${inputFieldCls} pr-10`}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAuthConfirmPassword((v) => !v)}
+                      aria-label={
+                        showAuthConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'
+                      }
+                      className="p-1.5 text-zinc-400 hover:text-slate-700 absolute right-2.5 top-1/2 -translate-y-1/2"
+                    >
+                      {showAuthConfirmPassword ? (
+                        <EyeOff className="w-4 h-4" />
+                      ) : (
+                        <Eye className="w-4 h-4" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={authLoading}
+                className="btn-press w-full py-2.5 px-4 text-sm font-semibold bg-gradient-to-r from-[#0B2559] to-[#12489B] hover:from-[#081B42] hover:to-[#0E3A7D] text-white rounded-xl shadow-[0_6px_16px_-6px_rgba(11,37,89,0.5)] disabled:opacity-45"
+              >
+                {(() => {
+                  if (authLoading) return 'Đang xử lý...';
+                  return authMode === 'login'
+                    ? 'Đăng nhập & Tiếp tục'
+                    : 'Tạo tài khoản Khách hàng';
+                })()}
+              </button>
+            </form>
+
+            <div className="pt-3 border-t border-zinc-100 text-[11px] text-zinc-500 text-center">
+              Tài khoản giúp bảo mật thông tin đơn hàng và đồng bộ lịch sử tra cứu của bạn.
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen client-ambient-bg text-[#0F172A]">
-      {/* Streamlined, Beginner-Friendly Sticky Header */}
+      {/* Signed-In Client Sticky Header */}
       <header className="sticky top-0 z-20 sticky-glass border-b border-slate-200/80">
         <div className="max-w-6xl w-full mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
           {/* Left: Clean Brand Logo */}
@@ -329,14 +621,14 @@ export function ClientPortalView({
             onClick={(e) => {
               e.preventDefault();
               handleResetLookup();
-              setHomeTab('lookup');
+              setHomeTab('hub');
             }}
             className="whitespace-nowrap shrink-0"
           >
             <BrandLogo />
           </a>
 
-          {/* Center: Single Clear Pill Switcher for the 2 Primary Client Tools (Desktop) */}
+          {/* Center: Single Clear Pill Switcher for Client Views (Desktop) */}
           <nav
             aria-label="Chức năng chính"
             className="hidden md:inline-flex items-center bg-slate-100/90 border border-slate-200/80 p-1 rounded-xl gap-1"
@@ -345,16 +637,31 @@ export function ClientPortalView({
               type="button"
               onClick={() => {
                 handleResetLookup();
+                setHomeTab('hub');
+              }}
+              className={`btn-press px-3.5 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap ${
+                homeTab === 'hub' && !portal
+                  ? 'bg-white text-[#0B2559] shadow-xs ring-1 ring-slate-900/5'
+                  : 'text-zinc-600 hover:text-slate-900'
+              }`}
+            >
+              <Home className="w-3.5 h-3.5 text-[#12489B]" />
+              <span>Trang chủ</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleResetLookup();
                 setHomeTab('lookup');
               }}
-              className={`btn-press px-4 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap ${
+              className={`btn-press px-3.5 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap ${
                 homeTab === 'lookup' && !portal
                   ? 'bg-white text-slate-900 shadow-xs ring-1 ring-slate-900/5'
                   : 'text-zinc-600 hover:text-slate-900'
               }`}
             >
               <Search className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>Tra cứu đơn hàng</span>
+              <span>Tra cứu tiến độ</span>
             </button>
             <button
               type="button"
@@ -362,7 +669,7 @@ export function ClientPortalView({
                 handleResetLookup();
                 setHomeTab('checker');
               }}
-              className={`btn-press px-4 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap ${
+              className={`btn-press px-3.5 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap ${
                 homeTab === 'checker' && !portal
                   ? 'bg-white text-[#12489B] shadow-xs ring-1 ring-[#12489B]/15'
                   : 'text-zinc-600 hover:text-slate-900'
@@ -375,55 +682,37 @@ export function ClientPortalView({
 
           {/* Right: Unified Account Control + Subtle Admin Link */}
           <div className="flex items-center gap-2.5 shrink-0">
-            {user ? (
-              <div className="inline-flex items-center bg-white border border-zinc-200/90 rounded-xl p-1 pl-1.5 gap-1.5 shadow-2xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleResetLookup();
-                    setHomeTab('auth');
-                  }}
-                  className={`btn-press inline-flex items-center gap-2 pr-1.5 py-0.5 rounded-lg text-xs ${
-                    homeTab === 'auth' && !portal
-                      ? 'text-[#12489B] font-semibold'
-                      : 'text-slate-800 hover:text-[#12489B] font-medium'
-                  }`}
-                  title="Xem tài khoản & đơn hàng đã lưu"
-                >
-                  <span className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-200/80 text-[#0B2559] text-[11px] font-bold flex items-center justify-center shrink-0">
-                    {avatarInitial}
-                  </span>
-                  <span className="max-w-[110px] sm:max-w-[140px] truncate">
-                    {displayName}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleClientSignOut}
-                  title="Đăng xuất"
-                  aria-label="Đăng xuất"
-                  className="btn-press p-1.5 text-zinc-400 hover:text-[#DC2626] hover:bg-red-50 rounded-lg border-l border-zinc-100"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ) : (
+            <div className="inline-flex items-center bg-white border border-zinc-200/90 rounded-xl p-1 pl-1.5 gap-1.5 shadow-2xs">
               <button
                 type="button"
                 onClick={() => {
                   handleResetLookup();
                   setHomeTab('auth');
                 }}
-                className={`btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl whitespace-nowrap ${
+                className={`btn-press inline-flex items-center gap-2 pr-1.5 py-0.5 rounded-lg text-xs ${
                   homeTab === 'auth' && !portal
-                    ? 'bg-[#0B2559] text-white shadow-2xs'
-                    : 'text-[#0B2559] bg-blue-50 hover:bg-blue-100 border border-blue-200/80'
+                    ? 'text-[#12489B] font-semibold'
+                    : 'text-slate-800 hover:text-[#12489B] font-medium'
                 }`}
+                title="Xem tài khoản & đơn hàng đã lưu"
               >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Đăng nhập</span>
+                <span className="w-6 h-6 rounded-lg bg-blue-50 border border-blue-200/80 text-[#0B2559] text-[11px] font-bold flex items-center justify-center shrink-0">
+                  {avatarInitial}
+                </span>
+                <span className="max-w-[110px] sm:max-w-[140px] truncate">
+                  {displayName}
+                </span>
               </button>
-            )}
+              <button
+                type="button"
+                onClick={handleClientSignOut}
+                title="Đăng xuất"
+                aria-label="Đăng xuất"
+                className="btn-press p-1.5 text-zinc-400 hover:text-[#DC2626] hover:bg-red-50 rounded-lg border-l border-zinc-100"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
 
             <button
               type="button"
@@ -436,23 +725,38 @@ export function ClientPortalView({
           </div>
         </div>
 
-        {/* Mobile Compact 2-Tab Bar (Only visible below md) */}
+        {/* Mobile Compact 3-Tab Bar (Only visible below md) */}
         <div className="md:hidden px-4 pb-2.5">
-          <div className="bg-zinc-100/90 border border-zinc-200/70 p-1 rounded-xl grid grid-cols-2 gap-1">
+          <div className="bg-zinc-100/90 border border-zinc-200/70 p-1 rounded-xl grid grid-cols-3 gap-1">
+            <button
+              type="button"
+              onClick={() => {
+                handleResetLookup();
+                setHomeTab('hub');
+              }}
+              className={`btn-press py-2 px-2 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1 ${
+                homeTab === 'hub' && !portal
+                  ? 'bg-white text-[#0B2559] shadow-2xs'
+                  : 'text-zinc-600'
+              }`}
+            >
+              <Home className="w-3.5 h-3.5 text-[#12489B]" />
+              <span>Trang chủ</span>
+            </button>
             <button
               type="button"
               onClick={() => {
                 handleResetLookup();
                 setHomeTab('lookup');
               }}
-              className={`btn-press py-2 px-3 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1.5 ${
+              className={`btn-press py-2 px-2 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1 ${
                 homeTab === 'lookup' && !portal
                   ? 'bg-white text-slate-900 shadow-2xs'
                   : 'text-zinc-600'
               }`}
             >
               <Search className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>Tra cứu đơn</span>
+              <span>Tra cứu</span>
             </button>
             <button
               type="button"
@@ -460,14 +764,14 @@ export function ClientPortalView({
                 handleResetLookup();
                 setHomeTab('checker');
               }}
-              className={`btn-press py-2 px-3 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1.5 ${
+              className={`btn-press py-2 px-2 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1 ${
                 homeTab === 'checker' && !portal
                   ? 'bg-white text-[#12489B] shadow-2xs'
                   : 'text-zinc-600'
               }`}
             >
               <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Check Đạo văn &amp; AI</span>
+              <span>Check AI</span>
             </button>
           </div>
         </div>
@@ -475,11 +779,13 @@ export function ClientPortalView({
 
       <main
         className={`${
-          !portal && (homeTab === 'checker' || homeTab === 'lookup')
+          !portal && (homeTab === 'hub' || homeTab === 'checker' || homeTab === 'lookup')
             ? 'max-w-6xl'
             : 'max-w-5xl'
         } mx-auto px-4 sm:px-8 ${
-          !portal && homeTab === 'lookup' ? 'py-5 sm:py-6' : 'py-8 sm:py-10'
+          !portal && (homeTab === 'hub' || homeTab === 'lookup')
+            ? 'py-5 sm:py-6'
+            : 'py-8 sm:py-10'
         }`}
       >
         {(() => {
@@ -495,6 +801,17 @@ export function ClientPortalView({
           }
 
           if (!activeCode || !portal) {
+            if (homeTab === 'hub') {
+              return (
+                <ClientIntentHubView
+                  displayName={displayName}
+                  savedOrderCount={(userProfile?.savedOrderCodes || []).length}
+                  onSelectLookup={() => setHomeTab('lookup')}
+                  onSelectChecker={() => setHomeTab('checker')}
+                />
+              );
+            }
+
             if (homeTab === 'checker') {
               return (
                 <div className="surface-enter">
@@ -506,6 +823,17 @@ export function ClientPortalView({
             if (homeTab === 'lookup') {
               return (
                 <div className="surface-enter space-y-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setHomeTab('hub')}
+                      className="btn-press inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 hover:text-[#0B2559]"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      Quay lại trang lựa chọn
+                    </button>
+                  </div>
+
                   {/* Row 1: 2-Column Hero Split — Tra cứu đơn hàng (Left) + Cam kết cốt lõi (Right) */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
                     <section className="relative overflow-hidden lg:col-span-7 bg-white/95 backdrop-blur-xs border border-slate-200/85 rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-[0_12px_34px_-14px_rgba(11,37,89,0.1)] space-y-4">
@@ -527,7 +855,7 @@ export function ClientPortalView({
                             </span>
                           </h1>
                           <p className="text-xs text-zinc-600 leading-relaxed">
-                            Nhập mã đơn hàng được cung cấp (không bắt buộc đăng nhập) để xem tiến độ thời gian thực, tải tài liệu và thanh toán.
+                            Nhập mã đơn hàng được cung cấp để xem tiến độ thời gian thực, tải tài liệu và thanh toán.
                           </p>
                         </div>
 
@@ -563,37 +891,37 @@ export function ClientPortalView({
                         </form>
                       </div>
 
-                      {/* Compact Saved Orders or Sign-in Hint */}
-                      {user && userProfile ? (
-                        <div className="pt-3 border-t border-slate-100 space-y-2">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                              <Bookmark className="w-3.5 h-3.5 text-[#12489B]" />
-                              Đơn hàng đã lưu của {userProfile.displayName}
-                            </span>
-                            <span className="text-[11px] font-mono text-zinc-400 tabular-nums">
-                              {(userProfile.savedOrderCodes || []).length} đơn
-                            </span>
-                          </div>
+                      {/* Compact Saved Orders for Signed-In Client */}
+                      <div className="pt-3 border-t border-slate-100 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                            <Bookmark className="w-3.5 h-3.5 text-[#12489B]" />
+                            Đơn hàng đã lưu của {displayName}
+                          </span>
+                          <span className="text-[11px] font-mono text-zinc-400 tabular-nums">
+                            {(userProfile?.savedOrderCodes || []).length} đơn
+                          </span>
+                        </div>
 
-                          {(userProfile.savedOrderCodes || []).length === 0 ? (
-                            <p className="text-[11px] text-zinc-500">
-                              Mã đơn hợp lệ sau khi tra cứu sẽ tự động lưu tại đây để mở lại nhanh.
-                            </p>
-                          ) : (
-                            <div className="flex flex-wrap gap-1.5">
-                              {(userProfile.savedOrderCodes || []).map((savedCode) => (
-                                <div
-                                  key={savedCode}
-                                  className="inline-flex items-center bg-blue-50/60 border border-blue-200/70 rounded-lg overflow-hidden"
+                        {(userProfile?.savedOrderCodes || []).length === 0 ? (
+                          <p className="text-[11px] text-zinc-500">
+                            Mã đơn hợp lệ sau khi tra cứu sẽ tự động lưu tại đây để mở lại nhanh.
+                          </p>
+                        ) : (
+                          <div className="flex flex-wrap gap-1.5">
+                            {(userProfile?.savedOrderCodes || []).map((savedCode) => (
+                              <div
+                                key={savedCode}
+                                className="inline-flex items-center bg-blue-50/60 border border-blue-200/70 rounded-lg overflow-hidden"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => void openOrderByCode(savedCode)}
+                                  className="btn-press px-2.5 py-1 text-xs font-mono font-semibold text-[#12489B] hover:bg-blue-100/70"
                                 >
-                                  <button
-                                    type="button"
-                                    onClick={() => void openOrderByCode(savedCode)}
-                                    className="btn-press px-2.5 py-1 text-xs font-mono font-semibold text-[#12489B] hover:bg-blue-100/70"
-                                  >
-                                    #{savedCode}
-                                  </button>
+                                  #{savedCode}
+                                </button>
+                                {userProfile && (
                                   <button
                                     type="button"
                                     onClick={() =>
@@ -608,23 +936,12 @@ export function ClientPortalView({
                                   >
                                     <X className="w-3 h-3" />
                                   </button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 text-xs text-zinc-500">
-                          <span>Đăng nhập để tự động lưu lịch sử các mã đơn hàng của bạn.</span>
-                          <button
-                            type="button"
-                            onClick={() => setHomeTab('auth')}
-                            className="btn-press font-semibold text-[#12489B] hover:underline whitespace-nowrap shrink-0"
-                          >
-                            Đăng nhập →
-                          </button>
-                        </div>
-                      )}
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </section>
 
                     <div className="lg:col-span-5">
@@ -650,257 +967,46 @@ export function ClientPortalView({
             return (
               <div className="surface-enter max-w-xl w-full mx-auto">
                 <section className="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 flex flex-col justify-between shadow-[0_8px_28px_rgb(15,23,42,0.03)] space-y-6">
-                  <div className="space-y-6">
-                    {homeTab === 'auth' && (
-                      <div className="space-y-5">
-                        {user && userProfile ? (
-                          <div className="space-y-4">
-                            <div className="space-y-1">
-                              <p className="text-xs font-mono font-semibold uppercase tracking-wider text-[#16A34A]">
-                                Đã đăng nhập
-                              </p>
-                              <h2 className="text-xl font-bold text-slate-900">
-                                Xin chào, {userProfile.displayName}
-                              </h2>
-                              <p className="text-xs font-mono text-zinc-500">
-                                {userProfile.email}
-                                {userProfile.phoneNumber ? ` · ${userProfile.phoneNumber}` : ''}
-                              </p>
-                            </div>
-                            <div className="flex flex-wrap gap-2.5">
-                              <button
-                                type="button"
-                                onClick={() => setHomeTab('lookup')}
-                                className="btn-press px-4 py-2 text-xs font-medium bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559]"
-                              >
-                                Tra cứu & Xem đơn đã lưu
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleClientSignOut}
-                                className="btn-press px-4 py-2 text-xs font-medium bg-zinc-100 text-slate-900 rounded-lg hover:bg-zinc-200/80"
-                              >
-                                Đăng xuất
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="space-y-1">
-                              <h2 className="text-2xl font-bold tracking-tight text-slate-900">
-                                {authMode === 'login'
-                                  ? 'Đăng nhập Khách hàng'
-                                  : 'Đăng ký tài khoản Khách hàng'}
-                              </h2>
-                              <p className="text-xs text-zinc-600 leading-relaxed">
-                                Lưu danh sách mã đơn hàng đã đặt, đồng bộ tên hiển thị khi chat 48h với người viết và quản lý lịch sử bảo hành.
-                              </p>
-                            </div>
-
-                            {/* Auth Mode Sub-tabs */}
-                            <div className="flex border-b border-zinc-200 text-xs font-semibold">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setAuthMode('login');
-                                  setAuthError('');
-                                }}
-                                className={`pb-2.5 px-3 border-b-2 transition-colors ${
-                                  authMode === 'login'
-                                    ? 'border-[#12489B] text-[#12489B]'
-                                    : 'border-transparent text-zinc-500 hover:text-slate-900'
-                                }`}
-                              >
-                                Đăng nhập
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setAuthMode('register');
-                                  setAuthError('');
-                                }}
-                                className={`pb-2.5 px-3 border-b-2 transition-colors ${
-                                  authMode === 'register'
-                                    ? 'border-[#12489B] text-[#12489B]'
-                                    : 'border-transparent text-zinc-500 hover:text-slate-900'
-                                }`}
-                              >
-                                Tạo tài khoản mới
-                              </button>
-                            </div>
-
-                            {providerDisabledError && (
-                              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2 text-xs text-slate-800">
-                                <div className="flex items-start justify-between gap-3">
-                                  <p className="font-semibold text-[#D97706]">
-                                    Cần bật Email/Password trong Firebase Console
-                                  </p>
-                                  <a
-                                    href={FIREBASE_AUTH_PROVIDERS_URL}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="btn-press inline-flex items-center gap-1 px-2.5 py-1 font-semibold bg-[#D97706] text-white rounded-lg shrink-0"
-                                  >
-                                    <span>Mở Firebase Console</span>
-                                    <ExternalLink className="w-3 h-3" />
-                                  </a>
-                                </div>
-                                <p className="text-zinc-600 leading-relaxed">
-                                  Vào Authentication → Sign-in method → bật Email/Password rồi nhấn Save.
-                                </p>
-                              </div>
-                            )}
-
-                            {authError && (
-                              <div className="text-xs text-[#DC2626] bg-red-50 border border-red-200 rounded-xl p-3.5 flex items-start gap-2 leading-relaxed">
-                                <AlertCircle className="w-4 h-4 text-[#DC2626] shrink-0 mt-0.5" />
-                                <span>{authError}</span>
-                              </div>
-                            )}
-
-                            <form onSubmit={handleClientEmailSubmit} className="space-y-3.5">
-                              {authMode === 'register' && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                                  <div>
-                                    <label className="block text-xs font-medium text-zinc-700 mb-1">
-                                      Họ tên / Nickname *
-                                    </label>
-                                    <input
-                                      type="text"
-                                      required
-                                      maxLength={FIELD_LIMITS.displayNameMax}
-                                      value={authName}
-                                      onChange={(e) => setAuthName(e.target.value)}
-                                      placeholder="VD: Hoàng Anh"
-                                      className={inputFieldCls}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-zinc-700 mb-1">
-                                      Số điện thoại *
-                                    </label>
-                                    <input
-                                      type="tel"
-                                      required
-                                      maxLength={FIELD_LIMITS.phoneMax}
-                                      value={authPhone}
-                                      onChange={(e) => setAuthPhone(e.target.value)}
-                                      placeholder="0912 345 678"
-                                      className={`${inputFieldCls} font-mono tabular-nums`}
-                                    />
-                                  </div>
-                                </div>
-                              )}
-
-                              <div>
-                                <label className="block text-xs font-medium text-zinc-700 mb-1">
-                                  Địa chỉ Email *
-                                </label>
-                                <input
-                                  type="email"
-                                  required
-                                  maxLength={FIELD_LIMITS.emailMax}
-                                  value={authEmail}
-                                  onChange={(e) => setAuthEmail(e.target.value)}
-                                  placeholder="email@example.com"
-                                  className={inputFieldCls}
-                                />
-                              </div>
-
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <label className="block text-xs font-medium text-zinc-700">
-                                    Mật khẩu *
-                                  </label>
-                                  {authMode === 'login' && (
-                                    <button
-                                      type="button"
-                                      onClick={handleForgotPassword}
-                                      className="text-xs font-medium text-[#12489B] hover:underline"
-                                    >
-                                      Quên mật khẩu?
-                                    </button>
-                                  )}
-                                </div>
-                                <div className="relative">
-                                  <input
-                                    type={showAuthPassword ? 'text' : 'password'}
-                                    required
-                                    minLength={6}
-                                    value={authPassword}
-                                    onChange={(e) => setAuthPassword(e.target.value)}
-                                    placeholder="Tối thiểu 6 ký tự"
-                                    className={`${inputFieldCls} pr-10`}
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowAuthPassword((v) => !v)}
-                                    aria-label={showAuthPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                                    className="p-1.5 text-zinc-400 hover:text-slate-700 absolute right-2.5 top-1/2 -translate-y-1/2"
-                                  >
-                                    {showAuthPassword ? (
-                                      <EyeOff className="w-4 h-4" />
-                                    ) : (
-                                      <Eye className="w-4 h-4" />
-                                    )}
-                                  </button>
-                                </div>
-                              </div>
-
-                              {authMode === 'register' && (
-                                <div>
-                                  <label className="block text-xs font-medium text-zinc-700 mb-1">
-                                    Nhập lại mật khẩu *
-                                  </label>
-                                  <div className="relative">
-                                    <input
-                                      type={showAuthConfirmPassword ? 'text' : 'password'}
-                                      required
-                                      minLength={6}
-                                      value={authConfirmPassword}
-                                      onChange={(e) => setAuthConfirmPassword(e.target.value)}
-                                      placeholder="Nhập lại đúng mật khẩu"
-                                      className={`${inputFieldCls} pr-10`}
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={() => setShowAuthConfirmPassword((v) => !v)}
-                                      aria-label={
-                                        showAuthConfirmPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'
-                                      }
-                                      className="p-1.5 text-zinc-400 hover:text-slate-700 absolute right-2.5 top-1/2 -translate-y-1/2"
-                                    >
-                                      {showAuthConfirmPassword ? (
-                                        <EyeOff className="w-4 h-4" />
-                                      ) : (
-                                        <Eye className="w-4 h-4" />
-                                      )}
-                                    </button>
-                                  </div>
-                                </div>
-                              )}
-
-                              <button
-                                type="submit"
-                                disabled={authLoading}
-                                className="btn-press w-full py-2.5 px-4 text-sm font-semibold bg-[#12489B] text-white rounded-xl hover:bg-[#0B2559] disabled:opacity-45"
-                              >
-                                {(() => {
-                                  if (authLoading) return 'Đang xử lý...';
-                                  return authMode === 'login'
-                                    ? 'Đăng nhập bằng Email'
-                                    : 'Tạo tài khoản Khách hàng';
-                                })()}
-                              </button>
-                            </form>
-                          </>
-                        )}
-                      </div>
-                    )}
+                  <div className="space-y-4">
+                    <div className="space-y-1">
+                      <p className="text-xs font-mono font-semibold uppercase tracking-wider text-[#16A34A]">
+                        Đã đăng nhập
+                      </p>
+                      <h2 className="text-xl font-bold text-slate-900">
+                        Xin chào, {displayName}
+                      </h2>
+                      <p className="text-xs font-mono text-zinc-500">
+                        {userProfile?.email || user.email}
+                        {userProfile?.phoneNumber ? ` · ${userProfile.phoneNumber}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => setHomeTab('hub')}
+                        className="btn-press px-4 py-2 text-xs font-semibold bg-gradient-to-r from-[#0B2559] to-[#12489B] text-white rounded-lg hover:from-[#081B42] hover:to-[#0E3A7D]"
+                      >
+                        Về trang &quot;Bạn muốn làm gì?&quot;
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setHomeTab('lookup')}
+                        className="btn-press px-4 py-2 text-xs font-semibold bg-blue-50 text-[#0B2559] border border-blue-200/80 rounded-lg hover:bg-blue-100"
+                      >
+                        Tra cứu &amp; Xem đơn đã lưu
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleClientSignOut}
+                        className="btn-press px-4 py-2 text-xs font-medium bg-zinc-100 text-slate-900 rounded-lg hover:bg-zinc-200/80"
+                      >
+                        Đăng xuất
+                      </button>
+                    </div>
                   </div>
 
                   <div className="pt-4 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
-                    <span>Chỉ sử dụng Email & Mật khẩu nội bộ.</span>
+                    <span>Tài khoản Khách hàng AssignTrack đã kích hoạt đồng bộ lịch sử tra cứu.</span>
                   </div>
                 </section>
               </div>
