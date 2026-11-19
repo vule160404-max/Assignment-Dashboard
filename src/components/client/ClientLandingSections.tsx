@@ -83,7 +83,7 @@ const SERVICES: readonly ServiceItem[] = [
   {
     id: 'writing',
     title: 'Hỗ trợ viết bài & Luận văn',
-    price: 'Chỉ từ 499K',
+    price: 'Chỉ từ 299K',
     description:
       'Hỗ trợ trọn gói Tiểu luận, Báo cáo thực tập, Khóa luận tốt nghiệp. Kèm báo cáo Turnitin minh bạch.',
     ctaLabel: 'Nhận tư vấn ngay',
