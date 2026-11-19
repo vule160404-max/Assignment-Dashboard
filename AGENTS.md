@@ -105,4 +105,17 @@ Use when an idea should be challenged, researched, and shaped before committing 
 - **Skills Installed**: `.agents/skills/emilkowalski/` (`emil-design-eng`, `animate`, `choreograph`, `apple-design`, `learn-taste`, `ui-cheatsheet.md`, `performance-cheatsheet.md`).
 - **Core Rules**: Use `--ease-out` (`cubic-bezier(0.23, 1, 0.32, 1)`) under `300ms` for UI; never use `transition: all`, `ease-in`, or `scale(0)`; animate only `transform` and `opacity` (plus `clip-path` or `<20px` blur); gate hover effects with `@media (hover: hover) and (pointer: fine)`; provide `btn-press` tactile feedback (`scale(0.97)`); support `prefers-reduced-motion: reduce`.
 
+---
+
+## 7. AssignTrack Project Context & Non-Negotiable Guardrails
+
+- **Full Context Handbook**: Always read `docs/ASSIGNTRACK_CONTEXT.md` and `.specify/memory/constitution.md` (and activate `.agents/skills/assigntrack-handbook/SKILL.md` when working on product features, UI, APIs, or deploys).
+- **1. Firebase Database Lock**: Target ONLY Firebase project `gen-lang-client-0888688386`, database **`ai-studio-39ecaf2f-943a-4559-8128-4524e07fb377`** (`firebase.json`, `firebase-applet-config.json`). NEVER write or deploy rules to sibling databases (`ai-studio-nordicsound-...`). Modify `firestore.rules` only via `firestore-rules-author` and deploy with `npx -y firebase-tools@latest deploy --only firestore:rules --project gen-lang-client-0888688386`.
+- **2. Vercel ESM Serverless Self-Containment**: `package.json` sets `"type": "module"`. `api/ai/generate.ts` and `api/check/analyze.ts` MUST stay self-contained without extensionless relative imports from `../../server/...` (which cause HTTP 500 `ERR_MODULE_NOT_FOUND` on Vercel).
+- **3. Modal Portal Rule**: `.surface-enter` sets `transform: translateY(0)`, trapping `position: fixed` elements. Fixed modals/overlays opened inside `.surface-enter` MUST use `createPortal(..., document.body)`.
+- **4. Brand Palette & Logo System**: Harmonize all UI with `public/assets/assigntrack-logo.png`: Deep Academic Navy (`#0B2559`), Royal Blue (`#12489B`), Scholar Gold (`#F5B700` / `#D97706`), and `blue-*` tints. Never reintroduce legacy purple/indigo (`#4338CA`, `indigo-*`). Preserve only the semantic `violet-*` AI mixed-sentence highlight classes in `ClientIntegrityCheckerView.tsx`.
+- **5. Client Portal Pricing, Contacts & UX Rules**: Compact 1-screen desktop bento landing; 3-zone header without duplicate tab bars; Zalo link `https://zalo.me/0916045202`; service pricing cards (`Chỉ từ 299K` Writing → Zalo, `Free` Turnitin Checker → `checker` tab, `Báo giá theo số trang` Reduce AI/Plagiarism → Zalo); Integrity Checker accepts files only (drag-drop / click / paste `.docx`/`.txt`/`.md`, no manual text box/sample button) with prominent reference-only disclaimer and non-Turnitin Zalo link.
+- **6. Verification & Living Doc Discipline**: On Windows PowerShell 5.1 (use `;` instead of `&&`), verify `npm run lint; npm run build` (`tsc --noEmit && eslint firestore.rules` + `vite build`) before every commit/push, and update `docs/ASSIGNTRACK_CONTEXT.md` in the same commit whenever business rules, pricing, contacts, collections, or architectural invariants change.
+
+
 
