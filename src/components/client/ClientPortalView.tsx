@@ -61,6 +61,7 @@ import { BrandLogo } from '../shared/BrandLogo';
 import { OrderChatPanel } from '../shared/OrderChatPanel';
 import { PdfPreviewModal } from '../shared/PdfPreviewModal';
 import { ClientIntegrityCheckerView } from './ClientIntegrityCheckerView';
+import { ClientLandingSections } from './ClientLandingSections';
 import { PaymentQrCard } from './PaymentQrCard';
 
 interface ClientPortalViewProps {
@@ -496,8 +497,13 @@ export function ClientPortalView({
             }
 
             return (
-              <div className="surface-enter max-w-xl w-full mx-auto">
-                <section className="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 flex flex-col justify-between shadow-[0_8px_28px_rgb(15,23,42,0.03)] space-y-6">
+              <div className="surface-enter space-y-6 sm:space-y-8">
+                <div
+                  className={`${
+                    homeTab === 'lookup' ? 'max-w-2xl' : 'max-w-xl'
+                  } w-full mx-auto`}
+                >
+                  <section className="bg-white border border-zinc-200 rounded-2xl p-6 sm:p-8 flex flex-col justify-between shadow-[0_8px_28px_rgb(15,23,42,0.03)] space-y-6">
                   <div className="space-y-6">
 
                     {homeTab === 'lookup' && (
@@ -857,7 +863,22 @@ export function ClientPortalView({
                       </button>
                     )}
                   </div>
-                </section>
+                  </section>
+                </div>
+
+                {homeTab === 'lookup' && (
+                  <ClientLandingSections
+                    onOpenChecker={(hintToast) => {
+                      handleResetLookup();
+                      setHomeTab('checker');
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                      if (hintToast) {
+                        onToast(hintToast);
+                      }
+                    }}
+                    onToast={onToast}
+                  />
+                )}
               </div>
             );
           }
