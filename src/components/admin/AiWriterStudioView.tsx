@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
   Bot,
+  Cloud,
+  CloudOff,
   Download,
   FileText,
   Layers,
@@ -22,6 +24,18 @@ import {
   saveGlobalSkillLibrary,
   saveWriterSessions,
 } from '../../lib/aiWriterClient';
+import {
+  CloudSyncState,
+  deleteWriterSessionFromCloud,
+  mergeAiSettingsInitial,
+  mergeSkillLibrariesInitial,
+  saveAiWriterSettingsToCloud,
+  saveAiWriterSkillsToCloud,
+  saveWriterSessionToCloud,
+  subscribeAiWriterSettings,
+  subscribeAiWriterSkills,
+  subscribeWriterSessions,
+} from '../../services/writerSyncService';
 import {
   buildFormattedDocxFromSession,
   extractTextFromSkillFile,
@@ -166,16 +180,212 @@ export function AiWriterStudioView({
   const [exportingDocx, setExportingDocx] = useState(false);
   const [exportingAllDocx, setExportingAllDocx] = useState(false);
   const [attachingToOrder, setAttachingToOrder] = useState(false);
+  const [cloudSyncState, setCloudSyncState] = useState<CloudSyncState>('connecting');
 
-  // Refs for background multi-session parallel execution
+  // Refs for background multi-session parallel execution & cloud sync loop protection
   const sessionsRef = useRef<WriterSession[]>(sessions);
   sessionsRef.current = sessions;
+  const aiSettingsRef = useRef<AiChatbotSettingsStore>(aiSettings);
+  aiSettingsRef.current = aiSettings;
+  const skillsRef = useRef<SkillDocument[]>(skills);
+  skillsRef.current = skills;
   const pausedSessionIdsRef = useRef<Set<string>>(new Set());
   const activeTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const hydratedSettingsRef = useRef(false);
+  const hydratedSkillsRef = useRef(false);
+  const hydratedSessionsRef = useRef(false);
+  const lastSyncedSessionAtRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     saveWriterSessions(sessions);
   }, [sessions]);
+
+  // Real-time Firestore Cloud Sync for AI API Settings, Skills Library, and Paper Sessions
+  useEffect(() => {
+    const updateSyncState = (next: CloudSyncState) => {
+      setCloudSyncState((prev) => {
+        if (next === 'permission_denied') return 'permission_denied';
+        if (prev === 'permission_denied' && next === 'connecting') return prev;
+        return next;
+      });
+    };
+
+    const unsubSettings = subscribeAiWriterSettings((cloudSettings) => {
+      if (!hydratedSettingsRef.current) {
+        hydratedSettingsRef.current = true;
+        if (!cloudSettings) {
+          void saveAiWriterSettingsToCloud(aiSettingsRef.current);
+          return;
+        }
+        const { merged, shouldPushBack } = mergeAiSettingsInitial(
+          aiSettingsRef.current,
+          cloudSettings
+        );
+        setAiSettings(merged);
+        saveAiChatbotSettings(merged);
+        if (shouldPushBack) {
+          void saveAiWriterSettingsToCloud(merged);
+        }
+        return;
+      }
+
+      if (cloudSettings) {
+        setAiSettings(cloudSettings);
+        saveAiChatbotSettings(cloudSettings);
+      }
+    }, updateSyncState);
+
+    const unsubSkills = subscribeAiWriterSkills((cloudSkills) => {
+      if (!hydratedSkillsRef.current) {
+        hydratedSkillsRef.current = true;
+        if (!cloudSkills) {
+          void saveAiWriterSkillsToCloud(skillsRef.current);
+          return;
+        }
+        const { merged, shouldPushBack } = mergeSkillLibrariesInitial(
+          skillsRef.current,
+          cloudSkills
+        );
+        setSkills(merged);
+        saveGlobalSkillLibrary(merged);
+        if (shouldPushBack) {
+          void saveAiWriterSkillsToCloud(merged);
+        }
+        return;
+      }
+
+      if (cloudSkills) {
+        setSkills(cloudSkills);
+        saveGlobalSkillLibrary(cloudSkills);
+      }
+    }, updateSyncState);
+
+    const unsubSessions = subscribeWriterSessions((cloudSessions) => {
+      const hasMeaningfulData = (s: WriterSession) =>
+        Boolean(
+          s.topic.trim() ||
+            s.subject.trim() ||
+            s.instructions.trim() ||
+            s.linkedOrderCode.trim() ||
+            s.outline.some((sec) => sec.content.trim().length > 0)
+        );
+
+      if (!hydratedSessionsRef.current) {
+        hydratedSessionsRef.current = true;
+        const localSessions = sessionsRef.current;
+
+        if (cloudSessions.length === 0) {
+          // Seed cloud with any meaningful local sessions
+          for (const s of localSessions) {
+            if (hasMeaningfulData(s)) {
+              lastSyncedSessionAtRef.current[s.id] = s.updatedAt;
+              void saveWriterSessionToCloud(s);
+            }
+          }
+          return;
+        }
+
+        const mergedById = new Map<string, WriterSession>();
+        for (const cs of cloudSessions) {
+          mergedById.set(cs.id, cs);
+          lastSyncedSessionAtRef.current[cs.id] = cs.updatedAt;
+        }
+
+        const toPush: WriterSession[] = [];
+        for (const ls of localSessions) {
+          if (!hasMeaningfulData(ls)) continue;
+          const existing = mergedById.get(ls.id);
+          if (!existing) {
+            mergedById.set(ls.id, ls);
+            toPush.push(ls);
+          } else {
+            const localTime = Date.parse(ls.updatedAt || '') || 0;
+            const cloudTime = Date.parse(existing.updatedAt || '') || 0;
+            if (localTime > cloudTime) {
+              mergedById.set(ls.id, ls);
+              toPush.push(ls);
+            }
+          }
+        }
+
+        const mergedList = Array.from(mergedById.values()).sort(
+          (a, b) =>
+            (Date.parse(b.updatedAt || '') || 0) -
+            (Date.parse(a.updatedAt || '') || 0)
+        );
+        if (mergedList.length > 0) {
+          setSessions(mergedList);
+        }
+        for (const s of toPush) {
+          lastSyncedSessionAtRef.current[s.id] = s.updatedAt;
+          void saveWriterSessionToCloud(s);
+        }
+        return;
+      }
+
+      if (cloudSessions.length === 0) return;
+
+      // Subsequent real-time updates: merge cloud changes without clobbering any busy local session
+      setSessions((prev) => {
+        const localById = new Map(prev.map((s) => [s.id, s]));
+        const nextList: WriterSession[] = [];
+        const seen = new Set<string>();
+
+        for (const cs of cloudSessions) {
+          seen.add(cs.id);
+          const local = localById.get(cs.id);
+          if (local && isWriterSessionBusy(local)) {
+            nextList.push(local);
+          } else {
+            lastSyncedSessionAtRef.current[cs.id] = cs.updatedAt;
+            nextList.push(cs);
+          }
+        }
+
+        for (const local of prev) {
+          if (!seen.has(local.id) && isWriterSessionBusy(local)) {
+            nextList.push(local);
+          }
+        }
+
+        return nextList.length > 0 ? nextList : prev;
+      });
+    }, updateSyncState);
+
+    return () => {
+      unsubSettings();
+      unsubSkills();
+      unsubSessions();
+    };
+  }, []);
+
+  // Debounced cloud push for modified Writer Sessions (skips sessions mid-generation)
+  useEffect(() => {
+    if (!hydratedSessionsRef.current || cloudSyncState === 'permission_denied') {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      for (const s of sessionsRef.current) {
+        if (isWriterSessionBusy(s)) continue;
+        const hasMeaningfulData = Boolean(
+          s.topic.trim() ||
+            s.subject.trim() ||
+            s.instructions.trim() ||
+            s.linkedOrderCode.trim() ||
+            s.outline.some((sec) => sec.content.trim().length > 0)
+        );
+        if (!hasMeaningfulData) continue;
+
+        if (lastSyncedSessionAtRef.current[s.id] !== s.updatedAt) {
+          lastSyncedSessionAtRef.current[s.id] = s.updatedAt;
+          void saveWriterSessionToCloud(s);
+        }
+      }
+    }, 1500);
+
+    return () => window.clearTimeout(timer);
+  }, [sessions, cloudSyncState]);
 
   const activeSession = useMemo(
     () =>
@@ -275,11 +485,28 @@ export function AiWriterStudioView({
   const handleSaveAiSettings = (next: AiChatbotSettingsStore) => {
     setAiSettings(next);
     saveAiChatbotSettings(next);
+    void saveAiWriterSettingsToCloud(next).then((res) => {
+      if (res.ok) {
+        setCloudSyncState('synced');
+      } else if (res.permissionDenied) {
+        setCloudSyncState('permission_denied');
+        onToast(
+          'Đã lưu API trên trình duyệt này. Hãy cập nhật Firestore Rules để đồng bộ giữa Edge & Chrome.'
+        );
+      }
+    });
   };
 
   const handleUpdateSkills = (next: SkillDocument[]) => {
     setSkills(next);
     saveGlobalSkillLibrary(next);
+    void saveAiWriterSkillsToCloud(next).then((res) => {
+      if (res.ok) {
+        setCloudSyncState('synced');
+      } else if (res.permissionDenied) {
+        setCloudSyncState('permission_denied');
+      }
+    });
   };
 
   const handleLoadFromOrder = (orderCode: string) => {
@@ -340,6 +567,8 @@ export function AiWriterStudioView({
 
   const handleDeleteSession = (id: string) => {
     pausedSessionIdsRef.current.add(id);
+    delete lastSyncedSessionAtRef.current[id];
+    void deleteWriterSessionFromCloud(id);
     if (sessions.length <= 1) {
       const reset = createDefaultSession(null);
       setSessions([reset]);
@@ -1149,8 +1378,38 @@ export function AiWriterStudioView({
           </select>
         </div>
 
-        {/* Right Controls: Skill Library, API Chatbot, Export .DOCX */}
+        {/* Right Controls: Cloud Sync Status, Skill Library, API Chatbot, Export .DOCX */}
         <div className="flex flex-wrap items-center gap-1.5">
+          <span
+            title={
+              cloudSyncState === 'synced'
+                ? 'API Keys, Skills và các bài viết đang được đồng bộ thời gian thực qua Firestore giữa các trình duyệt.'
+                : cloudSyncState === 'permission_denied'
+                  ? 'Chưa thể đồng bộ đám mây vì Firestore Rules mới chưa được cập nhật lên Firebase Console.'
+                  : 'Đang kết nối đồng bộ đám mây...'
+            }
+            className={`px-2 py-1.5 text-[11px] font-medium rounded-lg border inline-flex items-center gap-1.5 ${
+              cloudSyncState === 'synced'
+                ? 'border-emerald-200/80 bg-emerald-50/70 text-emerald-700'
+                : cloudSyncState === 'permission_denied'
+                  ? 'border-amber-200 bg-amber-50 text-amber-800'
+                  : 'border-zinc-200 bg-zinc-50 text-zinc-500'
+            }`}
+          >
+            {cloudSyncState === 'permission_denied' ? (
+              <CloudOff className="w-3.5 h-3.5" />
+            ) : (
+              <Cloud className="w-3.5 h-3.5" />
+            )}
+            <span className="hidden sm:inline">
+              {cloudSyncState === 'synced'
+                ? 'Đã đồng bộ'
+                : cloudSyncState === 'permission_denied'
+                  ? 'Chưa đồng bộ Cloud'
+                  : 'Đang đồng bộ...'}
+            </span>
+          </span>
+
           <button
             type="button"
             onClick={() => setShowSkillModal(true)}

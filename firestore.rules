@@ -306,6 +306,33 @@ service cloud.firestore {
         && isValidTimestampStr(data.updatedAt);
     }
 
+    function isValidAiWriterSettings(data) {
+      return data.keys().hasAll(['activeProvider', 'profilesJson', 'updatedAt'])
+        && data.keys().hasOnly(['activeProvider', 'profilesJson', 'updatedAt', 'updatedByUid'])
+        && data.activeProvider in ['perplexity', 'gemini', 'openai', 'anthropic', 'custom_openai']
+        && data.profilesJson is string && data.profilesJson.size() >= 2 && data.profilesJson.size() <= 50000
+        && isValidTimestampStr(data.updatedAt)
+        && (!('updatedByUid' in data) || isValidId(data.updatedByUid));
+    }
+
+    function isValidAiWriterSkills(data) {
+      return data.keys().hasAll(['skillsJson', 'updatedAt'])
+        && data.keys().hasOnly(['skillsJson', 'updatedAt', 'updatedByUid'])
+        && data.skillsJson is string && data.skillsJson.size() >= 2 && data.skillsJson.size() <= 500000
+        && isValidTimestampStr(data.updatedAt)
+        && (!('updatedByUid' in data) || isValidId(data.updatedByUid));
+    }
+
+    function isValidAiWriterSession(data, sessionId) {
+      return data.keys().hasAll(['id', 'payloadJson', 'updatedAt'])
+        && data.keys().hasOnly(['id', 'payloadJson', 'updatedAt', 'updatedByUid'])
+        && data.id == sessionId
+        && isValidId(data.id)
+        && data.payloadJson is string && data.payloadJson.size() >= 2 && data.payloadJson.size() <= 800000
+        && isValidTimestampStr(data.updatedAt)
+        && (!('updatedByUid' in data) || isValidId(data.updatedByUid));
+    }
+
     // --- Collection Rules ---
     match /admins/{uid} {
       allow get: if isAdmin() && isValidId(uid);
@@ -449,22 +476,53 @@ service cloud.firestore {
     }
 
     match /settings/{settingId} {
-      allow get: if isAdmin() && isValidId(settingId);
-      allow list: if isAdmin();
-      allow create: if isAdmin() && isValidId(settingId) && (
-        (settingId == 'notifications' && isValidNotificationSettings(incoming()))
-        || (settingId != 'notifications' && isValidBankSettings(incoming()))
+      allow get: if isValidId(settingId) && (
+        isAdmin()
+        || (isTeamMember() && settingId in ['aiWriterSettings', 'aiWriterSkills'])
       );
-      allow update: if isAdmin() && isValidId(settingId) && (
+      allow list: if isAdmin();
+      allow create: if isValidId(settingId) && (
+        (isAdmin() && settingId == 'notifications' && isValidNotificationSettings(incoming()))
+        || (isTeamMember() && settingId == 'aiWriterSettings' && isValidAiWriterSettings(incoming()))
+        || (isTeamMember() && settingId == 'aiWriterSkills' && isValidAiWriterSkills(incoming()))
+        || (
+          isAdmin()
+          && settingId != 'notifications'
+          && settingId != 'aiWriterSettings'
+          && settingId != 'aiWriterSkills'
+          && isValidBankSettings(incoming())
+        )
+      );
+      allow update: if isValidId(settingId) && (
         (
-          settingId == 'notifications'
+          isAdmin()
+          && settingId == 'notifications'
           && isValidNotificationSettings(incoming())
           && incoming().diff(existing()).affectedKeys().hasOnly([
             'telegramNotifyRevision', 'telegramNotifyMessage', 'telegramNotifyDeadline', 'updatedAt'
           ])
         )
         || (
-          settingId != 'notifications'
+          isTeamMember()
+          && settingId == 'aiWriterSettings'
+          && isValidAiWriterSettings(incoming())
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'activeProvider', 'profilesJson', 'updatedAt', 'updatedByUid'
+          ])
+        )
+        || (
+          isTeamMember()
+          && settingId == 'aiWriterSkills'
+          && isValidAiWriterSkills(incoming())
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'skillsJson', 'updatedAt', 'updatedByUid'
+          ])
+        )
+        || (
+          isAdmin()
+          && settingId != 'notifications'
+          && settingId != 'aiWriterSettings'
+          && settingId != 'aiWriterSkills'
           && isValidBankSettings(incoming())
           && incoming().diff(existing()).affectedKeys().hasOnly([
             'qrMode', 'uploadedQrUrl', 'bankName', 'accountNumber', 'accountName', 'vietqrBankBin', 'vietqrTemplate', 'updatedAt'
@@ -472,6 +530,20 @@ service cloud.firestore {
         )
       );
       allow delete: if isAdmin() && isValidId(settingId);
+    }
+
+    match /aiWriterSessions/{sessionId} {
+      allow get: if isTeamMember() && isValidId(sessionId);
+      allow list: if isTeamMember();
+      allow create: if isTeamMember() && isValidId(sessionId) && isValidAiWriterSession(incoming(), sessionId);
+      allow update: if isTeamMember()
+        && isValidId(sessionId)
+        && isValidAiWriterSession(incoming(), sessionId)
+        && incoming().id == existing().id
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'payloadJson', 'updatedAt', 'updatedByUid'
+        ]);
+      allow delete: if isTeamMember() && isValidId(sessionId);
     }
 
     // Collection-group admin visibility for inbox/revisions across all orders
