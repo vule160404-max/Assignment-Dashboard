@@ -11,8 +11,8 @@ export function BrandLogo({
 }: BrandLogoProps) {
   const iconBoxClass =
     size === 'md'
-      ? 'w-10 h-10 rounded-xl'
-      : 'w-8 h-8 rounded-lg';
+      ? 'w-12 h-12'
+      : 'w-10 h-10';
 
   const textClass =
     size === 'md'
@@ -22,14 +22,14 @@ export function BrandLogo({
   return (
     <span className={`inline-flex items-center gap-2.5 shrink-0 ${className}`}>
       <img
-        src="/assets/aistudio/image_2f6c660b.png"
+        src="/assets/assigntrack-logo.png"
         alt="AssignTrack"
-        className={`${iconBoxClass} object-cover object-center shrink-0 ring-1 ring-slate-900/10 shadow-xs`}
+        className={`${iconBoxClass} object-contain shrink-0 drop-shadow-[0_1px_2px_rgba(15,23,42,0.12)]`}
       />
       {showWordmark && (
         <span className={`${textClass} whitespace-nowrap`}>
-          <span className="text-[#0F172A]">Assign</span>
-          <span className="text-[#10B981]">Track</span>
+          <span className="text-[#0B2559]">Assign</span>
+          <span className="text-[#D97706]">Track</span>
         </span>
       )}
     </span>
