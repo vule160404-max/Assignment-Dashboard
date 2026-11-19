@@ -99,7 +99,7 @@ const SERVICES: readonly ServiceItem[] = [
     id: 'turnitin',
     badge: 'Phổ biến',
     title: 'Check Đạo văn & AI (Turnitin)',
-    price: 'Chỉ 40K / lượt',
+    price: 'Free',
     description:
       'Xuất file báo cáo Turnitin chính hãng (không lưu bài vào kho dữ liệu), nhận kết quả sau 5 phút.',
     ctaLabel: 'Check ngay',
@@ -117,8 +117,9 @@ const SERVICES: readonly ServiceItem[] = [
     price: 'Báo giá theo số trang',
     description:
       'Biên tập thủ công chuẩn văn phong học thuật, hạ tỷ lệ AI & trùng lặp xuống mức an toàn theo yêu cầu trường.',
-    ctaLabel: 'Gửi file kiểm tra',
+    ctaLabel: 'Nhận tư vấn ngay',
     icon: FileCheck2,
+    href: ZALO_CONSULT_URL,
     topBarClass: 'bg-gradient-to-r from-emerald-500 to-teal-500',
     iconBoxClass: 'bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200/70',
     priceClass: 'text-emerald-700',
@@ -192,12 +193,6 @@ export function ClientLandingSections({ onOpenChecker }: ClientLandingSectionsPr
   const handleServiceAction = (id: ServiceItem['id']) => {
     if (id === 'turnitin') {
       onOpenChecker();
-      return;
-    }
-    if (id === 'reduce') {
-      onOpenChecker(
-        'Tải file bài viết lên để kiểm tra sơ bộ tỷ lệ trùng lặp & AI trước khi nhận báo giá chỉnh sửa.'
-      );
     }
   };
 
