@@ -213,8 +213,66 @@ export function AiWriterStudioView({
   });
   const [activityLogs, setActivityLogs] = useState<WriterActivityLogEntry[]>([]);
   const [currentStepLabel, setCurrentStepLabel] = useState<string>('');
+  const activeAbortControllerRef = useRef<AbortController | null>(null);
   const ribbonWrapperRef = useRef<HTMLDivElement | null>(null);
   const [stickyPanelsTopPx, setStickyPanelsTopPx] = useState<number>(154);
+
+  const isAbortError = (err: unknown): boolean =>
+    Boolean(
+      err &&
+        typeof err === 'object' &&
+        ((err as { name?: string }).name === 'AbortError' ||
+          String((err as { message?: string }).message || '')
+            .toLowerCase()
+            .includes('aborted'))
+    );
+
+  const getFreshAiSignal = (): AbortSignal => {
+    const controller = new AbortController();
+    activeAbortControllerRef.current = controller;
+    return controller.signal;
+  };
+
+  const handleStopActiveAi = () => {
+    if (activeAbortControllerRef.current) {
+      activeAbortControllerRef.current.abort();
+      activeAbortControllerRef.current = null;
+    }
+    sessionsRef.current.forEach((s) => {
+      if (isWriterSessionBusy(s) || s.id === activeSession?.id) {
+        pausedSessionIdsRef.current.add(s.id);
+        mutateSessionById(s.id, (prev) => ({
+          ...prev,
+          batchStatus:
+            prev.batchStatus === 'outlining' ? 'idle' : 'paused',
+          outline: prev.outline.map((sec) =>
+            sec.status === 'generating'
+              ? { ...sec, status: 'idle', errorMsg: undefined }
+              : sec
+          ),
+        }));
+      }
+    });
+    setRefiningSection(false);
+    setCurrentStepLabel('');
+    setActivityLogs((prev) =>
+      prev.map((item) =>
+        item.status === 'running'
+          ? {
+              ...item,
+              status: 'warning',
+              detail: 'Đã dừng ngay theo yêu cầu người dùng.',
+            }
+          : item
+      )
+    );
+    pushActivityLog(
+      'warning',
+      'Đã dừng Trợ lý AI',
+      'Hủy lệnh đang chạy để bạn chỉnh lại đề bài hoặc dàn ý.'
+    );
+    onToast('Đã dừng ngay Trợ lý AI.');
+  };
 
   useEffect(() => {
     const el = ribbonWrapperRef.current;
@@ -621,7 +679,8 @@ export function AiWriterStudioView({
    * so Step 2 (GLM-5.3-Flash / GLM-5.3 / Writer) writes all sections cheaply & accurately.
    */
   const ensureHybridSourcesForSession = async (
-    targetSessionId: string
+    targetSessionId: string,
+    signal?: AbortSignal
   ): Promise<WriterSession | null> => {
     const sess = sessionsRef.current.find((s) => s.id === targetSessionId);
     if (!sess) return null;
@@ -653,7 +712,8 @@ export function AiWriterStudioView({
     try {
       const dossier = await researchSourcesWithPerplexity(
         sess,
-        effectiveWriter.researchProfile
+        effectiveWriter.researchProfile,
+        signal
       );
       const elapsed = (Date.now() - t0) / 1000;
       updateActivityLog(logId, {
@@ -880,10 +940,11 @@ export function AiWriterStudioView({
     }));
 
     const t0 = Date.now();
+    const signal = getFreshAiSignal();
     let outlineLogId = '';
     try {
       const preparedSess =
-        (await ensureHybridSourcesForSession(targetSessionId)) || sess;
+        (await ensureHybridSourcesForSession(targetSessionId, signal)) || sess;
       setCurrentStepLabel(
         `Đang lập dàn ý chuẩn ${sess.citationStyle} (${sess.targetWordCount} từ)...`
       );
@@ -897,7 +958,8 @@ export function AiWriterStudioView({
         preparedSess,
         skills,
         activeProfile,
-        effectiveWriter.enableWebSearch
+        effectiveWriter.enableWebSearch,
+        signal
       );
       mutateSessionById(targetSessionId, (s) => ({
         ...s,
@@ -916,6 +978,14 @@ export function AiWriterStudioView({
         `AI (${activeModelDisplayName}) đã lập dàn ý ${sections.length} mục cho "${sess.title}".`
       );
     } catch (err) {
+      if (isAbortError(err)) {
+        setCurrentStepLabel('');
+        mutateSessionById(targetSessionId, (s) => ({
+          ...s,
+          batchStatus: 'idle',
+        }));
+        return;
+      }
       const msg =
         err instanceof Error ? err.message : 'Tạo dàn ý bằng AI thất bại.';
       if (outlineLogId) {
@@ -1025,10 +1095,11 @@ export function AiWriterStudioView({
     const targetSecObj = activeSession.outline.find((s) => s.id === sectionId);
     const secLabel = targetSecObj?.title || 'Mục dàn ý';
     const t0 = Date.now();
+    const signal = getFreshAiSignal();
     let secLogId = '';
     try {
       const preparedSession =
-        (await ensureHybridSourcesForSession(targetSessionId)) ||
+        (await ensureHybridSourcesForSession(targetSessionId, signal)) ||
         sessionsRef.current.find((s) => s.id === targetSessionId) ||
         activeSession;
       setCurrentStepLabel(`Đang viết mục: ${secLabel}...`);
@@ -1043,7 +1114,8 @@ export function AiWriterStudioView({
         sectionId,
         skills,
         activeProfile,
-        effectiveWriter.enableWebSearch
+        effectiveWriter.enableWebSearch,
+        signal
       );
       const writtenWords = countWords(generatedText);
 
@@ -1073,6 +1145,18 @@ export function AiWriterStudioView({
       setCurrentStepLabel('');
       onToast('Đã viết xong mục dàn ý!');
     } catch (err) {
+      if (isAbortError(err)) {
+        setCurrentStepLabel('');
+        mutateSessionById(targetSessionId, (s) => ({
+          ...s,
+          outline: s.outline.map((sec) =>
+            sec.id === sectionId
+              ? { ...sec, status: 'idle', errorMsg: undefined }
+              : sec
+          ),
+        }));
+        return;
+      }
       const msg =
         err instanceof Error ? err.message : 'Lỗi khi gọi AI viết mục này.';
       if (secLogId) {
@@ -1118,9 +1202,10 @@ export function AiWriterStudioView({
       batchErrorMsg: undefined,
     }));
 
+    const signal = getFreshAiSignal();
     try {
       // In Hybrid mode, run Step 1 (Perplexity web search) once before writing all sections
-      await ensureHybridSourcesForSession(targetSessionId);
+      await ensureHybridSourcesForSession(targetSessionId, signal);
 
       const sectionIds = initialSnap.outline.map((sec) => sec.id);
 
@@ -1182,7 +1267,8 @@ export function AiWriterStudioView({
           secId,
           skills,
           activeProfile,
-          effectiveWriter.enableWebSearch
+          effectiveWriter.enableWebSearch,
+          signal
         );
 
         if (pausedSessionIdsRef.current.has(targetSessionId)) {
@@ -1240,6 +1326,19 @@ export function AiWriterStudioView({
         activeProfile.model.replace(/^perplexity\//, '')
       );
     } catch (err) {
+      if (isAbortError(err)) {
+        setCurrentStepLabel('');
+        mutateSessionById(targetSessionId, (s) => ({
+          ...s,
+          batchStatus: 'paused',
+          outline: s.outline.map((sec) =>
+            sec.status === 'generating'
+              ? { ...sec, status: 'idle', errorMsg: undefined }
+              : sec
+          ),
+        }));
+        return;
+      }
       const msg =
         err instanceof Error
           ? err.message
@@ -1633,9 +1732,11 @@ export function AiWriterStudioView({
     }
 
     setRefiningSection(true);
+    const signal = getFreshAiSignal();
+    setCurrentStepLabel(`Đang chỉnh sửa mục "${currentSection.title}"...`);
     try {
       const preparedSess =
-        (await ensureHybridSourcesForSession(activeSession.id)) ||
+        (await ensureHybridSourcesForSession(activeSession.id, signal)) ||
         activeSession;
       const revised = await refineTextWithAi(
         preparedSess,
@@ -1645,15 +1746,19 @@ export function AiWriterStudioView({
         customPrompt,
         skills,
         activeProfile,
-        effectiveWriter.enableWebSearch
+        effectiveWriter.enableWebSearch,
+        signal
       );
       handleUpdateOutlineSection(
         currentSection.id,
         { content: revised, status: 'completed' },
         true
       );
+      setCurrentStepLabel('');
       onToast(`AI đã nâng cấp mục "${currentSection.title}".`);
     } catch (err) {
+      setCurrentStepLabel('');
+      if (isAbortError(err)) return;
       onToast(
         err instanceof Error
           ? err.message
@@ -1971,6 +2076,7 @@ export function AiWriterStudioView({
           isBusy={
             isActivePaperOutlining || isActivePaperWriting || refiningSection
           }
+          onStopAi={handleStopActiveAi}
           currentStepLabel={currentStepLabel}
           activeModelDisplayName={activeModelDisplayName}
           hasResearchedSources={Boolean(activeSession.researchedSources?.trim())}

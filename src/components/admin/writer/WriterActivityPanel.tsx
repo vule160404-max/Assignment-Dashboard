@@ -9,6 +9,7 @@ import {
   PanelRightOpen,
   PauseCircle,
   Sparkles,
+  Square,
   Trash2,
 } from 'lucide-react';
 
@@ -34,6 +35,7 @@ interface WriterActivityPanelProps {
   onToggleOpen: () => void;
   stickyTopPx?: number;
   isBusy: boolean;
+  onStopAi: () => void;
   currentStepLabel: string;
   activeModelDisplayName: string;
   hasResearchedSources: boolean;
@@ -50,6 +52,7 @@ export function WriterActivityPanel({
   onToggleOpen,
   stickyTopPx = 152,
   isBusy,
+  onStopAi,
   currentStepLabel,
   activeModelDisplayName,
   hasResearchedSources,
@@ -67,28 +70,41 @@ export function WriterActivityPanel({
       ? Math.round((completedSectionsCount / totalSectionsCount) * 100)
       : 0;
 
-  // Collapsed state: sleek floating edge pill on the right side
+  // Collapsed state: sleek floating edge pill on the right side (with instant stop when busy)
   if (!isOpen) {
     return (
-      <button
-        type="button"
-        onClick={onToggleOpen}
-        title="Mở bảng Trạng thái & Lịch sử trợ lý AI"
-        className="btn-press fixed right-4 bottom-5 z-30 inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-white/95 backdrop-blur-md border border-zinc-200/95 shadow-lg hover:border-[#12489B]/50 hover:bg-blue-50/40 text-xs font-semibold text-slate-800"
-      >
-        <span
-          className={`w-2 h-2 rounded-full shrink-0 ${
-            isBusy ? 'bg-[#12489B] animate-ping' : 'bg-emerald-500'
-          }`}
-        />
-        <PanelRightOpen className="w-3.5 h-3.5 text-[#12489B]" />
-        <span>Trạng thái AI</span>
-        {logs.length > 0 && (
-          <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-full bg-blue-50 text-[#12489B] border border-blue-200/70">
-            {logs.length}
-          </span>
+      <div className="fixed right-4 bottom-5 z-30 inline-flex items-center gap-1.5">
+        {isBusy && (
+          <button
+            type="button"
+            onClick={onStopAi}
+            title="Dừng ngay trợ lý AI"
+            className="btn-press inline-flex items-center gap-1.5 px-3 py-2 rounded-full bg-rose-600 hover:bg-rose-700 text-white shadow-lg text-xs font-semibold"
+          >
+            <Square className="w-3 h-3 fill-current" />
+            <span>Dừng AI</span>
+          </button>
         )}
-      </button>
+        <button
+          type="button"
+          onClick={onToggleOpen}
+          title="Mở bảng Trạng thái & Lịch sử trợ lý AI"
+          className="btn-press inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-white/95 backdrop-blur-md border border-zinc-200/95 shadow-lg hover:border-[#12489B]/50 hover:bg-blue-50/40 text-xs font-semibold text-slate-800"
+        >
+          <span
+            className={`w-2 h-2 rounded-full shrink-0 ${
+              isBusy ? 'bg-[#12489B] animate-ping' : 'bg-emerald-500'
+            }`}
+          />
+          <PanelRightOpen className="w-3.5 h-3.5 text-[#12489B]" />
+          <span>Trạng thái AI</span>
+          {logs.length > 0 && (
+            <span className="px-1.5 py-0.5 text-[10px] font-mono font-bold rounded-full bg-blue-50 text-[#12489B] border border-blue-200/70">
+              {logs.length}
+            </span>
+          )}
+        </button>
+      </div>
     );
   }
 
@@ -142,25 +158,38 @@ export function WriterActivityPanel({
       {/* Live Status Summary Card */}
       <div className="shrink-0 p-3 border-b border-zinc-100 space-y-2.5 bg-slate-50/50">
         <div
-          className={`p-2.5 rounded-xl border text-xs flex items-start gap-2 ${
+          className={`p-2.5 rounded-xl border text-xs space-y-2 ${
             isBusy
               ? 'bg-blue-50/70 border-blue-200 text-[#0B2559]'
               : 'bg-white border-zinc-200/80 text-slate-700'
           }`}
         >
-          {isBusy ? (
-            <Loader2 className="w-3.5 h-3.5 text-[#12489B] animate-spin shrink-0 mt-0.5" />
-          ) : (
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-              {isBusy ? 'Đang thực hiện' : 'Trạng thái hiện tại'}
+          <div className="flex items-start gap-2">
+            {isBusy ? (
+              <Loader2 className="w-3.5 h-3.5 text-[#12489B] animate-spin shrink-0 mt-0.5" />
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0 mt-1.5" />
+            )}
+            <div className="min-w-0 flex-1">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                {isBusy ? 'Đang thực hiện' : 'Trạng thái hiện tại'}
+              </div>
+              <p className="text-[11px] font-semibold leading-snug mt-0.5 break-words">
+                {currentStepLabel || 'Sẵn sàng nhận lệnh lập dàn ý hoặc viết bài.'}
+              </p>
             </div>
-            <p className="text-[11px] font-semibold leading-snug mt-0.5 break-words">
-              {currentStepLabel || 'Sẵn sàng nhận lệnh lập dàn ý hoặc viết bài.'}
-            </p>
           </div>
+
+          {isBusy && (
+            <button
+              type="button"
+              onClick={onStopAi}
+              className="btn-press w-full py-1.5 px-2.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-semibold inline-flex items-center justify-center gap-1.5 shadow-2xs"
+            >
+              <Square className="w-3 h-3 fill-current" />
+              <span>Dừng trợ lý AI ngay</span>
+            </button>
+          )}
         </div>
 
         {/* Model & Research Source Pills */}

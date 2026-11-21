@@ -358,6 +358,7 @@ export interface AiGenerateRequest {
   systemPrompt: string;
   userPrompt: string;
   enableWebSearch?: boolean;
+  signal?: AbortSignal;
 }
 
 export interface AiGenerateDetailedResponse {
@@ -418,6 +419,7 @@ export async function callAiChatbotDetailed({
   systemPrompt,
   userPrompt,
   enableWebSearch,
+  signal,
 }: AiGenerateRequest): Promise<AiGenerateDetailedResponse> {
   const transientKey = profile.apiKey.trim();
   const authHeaders = await getTeamAuthHeaders();
@@ -425,6 +427,7 @@ export async function callAiChatbotDetailed({
   const resp = await fetch('/api/ai/generate', {
     method: 'POST',
     credentials: 'same-origin',
+    signal,
     headers: {
       'Content-Type': 'application/json',
       ...authHeaders,
@@ -546,7 +549,8 @@ export function resolveEffectiveWriterConfig(settings: AiChatbotSettingsStore): 
  */
 export async function researchSourcesWithPerplexity(
   session: WriterSession,
-  researchProfile: AiProviderProfile
+  researchProfile: AiProviderProfile,
+  signal?: AbortSignal
 ): Promise<string> {
   // Fast, ultra-cheap Perplexity Search API (POST /search — raw web results, 0 LLM output tokens)
   if (researchProfile.model === 'perplexity-search') {
@@ -563,6 +567,7 @@ export async function researchSourcesWithPerplexity(
       systemPrompt: '',
       userPrompt: searchLines.join('\n'),
       enableWebSearch: true,
+      signal,
     });
 
     return `RAW REAL-TIME WEB & SCHOLARLY SOURCES (Perplexity Search API — Format citations strictly in ${session.citationStyle}):\n\n${res.text}`.trim();
@@ -595,6 +600,7 @@ STRICT RULES:
     systemPrompt,
     userPrompt,
     enableWebSearch: true,
+    signal,
   });
 
   const extraUrls = new Set<string>();
@@ -680,7 +686,8 @@ export async function generateOutlineWithAi(
   session: WriterSession,
   skills: SkillDocument[],
   profile: AiProviderProfile,
-  enableWebSearch?: boolean
+  enableWebSearch?: boolean,
+  signal?: AbortSignal
 ): Promise<WriterOutlineSection[]> {
   const systemPrompt = buildSkillsAndContextSystemPrompt(session, skills);
   const userPrompt = `Based on the assignment brief, rubric, target total word count (${session.targetWordCount} words), citation style (${session.citationStyle}), and all active Skill files, design a comprehensive, publication-grade academic outline with a clear Table of Contents hierarchy.
@@ -710,6 +717,7 @@ Example JSON schema:
     systemPrompt,
     userPrompt,
     enableWebSearch,
+    signal,
   });
 
   return parseAiOutlineJson(rawText, session.targetWordCount, session.citationStyle);
@@ -960,7 +968,8 @@ export async function generateSectionWithAi(
   targetSectionId: string,
   skills: SkillDocument[],
   profile: AiProviderProfile,
-  enableWebSearch?: boolean
+  enableWebSearch?: boolean,
+  signal?: AbortSignal
 ): Promise<string> {
   const sectionIdx = session.outline.findIndex((s) => s.id === targetSectionId);
   if (sectionIdx === -1) {
@@ -1044,6 +1053,7 @@ STRICT OUTPUT RULES:
     systemPrompt,
     userPrompt,
     enableWebSearch,
+    signal,
   });
   return stripMarkdownHashesFromText(raw);
 }
@@ -1063,7 +1073,8 @@ export async function refineTextWithAi(
   customInstruction: string,
   skills: SkillDocument[],
   profile: AiProviderProfile,
-  enableWebSearch?: boolean
+  enableWebSearch?: boolean,
+  signal?: AbortSignal
 ): Promise<string> {
   const systemPrompt = buildSkillsAndContextSystemPrompt(session, skills);
 
@@ -1100,6 +1111,7 @@ Return ONLY the revised academic text for this section (no conversational intro 
     systemPrompt,
     userPrompt,
     enableWebSearch,
+    signal,
   });
   return stripMarkdownHashesFromText(raw);
 }
