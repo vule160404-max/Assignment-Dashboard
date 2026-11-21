@@ -1613,9 +1613,9 @@ export function AiWriterStudioView({
       {/* Main 2-Zone Workspace Grid: Segmented Sidebar (4 cols) + Live A4 Paper (8 cols) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {!focusPaperMode && (
-          <div className="lg:col-span-4 bg-white border border-zinc-200/90 rounded-2xl shadow-2xs overflow-hidden">
+          <div className="lg:col-span-4 lg:sticky lg:top-[7.5rem] lg:z-20 lg:max-h-[calc(100vh-8.5rem)] lg:flex lg:flex-col bg-white border border-zinc-200/90 rounded-2xl shadow-2xs overflow-hidden">
             {/* Segmented Tab Switcher (Brief vs Outline) */}
-            <div className="p-1.5 bg-zinc-100/80 border-b border-zinc-200/80 grid grid-cols-2 gap-1">
+            <div className="shrink-0 p-1.5 bg-zinc-100/80 border-b border-zinc-200/80 grid grid-cols-2 gap-1">
               <button
                 type="button"
                 onClick={() => setLeftTab('brief')}
@@ -1643,27 +1643,28 @@ export function AiWriterStudioView({
               </button>
             </div>
 
-            {leftTab === 'brief' ? (
-              <WriterBriefPanel
-                session={activeSession}
-                onUpdateSession={(updater) => mutateActiveSession(updater)}
-                onUploadContextFiles={handleUploadContextFiles}
-                onSwitchToOutlineWithAi={() => {
-                  setLeftTab('outline');
-                  void handleAiGenerateOutlineForSession(activeSession.id);
-                }}
-              />
-            ) : (
-              <WriterOutlinePanel
-                session={activeSession}
-                currentSectionId={currentSection?.id || ''}
-                totalDraftedWords={totalDraftedWords}
-                totalOutlineTargetWords={totalOutlineTargetWords}
-                generatingOutline={isActivePaperOutlining}
-                runningAllSections={isActivePaperWriting}
-                onSelectSection={(secId) =>
-                  mutateActiveSession((s) => ({ ...s, activeSectionId: secId }))
-                }
+            <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+              {leftTab === 'brief' ? (
+                <WriterBriefPanel
+                  session={activeSession}
+                  onUpdateSession={(updater) => mutateActiveSession(updater)}
+                  onUploadContextFiles={handleUploadContextFiles}
+                  onSwitchToOutlineWithAi={() => {
+                    setLeftTab('outline');
+                    void handleAiGenerateOutlineForSession(activeSession.id);
+                  }}
+                />
+              ) : (
+                <WriterOutlinePanel
+                  session={activeSession}
+                  currentSectionId={currentSection?.id || ''}
+                  totalDraftedWords={totalDraftedWords}
+                  totalOutlineTargetWords={totalOutlineTargetWords}
+                  generatingOutline={isActivePaperOutlining}
+                  runningAllSections={isActivePaperWriting}
+                  onSelectSection={(secId) =>
+                    mutateActiveSession((s) => ({ ...s, activeSectionId: secId }))
+                  }
                 onAiGenerateOutline={() =>
                   void handleAiGenerateOutlineForSession(activeSession.id)
                 }
@@ -1681,7 +1682,8 @@ export function AiWriterStudioView({
                 onMoveSection={handleMoveOutlineSection}
                 onDeleteSection={handleDeleteOutlineSection}
               />
-            )}
+              )}
+            </div>
           </div>
         )}
 
