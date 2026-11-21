@@ -53,14 +53,23 @@ export function stripSecretsFromAiSettings(
   };
 }
 
+let inMemoryVaultSeal = '';
+
 async function getTeamAuthHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {};
+  if (inMemoryVaultSeal) {
+    headers['x-vault-seal'] = inMemoryVaultSeal;
+  }
   const current = auth.currentUser;
-  if (!current) return {};
+  if (!current) return headers;
   try {
     const token = await current.getIdToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    return headers;
   } catch {
-    return {};
+    return headers;
   }
 }
 
@@ -75,7 +84,6 @@ export async function syncServerAiKeysStatus(): Promise<
     custom_openai: false,
   };
   const authHeaders = await getTeamAuthHeaders();
-  if (!authHeaders.Authorization) return defaultStatus;
 
   const pendingEntries = Object.entries(pendingLegacyKeysToMigrate).filter(
     ([, v]) => Boolean(v && v.trim())
@@ -89,6 +97,7 @@ export async function syncServerAiKeysStatus(): Promise<
       }
       const resp = await fetch('/api/ai/keys', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
           ...authHeaders,
@@ -97,7 +106,11 @@ export async function syncServerAiKeysStatus(): Promise<
       });
       const data = (await resp.json().catch(() => ({}))) as {
         configured?: Record<AiProviderType, boolean>;
+        vaultSeal?: string;
       };
+      if (data.vaultSeal) {
+        inMemoryVaultSeal = data.vaultSeal;
+      }
       if (resp.ok && data.configured) {
         return { ...defaultStatus, ...data.configured };
       }
@@ -105,6 +118,7 @@ export async function syncServerAiKeysStatus(): Promise<
 
     const resp = await fetch('/api/ai/keys/status', {
       method: 'GET',
+      credentials: 'same-origin',
       headers: authHeaders,
     });
     const data = (await resp.json().catch(() => ({}))) as {
@@ -127,6 +141,7 @@ export async function saveAiProviderKeyToServerVault(
   const authHeaders = await getTeamAuthHeaders();
   const resp = await fetch('/api/ai/keys', {
     method: 'POST',
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
       ...authHeaders,
@@ -135,8 +150,12 @@ export async function saveAiProviderKeyToServerVault(
   });
   const data = (await resp.json().catch(() => ({}))) as {
     configured?: Record<AiProviderType, boolean>;
+    vaultSeal?: string;
     error?: string;
   };
+  if (data.vaultSeal) {
+    inMemoryVaultSeal = data.vaultSeal;
+  }
   if (!resp.ok) {
     throw new Error(data.error || 'Không thể lưu API Key vào kho bảo mật Server.');
   }
@@ -312,6 +331,7 @@ export async function fetchPerplexityOrchestratorModels(
   const authHeaders = await getTeamAuthHeaders();
   const resp = await fetch('/api/ai/perplexity/models', {
     method: 'POST',
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
       ...authHeaders,
@@ -346,6 +366,7 @@ export async function callAiChatbot({
 
   const resp = await fetch('/api/ai/generate', {
     method: 'POST',
+    credentials: 'same-origin',
     headers: {
       'Content-Type': 'application/json',
       ...authHeaders,

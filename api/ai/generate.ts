@@ -1,14 +1,54 @@
 import type { IncomingMessage, ServerResponse } from 'http';
+import crypto from 'crypto';
+import fs from 'fs';
+import path from 'path';
+import Perplexity from '@perplexity-ai/perplexity_ai';
+
+type AiProviderKeyName =
+  | 'perplexity'
+  | 'gemini'
+  | 'openai'
+  | 'anthropic'
+  | 'custom_openai';
+
+type StoredAiProviderSecrets = Partial<Record<AiProviderKeyName, string>>;
 
 interface AiRequestBody {
   provider?: string;
   apiKey?: string;
   baseUrl?: string;
   model?: string;
+  schema?: string;
   systemPrompt?: string;
   userPrompt?: string;
   temperature?: number;
+  previous_response_id?: string;
+  tools?: Array<{ type: 'web_search' | 'fetch_url' }>;
+  response_format?: Record<string, unknown>;
 }
+
+const AI_VAULT_COOKIE_NAME = 'assigntrack_ai_vault';
+const AI_VAULT_CIPHER_KEY = crypto.scryptSync(
+  process.env.VAULT_SECRET ||
+    'assigntrack-server-vault-v1-gen-lang-client-0888688386',
+  'assigntrack-vault-salt-2026',
+  32
+);
+
+const UPLOADS_DIR = process.env.VERCEL
+  ? path.resolve('/tmp', 'assigntrack-uploads')
+  : path.resolve(process.cwd(), 'uploads');
+const AI_KEYS_FILE = path.join(UPLOADS_DIR, '.ai-provider-keys.json');
+
+const PERPLEXITY_AGENT_PRESETS = new Set([
+  'fast-search',
+  'pro-search',
+  'deep-research',
+  'advanced-deep-research',
+  'low',
+  'medium',
+  'high',
+]);
 
 function sendJson(res: ServerResponse, statusCode: number, payload: unknown): void {
   res.statusCode = statusCode;
@@ -32,6 +72,94 @@ async function readJsonBody(
   const raw = Buffer.concat(chunks).toString('utf8').trim();
   if (!raw) return {};
   return JSON.parse(raw) as AiRequestBody;
+}
+
+function decryptVaultSeal(seal?: string | null): StoredAiProviderSecrets {
+  if (!seal || typeof seal !== 'string') return {};
+  const parts = seal.trim().split('.');
+  if (parts.length !== 3) return {};
+  try {
+    const iv = Buffer.from(parts[0], 'hex');
+    const tag = Buffer.from(parts[1], 'hex');
+    const encrypted = Buffer.from(parts[2], 'hex');
+    if (iv.length !== 12 || tag.length !== 16) return {};
+    const decipher = crypto.createDecipheriv(
+      'aes-256-gcm',
+      AI_VAULT_CIPHER_KEY,
+      iv
+    );
+    decipher.setAuthTag(tag);
+    const decrypted = Buffer.concat([
+      decipher.update(encrypted),
+      decipher.final(),
+    ]).toString('utf8');
+    const parsed = JSON.parse(decrypted) as StoredAiProviderSecrets;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function readVaultFromReq(req: IncomingMessage): StoredAiProviderSecrets {
+  let merged: StoredAiProviderSecrets = {};
+  const cookieHeader = req.headers?.cookie || '';
+  if (cookieHeader) {
+    for (const pair of cookieHeader.split(';')) {
+      const idx = pair.indexOf('=');
+      if (idx === -1) continue;
+      const k = pair.slice(0, idx).trim();
+      const v = pair.slice(idx + 1).trim();
+      if (k === AI_VAULT_COOKIE_NAME && v) {
+        merged = { ...merged, ...decryptVaultSeal(decodeURIComponent(v)) };
+      }
+    }
+  }
+  const sealHeader = req.headers?.['x-vault-seal'];
+  if (typeof sealHeader === 'string' && sealHeader.trim()) {
+    merged = { ...merged, ...decryptVaultSeal(sealHeader.trim()) };
+  }
+  return merged;
+}
+
+function getEnvKey(provider: string): string {
+  switch (provider) {
+    case 'perplexity':
+      return (process.env.PERPLEXITY_API_KEY || '').trim();
+    case 'gemini':
+      return (process.env.GEMINI_API_KEY || '').trim();
+    case 'openai':
+      return (process.env.OPENAI_API_KEY || '').trim();
+    case 'anthropic':
+      return (process.env.ANTHROPIC_API_KEY || '').trim();
+    case 'custom_openai':
+      return (
+        process.env.CUSTOM_OPENAI_API_KEY ||
+        process.env.NVIDIA_API_KEY ||
+        ''
+      ).trim();
+    default:
+      return '';
+  }
+}
+
+async function resolveProviderKey(
+  req: IncomingMessage,
+  provider: string,
+  rawApiKey?: string
+): Promise<string> {
+  if (rawApiKey && rawApiKey.trim()) return rawApiKey.trim();
+  const fromHeaders = readVaultFromReq(req);
+  const headerKey = (fromHeaders[provider as AiProviderKeyName] || '').trim();
+  if (headerKey) return headerKey;
+  try {
+    const raw = await fs.promises.readFile(AI_KEYS_FILE, 'utf8');
+    const parsed = JSON.parse(raw) as StoredAiProviderSecrets;
+    const diskKey = (parsed[provider as AiProviderKeyName] || '').trim();
+    if (diskKey) return diskKey;
+  } catch {
+    // ignore
+  }
+  return getEnvKey(provider);
 }
 
 function resolveNvidiaModel(model: string): string {
@@ -72,23 +200,22 @@ export default async function handler(
   }
 
   const provider =
-    typeof body.provider === 'string' ? body.provider.trim() : 'gemini';
+    typeof body.provider === 'string' ? body.provider.trim() : 'perplexity';
   const rawApiKey =
     typeof body.apiKey === 'string' ? body.apiKey.trim() : '';
-  const apiKey =
-    rawApiKey ||
-    (provider === 'gemini' ? (process.env.GEMINI_API_KEY || '').trim() : '');
+  const apiKey = await resolveProviderKey(req, provider, rawApiKey);
   const model =
     typeof body.model === 'string' && body.model.trim()
       ? body.model.trim()
+      : provider === 'perplexity'
+      ? 'pro-search'
       : provider === 'openai'
       ? 'gpt-4.1'
       : provider === 'anthropic'
       ? 'claude-3-7-sonnet-latest'
-      : provider === 'perplexity'
-      ? 'sonar-reasoning-pro'
       : 'gemini-2.5-flash';
   const baseUrl = typeof body.baseUrl === 'string' ? body.baseUrl.trim() : '';
+  const schema = typeof body.schema === 'string' ? body.schema.trim() : '';
   const systemPrompt =
     typeof body.systemPrompt === 'string' ? body.systemPrompt : '';
   const userPrompt = typeof body.userPrompt === 'string' ? body.userPrompt : '';
@@ -160,14 +287,132 @@ export default async function handler(
       return;
     }
 
-    if (provider === 'anthropic') {
-      const cleanBase = (baseUrl || 'https://api.anthropic.com/v1').replace(
-        /\/+$/,
-        ''
-      );
+    // Perplexity Agent API (POST https://api.perplexity.ai/v1/agent via official @perplexity-ai/perplexity_ai SDK)
+    const isPerplexityAgentSchema =
+      provider === 'perplexity' &&
+      (schema === 'agent' ||
+        PERPLEXITY_AGENT_PRESETS.has(model.toLowerCase()) ||
+        /\/v1\/agent\/?$/i.test(baseUrl) ||
+        /\/v1\/responses\/?$/i.test(baseUrl) ||
+        (!/\/orchestrator/i.test(baseUrl) && !/^sonar/i.test(model)));
+
+    if (isPerplexityAgentSchema) {
+      const trimmedTarget = model.replace(/^preset:/i, '').trim();
+      const isPreset = PERPLEXITY_AGENT_PRESETS.has(trimmedTarget.toLowerCase());
+      const reqPayload: Record<string, unknown> = {
+        input: userPrompt,
+      };
+      if (systemPrompt.trim()) {
+        reqPayload.instructions = systemPrompt.trim();
+      }
+      if (typeof temperature === 'number') {
+        reqPayload.temperature = temperature;
+      }
+      if (body.previous_response_id?.trim()) {
+        reqPayload.previous_response_id = body.previous_response_id.trim();
+      }
+      if (body.response_format && typeof body.response_format === 'object') {
+        reqPayload.response_format = body.response_format;
+      }
+
+      if (isPreset) {
+        reqPayload.preset = trimmedTarget.toLowerCase();
+        if (Array.isArray(body.tools) && body.tools.length > 0) {
+          reqPayload.tools = body.tools;
+        }
+      } else {
+        reqPayload.model = trimmedTarget;
+        if (Array.isArray(body.tools) && body.tools.length > 0) {
+          reqPayload.tools = body.tools;
+        } else {
+          reqPayload.tools = [{ type: 'web_search' }];
+        }
+      }
+
+      try {
+        const client = new Perplexity({ apiKey, maxRetries: 2 });
+        const response = await client.responses.create({
+          ...reqPayload,
+          stream: false,
+        } as Perplexity.ResponseCreateParamsNonStreaming);
+
+        const outputItems = Array.isArray(response.output) ? response.output : [];
+        const searchResults: unknown[] = [];
+        const annotations: unknown[] = [];
+
+        for (const item of outputItems) {
+          if (!item || typeof item !== 'object') continue;
+          const typed = item as {
+            type?: string;
+            results?: unknown[];
+            content?: Array<{
+              type?: string;
+              text?: string;
+              annotations?: unknown[];
+            }>;
+          };
+          if (typed.type === 'search_results' && Array.isArray(typed.results)) {
+            searchResults.push(...typed.results);
+          }
+          if (Array.isArray(typed.content)) {
+            for (const part of typed.content) {
+              if (Array.isArray(part?.annotations)) {
+                annotations.push(...part.annotations);
+              }
+            }
+          }
+        }
+
+        const outputText = (response.output_text || '')
+          .replace(/<think>[\s\S]*?<\/think>/gi, '')
+          .trim();
+
+        sendJson(res, 200, {
+          text: outputText,
+          output_text: outputText,
+          id: response.id,
+          model: response.model || trimmedTarget,
+          provider: 'perplexity',
+          schema: 'agent',
+          search_results: searchResults,
+          annotations,
+          usage: response.usage,
+        });
+        return;
+      } catch (err) {
+        const errObj = err as { status?: number; message?: string };
+        const status =
+          typeof errObj?.status === 'number' &&
+          errObj.status >= 400 &&
+          errObj.status < 600
+            ? errObj.status
+            : 500;
+        sendJson(res, status, {
+          error:
+            errObj?.message ||
+            `Perplexity Agent API lỗi HTTP ${status}. Vui lòng kiểm tra Preset, Model hoặc API Key.`,
+        });
+        return;
+      }
+    }
+
+    const isPerplexityMessagesSchema =
+      provider === 'perplexity' &&
+      (schema === 'messages' ||
+        /\/orchestrator\/?$/i.test(baseUrl) ||
+        /\/messages\/?$/i.test(baseUrl));
+
+    if (provider === 'anthropic' || isPerplexityMessagesSchema) {
+      const defaultMessagesBase =
+        provider === 'perplexity'
+          ? 'https://api.perplexity.ai/orchestrator'
+          : 'https://api.anthropic.com/v1';
+      const cleanBase = (baseUrl || defaultMessagesBase).replace(/\/+$/, '');
       const url = cleanBase.endsWith('/messages')
         ? cleanBase
-        : `${cleanBase}/messages`;
+        : cleanBase.endsWith('/v1')
+        ? `${cleanBase}/messages`
+        : `${cleanBase}/v1/messages`;
 
       const payload: Record<string, unknown> = {
         model,
@@ -179,13 +424,18 @@ export default async function handler(
         payload.system = systemPrompt;
       }
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      };
+      if (provider === 'perplexity') {
+        headers.Authorization = `Bearer ${apiKey}`;
+      }
+
       const resp = await fetch(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-        },
+        headers,
         body: JSON.stringify(payload),
       });
       const data = (await resp.json().catch(() => ({}))) as Record<
@@ -197,7 +447,7 @@ export default async function handler(
         sendJson(res, resp.status, {
           error:
             errObj?.message ||
-            `Anthropic Claude API lỗi HTTP ${resp.status}. Vui lòng kiểm tra API Key hoặc Model.`,
+            `Messages API (${provider}) lỗi HTTP ${resp.status}. Vui lòng kiểm tra API Key hoặc Model.`,
         });
         return;
       }
@@ -209,24 +459,39 @@ export default async function handler(
         .join('')
         .trim();
 
-      sendJson(res, 200, { text, model, provider });
+      sendJson(res, 200, { text, model, provider, schema: 'messages' });
       return;
     }
 
-    // Perplexity, OpenAI, NVIDIA NIM, or Custom OpenAI-Compatible
+    // Perplexity Orchestrator (/orchestrator/v1/chat/completions), Perplexity Sonar (/chat/completions), OpenAI, NVIDIA NIM, or Custom OpenAI-Compatible
     const defaultBaseByProvider =
       provider === 'perplexity'
-        ? 'https://api.perplexity.ai'
+        ? 'https://api.perplexity.ai/orchestrator/v1'
         : 'https://api.openai.com/v1';
     const cleanBase = (baseUrl || defaultBaseByProvider)
       .replace(/\/+$/, '')
       .replace(/\/chat\/completions$/i, '');
-    const url =
-      provider === 'perplexity'
-        ? `${cleanBase.replace(/\/v1$/i, '')}/chat/completions`
-        : cleanBase.endsWith('/v1')
+
+    let url = '';
+    if (provider === 'perplexity') {
+      const isOrchestratorSlugOrBase =
+        model.includes('/') || /\/orchestrator/i.test(cleanBase);
+      if (isOrchestratorSlugOrBase) {
+        if (/\/orchestrator\/v1$/i.test(cleanBase)) {
+          url = `${cleanBase}/chat/completions`;
+        } else if (/\/orchestrator$/i.test(cleanBase)) {
+          url = `${cleanBase}/v1/chat/completions`;
+        } else {
+          url = 'https://api.perplexity.ai/orchestrator/v1/chat/completions';
+        }
+      } else {
+        url = `${cleanBase.replace(/\/v1$/i, '')}/chat/completions`;
+      }
+    } else {
+      url = cleanBase.endsWith('/v1')
         ? `${cleanBase}/chat/completions`
         : `${cleanBase}/v1/chat/completions`;
+    }
 
     const isNvidiaNim = /integrate\.api\.nvidia\.com/i.test(cleanBase);
     const resolvedModel = isNvidiaNim ? resolveNvidiaModel(model) : model;
@@ -315,7 +580,7 @@ export default async function handler(
       sendJson(res, 502, {
         error: `Model "${resolvedModel}" trả về nội dung rỗng (finish_reason: ${
           firstChoice?.finish_reason || 'không rõ'
-        }). Hãy thử lại hoặc chọn nvidia/nemotron-3-ultra-550b-a55b.`,
+        }).`,
       });
       return;
     }
