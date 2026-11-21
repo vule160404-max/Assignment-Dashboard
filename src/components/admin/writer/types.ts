@@ -366,7 +366,7 @@ export const AI_PROVIDER_SUGGESTED_MODELS: Record<AiProviderType, string[]> = {
 
 export const DEFAULT_HYBRID_PIPELINE: AiHybridPipelineConfig = {
   enabled: false,
-  researchModel: 'fast-search',
+  researchModel: 'perplexity-search',
   writerProvider: 'perplexity',
   writerModel: 'perplexity/glm-5.3-flash',
 };

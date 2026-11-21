@@ -25,6 +25,9 @@ interface AiRequestBody {
   temperature?: number;
   previous_response_id?: string;
   enableWebSearch?: boolean;
+  maxOutputTokens?: number;
+  isResearchStep?: boolean;
+  searchFallbackQuery?: string;
   tools?: Array<{ type: 'web_search' | 'fetch_url' }>;
   response_format?: Record<string, unknown>;
 }
@@ -289,19 +292,19 @@ export default async function handler(
       return;
     }
 
-    // Perplexity Search API (POST https://api.perplexity.ai/search — raw ranked web results, 0 LLM output tokens)
-    const isPerplexitySearchApi =
-      provider === 'perplexity' &&
-      (schema === 'search' || model === 'perplexity-search');
-
-    if (isPerplexitySearchApi) {
-      const queries = userPrompt
+    // Helper: Perplexity Search API (POST https://api.perplexity.ai/search — ~1-2s, 0 LLM tokens)
+    const runPerplexitySearchApi = async (rawQueryInput: string) => {
+      const queries = rawQueryInput
         .split(/\r?\n/)
         .map((line) => line.trim())
         .filter(Boolean)
-        .slice(0, 5);
+        .map((q) => q.slice(0, 380))
+        .slice(0, 4);
       const searchPayload = {
-        query: queries.length > 1 ? queries : queries[0] || userPrompt.trim(),
+        query:
+          queries.length > 1
+            ? queries
+            : queries[0] || rawQueryInput.trim().slice(0, 380),
         max_results: 12,
       };
       const httpResp = await fetch('https://api.perplexity.ai/search', {
@@ -311,6 +314,7 @@ export default async function handler(
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(searchPayload),
+        signal: AbortSignal.timeout(15_000),
       });
       const rawJson = (await httpResp.json().catch(() => ({}))) as {
         id?: string;
@@ -325,13 +329,13 @@ export default async function handler(
         detail?: string;
       };
       if (!httpResp.ok) {
-        sendJson(res, httpResp.status, {
-          error:
-            rawJson?.error?.message ||
+        const err = new Error(
+          rawJson?.error?.message ||
             rawJson?.detail ||
-            `Perplexity Search API lỗi HTTP ${httpResp.status}.`,
-        });
-        return;
+            `Perplexity Search API lỗi HTTP ${httpResp.status}.`
+        ) as Error & { status?: number };
+        err.status = httpResp.status;
+        throw err;
       }
       const results = Array.isArray(rawJson.results) ? rawJson.results : [];
       const formattedText =
@@ -343,20 +347,41 @@ export default async function handler(
               })
               .join('\n\n')
           : 'No web search results returned.';
-
-      sendJson(res, 200, {
+      return {
         text: formattedText,
         id: rawJson.id,
-        model: 'perplexity-search',
-        provider: 'perplexity',
-        schema: 'search',
-        search_results: results,
-      });
+        results,
+      };
+    };
+
+    // Perplexity Search API (explicitly chosen)
+    const isPerplexitySearchApi =
+      provider === 'perplexity' &&
+      (schema === 'search' || model === 'perplexity-search');
+
+    if (isPerplexitySearchApi) {
+      try {
+        const searchRes = await runPerplexitySearchApi(userPrompt);
+        sendJson(res, 200, {
+          text: searchRes.text,
+          id: searchRes.id,
+          model: 'perplexity-search',
+          provider: 'perplexity',
+          schema: 'search',
+          search_results: searchRes.results,
+        });
+      } catch (err) {
+        const errObj = err as { status?: number; message?: string };
+        sendJson(res, errObj?.status || 502, {
+          error:
+            errObj?.message || 'Perplexity Search API không phản hồi kịp thời.',
+        });
+      }
       return;
     }
 
-    // Perplexity Agent API (POST https://api.perplexity.ai/v1/agent via official @perplexity-ai/perplexity_ai SDK)
-    // Sonar models (sonar, sonar-pro, sonar-reasoning-pro, sonar-deep-research) route to /chat/completions.
+    // Perplexity Agent API (POST https://api.perplexity.ai/v1/agent)
+    // Uses SSE streaming + bounded max_steps + hard safety deadline so it NEVER hits Vercel's 60s HTTP 504!
     const isPerplexityAgentSchema =
       provider === 'perplexity' &&
       schema !== 'sonar' &&
@@ -365,8 +390,16 @@ export default async function handler(
     if (isPerplexityAgentSchema) {
       const trimmedTarget = model.replace(/^preset:/i, '').trim();
       const isPreset = PERPLEXITY_AGENT_PRESETS.has(trimmedTarget.toLowerCase());
+      const isDeepPreset = /deep-research/i.test(trimmedTarget);
+      const isResearchStep = Boolean(body.isResearchStep);
       const reqPayload: Record<string, unknown> = {
         input: userPrompt,
+        max_output_tokens:
+          typeof body.maxOutputTokens === 'number' && body.maxOutputTokens > 0
+            ? Math.min(8192, Math.round(body.maxOutputTokens))
+            : isResearchStep
+            ? 1800
+            : 4096,
       };
       if (systemPrompt.trim()) {
         reqPayload.instructions = systemPrompt.trim();
@@ -383,6 +416,9 @@ export default async function handler(
 
       if (isPreset) {
         reqPayload.preset = trimmedTarget.toLowerCase();
+        if (!isDeepPreset) {
+          reqPayload.max_steps = 3;
+        }
         if (Array.isArray(body.tools) && body.tools.length > 0) {
           reqPayload.tools = body.tools;
         }
@@ -390,58 +426,144 @@ export default async function handler(
         reqPayload.model = trimmedTarget;
         if (Array.isArray(body.tools) && body.tools.length > 0) {
           reqPayload.tools = body.tools;
+          reqPayload.max_steps = 3;
         } else if (body.enableWebSearch !== false) {
           reqPayload.tools = [{ type: 'web_search' }];
+          // Cap tool loop to 3 steps so Agent web_search NEVER loops 60+ seconds!
+          reqPayload.max_steps = 3;
+        } else {
+          // Pure writing step (no web search): single-step fast generation
+          reqPayload.max_steps = 1;
         }
       }
 
+      // Hard internal deadline safely below Vercel's 60s maxDuration:
+      // 25s for Step 1 research (leaves plenty of time for instant /search fallback), 50s for writing
+      const deadlineMs = isResearchStep ? 25_000 : 50_000;
+      const controller = new AbortController();
+      const timeoutHandle = setTimeout(() => controller.abort(), deadlineMs);
+
+      let streamedText = '';
+      let completedResponse: {
+        id?: string;
+        model?: string;
+        output_text?: string;
+        output?: unknown[];
+        usage?: unknown;
+      } | null = null;
+
       try {
-        let response: {
-          id?: string;
-          model?: string;
-          output_text?: string;
-          output?: unknown[];
-          usage?: unknown;
-        };
-        try {
-          const mod = await import('@perplexity-ai/perplexity_ai');
-          const PerplexityCtor = mod.default;
-          const client = new PerplexityCtor({ apiKey, maxRetries: 0 });
-          response = (await client.responses.create({
-            ...reqPayload,
-            stream: false,
-          } as Parameters<typeof client.responses.create>[0])) as typeof response;
-        } catch (sdkErr) {
-          if (
-            typeof (sdkErr as { status?: number })?.status === 'number' &&
-            (sdkErr as { status: number }).status >= 400
-          ) {
-            throw sdkErr;
-          }
-          const httpResp = await fetch('https://api.perplexity.ai/v1/agent', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({ ...reqPayload, stream: false }),
-          });
+        const httpResp = await fetch('https://api.perplexity.ai/v1/agent', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'text/event-stream',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({ ...reqPayload, stream: true }),
+          signal: controller.signal,
+        });
+
+        if (!httpResp.ok) {
           const rawJson = (await httpResp.json().catch(() => ({}))) as Record<
             string,
             unknown
           >;
-          if (!httpResp.ok) {
-            const errObj = rawJson.error as { message?: string } | undefined;
-            const err = new Error(
-              errObj?.message || `Perplexity Agent API HTTP ${httpResp.status}`
-            ) as Error & { status?: number };
-            err.status = httpResp.status;
-            throw err;
-          }
-          response = rawJson as typeof response;
+          const errObj = rawJson.error as { message?: string } | undefined;
+          const err = new Error(
+            errObj?.message ||
+              (typeof rawJson.detail === 'string' ? rawJson.detail : '') ||
+              `Perplexity Agent API HTTP ${httpResp.status}`
+          ) as Error & { status?: number };
+          err.status = httpResp.status;
+          throw err;
         }
 
-        const outputItems = Array.isArray(response.output) ? response.output : [];
+        const contentType = httpResp.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          completedResponse = (await httpResp.json().catch(() => null)) as typeof completedResponse;
+        } else if (httpResp.body) {
+          const reader = httpResp.body.getReader();
+          const decoder = new TextDecoder('utf-8');
+          let buffer = '';
+
+          try {
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              buffer += decoder.decode(value, { stream: true });
+              const lines = buffer.split(/\r?\n/);
+              buffer = lines.pop() || '';
+
+              for (const rawLine of lines) {
+                const line = rawLine.trim();
+                if (!line.startsWith('data:')) continue;
+                const payloadStr = line.slice(5).trim();
+                if (!payloadStr || payloadStr === '[DONE]') continue;
+                try {
+                  const evt = JSON.parse(payloadStr) as {
+                    type?: string;
+                    delta?: string;
+                    text?: string;
+                    error?: { message?: string };
+                    response?: {
+                      id?: string;
+                      model?: string;
+                      output_text?: string;
+                      output?: unknown[];
+                      usage?: unknown;
+                    };
+                  };
+                  if (
+                    evt.type === 'response.output_text.delta' &&
+                    typeof evt.delta === 'string'
+                  ) {
+                    streamedText += evt.delta;
+                  } else if (
+                    evt.type === 'response.output_text.done' &&
+                    typeof evt.text === 'string' &&
+                    !streamedText
+                  ) {
+                    streamedText = evt.text;
+                  } else if (
+                    evt.type === 'response.completed' &&
+                    evt.response
+                  ) {
+                    completedResponse = evt.response;
+                  } else if (evt.type === 'response.failed' || evt.type === 'error') {
+                    throw new Error(
+                      evt.error?.message || 'Perplexity Agent stream báo lỗi.'
+                    );
+                  }
+                } catch (parseOrEvtErr) {
+                  if (
+                    parseOrEvtErr instanceof Error &&
+                    parseOrEvtErr.message.includes('Perplexity Agent')
+                  ) {
+                    throw parseOrEvtErr;
+                  }
+                }
+              }
+            }
+          } catch (readErr) {
+            // If deadline hit AFTER we already streamed substantial text, keep what we have instead of crashing!
+            if (streamedText.trim().length < 120) {
+              throw readErr;
+            }
+          } finally {
+            try {
+              reader.releaseLock();
+            } catch {
+              // ignore
+            }
+          }
+        }
+
+        clearTimeout(timeoutHandle);
+
+        const outputItems = Array.isArray(completedResponse?.output)
+          ? completedResponse.output
+          : [];
         const searchResults: unknown[] = [];
         const annotations: unknown[] = [];
 
@@ -468,24 +590,72 @@ export default async function handler(
           }
         }
 
-        const outputText = (response.output_text || '')
+        const finalRawText =
+          completedResponse?.output_text || streamedText || '';
+        const outputText = finalRawText
           .replace(/<think>[\s\S]*?<\/think>/gi, '')
           .trim();
+
+        if (!outputText) {
+          throw new Error(
+            `Perplexity Agent (${trimmedTarget}) trả về nội dung rỗng.`
+          );
+        }
 
         sendJson(res, 200, {
           text: outputText,
           output_text: outputText,
-          id: response.id,
-          model: response.model || trimmedTarget,
+          id: completedResponse?.id,
+          model: completedResponse?.model || trimmedTarget,
           provider: 'perplexity',
           schema: 'agent',
           search_results: searchResults,
           annotations,
-          usage: response.usage,
+          usage: completedResponse?.usage,
         });
         return;
       } catch (err) {
-        const errObj = err as { status?: number; message?: string };
+        clearTimeout(timeoutHandle);
+        const errObj = err as { status?: number; name?: string; message?: string };
+        const isTimeout =
+          errObj?.name === 'AbortError' ||
+          errObj?.name === 'TimeoutError' ||
+          String(errObj?.message || '')
+            .toLowerCase()
+            .includes('aborted');
+
+        // Seamless automatic fallback to Perplexity Search API (/search) if Step 1 Agent timed out!
+        if (isResearchStep && (isTimeout || (errObj?.status || 0) >= 500)) {
+          try {
+            const fallbackQuery =
+              typeof body.searchFallbackQuery === 'string' &&
+              body.searchFallbackQuery.trim()
+                ? body.searchFallbackQuery.trim()
+                : userPrompt.slice(0, 360);
+            const fallbackRes = await runPerplexitySearchApi(fallbackQuery);
+            sendJson(res, 200, {
+              text: fallbackRes.text,
+              id: fallbackRes.id,
+              model: 'perplexity-search (fallback)',
+              provider: 'perplexity',
+              schema: 'search',
+              search_results: fallbackRes.results,
+            });
+            return;
+          } catch {
+            // Fall through to clean error below
+          }
+        }
+
+        if (isTimeout) {
+          sendJson(res, 504, {
+            error: isResearchStep
+              ? 'Perplexity Agent tra cứu quá lâu (>25s). Hãy chọn "Search API (/search) · Rẻ nhất" ở Bước 1 để tra cứu chỉ trong 1-2 giây.'
+              : `Model "${trimmedTarget}" phản hồi quá lâu (>50s). Hãy thử bấm Viết lại mục này.`,
+          });
+          return;
+        }
+
         const status =
           typeof errObj?.status === 'number' &&
           errObj.status >= 400 &&

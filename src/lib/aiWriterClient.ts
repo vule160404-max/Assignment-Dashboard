@@ -82,6 +82,7 @@ export function stripSecretsFromAiSettings(
     profiles: {
       perplexity: {
         ...store.profiles.perplexity,
+        label: 'Perplexity Agent API',
         baseUrl: normalizePerplexityBaseUrl(
           store.profiles.perplexity?.baseUrl,
           store.profiles.perplexity?.model
@@ -358,6 +359,9 @@ export interface AiGenerateRequest {
   systemPrompt: string;
   userPrompt: string;
   enableWebSearch?: boolean;
+  maxOutputTokens?: number;
+  isResearchStep?: boolean;
+  searchFallbackQuery?: string;
   signal?: AbortSignal;
 }
 
@@ -419,6 +423,9 @@ export async function callAiChatbotDetailed({
   systemPrompt,
   userPrompt,
   enableWebSearch,
+  maxOutputTokens,
+  isResearchStep,
+  searchFallbackQuery,
   signal,
 }: AiGenerateRequest): Promise<AiGenerateDetailedResponse> {
   const transientKey = profile.apiKey.trim();
@@ -439,6 +446,9 @@ export async function callAiChatbotDetailed({
       model: profile.model.trim(),
       temperature: profile.temperature,
       enableWebSearch,
+      maxOutputTokens,
+      isResearchStep,
+      searchFallbackQuery,
       systemPrompt,
       userPrompt,
     }),
@@ -552,21 +562,23 @@ export async function researchSourcesWithPerplexity(
   researchProfile: AiProviderProfile,
   signal?: AbortSignal
 ): Promise<string> {
-  // Fast, ultra-cheap Perplexity Search API (POST /search — raw web results, 0 LLM output tokens)
-  if (researchProfile.model === 'perplexity-search') {
-    const coreTopic = (session.topic || session.title || '').trim();
-    const coreSubject = (session.subject || '').trim();
-    const searchLines = [
-      `${coreTopic} ${coreSubject} peer reviewed academic study journal`.trim(),
-      `${coreTopic} empirical research data statistics 2023 2024 2025 2026`.trim(),
-      `${coreTopic} literature review theoretical framework scholarly article`.trim(),
-    ].filter(Boolean);
+  const coreTopic = (session.topic || session.title || '').trim();
+  const coreSubject = (session.subject || '').trim();
+  const searchLines = [
+    `${coreTopic} ${coreSubject} peer reviewed academic study journal`.trim(),
+    `${coreTopic} empirical research data statistics 2023 2024 2025 2026`.trim(),
+    `${coreTopic} literature review theoretical framework scholarly article`.trim(),
+  ].filter(Boolean);
+  const compactSearchQuery = searchLines.join('\n');
 
+  // Fast, ultra-cheap Perplexity Search API (POST /search — raw web results, 0 LLM output tokens, ~1-2s)
+  if (researchProfile.model === 'perplexity-search') {
     const res = await callAiChatbotDetailed({
       profile: researchProfile,
       systemPrompt: '',
-      userPrompt: searchLines.join('\n'),
+      userPrompt: compactSearchQuery,
       enableWebSearch: true,
+      isResearchStep: true,
       signal,
     });
 
@@ -577,18 +589,18 @@ export async function researchSourcesWithPerplexity(
 Your ONLY job is to search the live web for the latest, authoritative, real-world academic papers, peer-reviewed journal articles, official reports, and verified statistics relevant to the assignment topic.
 DO NOT write an essay or long prose. Keep your response concise, structured, and strictly factual to minimize output tokens.`;
 
-  const userPrompt = `Find 10 to 15 recent, high-authority, real-time verifiable scholarly & official sources for the following academic assignment:
+  const userPrompt = `Find 8 to 12 recent, high-authority, real-time verifiable scholarly & official sources for the following academic assignment:
 - Subject: ${session.subject || 'General Academic Research'}
 - Topic: ${session.topic || session.title}
 - Citation Style: ${session.citationStyle}
 - Writing Language: ${session.writingLanguage}
-- Key Instructions / Scope: ${(session.instructions || '').slice(0, 1200)}
-- Rubric Focus: ${(session.rubricNotes || '').slice(0, 600)}
+- Key Instructions / Scope: ${(session.instructions || '').slice(0, 900)}
+- Rubric Focus: ${(session.rubricNotes || '').slice(0, 500)}
 
 Return ONLY a clean numbered dossier of verified sources. For each source provide:
 1. Exact ${session.citationStyle} full reference entry (Author(s), Year, Title, Journal/Publisher, DOI or direct URL).
 2. In-text citation format (e.g., (Author, Year)).
-3. 1-2 concise bullet points of exact verified statistics, empirical findings, or arguments from that source.
+3. 1 concise bullet point of exact verified statistics, empirical findings, or arguments from that source.
 
 STRICT RULES:
 - Every single source MUST be real and grounded in your web search results.
@@ -600,6 +612,9 @@ STRICT RULES:
     systemPrompt,
     userPrompt,
     enableWebSearch: true,
+    isResearchStep: true,
+    maxOutputTokens: 1800,
+    searchFallbackQuery: compactSearchQuery,
     signal,
   });
 
