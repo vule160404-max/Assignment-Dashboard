@@ -986,7 +986,7 @@ export function ClientPortalView({
                         onClick={() => setHomeTab('hub')}
                         className="btn-press px-4 py-2 text-xs font-semibold bg-gradient-to-r from-[#0B2559] to-[#12489B] text-white rounded-lg hover:from-[#081B42] hover:to-[#0E3A7D]"
                       >
-                        Về trang &quot;Bạn muốn làm gì?&quot;
+                        Về trang chủ
                       </button>
                       <button
                         type="button"
