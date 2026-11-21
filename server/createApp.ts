@@ -2081,11 +2081,44 @@ export function createApiApp(): express.Express {
       const nonEmptyPages = pages.filter((pg) => pg.length > 0);
       const totalPages = Math.max(1, nonEmptyPages.length);
       const isLockedForViewer = !isTeamAuthorized && meta.isLocked;
-      const previewLimit = isLockedForViewer
-        ? Math.max(1, meta.previewMaxPages || 2)
+      // Show 3 clear pages by default (Cover + TOC + first body page) when payment-locked
+      const clearPageLimit = isLockedForViewer
+        ? Math.max(3, meta.previewMaxPages || 3)
         : totalPages;
-      const visiblePages = nonEmptyPages.slice(0, previewLimit);
-      const hiddenPagesCount = Math.max(0, totalPages - visiblePages.length);
+      const hiddenPagesCount = Math.max(0, totalPages - clearPageLimit);
+
+      // Server-side irreversible text masking for locked blurred pages so DevTools cannot reveal real content
+      const maskLockedText = (input: string): string => {
+        const glyphs = 'aeiounrstlcdmpbg';
+        let idx = 0;
+        return input.replace(/[A-Za-zÀ-ỹ0-9]/g, (ch) => {
+          idx += 1;
+          const rep = glyphs[(idx * 7 + ch.charCodeAt(0)) % glyphs.length];
+          return ch === ch.toUpperCase() && ch !== ch.toLowerCase()
+            ? rep.toUpperCase()
+            : rep;
+        });
+      };
+
+      const responsePages = nonEmptyPages.map((pg, pageIdx) => {
+        const blurred = isLockedForViewer && pageIdx >= clearPageLimit;
+        if (!blurred) {
+          return { pageNumber: pageIdx + 1, blurred: false, blocks: pg };
+        }
+        return {
+          pageNumber: pageIdx + 1,
+          blurred: true,
+          blocks: pg.map((b) => ({
+            ...b,
+            text: maskLockedText(b.text),
+            leftText: b.leftText ? maskLockedText(b.leftText) : undefined,
+            rightText: b.rightText,
+            runs: b.runs
+              ? b.runs.map((r) => ({ ...r, text: maskLockedText(r.text) }))
+              : undefined,
+          })),
+        };
+      });
 
       res.setHeader('Cache-Control', 'private, no-store');
       res.json({
@@ -2095,9 +2128,9 @@ export function createApiApp(): express.Express {
         totalPages,
         totalWords,
         isLocked: isLockedForViewer,
-        previewLimit,
+        previewLimit: clearPageLimit,
         hiddenPagesCount,
-        pages: visiblePages,
+        pages: responsePages,
       });
     } catch (err) {
       console.error('DOCX preview parse error:', err);

@@ -279,7 +279,7 @@ export function WriterDeliverModal({
                   ) : (
                     <Unlock className="w-3.5 h-3.5 text-emerald-600" />
                   )}
-                  <span>Khóa tải xuống (Chỉ xem trước 2 trang đầu)</span>
+                  <span>Khóa tải xuống (Xem rõ 3 trang đầu, các trang sau làm mờ)</span>
                 </span>
               </label>
               <span
@@ -294,7 +294,7 @@ export function WriterDeliverModal({
             </div>
             <p className="text-[11px] text-zinc-500 leading-relaxed pl-6">
               {isLocked
-                ? 'Khách hàng có thể đọc thử 2 trang đầu trên Portal. Hệ thống sẽ tự động mở khóa tải toàn bộ file khi khách hoàn tất thanh toán 100%.'
+                ? 'Khách hàng có thể đọc rõ 3 trang đầu (Bìa + Mục lục + Trang nội dung đầu) và xem hiệu ứng làm mờ các trang sau. Hệ thống sẽ tự động mở khóa toàn bộ khi khách thanh toán 100%.'
                 : 'Khách hàng có thể bấm tải trực tiếp toàn bộ file Word .DOCX về máy ngay trên Portal.'}
             </p>
           </div>

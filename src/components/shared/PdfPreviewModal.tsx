@@ -47,6 +47,12 @@ interface DocxPreviewBlock {
   hasBottomBorder?: boolean;
 }
 
+interface DocxPreviewPage {
+  pageNumber: number;
+  blurred: boolean;
+  blocks: DocxPreviewBlock[];
+}
+
 interface DocxPreviewPayload {
   fileName: string;
   defaultFontFamily?: string;
@@ -56,7 +62,7 @@ interface DocxPreviewPayload {
   isLocked: boolean;
   previewLimit: number;
   hiddenPagesCount: number;
-  pages: DocxPreviewBlock[][];
+  pages: DocxPreviewPage[];
 }
 
 export function PdfPreviewModal({
@@ -301,7 +307,10 @@ export function PdfPreviewModal({
   if (isTurnitinCappedForViewer) {
     headerSubtitle = `Báo cáo Turnitin/AI · Hiển thị từ trang 1 đến trang ${(attachment.turnitinScorePage || 1) + 2}`;
   } else if (isPaymentLockedForViewer) {
-    headerSubtitle = `Bản xem trước có giới hạn (${attachment.previewMaxPages || 2} trang đầu rõ nét)`;
+    const clearPages = isDocx
+      ? Math.max(3, attachment.previewMaxPages || 3)
+      : attachment.previewMaxPages || 3;
+    headerSubtitle = `Bản xem trước có giới hạn (${clearPages} trang đầu rõ nét · các trang sau làm mờ)`;
   }
 
   const hiddenPagesCount = Math.max(0, originalTotalPages - pages.length);
@@ -476,7 +485,7 @@ export function PdfPreviewModal({
                   <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 rounded-full">
                     <Lock className="w-3 h-3" />
                     <span>
-                      Xem trước {docxPreview.pages.length}/{docxPreview.totalPages} trang đầu
+                      Xem rõ {Math.min(docxPreview.previewLimit, docxPreview.totalPages)}/{docxPreview.totalPages} trang đầu · Các trang sau làm mờ
                     </span>
                   </span>
                 ) : (
@@ -486,8 +495,10 @@ export function PdfPreviewModal({
                 )}
               </div>
 
-              {/* Rendered Authentic A4 Word Sheets */}
-              {docxPreview.pages.map((blocks, pageIdx) => {
+              {/* Rendered Authentic A4 Word Sheets (3 clear pages + blurred masked remaining pages) */}
+              {docxPreview.pages.map((pageObj, pageIdx) => {
+                const blocks = pageObj.blocks || [];
+                const isBlurred = Boolean(pageObj.blurred);
                 const isCoverSheet =
                   pageIdx === 0 &&
                   blocks.length <= 16 &&
@@ -515,11 +526,11 @@ export function PdfPreviewModal({
 
                 return (
                   <div
-                    key={pageIdx}
+                    key={pageObj.pageNumber || pageIdx}
                     onContextMenu={(e) => {
                       if (docxPreview.isLocked) e.preventDefault();
                     }}
-                    className={`relative bg-white border border-zinc-300/90 rounded-sm shadow-md mx-auto flex flex-col justify-between min-h-[760px] sm:min-h-[980px] px-8 sm:px-16 py-10 sm:py-14 ${
+                    className={`relative bg-white border border-zinc-300/90 rounded-sm shadow-md mx-auto flex flex-col justify-between min-h-[760px] sm:min-h-[980px] px-8 sm:px-16 py-10 sm:py-14 overflow-hidden ${
                       docxPreview.isLocked ? 'select-none' : ''
                     }`}
                     style={{ fontFamily: docFont }}
@@ -527,6 +538,10 @@ export function PdfPreviewModal({
                     {/* Cover page double frame if enabled in Word document */}
                     <div
                       className={`flex-1 flex flex-col ${
+                        isBlurred
+                          ? 'blur-[6px] opacity-70 pointer-events-none select-none'
+                          : ''
+                      } ${
                         isCoverSheet
                           ? `justify-between py-6 ${
                               docxPreview.hasPageBorder
@@ -618,6 +633,23 @@ export function PdfPreviewModal({
                         })}
                       </div>
                     </div>
+
+                    {/* Frosted Lock Overlay on Blurred Pages */}
+                    {isBlurred && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-white/30 backdrop-blur-[1.5px] p-6 font-sans">
+                        <div className="bg-white/95 border border-zinc-200/95 rounded-2xl shadow-lg px-6 py-5 max-w-sm text-center space-y-2">
+                          <div className="w-9 h-9 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto">
+                            <Lock className="w-4.5 h-4.5 text-[#12489B]" />
+                          </div>
+                          <p className="text-xs font-bold text-slate-900">
+                            Trang {pageIdx + 1} / {docxPreview.totalPages} đang được bảo vệ
+                          </p>
+                          <p className="text-[11px] text-zinc-500 leading-relaxed">
+                            Hoàn tất thanh toán phần còn lại để xem rõ nội dung trang này và tải tệp Word (.DOCX) gốc.
+                          </p>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Authentic A4 Page Number Footer */}
                     <div className="pt-6 mt-6 border-t border-zinc-100 flex items-center justify-between font-sans text-[11px] text-zinc-400">
