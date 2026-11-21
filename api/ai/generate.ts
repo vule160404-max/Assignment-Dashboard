@@ -22,6 +22,7 @@ interface AiRequestBody {
   userPrompt?: string;
   temperature?: number;
   previous_response_id?: string;
+  enableWebSearch?: boolean;
   tools?: Array<{ type: 'web_search' | 'fetch_url' }>;
   response_format?: Record<string, unknown>;
 }
@@ -287,13 +288,11 @@ export default async function handler(
     }
 
     // Perplexity Agent API (POST https://api.perplexity.ai/v1/agent via official @perplexity-ai/perplexity_ai SDK)
+    // Sonar models (sonar, sonar-pro, sonar-reasoning-pro, sonar-deep-research) route to /chat/completions.
     const isPerplexityAgentSchema =
       provider === 'perplexity' &&
-      (schema === 'agent' ||
-        PERPLEXITY_AGENT_PRESETS.has(model.toLowerCase()) ||
-        /\/v1\/agent\/?$/i.test(baseUrl) ||
-        /\/v1\/responses\/?$/i.test(baseUrl) ||
-        (!/\/orchestrator/i.test(baseUrl) && !/^sonar/i.test(model)));
+      schema !== 'sonar' &&
+      !/^sonar/i.test(model);
 
     if (isPerplexityAgentSchema) {
       const trimmedTarget = model.replace(/^preset:/i, '').trim();
@@ -323,7 +322,7 @@ export default async function handler(
         reqPayload.model = trimmedTarget;
         if (Array.isArray(body.tools) && body.tools.length > 0) {
           reqPayload.tools = body.tools;
-        } else {
+        } else if (body.enableWebSearch !== false) {
           reqPayload.tools = [{ type: 'web_search' }];
         }
       }
@@ -501,10 +500,10 @@ export default async function handler(
       return;
     }
 
-    // Perplexity Orchestrator (/orchestrator/v1/chat/completions), Perplexity Sonar (/chat/completions), OpenAI, NVIDIA NIM, or Custom OpenAI-Compatible
+    // Perplexity Sonar (/chat/completions), OpenAI, NVIDIA NIM, or Custom OpenAI-Compatible
     const defaultBaseByProvider =
       provider === 'perplexity'
-        ? 'https://api.perplexity.ai/orchestrator/v1'
+        ? 'https://api.perplexity.ai'
         : 'https://api.openai.com/v1';
     const cleanBase = (baseUrl || defaultBaseByProvider)
       .replace(/\/+$/, '')
@@ -512,19 +511,7 @@ export default async function handler(
 
     let url = '';
     if (provider === 'perplexity') {
-      const isOrchestratorSlugOrBase =
-        model.includes('/') || /\/orchestrator/i.test(cleanBase);
-      if (isOrchestratorSlugOrBase) {
-        if (/\/orchestrator\/v1$/i.test(cleanBase)) {
-          url = `${cleanBase}/chat/completions`;
-        } else if (/\/orchestrator$/i.test(cleanBase)) {
-          url = `${cleanBase}/v1/chat/completions`;
-        } else {
-          url = 'https://api.perplexity.ai/orchestrator/v1/chat/completions';
-        }
-      } else {
-        url = `${cleanBase.replace(/\/v1$/i, '')}/chat/completions`;
-      }
+      url = 'https://api.perplexity.ai/chat/completions';
     } else {
       url = cleanBase.endsWith('/v1')
         ? `${cleanBase}/chat/completions`
@@ -623,7 +610,15 @@ export default async function handler(
       return;
     }
 
-    sendJson(res, 200, { text, model: resolvedModel, provider });
+    sendJson(res, 200, {
+      text,
+      model: resolvedModel,
+      provider,
+      citations: Array.isArray(data.citations) ? data.citations : undefined,
+      search_results: Array.isArray(data.search_results)
+        ? data.search_results
+        : undefined,
+    });
   } catch (err) {
     sendJson(res, 502, {
       error:

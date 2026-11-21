@@ -1,9 +1,11 @@
 import {
   AiChatbotSettingsStore,
+  AiHybridPipelineConfig,
   AiProviderProfile,
   AiProviderType,
   DEFAULT_AI_SETTINGS,
   DEFAULT_BUILTIN_SKILLS,
+  DEFAULT_HYBRID_PIPELINE,
   SkillDocument,
   WriterOutlineSection,
   WriterSession,
@@ -38,13 +40,55 @@ export function queueLegacyAiKeysForServerMigration(
   return foundAny;
 }
 
+function normalizePerplexityBaseUrl(url?: string, model?: string): string {
+  const clean = (url || '').trim();
+  if (/^sonar/i.test((model || '').trim())) {
+    return 'https://api.perplexity.ai';
+  }
+  if (!clean || /\/orchestrator/i.test(clean)) {
+    return 'https://api.perplexity.ai/v1/agent';
+  }
+  return clean;
+}
+
+export function normalizeHybridPipeline(
+  raw?: Partial<AiHybridPipelineConfig> | null
+): AiHybridPipelineConfig {
+  return {
+    enabled: Boolean(raw?.enabled),
+    researchModel:
+      typeof raw?.researchModel === 'string' && raw.researchModel.trim()
+        ? raw.researchModel.trim()
+        : DEFAULT_HYBRID_PIPELINE.researchModel,
+    writerProvider:
+      raw?.writerProvider &&
+      (['perplexity', 'gemini', 'openai', 'anthropic', 'custom_openai'] as AiProviderType[]).includes(
+        raw.writerProvider
+      )
+        ? raw.writerProvider
+        : DEFAULT_HYBRID_PIPELINE.writerProvider,
+    writerModel:
+      typeof raw?.writerModel === 'string' && raw.writerModel.trim()
+        ? raw.writerModel.trim()
+        : DEFAULT_HYBRID_PIPELINE.writerModel,
+  };
+}
+
 export function stripSecretsFromAiSettings(
   store: AiChatbotSettingsStore
 ): AiChatbotSettingsStore {
   return {
     activeProvider: store.activeProvider,
+    hybridPipeline: normalizeHybridPipeline(store.hybridPipeline),
     profiles: {
-      perplexity: { ...store.profiles.perplexity, apiKey: '' },
+      perplexity: {
+        ...store.profiles.perplexity,
+        baseUrl: normalizePerplexityBaseUrl(
+          store.profiles.perplexity?.baseUrl,
+          store.profiles.perplexity?.model
+        ),
+        apiKey: '',
+      },
       gemini: { ...store.profiles.gemini, apiKey: '' },
       openai: { ...store.profiles.openai, apiKey: '' },
       anthropic: { ...store.profiles.anthropic, apiKey: '' },
@@ -179,6 +223,7 @@ export function loadAiChatbotSettings(): AiChatbotSettingsStore {
     const normalized: AiChatbotSettingsStore = stripSecretsFromAiSettings({
       activeProvider:
         parsed.activeProvider || DEFAULT_AI_SETTINGS.activeProvider,
+      hybridPipeline: normalizeHybridPipeline(parsed.hybridPipeline),
       profiles: {
         perplexity: {
           ...DEFAULT_AI_SETTINGS.profiles.perplexity,
@@ -313,18 +358,31 @@ export interface AiGenerateRequest {
   profile: AiProviderProfile;
   systemPrompt: string;
   userPrompt: string;
+  enableWebSearch?: boolean;
 }
 
-export interface PerplexityOrchestratorModelInfo {
+export interface AiGenerateDetailedResponse {
+  text: string;
+  model?: string;
+  citations?: string[];
+  search_results?: Array<{
+    title?: string;
+    url?: string;
+    date?: string;
+    snippet?: string;
+  }>;
+}
+
+export interface PerplexityModelInfo {
   id: string;
   owned_by?: string;
   name?: string;
 }
 
-export async function fetchPerplexityOrchestratorModels(
+export async function fetchPerplexityCatalogModels(
   apiKey?: string
 ): Promise<{
-  models: PerplexityOrchestratorModelInfo[];
+  models: PerplexityModelInfo[];
   serverKeyConfigured: boolean;
 }> {
   const trimmedKey = (apiKey || '').trim();
@@ -341,7 +399,7 @@ export async function fetchPerplexityOrchestratorModels(
   const data = (await resp.json().catch(() => ({}))) as {
     ok?: boolean;
     serverKeyConfigured?: boolean;
-    models?: PerplexityOrchestratorModelInfo[];
+    models?: PerplexityModelInfo[];
     error?: string;
   };
   if (resp.ok && Array.isArray(data.models)) {
@@ -352,15 +410,16 @@ export async function fetchPerplexityOrchestratorModels(
   }
   throw new Error(
     data.error ||
-      `Không thể tải danh sách model từ Perplexity Orchestrator (HTTP ${resp.status}).`
+      `Không thể tải danh sách model từ Perplexity (HTTP ${resp.status}).`
   );
 }
 
-export async function callAiChatbot({
+export async function callAiChatbotDetailed({
   profile,
   systemPrompt,
   userPrompt,
-}: AiGenerateRequest): Promise<string> {
+  enableWebSearch,
+}: AiGenerateRequest): Promise<AiGenerateDetailedResponse> {
   const transientKey = profile.apiKey.trim();
   const authHeaders = await getTeamAuthHeaders();
 
@@ -377,6 +436,7 @@ export async function callAiChatbot({
       baseUrl: profile.baseUrl.trim(),
       model: profile.model.trim(),
       temperature: profile.temperature,
+      enableWebSearch,
       systemPrompt,
       userPrompt,
     }),
@@ -387,6 +447,13 @@ export async function callAiChatbot({
     text?: string;
     model?: string;
     error?: string;
+    citations?: string[];
+    search_results?: Array<{
+      title?: string;
+      url?: string;
+      date?: string;
+      snippet?: string;
+    }>;
   } = {};
   try {
     data = JSON.parse(rawRespText) as typeof data;
@@ -395,7 +462,14 @@ export async function callAiChatbot({
   }
 
   if (resp.ok && data.text?.trim()) {
-    return data.text.trim();
+    return {
+      text: data.text.trim(),
+      model: data.model,
+      citations: Array.isArray(data.citations) ? data.citations : undefined,
+      search_results: Array.isArray(data.search_results)
+        ? data.search_results
+        : undefined,
+    };
   }
 
   const rawSnippet = rawRespText
@@ -410,6 +484,127 @@ export async function callAiChatbot({
         ? `Không thể gọi ${profile.label} (HTTP ${resp.status}: ${rawSnippet}).`
         : `Không thể gọi ${profile.label} (HTTP ${resp.status}).`)
   );
+}
+
+export async function callAiChatbot(req: AiGenerateRequest): Promise<string> {
+  const res = await callAiChatbotDetailed(req);
+  return res.text;
+}
+
+/**
+ * Resolves the effective writing profile from settings.
+ * In Hybrid mode, returns the configured Writer provider & model with web search disabled
+ * (since Perplexity already gathered real-time verified sources in Step 1).
+ */
+export function resolveEffectiveWriterConfig(settings: AiChatbotSettingsStore): {
+  profile: AiProviderProfile;
+  enableWebSearch?: boolean;
+  isHybrid: boolean;
+  researchProfile: AiProviderProfile;
+} {
+  const hybrid = normalizeHybridPipeline(settings.hybridPipeline);
+  const researchModel = hybrid.researchModel || 'fast-search';
+  const researchProfile: AiProviderProfile = {
+    ...settings.profiles.perplexity,
+    model: researchModel,
+    baseUrl: /^sonar/i.test(researchModel)
+      ? 'https://api.perplexity.ai'
+      : 'https://api.perplexity.ai/v1/agent',
+    temperature: 0.1,
+  };
+
+  if (hybrid.enabled) {
+    const baseWriter = settings.profiles[hybrid.writerProvider];
+    const writerModel = hybrid.writerModel?.trim() || baseWriter.model;
+    const writerProfile: AiProviderProfile = {
+      ...baseWriter,
+      model: writerModel,
+      baseUrl:
+        hybrid.writerProvider === 'perplexity'
+          ? 'https://api.perplexity.ai/v1/agent'
+          : baseWriter.baseUrl,
+    };
+    return {
+      profile: writerProfile,
+      // Disable web search during the writing step so GLM-5.3-Flash / GLM-5.3 writes cheaply from Step 1 sources
+      enableWebSearch: false,
+      isHybrid: true,
+      researchProfile,
+    };
+  }
+
+  return {
+    profile: settings.profiles[settings.activeProvider],
+    enableWebSearch: undefined,
+    isHybrid: false,
+    researchProfile,
+  };
+}
+
+/**
+ * Step 1 of Hybrid Pipeline: Uses Perplexity (Agent Search / Sonar) ONLY to gather
+ * up-to-date real-time web/academic sources and properly formatted citations (low output tokens).
+ */
+export async function researchSourcesWithPerplexity(
+  session: WriterSession,
+  researchProfile: AiProviderProfile
+): Promise<string> {
+  const systemPrompt = `You are a precision Academic Citation & Web Research Assistant.
+Your ONLY job is to search the live web for the latest, authoritative, real-world academic papers, peer-reviewed journal articles, official reports, and verified statistics relevant to the assignment topic.
+DO NOT write an essay or long prose. Keep your response concise, structured, and strictly factual to minimize output tokens.`;
+
+  const userPrompt = `Find 10 to 15 recent, high-authority, real-time verifiable scholarly & official sources for the following academic assignment:
+- Subject: ${session.subject || 'General Academic Research'}
+- Topic: ${session.topic || session.title}
+- Citation Style: ${session.citationStyle}
+- Writing Language: ${session.writingLanguage}
+- Key Instructions / Scope: ${(session.instructions || '').slice(0, 1200)}
+- Rubric Focus: ${(session.rubricNotes || '').slice(0, 600)}
+
+Return ONLY a clean numbered dossier of verified sources. For each source provide:
+1. Exact ${session.citationStyle} full reference entry (Author(s), Year, Title, Journal/Publisher, DOI or direct URL).
+2. In-text citation format (e.g., (Author, Year)).
+3. 1-2 concise bullet points of exact verified statistics, empirical findings, or arguments from that source.
+
+STRICT RULES:
+- Every single source MUST be real and grounded in your web search results.
+- Prioritize recent publications (2021-2026) and seminal foundational studies.
+- Do NOT write essay paragraphs — ONLY return the structured verified source & citation dossier.`;
+
+  const res = await callAiChatbotDetailed({
+    profile: researchProfile,
+    systemPrompt,
+    userPrompt,
+    enableWebSearch: true,
+  });
+
+  const extraUrls = new Set<string>();
+  if (Array.isArray(res.citations)) {
+    for (const c of res.citations) {
+      if (typeof c === 'string' && c.trim()) extraUrls.add(c.trim());
+    }
+  }
+  if (Array.isArray(res.search_results)) {
+    for (const sr of res.search_results) {
+      if (sr?.url) {
+        extraUrls.add(
+          sr.title ? `${sr.title} — ${sr.url}` : sr.url
+        );
+      }
+    }
+  }
+
+  const urlAppendix =
+    extraUrls.size > 0
+      ? `\n\n--- VERIFIED SOURCE URLS RETURNED BY PERPLEXITY ---\n${Array.from(
+          extraUrls
+        )
+          .slice(0, 20)
+          .map((u, idx) => `[${idx + 1}] ${u}`)
+          .join('\n')}`
+      : '';
+
+  return `${res.text}${urlAppendix}`.trim();
 }
 
 export function buildSkillsAndContextSystemPrompt(
@@ -438,10 +633,16 @@ export function buildSkillsAndContextSystemPrompt(
           .join('\n\n')
       : '';
 
+  const researchedSourcesBlock = session.researchedSources?.trim()
+    ? `\n\n=== VERIFIED REAL-TIME WEB SOURCES & CITATIONS (FROM PERPLEXITY SEARCH) ===
+CRITICAL GROUNDING RULE: You MUST ground your arguments, empirical statistics, and in-text citations primarily in the verified real-time sources below. Use the exact author names, years, and bibliographic details provided. Do NOT fabricate fake citations or non-existent DOIs.
+${session.researchedSources.trim()}`
+    : '';
+
   return `You are an elite Academic Researcher & University Writing Specialist assisting inside an academic research & drafting studio.
 
 === ACTIVE SKILL FILES & SYSTEM INSTRUCTIONS ===
-${skillBlock}${contextBlock}
+${skillBlock}${contextBlock}${researchedSourcesBlock}
 
 === ASSIGNMENT BRIEF & FORMATTING RULES ===
 - Subject / Course: ${session.subject || 'General Academic Research'}
@@ -459,7 +660,8 @@ ${session.rubricNotes || 'High distinction academic rigor, critical synthesis, a
 export async function generateOutlineWithAi(
   session: WriterSession,
   skills: SkillDocument[],
-  profile: AiProviderProfile
+  profile: AiProviderProfile,
+  enableWebSearch?: boolean
 ): Promise<WriterOutlineSection[]> {
   const systemPrompt = buildSkillsAndContextSystemPrompt(session, skills);
   const userPrompt = `Based on the assignment brief, rubric, target total word count (${session.targetWordCount} words), citation style (${session.citationStyle}), and all active Skill files, design a comprehensive, publication-grade academic outline with a clear Table of Contents hierarchy.
@@ -488,6 +690,7 @@ Example JSON schema:
     profile,
     systemPrompt,
     userPrompt,
+    enableWebSearch,
   });
 
   return parseAiOutlineJson(rawText, session.targetWordCount, session.citationStyle);
@@ -609,7 +812,8 @@ export async function generateSectionWithAi(
   session: WriterSession,
   targetSectionId: string,
   skills: SkillDocument[],
-  profile: AiProviderProfile
+  profile: AiProviderProfile,
+  enableWebSearch?: boolean
 ): Promise<string> {
   const sectionIdx = session.outline.findIndex((s) => s.id === targetSectionId);
   if (sectionIdx === -1) {
@@ -684,6 +888,7 @@ STRICT OUTPUT RULES:
     profile,
     systemPrompt,
     userPrompt,
+    enableWebSearch,
   });
   return stripMarkdownHashesFromText(raw);
 }
@@ -702,7 +907,8 @@ export async function refineTextWithAi(
   action: AiRefineAction,
   customInstruction: string,
   skills: SkillDocument[],
-  profile: AiProviderProfile
+  profile: AiProviderProfile,
+  enableWebSearch?: boolean
 ): Promise<string> {
   const systemPrompt = buildSkillsAndContextSystemPrompt(session, skills);
 
@@ -738,6 +944,7 @@ Return ONLY the revised academic text for this section (no conversational intro 
     profile,
     systemPrompt,
     userPrompt,
+    enableWebSearch,
   });
   return stripMarkdownHashesFromText(raw);
 }

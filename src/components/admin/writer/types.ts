@@ -16,9 +16,20 @@ export interface AiProviderProfile {
   temperature: number;
 }
 
+export interface AiHybridPipelineConfig {
+  enabled: boolean;
+  /** Perplexity preset or Sonar model used ONLY to research up-to-date web sources & citations */
+  researchModel: string;
+  /** Provider used for writing the full essay */
+  writerProvider: AiProviderType;
+  /** Model used for writing the full essay (e.g. perplexity/glm-5.3-flash, perplexity/glm-5.3, z-ai/glm-5.3-flash) */
+  writerModel: string;
+}
+
 export interface AiChatbotSettingsStore {
   activeProvider: AiProviderType;
   profiles: Record<AiProviderType, AiProviderProfile>;
+  hybridPipeline?: AiHybridPipelineConfig;
 }
 
 export interface SkillDocument {
@@ -290,6 +301,8 @@ export interface WriterSession {
   fullPaperOverride?: string;
   batchStatus?: WriterBatchStatus;
   batchErrorMsg?: string;
+  researchedSources?: string;
+  researchedSourcesTopic?: string;
   historyStack: string[];
   historyIndex: number;
   updatedAt: string;
@@ -297,19 +310,19 @@ export interface WriterSession {
 
 export const AI_PROVIDER_SUGGESTED_MODELS: Record<AiProviderType, string[]> = {
   perplexity: [
+    'fast-search',
     'pro-search',
     'deep-research',
     'advanced-deep-research',
-    'fast-search',
-    'openai/gpt-5.6-sol',
-    'anthropic/claude-sonnet-5-5',
-    'anthropic/claude-opus-5-5',
-    'google/gemini-4-carbon',
+    'sonar',
+    'sonar-pro',
+    'perplexity/glm-5.3-flash',
+    'perplexity/glm-5.3',
+    'google/gemini-3.5-flash',
+    'google/gemini-3.8-flash',
     'perplexity/kimi-k3',
     'xai/grok-4.7',
-    'perplexity/glm-5.3',
     'sonar-reasoning-pro',
-    'sonar-deep-research',
   ],
   gemini: [
     'gemini-2.5-pro',
@@ -354,8 +367,16 @@ export const AI_PROVIDER_SUGGESTED_MODELS: Record<AiProviderType, string[]> = {
   ],
 };
 
+export const DEFAULT_HYBRID_PIPELINE: AiHybridPipelineConfig = {
+  enabled: false,
+  researchModel: 'fast-search',
+  writerProvider: 'perplexity',
+  writerModel: 'perplexity/glm-5.3-flash',
+};
+
 export const DEFAULT_AI_SETTINGS: AiChatbotSettingsStore = {
   activeProvider: 'perplexity',
+  hybridPipeline: DEFAULT_HYBRID_PIPELINE,
   profiles: {
     perplexity: {
       provider: 'perplexity',

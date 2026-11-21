@@ -15,6 +15,7 @@ import {
   WriterSession,
 } from '../components/admin/writer/types';
 import {
+  normalizeHybridPipeline,
   queueLegacyAiKeysForServerMigration,
   sanitizeWriterSession,
   stripSecretsFromAiSettings,
@@ -53,6 +54,7 @@ export function normalizeAiSettings(
       parsed.activeProvider && PROVIDER_KEYS.includes(parsed.activeProvider)
         ? parsed.activeProvider
         : DEFAULT_AI_SETTINGS.activeProvider,
+    hybridPipeline: normalizeHybridPipeline(parsed.hybridPipeline),
     profiles: {
       perplexity: {
         ...DEFAULT_AI_SETTINGS.profiles.perplexity,

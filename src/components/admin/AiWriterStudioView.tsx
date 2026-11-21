@@ -17,6 +17,8 @@ import {
   loadWriterSessions,
   parseAiOutlineJson,
   refineTextWithAi,
+  researchSourcesWithPerplexity,
+  resolveEffectiveWriterConfig,
   sanitizeWriterSession,
   saveAiChatbotSettings,
   saveGlobalSkillLibrary,
@@ -494,14 +496,69 @@ export function AiWriterStudioView({
     }
   }, [initialOrderCode, orders]);
 
-  const activeProfile = aiSettings.profiles[aiSettings.activeProvider];
-  const hasEffectiveApiKey =
+  const effectiveWriter = useMemo(
+    () => resolveEffectiveWriterConfig(aiSettings),
+    [aiSettings]
+  );
+  const activeProfile = effectiveWriter.profile;
+  const hasPerplexityKey =
+    Boolean(aiSettings.profiles.perplexity?.apiKey?.trim()) ||
+    Boolean(serverKeysConfigured.perplexity);
+  const hasWriterKey =
     Boolean(activeProfile.apiKey.trim()) ||
     Boolean(serverKeysConfigured[activeProfile.provider]);
+  const hasEffectiveApiKey = effectiveWriter.isHybrid
+    ? hasPerplexityKey && hasWriterKey
+    : hasWriterKey;
+  const activeModelDisplayName = effectiveWriter.isHybrid
+    ? `${effectiveWriter.researchProfile.model} → ${activeProfile.model.replace(/^perplexity\//, '')}`
+    : activeProfile.model;
   const enabledSkillsCount = useMemo(
     () => skills.filter((s) => s.enabled).length,
     [skills]
   );
+
+  /**
+   * When Hybrid mode is active, runs Step 1 (Perplexity web search) once per session topic
+   * to fetch verified real-time sources & citations, then caches them on the session
+   * so Step 2 (GLM-5.3-Flash / GLM-5.3 / Writer) writes all sections cheaply & accurately.
+   */
+  const ensureHybridSourcesForSession = async (
+    targetSessionId: string
+  ): Promise<WriterSession | null> => {
+    const sess = sessionsRef.current.find((s) => s.id === targetSessionId);
+    if (!sess) return null;
+    if (!effectiveWriter.isHybrid) return sess;
+
+    const topicKey = (sess.topic || sess.title || '').trim();
+    if (
+      sess.researchedSources?.trim() &&
+      (sess.researchedSourcesTopic || '').trim() === topicKey
+    ) {
+      return sess;
+    }
+
+    onToast(
+      `Bước 1/2: Perplexity (${effectiveWriter.researchProfile.model}) đang tra cứu nguồn thực tế & trích dẫn...`
+    );
+    const dossier = await researchSourcesWithPerplexity(
+      sess,
+      effectiveWriter.researchProfile
+    );
+    mutateSessionById(targetSessionId, (s) => ({
+      ...s,
+      researchedSources: dossier,
+      researchedSourcesTopic: topicKey,
+    }));
+    onToast(
+      `Bước 2/2: Đã thu thập xong nguồn chuẩn! Đang chuyển sang ${activeProfile.model} viết bài...`
+    );
+    return {
+      ...sess,
+      researchedSources: dossier,
+      researchedSourcesTopic: topicKey,
+    };
+  };
 
   // Mutate a specific session by ID (safe for background concurrent tasks)
   const mutateSessionById = (
@@ -696,7 +753,14 @@ export function AiWriterStudioView({
     }));
 
     try {
-      const sections = await generateOutlineWithAi(sess, skills, activeProfile);
+      const preparedSess =
+        (await ensureHybridSourcesForSession(targetSessionId)) || sess;
+      const sections = await generateOutlineWithAi(
+        preparedSess,
+        skills,
+        activeProfile,
+        effectiveWriter.enableWebSearch
+      );
       mutateSessionById(targetSessionId, (s) => ({
         ...s,
         outline: sections,
@@ -704,7 +768,7 @@ export function AiWriterStudioView({
         batchStatus: 'idle',
       }));
       onToast(
-        `AI (${activeProfile.model}) đã lập dàn ý ${sections.length} mục cho "${sess.title}".`
+        `AI (${activeModelDisplayName}) đã lập dàn ý ${sections.length} mục cho "${sess.title}".`
       );
     } catch (err) {
       const msg =
@@ -805,14 +869,16 @@ export function AiWriterStudioView({
     }));
 
     try {
-      const latestSession =
+      const preparedSession =
+        (await ensureHybridSourcesForSession(targetSessionId)) ||
         sessionsRef.current.find((s) => s.id === targetSessionId) ||
         activeSession;
       const generatedText = await generateSectionWithAi(
-        latestSession,
+        preparedSession,
         sectionId,
         skills,
-        activeProfile
+        activeProfile,
+        effectiveWriter.enableWebSearch
       );
 
       mutateSessionById(
@@ -871,6 +937,9 @@ export function AiWriterStudioView({
     }));
 
     try {
+      // In Hybrid mode, run Step 1 (Perplexity web search) once before writing all sections
+      await ensureHybridSourcesForSession(targetSessionId);
+
       const sectionIds = initialSnap.outline.map((sec) => sec.id);
 
       for (const secId of sectionIds) {
@@ -912,7 +981,8 @@ export function AiWriterStudioView({
           latestBeforeCall,
           secId,
           skills,
-          activeProfile
+          activeProfile,
+          effectiveWriter.enableWebSearch
         );
 
         if (pausedSessionIdsRef.current.has(targetSessionId)) {
@@ -1327,14 +1397,18 @@ export function AiWriterStudioView({
 
     setRefiningSection(true);
     try {
+      const preparedSess =
+        (await ensureHybridSourcesForSession(activeSession.id)) ||
+        activeSession;
       const revised = await refineTextWithAi(
-        activeSession,
+        preparedSess,
         currentSection.title,
         currentSection.content,
         action,
         customPrompt,
         skills,
-        activeProfile
+        activeProfile,
+        effectiveWriter.enableWebSearch
       );
       handleUpdateOutlineSection(
         currentSection.id,
@@ -1479,7 +1553,7 @@ export function AiWriterStudioView({
         exportingAll={exportingAllDocx}
         cloudSyncState={cloudSyncState}
         enabledSkillsCount={enabledSkillsCount}
-        activeModelName={activeProfile.model}
+        activeModelName={activeModelDisplayName}
         hasApiKey={hasEffectiveApiKey}
         linkedOrder={linkedOrder}
         totalDraftedWords={totalDraftedWords}

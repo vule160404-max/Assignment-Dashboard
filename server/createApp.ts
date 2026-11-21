@@ -2412,11 +2412,8 @@ export function createApiApp(): express.Express {
 
       const isPerplexityAgentSchema =
         provider === 'perplexity' &&
-        (schema === 'agent' ||
-          PERPLEXITY_AGENT_PRESETS.has(model) ||
-          /\/v1\/agent\/?$/i.test(baseUrl) ||
-          /\/v1\/responses\/?$/i.test(baseUrl) ||
-          (!/\/orchestrator/i.test(baseUrl) && !/^sonar/i.test(model)));
+        schema !== 'sonar' &&
+        !/^sonar/i.test(model);
 
       if (isPerplexityAgentSchema) {
         const previousResponseId =
@@ -2427,6 +2424,7 @@ export function createApiApp(): express.Express {
         const tools = Array.isArray(req.body?.tools)
           ? req.body.tools
           : undefined;
+        const enableWebSearch = req.body?.enableWebSearch !== false;
         const responseFormat =
           req.body?.response_format && typeof req.body.response_format === 'object'
             ? (req.body.response_format as Record<string, unknown>)
@@ -2440,6 +2438,7 @@ export function createApiApp(): express.Express {
             instructions: systemPrompt,
             temperature,
             previousResponseId,
+            enableWebSearch,
             tools,
             responseFormat,
           });
