@@ -356,7 +356,12 @@ export function WriterApiSettingsModal({
     setSavingVault(true);
     try {
       await persistEnteredKeysToVault();
-      const scrubbed = stripSecretsFromAiSettings(draft);
+      const nextDraft: AiChatbotSettingsStore = {
+        ...draft,
+        activeProvider: hybrid.enabled ? 'perplexity' : draft.activeProvider,
+        hybridPipeline: hybrid,
+      };
+      const scrubbed = stripSecretsFromAiSettings(nextDraft);
       onSaveSettings(scrubbed);
       const eff = resolveEffectiveWriterConfig(scrubbed);
       onToast(

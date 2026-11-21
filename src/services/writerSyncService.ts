@@ -172,9 +172,14 @@ export async function saveAiWriterSettingsToCloud(
   queueLegacyAiKeysForServerMigration(store.profiles);
   const scrubbed = stripSecretsFromAiSettings(store);
   const ref = doc(db, 'settings', 'aiWriterSettings');
+  // Embed hybridPipeline inside profilesJson to stay strictly within Firestore rules allowlist
+  const profilesEnvelope = {
+    ...scrubbed.profiles,
+    __hybridPipeline: scrubbed.hybridPipeline,
+  };
   const payload: Record<string, string> = {
     activeProvider: scrubbed.activeProvider,
-    profilesJson: JSON.stringify(scrubbed.profiles),
+    profilesJson: JSON.stringify(profilesEnvelope),
     updatedAt: new Date().toISOString(),
   };
   if (auth.currentUser?.uid) {
@@ -207,11 +212,16 @@ export function subscribeAiWriterSettings(
           activeProvider?: AiProviderType;
           profilesJson?: string;
         };
-        const profiles = data.profilesJson ? JSON.parse(data.profilesJson) : {};
-        const hadCloudPlaintextKeys = queueLegacyAiKeysForServerMigration(profiles);
+        const rawEnvelope = data.profilesJson ? JSON.parse(data.profilesJson) : {};
+        const hybridPipeline =
+          rawEnvelope && typeof rawEnvelope === 'object'
+            ? rawEnvelope.__hybridPipeline
+            : undefined;
+        const hadCloudPlaintextKeys = queueLegacyAiKeysForServerMigration(rawEnvelope);
         const normalized = normalizeAiSettings({
           activeProvider: data.activeProvider,
-          profiles,
+          profiles: rawEnvelope,
+          hybridPipeline,
         });
         if (hadCloudPlaintextKeys) {
           // Migrate any legacy plaintext keys to server vault and scrub from Firestore document
