@@ -1889,12 +1889,37 @@ export function createApiApp(): express.Express {
           .replace(/&apos;/g, "'")
           .replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(Number(n)));
 
+      type PreviewRun = {
+        text: string;
+        bold?: boolean;
+        italic?: boolean;
+        underline?: boolean;
+        color?: string;
+      };
+
       type PreviewBlock = {
         text: string;
-        kind: 'h1' | 'h2' | 'h3' | 'p';
+        runs?: PreviewRun[];
+        kind: 'h1' | 'h2' | 'h3' | 'toc' | 'p';
+        leftText?: string;
+        rightText?: string;
         align?: 'left' | 'center' | 'right' | 'justify';
         bold?: boolean;
+        fontSizePt?: number;
+        indentLeftPx?: number;
+        firstLineIndentPx?: number;
+        spaceBeforePx?: number;
+        spaceAfterPx?: number;
+        hasBottomBorder?: boolean;
       };
+
+      // Detect document default font family from styles.xml or document.xml
+      const stylesXml = (await zip.file('word/styles.xml')?.async('string')) || '';
+      const fontMatch =
+        stylesXml.match(/<w:rFonts\b[^>]*w:ascii="([^"]+)"/i) ||
+        xml.match(/<w:rFonts\b[^>]*w:ascii="([^"]+)"/i);
+      const defaultFontFamily = fontMatch?.[1] || 'Times New Roman';
+      const hasPageBorder = /<w:pgBorders\b/i.test(xml);
 
       const pages: PreviewBlock[][] = [[]];
       let currentPageWords = 0;
@@ -1911,18 +1936,12 @@ export function createApiApp(): express.Express {
           currentPageWords = 0;
         }
 
-        const tMatches = pXml.match(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g) || [];
-        const rawText = tMatches
-          .map((t) => decodeXml(t.replace(/<[^>]+>/g, '')))
-          .join('')
-          .replace(/\s+/g, ' ')
-          .trim();
+        const pPrMatch = pXml.match(/<w:pPr\b[\s\S]*?<\/w:pPr>/);
+        const pPr = pPrMatch?.[0] || '';
 
-        if (!rawText) continue;
-
-        const styleMatch = pXml.match(/<w:pStyle\b[^>]*w:val="([^"]+)"/i);
+        const styleMatch = pPr.match(/<w:pStyle\b[^>]*w:val="([^"]+)"/i);
         const styleVal = (styleMatch?.[1] || '').toLowerCase();
-        const alignMatch = pXml.match(/<w:jc\b[^>]*w:val="([^"]+)"/i);
+        const alignMatch = pPr.match(/<w:jc\b[^>]*w:val="([^"]+)"/i);
         const rawAlign = (alignMatch?.[1] || '').toLowerCase();
         const align: PreviewBlock['align'] =
           rawAlign === 'center'
@@ -1933,9 +1952,96 @@ export function createApiApp(): express.Express {
             ? 'justify'
             : 'left';
 
-        const isBold = /<w:b(?:\s|\/|>)/i.test(pXml) && !/<w:b\s+w:val="0"/i.test(pXml);
+        const indMatch = pPr.match(/<w:ind\b[^>]*>/i)?.[0] || '';
+        const indLeftTwips = Number(indMatch.match(/w:left="(\d+)"/i)?.[1] || 0);
+        const indFirstTwips = Number(indMatch.match(/w:firstLine="(\d+)"/i)?.[1] || 0);
+        const indentLeftPx = indLeftTwips > 0 ? Math.min(72, Math.round(indLeftTwips / 15)) : 0;
+        const firstLineIndentPx =
+          indFirstTwips > 0 ? Math.min(48, Math.round(indFirstTwips / 15)) : 0;
+
+        const spacingMatch = pPr.match(/<w:spacing\b[^>]*>/i)?.[0] || '';
+        const beforeTwips = Number(spacingMatch.match(/w:before="(\d+)"/i)?.[1] || 0);
+        const afterTwips = Number(spacingMatch.match(/w:after="(\d+)"/i)?.[1] || 0);
+        const spaceBeforePx = beforeTwips > 0 ? Math.min(28, Math.round(beforeTwips / 20)) : 0;
+        const spaceAfterPx = afterTwips > 0 ? Math.min(24, Math.round(afterTwips / 20)) : 0;
+        const hasBottomBorder = /<w:bottom\b/i.test(pPr);
+
+        // Parse runs (<w:r>) preserving tabs, bold, italic, underline, font size, and color
+        const runMatches = pXml.match(/<w:r\b[\s\S]*?<\/w:r>/g) || [];
+        const runs: PreviewRun[] = [];
+        let hasTab = false;
+        let leftParts: string[] = [];
+        let rightParts: string[] = [];
+        let maxRunSizeHalfPt = 0;
+        let allBold = true;
+        let hasTextRun = false;
+
+        for (const rXml of runMatches) {
+          const rPr = rXml.match(/<w:rPr\b[\s\S]*?<\/w:rPr>/)?.[0] || '';
+          const rBold = /<w:b(?:\s|\/|>)/i.test(rPr) && !/<w:b\s+w:val="0"/i.test(rPr);
+          const rItalic = /<w:i(?:\s|\/|>)/i.test(rPr) && !/<w:i\s+w:val="0"/i.test(rPr);
+          const rUnderline =
+            /<w:u\b/i.test(rPr) && !/<w:u\b[^>]*w:val="none"/i.test(rPr);
+          const rColorRaw = rPr.match(/<w:color\b[^>]*w:val="([0-9a-fA-F]{6})"/i)?.[1];
+          const rColor =
+            rColorRaw && rColorRaw.toLowerCase() !== '000000'
+              ? `#${rColorRaw}`
+              : undefined;
+          const szVal = Number(rPr.match(/<w:sz\b[^>]*w:val="(\d+)"/i)?.[1] || 0);
+          if (szVal > maxRunSizeHalfPt) maxRunSizeHalfPt = szVal;
+
+          if (/<w:tab\b/i.test(rXml)) {
+            hasTab = true;
+          }
+
+          const tMatches = rXml.match(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g) || [];
+          const runText = tMatches
+            .map((t) => decodeXml(t.replace(/<[^>]+>/g, '')))
+            .join('');
+
+          if (!runText) continue;
+          hasTextRun = true;
+          if (!rBold && runText.trim()) allBold = false;
+
+          if (hasTab) {
+            rightParts.push(runText);
+          } else {
+            leftParts.push(runText);
+          }
+
+          runs.push({
+            text: runText,
+            bold: rBold || undefined,
+            italic: rItalic || undefined,
+            underline: rUnderline || undefined,
+            color: rColor,
+          });
+        }
+
+        const rawText = runs
+          .map((r) => r.text)
+          .join('')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (!rawText && !hasBottomBorder) continue;
+
+        const leftText = leftParts.join('').replace(/\s+/g, ' ').trim();
+        const rightText = rightParts.join('').replace(/\s+/g, ' ').trim();
+        const isTocRow =
+          hasTab &&
+          Boolean(leftText) &&
+          Boolean(rightText) &&
+          /^\d{1,3}$/.test(rightText);
+
         let kind: PreviewBlock['kind'] = 'p';
-        if (styleVal.includes('heading1') || styleVal === 'title' || styleVal === '1') {
+        if (isTocRow) {
+          kind = 'toc';
+        } else if (
+          styleVal.includes('heading1') ||
+          styleVal === 'title' ||
+          styleVal === '1'
+        ) {
           kind = 'h1';
         } else if (styleVal.includes('heading2') || styleVal === '2') {
           kind = 'h2';
@@ -1943,20 +2049,31 @@ export function createApiApp(): express.Express {
           kind = 'h3';
         }
 
+        const fontSizePt =
+          maxRunSizeHalfPt > 0 ? Math.round(maxRunSizeHalfPt / 2) : undefined;
         const words = rawText.split(/\s+/).filter(Boolean).length;
         totalWords += words;
 
-        // Auto-paginate around ~340 words per A4 page if no explicit page break
-        if (currentPageWords + words > 360 && pages[pages.length - 1].length > 0) {
+        // Auto-paginate around ~360 words per A4 page if no explicit page break
+        if (currentPageWords + words > 380 && pages[pages.length - 1].length > 0) {
           pages.push([]);
           currentPageWords = 0;
         }
 
         pages[pages.length - 1].push({
           text: rawText,
+          runs: runs.length > 0 ? runs : undefined,
           kind,
+          leftText: isTocRow ? leftText : undefined,
+          rightText: isTocRow ? rightText : undefined,
           align,
-          bold: isBold,
+          bold: hasTextRun && allBold,
+          fontSizePt,
+          indentLeftPx: indentLeftPx || undefined,
+          firstLineIndentPx: firstLineIndentPx || undefined,
+          spaceBeforePx: spaceBeforePx || undefined,
+          spaceAfterPx: spaceAfterPx || undefined,
+          hasBottomBorder: hasBottomBorder || undefined,
         });
         currentPageWords += words;
       }
@@ -1973,6 +2090,8 @@ export function createApiApp(): express.Express {
       res.setHeader('Cache-Control', 'private, no-store');
       res.json({
         fileName: meta.originalName,
+        defaultFontFamily,
+        hasPageBorder,
         totalPages,
         totalWords,
         isLocked: isLockedForViewer,

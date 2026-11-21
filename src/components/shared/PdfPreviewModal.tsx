@@ -23,15 +23,34 @@ interface RenderedPage {
   blurred: boolean;
 }
 
+interface DocxPreviewRun {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  color?: string;
+}
+
 interface DocxPreviewBlock {
   text: string;
-  kind: 'h1' | 'h2' | 'h3' | 'p';
+  runs?: DocxPreviewRun[];
+  kind: 'h1' | 'h2' | 'h3' | 'toc' | 'p';
+  leftText?: string;
+  rightText?: string;
   align?: 'left' | 'center' | 'right' | 'justify';
   bold?: boolean;
+  fontSizePt?: number;
+  indentLeftPx?: number;
+  firstLineIndentPx?: number;
+  spaceBeforePx?: number;
+  spaceAfterPx?: number;
+  hasBottomBorder?: boolean;
 }
 
 interface DocxPreviewPayload {
   fileName: string;
+  defaultFontFamily?: string;
+  hasPageBorder?: boolean;
   totalPages: number;
   totalWords: number;
   isLocked: boolean;
@@ -440,7 +459,7 @@ export function PdfPreviewModal({
           )}
 
           {isDocx && !loading && !error && docxPreview && (
-            <div className="space-y-5 max-w-3xl mx-auto">
+            <div className="space-y-6 max-w-[820px] mx-auto">
               {/* Compact Word Document Meta Strip */}
               <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 rounded-xl bg-white border border-zinc-200/90 text-xs text-zinc-600 shadow-2xs">
                 <div className="flex items-center gap-2 font-medium text-slate-800">
@@ -448,8 +467,9 @@ export function PdfPreviewModal({
                     .DOCX
                   </span>
                   <span>
-                    Tổng cộng ~{docxPreview.totalWords.toLocaleString('vi-VN')} từ ·{' '}
-                    {docxPreview.totalPages} trang
+                    ~{docxPreview.totalWords.toLocaleString('vi-VN')} từ ·{' '}
+                    {docxPreview.totalPages} trang ·{' '}
+                    {docxPreview.defaultFontFamily || 'Times New Roman'}
                   </span>
                 </div>
                 {docxPreview.isLocked ? (
@@ -466,78 +486,149 @@ export function PdfPreviewModal({
                 )}
               </div>
 
-              {/* Rendered A4 Word Sheets */}
-              {docxPreview.pages.map((blocks, pageIdx) => (
-                <div
-                  key={pageIdx}
-                  onContextMenu={(e) => {
-                    if (docxPreview.isLocked) e.preventDefault();
-                  }}
-                  className={`relative bg-white border border-zinc-200/95 rounded-xl shadow-sm px-7 sm:px-12 py-8 sm:py-10 space-y-3.5 ${
-                    docxPreview.isLocked ? 'select-none' : ''
-                  }`}
-                  style={{ fontFamily: '"Times New Roman", Georgia, serif' }}
-                >
-                  <div className="flex items-center justify-between pb-3 mb-2 border-b border-zinc-100 font-sans text-[11px] text-zinc-400">
-                    <span className="truncate max-w-[75%]">{attachment.name}</span>
-                    <span className="font-mono font-semibold text-zinc-500">
-                      Trang {pageIdx + 1} / {docxPreview.totalPages}
+              {/* Rendered Authentic A4 Word Sheets */}
+              {docxPreview.pages.map((blocks, pageIdx) => {
+                const isCoverSheet =
+                  pageIdx === 0 &&
+                  blocks.length <= 16 &&
+                  blocks.filter((b) => b.align === 'center').length >= 2;
+                const docFont = docxPreview.defaultFontFamily
+                  ? `"${docxPreview.defaultFontFamily}", "Times New Roman", Georgia, serif`
+                  : '"Times New Roman", Georgia, serif';
+
+                const renderRuns = (block: DocxPreviewBlock) => {
+                  if (!block.runs || block.runs.length === 0) return block.text;
+                  return block.runs.map((run, rIdx) => (
+                    <span
+                      key={rIdx}
+                      style={{
+                        fontWeight: run.bold ? 700 : undefined,
+                        fontStyle: run.italic ? 'italic' : undefined,
+                        textDecoration: run.underline ? 'underline' : undefined,
+                        color: run.color || undefined,
+                      }}
+                    >
+                      {run.text}
                     </span>
+                  ));
+                };
+
+                return (
+                  <div
+                    key={pageIdx}
+                    onContextMenu={(e) => {
+                      if (docxPreview.isLocked) e.preventDefault();
+                    }}
+                    className={`relative bg-white border border-zinc-300/90 rounded-sm shadow-md mx-auto flex flex-col justify-between min-h-[760px] sm:min-h-[980px] px-8 sm:px-16 py-10 sm:py-14 ${
+                      docxPreview.isLocked ? 'select-none' : ''
+                    }`}
+                    style={{ fontFamily: docFont }}
+                  >
+                    {/* Cover page double frame if enabled in Word document */}
+                    <div
+                      className={`flex-1 flex flex-col ${
+                        isCoverSheet
+                          ? `justify-between py-6 ${
+                              docxPreview.hasPageBorder
+                                ? 'border-[3px] border-double border-[#0B2559]/75 px-6 sm:px-10 py-8'
+                                : ''
+                            }`
+                          : ''
+                      }`}
+                    >
+                      <div className={isCoverSheet ? 'space-y-4' : 'space-y-2.5'}>
+                        {blocks.map((block, bIdx) => {
+                          const alignClass =
+                            block.align === 'center'
+                              ? 'text-center'
+                              : block.align === 'right'
+                              ? 'text-right'
+                              : block.align === 'justify'
+                              ? 'text-justify'
+                              : 'text-left';
+
+                          // Table of Contents row with authentic right-aligned dotted leader
+                          if (block.kind === 'toc') {
+                            return (
+                              <div
+                                key={bIdx}
+                                style={{
+                                  paddingLeft: block.indentLeftPx
+                                    ? `${block.indentLeftPx}px`
+                                    : undefined,
+                                  marginTop: block.bold ? '8px' : '2px',
+                                }}
+                                className={`flex items-baseline gap-2 text-[13.5px] sm:text-[14.5px] leading-6 text-slate-900 ${
+                                  block.bold ? 'font-bold' : 'font-normal'
+                                }`}
+                              >
+                                <span className="shrink-0 max-w-[85%] break-words">
+                                  {block.leftText}
+                                </span>
+                                <span className="flex-1 border-b border-dotted border-zinc-400/90 translate-y-[-3px] min-w-[16px]" />
+                                <span className="shrink-0 font-mono text-[13px] tabular-nums text-slate-700">
+                                  {block.rightText}
+                                </span>
+                              </div>
+                            );
+                          }
+
+                          const fontPx = block.fontSizePt
+                            ? Math.max(12, Math.min(24, Math.round(block.fontSizePt * 1.25)))
+                            : block.kind === 'h1'
+                            ? 18
+                            : block.kind === 'h2'
+                            ? 16
+                            : 14.5;
+
+                          return (
+                            <div
+                              key={bIdx}
+                              style={{
+                                fontSize: `${fontPx}px`,
+                                paddingLeft: block.indentLeftPx
+                                  ? `${block.indentLeftPx}px`
+                                  : undefined,
+                                textIndent:
+                                  block.kind === 'p' && block.firstLineIndentPx
+                                    ? `${block.firstLineIndentPx}px`
+                                    : undefined,
+                                marginTop: block.spaceBeforePx
+                                  ? `${block.spaceBeforePx}px`
+                                  : block.kind === 'h1'
+                                  ? '12px'
+                                  : undefined,
+                                marginBottom: block.spaceAfterPx
+                                  ? `${block.spaceAfterPx}px`
+                                  : undefined,
+                              }}
+                              className={`text-slate-900 ${
+                                block.kind === 'h1' || block.kind === 'h2' || block.bold
+                                  ? 'font-bold leading-snug'
+                                  : 'leading-[1.75]'
+                              } ${
+                                block.hasBottomBorder
+                                  ? 'border-b border-zinc-300 pb-2 mb-3'
+                                  : ''
+                              } ${alignClass}`}
+                            >
+                              {renderRuns(block)}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Authentic A4 Page Number Footer */}
+                    <div className="pt-6 mt-6 border-t border-zinc-100 flex items-center justify-between font-sans text-[11px] text-zinc-400">
+                      <span className="truncate max-w-[70%]">{attachment.name}</span>
+                      <span className="font-mono font-medium text-zinc-500">
+                        Trang {pageIdx + 1} / {docxPreview.totalPages}
+                      </span>
+                    </div>
                   </div>
-
-                  {blocks.map((block, bIdx) => {
-                    const alignClass =
-                      block.align === 'center'
-                        ? 'text-center'
-                        : block.align === 'right'
-                        ? 'text-right'
-                        : block.align === 'justify'
-                        ? 'text-justify'
-                        : 'text-left';
-
-                    if (block.kind === 'h1') {
-                      return (
-                        <h3
-                          key={bIdx}
-                          className={`text-base sm:text-lg font-bold text-slate-900 leading-snug pt-1 ${alignClass}`}
-                        >
-                          {block.text}
-                        </h3>
-                      );
-                    }
-                    if (block.kind === 'h2') {
-                      return (
-                        <h4
-                          key={bIdx}
-                          className={`text-sm sm:text-base font-bold text-slate-900 leading-snug pt-0.5 ${alignClass}`}
-                        >
-                          {block.text}
-                        </h4>
-                      );
-                    }
-                    if (block.kind === 'h3') {
-                      return (
-                        <h5
-                          key={bIdx}
-                          className={`text-sm font-semibold text-slate-800 leading-snug ${alignClass}`}
-                        >
-                          {block.text}
-                        </h5>
-                      );
-                    }
-                    return (
-                      <p
-                        key={bIdx}
-                        className={`text-[13.5px] sm:text-[14.5px] text-slate-800 leading-7 ${
-                          block.bold ? 'font-semibold' : ''
-                        } ${alignClass}`}
-                      >
-                        {block.text}
-                      </p>
-                    );
-                  })}
-                </div>
-              ))}
+                );
+              })}
 
               {/* Payment Lock Banner for Remaining Hidden Pages */}
               {docxPreview.hiddenPagesCount > 0 && (
