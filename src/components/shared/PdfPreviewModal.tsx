@@ -524,6 +524,146 @@ export function PdfPreviewModal({
                   ));
                 };
 
+                // Detect cover sheet & split into balanced Top / Middle / Bottom zones
+                const coverDateIdx =
+                  isCoverSheet && blocks.length >= 3 ? blocks.length - 1 : -1;
+                const coverTopBlocks = isCoverSheet
+                  ? blocks.slice(
+                      0,
+                      Math.max(
+                        0,
+                        blocks.findIndex(
+                          (b, idx) =>
+                            idx > 0 &&
+                            (b.kind === 'h1' ||
+                              (b.fontSizePt && b.fontSizePt >= 15) ||
+                              b.text.length > 55)
+                        )
+                      )
+                    )
+                  : [];
+                const coverMiddleBlocks = isCoverSheet
+                  ? blocks.slice(
+                      coverTopBlocks.length,
+                      coverDateIdx > coverTopBlocks.length
+                        ? coverDateIdx
+                        : blocks.length
+                    )
+                  : [];
+                const coverBottomBlock =
+                  isCoverSheet && coverDateIdx > coverTopBlocks.length
+                    ? blocks[coverDateIdx]
+                    : null;
+
+                const renderBlockNode = (block: DocxPreviewBlock, bIdx: number) => {
+                  const alignClass =
+                    block.align === 'center'
+                      ? 'text-center'
+                      : block.align === 'right'
+                      ? 'text-right'
+                      : block.align === 'justify'
+                      ? 'text-justify'
+                      : 'text-left';
+
+                  // Table of Contents row with authentic right-aligned dotted leader
+                  if (block.kind === 'toc') {
+                    return (
+                      <div
+                        key={bIdx}
+                        style={{
+                          paddingLeft: block.indentLeftPx
+                            ? `${block.indentLeftPx}px`
+                            : undefined,
+                          marginTop: block.bold ? '8px' : '2px',
+                        }}
+                        className={`flex items-baseline gap-2 text-[13.5px] sm:text-[14.5px] leading-6 text-slate-900 ${
+                          block.bold ? 'font-bold' : 'font-normal'
+                        }`}
+                      >
+                        <span className="shrink-0 max-w-[85%] break-words">
+                          {block.leftText}
+                        </span>
+                        <span className="flex-1 border-b border-dotted border-zinc-400/90 translate-y-[-3px] min-w-[16px]" />
+                        <span className="shrink-0 font-mono text-[13px] tabular-nums text-slate-700">
+                          {block.rightText}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  const fontPx = block.fontSizePt
+                    ? Math.max(
+                        12,
+                        Math.min(24, Math.round(block.fontSizePt * 1.25))
+                      )
+                    : block.kind === 'h1'
+                    ? 18
+                    : block.kind === 'h2'
+                    ? 16
+                    : 14.5;
+
+                  // On cover page, render "Label: Value" metadata lines cleanly aligned in 2 columns
+                  if (
+                    isCoverSheet &&
+                    block.align !== 'center' &&
+                    block.text.includes(':') &&
+                    block.text.indexOf(':') < 34
+                  ) {
+                    const colonIdx = block.text.indexOf(':');
+                    const labelPart = block.text.slice(0, colonIdx + 1).trim();
+                    const valuePart = block.text.slice(colonIdx + 1).trim();
+                    return (
+                      <div
+                        key={bIdx}
+                        style={{ fontSize: `${fontPx}px` }}
+                        className="grid grid-cols-[150px_1fr] sm:grid-cols-[180px_1fr] gap-3 text-left text-slate-900 leading-relaxed max-w-xl mx-auto"
+                      >
+                        <span className="font-semibold text-slate-700">
+                          {labelPart}
+                        </span>
+                        <span className="font-medium text-slate-900">
+                          {valuePart}
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div
+                      key={bIdx}
+                      style={{
+                        fontSize: `${fontPx}px`,
+                        paddingLeft: block.indentLeftPx
+                          ? `${block.indentLeftPx}px`
+                          : undefined,
+                        textIndent:
+                          block.kind === 'p' && block.firstLineIndentPx
+                            ? `${block.firstLineIndentPx}px`
+                            : undefined,
+                        marginTop: block.spaceBeforePx
+                          ? `${block.spaceBeforePx}px`
+                          : block.kind === 'h1'
+                          ? '12px'
+                          : undefined,
+                        marginBottom: block.spaceAfterPx
+                          ? `${block.spaceAfterPx}px`
+                          : undefined,
+                      }}
+                      className={`text-slate-900 ${
+                        block.kind === 'h1' || block.kind === 'h2' || block.bold
+                          ? 'font-bold leading-snug'
+                          : 'leading-[1.75]'
+                      } ${
+                        block.hasBottomBorder
+                          ? 'border-b border-zinc-300 pb-2 mb-3'
+                          : ''
+                      } ${alignClass}`}
+                    >
+                      {renderRuns(block)}
+                    </div>
+                  );
+                };
+
                 return (
                   <div
                     key={pageObj.pageNumber || pageIdx}
@@ -535,7 +675,7 @@ export function PdfPreviewModal({
                     }`}
                     style={{ fontFamily: docFont }}
                   >
-                    {/* Cover page double frame if enabled in Word document */}
+                    {/* Cover page balanced 3-zone frame OR regular body flow */}
                     <div
                       className={`flex-1 flex flex-col ${
                         isBlurred
@@ -545,93 +685,40 @@ export function PdfPreviewModal({
                         isCoverSheet
                           ? `justify-between py-6 ${
                               docxPreview.hasPageBorder
-                                ? 'border-[3px] border-double border-[#0B2559]/75 px-6 sm:px-10 py-8'
+                                ? 'border-[3px] border-double border-[#0B2559]/75 px-6 sm:px-10 py-10'
                                 : ''
                             }`
                           : ''
                       }`}
                     >
-                      <div className={isCoverSheet ? 'space-y-4' : 'space-y-2.5'}>
-                        {blocks.map((block, bIdx) => {
-                          const alignClass =
-                            block.align === 'center'
-                              ? 'text-center'
-                              : block.align === 'right'
-                              ? 'text-right'
-                              : block.align === 'justify'
-                              ? 'text-justify'
-                              : 'text-left';
+                      {isCoverSheet ? (
+                        <>
+                          {/* Top zone: University / Faculty / Doc Type */}
+                          <div className="space-y-2.5 text-center">
+                            {coverTopBlocks.map((b, i) => renderBlockNode(b, i))}
+                          </div>
 
-                          // Table of Contents row with authentic right-aligned dotted leader
-                          if (block.kind === 'toc') {
-                            return (
-                              <div
-                                key={bIdx}
-                                style={{
-                                  paddingLeft: block.indentLeftPx
-                                    ? `${block.indentLeftPx}px`
-                                    : undefined,
-                                  marginTop: block.bold ? '8px' : '2px',
-                                }}
-                                className={`flex items-baseline gap-2 text-[13.5px] sm:text-[14.5px] leading-6 text-slate-900 ${
-                                  block.bold ? 'font-bold' : 'font-normal'
-                                }`}
-                              >
-                                <span className="shrink-0 max-w-[85%] break-words">
-                                  {block.leftText}
-                                </span>
-                                <span className="flex-1 border-b border-dotted border-zinc-400/90 translate-y-[-3px] min-w-[16px]" />
-                                <span className="shrink-0 font-mono text-[13px] tabular-nums text-slate-700">
-                                  {block.rightText}
-                                </span>
-                              </div>
-                            );
-                          }
+                          {/* Middle zone: Topic Title & Metadata */}
+                          <div className="space-y-5 my-auto py-8">
+                            {coverMiddleBlocks.map((b, i) =>
+                              renderBlockNode(b, coverTopBlocks.length + i)
+                            )}
+                          </div>
 
-                          const fontPx = block.fontSizePt
-                            ? Math.max(12, Math.min(24, Math.round(block.fontSizePt * 1.25)))
-                            : block.kind === 'h1'
-                            ? 18
-                            : block.kind === 'h2'
-                            ? 16
-                            : 14.5;
-
-                          return (
-                            <div
-                              key={bIdx}
-                              style={{
-                                fontSize: `${fontPx}px`,
-                                paddingLeft: block.indentLeftPx
-                                  ? `${block.indentLeftPx}px`
-                                  : undefined,
-                                textIndent:
-                                  block.kind === 'p' && block.firstLineIndentPx
-                                    ? `${block.firstLineIndentPx}px`
-                                    : undefined,
-                                marginTop: block.spaceBeforePx
-                                  ? `${block.spaceBeforePx}px`
-                                  : block.kind === 'h1'
-                                  ? '12px'
-                                  : undefined,
-                                marginBottom: block.spaceAfterPx
-                                  ? `${block.spaceAfterPx}px`
-                                  : undefined,
-                              }}
-                              className={`text-slate-900 ${
-                                block.kind === 'h1' || block.kind === 'h2' || block.bold
-                                  ? 'font-bold leading-snug'
-                                  : 'leading-[1.75]'
-                              } ${
-                                block.hasBottomBorder
-                                  ? 'border-b border-zinc-300 pb-2 mb-3'
-                                  : ''
-                              } ${alignClass}`}
-                            >
-                              {renderRuns(block)}
+                          {/* Bottom zone: Location & Date */}
+                          {coverBottomBlock && (
+                            <div className="pt-4 text-center">
+                              {renderBlockNode(coverBottomBlock, coverDateIdx)}
                             </div>
-                          );
-                        })}
-                      </div>
+                          )}
+                        </>
+                      ) : (
+                        <div className="space-y-2.5">
+                          {blocks.map((block, bIdx) =>
+                            renderBlockNode(block, bIdx)
+                          )}
+                        </div>
+                      )}
                     </div>
 
                     {/* Frosted Lock Overlay on Blurred Pages */}
@@ -651,13 +738,14 @@ export function PdfPreviewModal({
                       </div>
                     )}
 
-                    {/* Authentic A4 Page Number Footer */}
-                    <div className="pt-6 mt-6 border-t border-zinc-100 flex items-center justify-between font-sans text-[11px] text-zinc-400">
-                      <span className="truncate max-w-[70%]">{attachment.name}</span>
-                      <span className="font-mono font-medium text-zinc-500">
-                        Trang {pageIdx + 1} / {docxPreview.totalPages}
-                      </span>
-                    </div>
+                    {/* Clean Page Number Footer (no raw filename, omitted on Cover Page) */}
+                    {!isCoverSheet && (
+                      <div className="pt-5 mt-6 flex items-center justify-center font-sans text-[11px] text-zinc-400">
+                        <span className="font-mono font-medium text-zinc-500">
+                          Trang {pageIdx + 1} / {docxPreview.totalPages}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
               })}

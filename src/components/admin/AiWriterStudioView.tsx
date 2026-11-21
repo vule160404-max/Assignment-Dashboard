@@ -42,6 +42,7 @@ import {
   buildFormattedDocxFromSession,
   extractTextFromSkillFile,
 } from '../../lib/docxBuilder';
+import { exportWriterSessionToPdf } from '../../lib/pdfExporter';
 import { countWords } from '../../lib/wordHumanizer';
 import { CitationStyle, OrderRecord } from '../../types/domain';
 import {
@@ -1950,6 +1951,14 @@ export function AiWriterStudioView({
           onDeliverDocxToClient ? () => setShowDeliverModal(true) : undefined
         }
         onExportDocx={() => void handleExportDocx()}
+        onExportPdf={() => {
+          if (!activeSession || totalDraftedWords === 0) {
+            onToast('Chưa có nội dung để xuất PDF.');
+            return;
+          }
+          exportWriterSessionToPdf(activeSession);
+          onToast('Đã mở hộp thoại lưu file .PDF chuẩn A4!');
+        }}
       />
 
       {/* Streamlined Word Ribbon (sticky wrapper measured dynamically so sidebars never overlap) */}

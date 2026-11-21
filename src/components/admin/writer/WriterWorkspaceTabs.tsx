@@ -48,6 +48,7 @@ interface WriterWorkspaceTabsProps {
   onPushToHumanizer?: () => void;
   onOpenDeliverModal?: () => void;
   onExportDocx: () => void;
+  onExportPdf?: () => void;
 }
 
 export function isWriterSessionBusy(session: WriterSession): boolean {
@@ -99,6 +100,7 @@ export function WriterWorkspaceTabs({
   onPushToHumanizer,
   onOpenDeliverModal,
   onExportDocx,
+  onExportPdf,
 }: WriterWorkspaceTabsProps) {
   const [showOrderPicker, setShowOrderPicker] = useState(false);
   const [pickedCodes, setPickedCodes] = useState<string[]>([]);
@@ -531,6 +533,19 @@ export function WriterWorkspaceTabs({
             <Download className="w-3.5 h-3.5" />
             <span>{exportingDocx ? 'Đang xuất...' : 'Tải .DOCX'}</span>
           </button>
+
+          {onExportPdf && (
+            <button
+              type="button"
+              disabled={totalDraftedWords === 0}
+              onClick={onExportPdf}
+              title="Xuất & Tải file PDF chuẩn A4 (giữ nguyên Trang bìa, Mục lục & font Tiếng Việt/Anh)"
+              className="btn-press px-3 py-1.5 text-xs font-semibold rounded-lg border border-rose-200/90 bg-rose-50/70 text-rose-700 hover:bg-rose-100/80 disabled:opacity-40 inline-flex items-center gap-1.5"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Tải .PDF</span>
+            </button>
+          )}
 
           {onOpenDeliverModal && (
             <button
