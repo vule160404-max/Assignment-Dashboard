@@ -1,29 +1,96 @@
+import { PDFDocument } from 'pdf-lib';
 import {
   DEFAULT_COVER_PAGE_CONFIG,
   WriterSession,
 } from '../components/admin/writer/types';
 
-function escapeHtml(raw: string): string {
+// A4 dimensions in points (72 DPI) and 2x render canvas (144 DPI = crisp print quality)
+const A4_PT_W = 595.28;
+const A4_PT_H = 841.89;
+const SCALE = 2;
+const CANVAS_W = Math.round(A4_PT_W * SCALE); // 1191 px
+const CANVAS_H = Math.round(A4_PT_H * SCALE); // 1684 px
+
+function stripMarkdown(raw: string): string {
   return raw
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/^[ \t]*#{1,6}[ \t]*/, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .trim();
 }
 
-function renderInlineMarkdown(raw: string): string {
-  const escaped = escapeHtml(raw);
-  return escaped
-    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-    .replace(/__([^_]+)__/g, '<u>$1</u>')
-    .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+function wrapTextLines(
+  ctx: CanvasRenderingContext2D,
+  text: string,
+  maxWidth: number,
+  firstLineIndentPx = 0
+): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  if (words.length === 0) return [];
+  const lines: string[] = [];
+  let current = '';
+
+  for (const word of words) {
+    const lineLimit = lines.length === 0 ? maxWidth - firstLineIndentPx : maxWidth;
+    const candidate = current ? `${current} ${word}` : word;
+    if (ctx.measureText(candidate).width <= lineLimit || !current) {
+      current = candidate;
+    } else {
+      lines.push(current);
+      current = word;
+    }
+  }
+  if (current) lines.push(current);
+  return lines;
 }
 
-function stripLeadingHashes(line: string): string {
-  return line.replace(/^[ \t]*#{1,6}[ \t]*/, '').trim();
+function createBlankPageCanvas(): {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+} {
+  const canvas = document.createElement('canvas');
+  canvas.width = CANVAS_W;
+  canvas.height = CANVAS_H;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) {
+    throw new Error('Trình duyệt không hỗ trợ Canvas để tạo tệp PDF.');
+  }
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.textBaseline = 'top';
+  return { canvas, ctx };
 }
 
-export function exportWriterSessionToPdf(session: WriterSession): void {
+function drawJustifiedLine(
+  ctx: CanvasRenderingContext2D,
+  line: string,
+  x: number,
+  y: number,
+  targetWidth: number,
+  isLastLine: boolean
+): void {
+  const words = line.split(' ').filter(Boolean);
+  if (isLastLine || words.length <= 1) {
+    ctx.fillText(line, x, y);
+    return;
+  }
+  const wordsWidth = words.reduce((acc, w) => acc + ctx.measureText(w).width, 0);
+  const gap = (targetWidth - wordsWidth) / (words.length - 1);
+  if (gap <= 0 || gap > 36) {
+    ctx.fillText(line, x, y);
+    return;
+  }
+  let cursorX = x;
+  for (let i = 0; i < words.length; i++) {
+    ctx.fillText(words[i], cursorX, y);
+    cursorX += ctx.measureText(words[i]).width + gap;
+  }
+}
+
+export async function exportWriterSessionToPdf(
+  session: WriterSession
+): Promise<string> {
   const fmt = session.format;
   const isVi = session.writingLanguage === 'Vietnamese';
   const cover = fmt.coverPage?.enabled
@@ -31,23 +98,81 @@ export function exportWriterSessionToPdf(session: WriterSession): void {
     : null;
   const includeToc = fmt.includeTableOfContents ?? true;
 
-  const fontCss = `"${fmt.fontFamily}", "Times New Roman", Georgia, serif`;
-  const marginCss = `${fmt.marginInch || 1}in`;
-  const textAlign = fmt.textAlign || 'justify';
-  const lineSpacing = fmt.lineSpacing || 1.5;
-  const fontSizePt = fmt.fontSizePt || 12;
-  const firstLineIndent = fmt.firstLineIndent ? '0.5in' : '0';
+  const fontStack = `"${fmt.fontFamily}", "Times New Roman", Arial, sans-serif`;
+  const marginPx = Math.round((fmt.marginInch || 1) * 72 * SCALE); // 1in = 144px at 2x
+  const contentW = CANVAS_W - marginPx * 2;
+  const topY = marginPx;
+  const bottomLimitY = CANVAS_H - marginPx - 28;
+  const baseFontPx = Math.round((fmt.fontSizePt || 12) * (96 / 72) * SCALE * 0.78);
+  const lineHeightPx = Math.round(baseFontPx * (fmt.lineSpacing || 1.5));
+  const paraGapPx = Math.round(((fmt.paragraphSpacingAfterPt || 6) + 4) * SCALE * 0.85);
+  const firstLineIndentPx = fmt.firstLineIndent ? Math.round(36 * SCALE) : 0;
 
   const totalWords = session.outline.reduce((sum, sec) => {
     const w = sec.content.trim() ? sec.content.trim().split(/\s+/).length : 0;
     return sum + w;
   }, 0);
 
-  // 1. Cover Page HTML
-  let coverHtml = '';
+  const pageCanvases: HTMLCanvasElement[] = [];
+
+  // --- 1. COVER PAGE ---
   if (cover) {
+    const { canvas, ctx } = createBlankPageCanvas();
     const f = cover.fields;
     const isModern = cover.templateId === 'modern_executive';
+
+    if (cover.showBorder) {
+      ctx.strokeStyle = '#0B2559';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(marginPx - 24, marginPx - 24, contentW + 48, CANVAS_H - marginPx * 2 + 48);
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(marginPx - 14, marginPx - 14, contentW + 28, CANVAS_H - marginPx * 2 + 28);
+    } else if (isModern) {
+      ctx.fillStyle = '#0B2559';
+      ctx.fillRect(marginPx, marginPx, contentW, 10);
+      ctx.fillStyle = '#D97706';
+      ctx.fillRect(marginPx, CANVAS_H - marginPx - 6, contentW, 6);
+    }
+
+    // Top zone
+    let cy = marginPx + 36;
+    ctx.textAlign = 'center';
+    if (f.showUniversity && cover.universityName.trim()) {
+      ctx.fillStyle = '#0F172A';
+      ctx.font = `700 ${Math.round(13.5 * SCALE)}px ${fontStack}`;
+      for (const l of wrapTextLines(ctx, cover.universityName.trim().toUpperCase(), contentW - 40)) {
+        ctx.fillText(l, CANVAS_W / 2, cy);
+        cy += Math.round(20 * SCALE);
+      }
+    }
+    if (f.showFaculty && cover.facultyName.trim()) {
+      ctx.fillStyle = '#334155';
+      ctx.font = `600 ${Math.round(12 * SCALE)}px ${fontStack}`;
+      for (const l of wrapTextLines(ctx, cover.facultyName.trim().toUpperCase(), contentW - 40)) {
+        ctx.fillText(l, CANVAS_W / 2, cy);
+        cy += Math.round(18 * SCALE);
+      }
+    }
+    if (f.showDocumentType && cover.documentTypeLabel.trim()) {
+      cy += Math.round(36 * SCALE);
+      ctx.fillStyle = '#0B2559';
+      ctx.font = `700 ${Math.round(13.5 * SCALE)}px ${fontStack}`;
+      ctx.fillText(cover.documentTypeLabel.trim().toUpperCase(), CANVAS_W / 2, cy);
+    }
+
+    // Middle zone: Topic + Metadata
+    let midY = Math.round(CANVAS_H * 0.34);
+    if (f.showTopic) {
+      ctx.fillStyle = '#0F172A';
+      ctx.font = `700 ${Math.round(17.5 * SCALE)}px ${fontStack}`;
+      const topicText = (session.topic || session.title || 'ACADEMIC PAPER').trim().toUpperCase();
+      const topicLines = wrapTextLines(ctx, topicText, contentW - 60);
+      for (const l of topicLines) {
+        ctx.fillText(l, CANVAS_W / 2, midY);
+        midY += Math.round(25 * SCALE);
+      }
+    }
+
     const metaRows: Array<{ label: string; value: string }> = [];
     if (f.showSubject && session.subject.trim()) {
       metaRows.push({
@@ -98,257 +223,319 @@ export function exportWriterSessionToPdf(session: WriterSession): void {
       });
     }
 
-    coverHtml = `
-      <section class="cover-page ${cover.showBorder ? 'cover-bordered' : ''} ${
-        isModern ? 'cover-modern' : ''
-      }">
-        <div class="cover-top">
-          ${
-            f.showUniversity && cover.universityName.trim()
-              ? `<div class="cover-uni">${escapeHtml(cover.universityName.trim())}</div>`
-              : ''
-          }
-          ${
-            f.showFaculty && cover.facultyName.trim()
-              ? `<div class="cover-faculty">${escapeHtml(cover.facultyName.trim())}</div>`
-              : ''
-          }
-          ${
-            f.showDocumentType && cover.documentTypeLabel.trim()
-              ? `<div class="cover-doctype">${escapeHtml(cover.documentTypeLabel.trim())}</div>`
-              : ''
-          }
-        </div>
+    if (metaRows.length > 0) {
+      let metaY = Math.max(midY + Math.round(44 * SCALE), Math.round(CANVAS_H * 0.54));
+      const boxLeft = marginPx + 64;
+      const labelW = 240;
+      const valueMaxW = contentW - 128 - labelW;
+      ctx.textAlign = 'left';
+      const metaFontPx = Math.round(11.5 * SCALE);
+      const metaLineH = Math.round(18 * SCALE);
 
-        <div class="cover-middle">
-          ${
-            f.showTopic
-              ? `<h1 class="cover-topic">${escapeHtml(
-                  (session.topic || session.title || 'ACADEMIC PAPER').trim()
-                )}</h1>`
-              : ''
-          }
-          ${
-            metaRows.length > 0
-              ? `<div class="cover-meta">${metaRows
-                  .map(
-                    (row) =>
-                      `<div class="cover-meta-row"><span class="cover-meta-label">${escapeHtml(
-                        row.label
-                      )}</span><span class="cover-meta-val">${escapeHtml(
-                        row.value
-                      )}</span></div>`
-                  )
-                  .join('')}</div>`
-              : ''
-          }
-        </div>
+      for (const row of metaRows) {
+        ctx.fillStyle = '#334155';
+        ctx.font = `700 ${metaFontPx}px ${fontStack}`;
+        ctx.fillText(row.label, boxLeft, metaY);
 
-        <div class="cover-bottom">
-          ${
-            f.showSubmissionDate && cover.locationAndDate.trim()
-              ? `<div class="cover-date">${escapeHtml(cover.locationAndDate.trim())}</div>`
-              : ''
-          }
-        </div>
-      </section>
-    `;
-  }
-
-  // 2. Table of Contents HTML
-  let tocHtml = '';
-  if (includeToc && session.outline.length > 0) {
-    const basePage = (cover ? 1 : 0) + 1;
-    let runningWords = 0;
-    const wordsPerPage = Math.max(240, Math.round(420 / lineSpacing));
-    const tocItems: string[] = [];
-
-    for (const sec of session.outline) {
-      const startPage = basePage + 1 + Math.floor(runningWords / wordsPerPage);
-      const isH1 = sec.headingLevel === 'h1';
-      tocItems.push(`
-        <div class="toc-row ${isH1 ? 'toc-h1' : 'toc-h2'}">
-          <span class="toc-title">${escapeHtml(stripLeadingHashes(sec.title))}</span>
-          <span class="toc-dots"></span>
-          <span class="toc-page">${startPage}</span>
-        </div>
-      `);
-      const lines = sec.content.split(/\r?\n/);
-      for (const l of lines) {
-        const clean = stripLeadingHashes(l);
-        if (/^\d+\.\d+(?:\.\d+)?\.?\s+\S/.test(clean) && clean.length <= 120) {
-          const subPage = basePage + 1 + Math.floor(runningWords / wordsPerPage);
-          tocItems.push(`
-            <div class="toc-row toc-h2">
-              <span class="toc-title">${escapeHtml(clean)}</span>
-              <span class="toc-dots"></span>
-              <span class="toc-page">${subPage}</span>
-            </div>
-          `);
+        ctx.fillStyle = '#0F172A';
+        ctx.font = `400 ${metaFontPx}px ${fontStack}`;
+        const valLines = wrapTextLines(ctx, row.value, valueMaxW);
+        for (let i = 0; i < valLines.length; i++) {
+          ctx.fillText(valLines[i], boxLeft + labelW, metaY + i * metaLineH);
         }
-        runningWords += clean ? clean.split(/\s+/).length : 0;
-      }
-      if (!sec.content.trim()) {
-        runningWords += sec.targetWords || 250;
+        metaY += Math.max(1, valLines.length) * metaLineH + Math.round(6 * SCALE);
       }
     }
 
-    tocHtml = `
-      <section class="toc-page">
-        <h2 class="toc-heading">${isVi ? 'MỤC LỤC' : 'TABLE OF CONTENTS'}</h2>
-        <div class="toc-list">${tocItems.join('')}</div>
-      </section>
-    `;
+    // Bottom zone: Location & Date
+    if (f.showSubmissionDate && cover.locationAndDate.trim()) {
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#0F172A';
+      ctx.font = `700 ${Math.round(12 * SCALE)}px ${fontStack}`;
+      ctx.fillText(
+        cover.locationAndDate.trim(),
+        CANVAS_W / 2,
+        CANVAS_H - marginPx - Math.round(34 * SCALE)
+      );
+    }
+
+    pageCanvases.push(canvas);
   }
 
-  // 3. Body Sections HTML
-  const sectionsHtml = session.outline
-    .map((sec) => {
-      const headingTag =
-        sec.headingLevel === 'h1' ? 'h2' : sec.headingLevel === 'h2' ? 'h3' : 'h4';
-      const isRefSec =
-        /^(references|bibliography|works cited|tài liệu tham khảo|danh mục tài liệu tham khảo)/i.test(
-          sec.title.replace(/^\d+(\.\d+)*\.?\s*/, '').trim()
-        );
-      const paragraphs = sec.content
-        .split(/\r?\n+/)
-        .map((line) => stripLeadingHashes(line))
-        .filter(Boolean)
-        .map((line) => {
-          if (
-            !isRefSec &&
-            /^\d+\.\d+(?:\.\d+)?\.?\s+\S/.test(line) &&
-            line.length <= 130
-          ) {
-            return `<h3 class="sub-heading">${renderInlineMarkdown(line)}</h3>`;
-          }
-          return `<p class="${isRefSec ? 'ref-entry' : 'body-para'}">${renderInlineMarkdown(
-            line
-          )}</p>`;
-        })
-        .join('');
+  // --- 2. RENDER BODY PAGES FIRST SO WE KNOW EXACT PAGE NUMBERS FOR TABLE OF CONTENTS ---
+  const bodyCanvases: HTMLCanvasElement[] = [];
+  const tocEntries: Array<{ title: string; level: 1 | 2; bodyPageIndex: number }> = [];
 
-      return `
-        <div class="paper-section ${isRefSec ? 'ref-section' : ''}">
-          <${headingTag} class="sec-heading sec-${sec.headingLevel}">${escapeHtml(
-        stripLeadingHashes(sec.title)
-      )}</${headingTag}>
-          ${paragraphs}
-        </div>
-      `;
-    })
-    .join('');
+  let current = createBlankPageCanvas();
+  let cursorY = topY;
 
-  const safeTitle = escapeHtml(
-    (session.linkedOrderCode
-      ? `${session.linkedOrderCode}_${session.topic || session.title}`
-      : session.topic || session.title || 'AssignTrack_Paper'
-    ).slice(0, 90)
-  );
+  const commitBodyPage = () => {
+    bodyCanvases.push(current.canvas);
+    current = createBlankPageCanvas();
+    cursorY = topY;
+  };
 
-  const html = `<!doctype html>
-<html lang="${isVi ? 'vi' : 'en'}">
-<head>
-  <meta charset="utf-8" />
-  <title>${safeTitle}</title>
-  <style>
-    @page {
-      size: A4;
-      margin: ${marginCss};
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      color: #0f172a;
-      font-family: ${fontCss};
-      font-size: ${fontSizePt}pt;
-      line-height: ${lineSpacing};
-      -webkit-print-color-adjust: exact;
-      print-color-adjust: exact;
-    }
-    .cover-page {
-      min-height: calc(297mm - 2 * ${marginCss});
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      text-align: center;
-      page-break-after: always;
-      padding: 12mm 10mm;
-    }
-    .cover-bordered {
-      border: 3px double #0B2559;
-    }
-    .cover-modern {
-      border-top: 6px solid #0B2559;
-      border-bottom: 3px solid #D97706;
-    }
-    .cover-uni { font-size: 13pt; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; }
-    .cover-faculty { font-size: 12pt; font-weight: 600; text-transform: uppercase; margin-top: 4pt; }
-    .cover-doctype { font-size: 13pt; font-weight: 700; color: #0B2559; text-transform: uppercase; margin-top: 18pt; letter-spacing: 0.8px; }
-    .cover-middle { margin: auto 0; padding: 18pt 0; }
-    .cover-topic { font-size: 17pt; font-weight: 700; line-height: 1.35; text-transform: uppercase; margin: 0 0 22pt; color: #0f172a; }
-    .cover-meta { max-width: 135mm; margin: 0 auto; text-align: left; }
-    .cover-meta-row { display: flex; gap: 10pt; margin-bottom: 6pt; font-size: 11.5pt; line-height: 1.45; }
-    .cover-meta-label { width: 46mm; flex-shrink: 0; font-weight: 600; color: #334155; }
-    .cover-meta-val { flex: 1; font-weight: 500; }
-    .cover-date { font-size: 12pt; font-weight: 700; }
-    .toc-page { page-break-after: always; }
-    .toc-heading { text-align: center; font-size: 14pt; font-weight: 700; margin: 0 0 14pt; letter-spacing: 0.6px; }
-    .toc-row { display: flex; align-items: baseline; gap: 6pt; margin-bottom: 4pt; font-size: 11.5pt; line-height: 1.45; }
-    .toc-h1 { font-weight: 700; margin-top: 6pt; }
-    .toc-h2 { padding-left: 16pt; font-weight: 400; }
-    .toc-dots { flex: 1; border-bottom: 1px dotted #94a3b8; min-width: 12pt; transform: translateY(-3pt); }
-    .toc-page { font-variant-numeric: tabular-nums; }
-    .paper-section { margin-bottom: 14pt; }
-    .ref-section { page-break-before: auto; }
-    .sec-heading { font-weight: 700; color: #0f172a; page-break-after: avoid; margin: 14pt 0 6pt; }
-    .sec-h1 { font-size: ${Math.min(16, fontSizePt + 2)}pt; }
-    .sec-h2 { font-size: ${Math.min(14, fontSizePt + 1)}pt; }
-    .sec-h3 { font-size: ${fontSizePt}pt; }
-    .sub-heading { font-size: ${fontSizePt + 0.5}pt; font-weight: 700; margin: 10pt 0 4pt; page-break-after: avoid; }
-    .body-para { text-align: ${textAlign}; text-indent: ${firstLineIndent}; margin: 0 0 ${fmt.paragraphSpacingAfterPt || 6}pt; }
-    .ref-entry { text-align: left; padding-left: 0.45in; text-indent: -0.45in; margin: 0 0 6pt; }
-  </style>
-</head>
-<body>
-  ${coverHtml}
-  ${tocHtml}
-  <main>
-    ${!cover && session.topic ? `<h1 class="cover-topic" style="text-align:center;margin-bottom:16pt;">${escapeHtml(session.topic)}</h1>` : ''}
-    ${sectionsHtml}
-  </main>
-</body>
-</html>`;
-
-  const iframe = document.createElement('iframe');
-  iframe.style.position = 'fixed';
-  iframe.style.right = '0';
-  iframe.style.bottom = '0';
-  iframe.style.width = '0';
-  iframe.style.height = '0';
-  iframe.style.border = '0';
-  document.body.appendChild(iframe);
-
-  const doc = iframe.contentDocument || iframe.contentWindow?.document;
-  if (!doc || !iframe.contentWindow) {
-    iframe.remove();
-    return;
-  }
-
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  const triggerPrint = () => {
-    try {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-    } finally {
-      window.setTimeout(() => {
-        iframe.remove();
-      }, 1500);
+  const ensureSpace = (neededPx: number) => {
+    if (cursorY + neededPx > bottomLimitY && cursorY > topY) {
+      commitBodyPage();
     }
   };
 
-  window.setTimeout(triggerPrint, 250);
+  for (const sec of session.outline) {
+    const cleanSecTitle = stripMarkdown(sec.title);
+    const isRefSec =
+      /^(references|bibliography|works cited|tài liệu tham khảo|danh mục tài liệu tham khảo)/i.test(
+        cleanSecTitle.replace(/^\d+(\.\d+)*\.?\s*/, '').trim()
+      );
+
+    // Heading
+    const headingFontPx =
+      sec.headingLevel === 'h1'
+        ? Math.round(baseFontPx * 1.25)
+        : sec.headingLevel === 'h2'
+        ? Math.round(baseFontPx * 1.12)
+        : baseFontPx;
+    const headingLineH = Math.round(headingFontPx * 1.35);
+
+    current.ctx.font = `700 ${headingFontPx}px ${fontStack}`;
+    current.ctx.fillStyle = '#0F172A';
+    current.ctx.textAlign = 'left';
+
+    const hLines = wrapTextLines(current.ctx, cleanSecTitle, contentW);
+    ensureSpace(hLines.length * headingLineH + lineHeightPx * 2);
+
+    tocEntries.push({
+      title: cleanSecTitle,
+      level: sec.headingLevel === 'h1' ? 1 : 2,
+      bodyPageIndex: bodyCanvases.length,
+    });
+
+    if (cursorY > topY) {
+      cursorY += Math.round(10 * SCALE);
+    }
+    for (const hl of hLines) {
+      current.ctx.fillText(hl, marginPx, cursorY);
+      cursorY += headingLineH;
+    }
+    cursorY += Math.round(6 * SCALE);
+
+    // Body paragraphs
+    const rawParas = sec.content
+      .split(/\r?\n+/)
+      .map((l) => stripMarkdown(l))
+      .filter(Boolean);
+
+    for (const para of rawParas) {
+      const isSubHeading =
+        !isRefSec &&
+        /^\d+\.\d+(?:\.\d+)?\.?\s+\S/.test(para) &&
+        para.length <= 130;
+
+      if (isSubHeading) {
+        const subFontPx = Math.round(baseFontPx * 1.08);
+        const subLineH = Math.round(subFontPx * 1.35);
+        current.ctx.font = `700 ${subFontPx}px ${fontStack}`;
+        current.ctx.fillStyle = '#0F172A';
+        current.ctx.textAlign = 'left';
+        const subLines = wrapTextLines(current.ctx, para, contentW);
+        ensureSpace(subLines.length * subLineH + lineHeightPx);
+
+        tocEntries.push({
+          title: para,
+          level: 2,
+          bodyPageIndex: bodyCanvases.length,
+        });
+
+        cursorY += Math.round(6 * SCALE);
+        for (const sl of subLines) {
+          current.ctx.fillText(sl, marginPx, cursorY);
+          cursorY += subLineH;
+        }
+        cursorY += Math.round(4 * SCALE);
+        continue;
+      }
+
+      current.ctx.font = `400 ${baseFontPx}px ${fontStack}`;
+      current.ctx.fillStyle = '#0F172A';
+      current.ctx.textAlign = 'left';
+
+      const hangIndent = isRefSec ? Math.round(32 * SCALE) : 0;
+      const indent0 = isRefSec ? 0 : firstLineIndentPx;
+      const pLines = wrapTextLines(
+        current.ctx,
+        para,
+        isRefSec ? contentW - hangIndent : contentW,
+        indent0
+      );
+
+      for (let li = 0; li < pLines.length; li++) {
+        ensureSpace(lineHeightPx);
+        const line = pLines[li];
+        const x =
+          marginPx + (li === 0 ? indent0 : isRefSec ? hangIndent : 0);
+        const availW =
+          contentW - (li === 0 ? indent0 : isRefSec ? hangIndent : 0);
+
+        if (!isRefSec && fmt.textAlign === 'justify') {
+          drawJustifiedLine(
+            current.ctx,
+            line,
+            x,
+            cursorY,
+            availW,
+            li === pLines.length - 1
+          );
+        } else {
+          current.ctx.fillText(line, x, cursorY);
+        }
+        cursorY += lineHeightPx;
+      }
+      cursorY += paraGapPx;
+    }
+  }
+
+  if (cursorY > topY || bodyCanvases.length === 0) {
+    bodyCanvases.push(current.canvas);
+  }
+
+  // --- 3. BUILD TABLE OF CONTENTS PAGE(S) WITH REAL PAGE NUMBERS ---
+  const tocCanvases: HTMLCanvasElement[] = [];
+  if (includeToc && tocEntries.length > 0) {
+    const tocPageCountEst = Math.max(1, Math.ceil(tocEntries.length / 26));
+    const bodyPageOffset = (cover ? 1 : 0) + tocPageCountEst + 1;
+
+    let tocPage = createBlankPageCanvas();
+    let ty = topY;
+
+    tocPage.ctx.textAlign = 'center';
+    tocPage.ctx.fillStyle = '#0F172A';
+    tocPage.ctx.font = `700 ${Math.round(14.5 * SCALE)}px ${fontStack}`;
+    tocPage.ctx.fillText(
+      isVi ? 'MỤC LỤC' : 'TABLE OF CONTENTS',
+      CANVAS_W / 2,
+      ty
+    );
+    ty += Math.round(30 * SCALE);
+
+    const tocFontPx = Math.round(11.5 * SCALE);
+    const tocLineH = Math.round(22 * SCALE);
+
+    for (const item of tocEntries) {
+      if (ty + tocLineH > bottomLimitY) {
+        tocCanvases.push(tocPage.canvas);
+        tocPage = createBlankPageCanvas();
+        ty = topY;
+      }
+
+      const indent = item.level === 2 ? Math.round(22 * SCALE) : 0;
+      if (item.level === 1 && ty > topY + Math.round(34 * SCALE)) {
+        ty += Math.round(4 * SCALE);
+      }
+
+      const pageNumStr = String(bodyPageOffset + item.bodyPageIndex);
+      tocPage.ctx.font = `${item.level === 1 ? '700' : '400'} ${tocFontPx}px ${fontStack}`;
+      tocPage.ctx.fillStyle = '#0F172A';
+      tocPage.ctx.textAlign = 'left';
+
+      const maxTitleW = contentW - indent - 70;
+      let displayTitle = item.title;
+      while (
+        tocPage.ctx.measureText(displayTitle).width > maxTitleW &&
+        displayTitle.length > 12
+      ) {
+        displayTitle = `${displayTitle.slice(0, -4)}...`;
+      }
+
+      const titleX = marginPx + indent;
+      tocPage.ctx.fillText(displayTitle, titleX, ty);
+
+      const pageNumW = tocPage.ctx.measureText(pageNumStr).width;
+      const pageNumX = CANVAS_W - marginPx - pageNumW;
+      tocPage.ctx.fillText(pageNumStr, pageNumX, ty);
+
+      // Dotted leader
+      const dotsStartX = titleX + tocPage.ctx.measureText(displayTitle).width + 12;
+      const dotsEndX = pageNumX - 12;
+      if (dotsEndX > dotsStartX + 12) {
+        tocPage.ctx.save();
+        tocPage.ctx.strokeStyle = '#94A3B8';
+        tocPage.ctx.lineWidth = 1.5;
+        tocPage.ctx.setLineDash([2, 6]);
+        tocPage.ctx.beginPath();
+        tocPage.ctx.moveTo(dotsStartX, ty + tocFontPx - 4);
+        tocPage.ctx.lineTo(dotsEndX, ty + tocFontPx - 4);
+        tocPage.ctx.stroke();
+        tocPage.ctx.restore();
+      }
+
+      ty += tocLineH;
+    }
+
+    tocCanvases.push(tocPage.canvas);
+  }
+
+  // Assemble all pages & stamp clean centered page numbers on non-cover pages
+  const allCanvases = [...pageCanvases, ...tocCanvases, ...bodyCanvases];
+  if (fmt.includePageNumbers !== false) {
+    for (let idx = 0; idx < allCanvases.length; idx++) {
+      if (cover && idx === 0) continue; // No page number on cover page
+      const ctx = allCanvases[idx].getContext('2d');
+      if (!ctx) continue;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#64748B';
+      ctx.font = `400 ${Math.round(10 * SCALE)}px ${fontStack}`;
+      ctx.fillText(
+        String(idx + 1),
+        CANVAS_W / 2,
+        CANVAS_H - Math.round(marginPx * 0.55)
+      );
+    }
+  }
+
+  // --- 4. PACK INTO A REAL .PDF FILE VIA PDF-LIB & DOWNLOAD DIRECTLY ---
+  const pdfDoc = await PDFDocument.create();
+  pdfDoc.setTitle(session.topic || session.title || 'Academic Paper');
+  pdfDoc.setCreator('AssignTrack Academic Studio');
+
+  for (const pageCanvas of allCanvases) {
+    const jpegDataUrl = pageCanvas.toDataURL('image/jpeg', 0.92);
+    const base64 = jpegDataUrl.split(',')[1];
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const embeddedImg = await pdfDoc.embedJpg(bytes);
+    const pdfPage = pdfDoc.addPage([A4_PT_W, A4_PT_H]);
+    pdfPage.drawImage(embeddedImg, {
+      x: 0,
+      y: 0,
+      width: A4_PT_W,
+      height: A4_PT_H,
+    });
+  }
+
+  const pdfBytes = await pdfDoc.save();
+  const blob = new Blob([new Uint8Array(pdfBytes)], { type: 'application/pdf' });
+  const safeBaseName = (
+    session.linkedOrderCode
+      ? `${session.linkedOrderCode}_${session.topic || session.title}`
+      : session.topic || session.title || 'AssignTrack_Paper'
+  )
+    .replace(/[^a-zA-Z0-9À-ỹ_\- ]/g, '')
+    .trim()
+    .replace(/\s+/g, '_')
+    .slice(0, 64);
+  const fileName = `${safeBaseName || 'AssignTrack_Paper'}.pdf`;
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 3000);
+
+  return fileName;
 }

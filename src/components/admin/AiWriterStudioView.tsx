@@ -1956,8 +1956,18 @@ export function AiWriterStudioView({
             onToast('Chưa có nội dung để xuất PDF.');
             return;
           }
-          exportWriterSessionToPdf(activeSession);
-          onToast('Đã mở hộp thoại lưu file .PDF chuẩn A4!');
+          onToast('Đang tạo tệp .PDF chuẩn A4...');
+          void exportWriterSessionToPdf(activeSession)
+            .then((fileName) => {
+              onToast(`Đã tải xuống tệp PDF: ${fileName}`);
+            })
+            .catch((err) => {
+              onToast(
+                err instanceof Error
+                  ? err.message
+                  : 'Không thể xuất tệp PDF.'
+              );
+            });
         }}
       />
 
