@@ -95,20 +95,20 @@ export function WriterBriefPanel({
         <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
           Chủ đề / Câu hỏi nghiên cứu (Topic)
         </label>
-        <input
-          type="text"
+        <textarea
+          rows={2}
           value={session.topic}
           onChange={(e) =>
             onUpdateSession((s) => ({
               ...s,
               topic: e.target.value,
               title: s.linkedOrderCode
-                ? `${s.linkedOrderCode} · ${e.target.value.slice(0, 28)}`
-                : e.target.value.slice(0, 36) || 'Bài nghiên cứu mới',
+                ? `${s.linkedOrderCode} · ${e.target.value.slice(0, 36)}`
+                : e.target.value.slice(0, 48) || 'Bài nghiên cứu mới',
             }))
           }
           placeholder="Nhập tên đề tài hoặc câu hỏi nghiên cứu..."
-          className="w-full px-2.5 py-1.5 text-xs font-medium bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
+          className="w-full px-2.5 py-1.5 text-xs font-medium bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B] leading-relaxed resize-y"
         />
       </div>
 

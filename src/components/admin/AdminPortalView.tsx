@@ -46,12 +46,15 @@ import {
   getStageMeta,
 } from '../../lib/utils';
 import {
+  AttachmentCategory,
   AttachmentItem,
   BankSettings,
   ClientRecord,
   FIELD_LIMITS,
   NotificationSettings,
   OrderRecord,
+  OrderStage,
+  OrderStatus,
   RevisionRequest,
   TeamInvite,
   UserProfile,
@@ -426,6 +429,107 @@ export function AdminPortalView({
         assignedStaffName: order.assignedStaffName,
         staffPayoutAmount: order.staffPayoutAmount || 0,
         staffPayoutStatus: order.staffPayoutStatus === 'paid' ? 'paid' : 'unpaid',
+        staffPayoutPaidAt: order.staffPayoutPaidAt || '',
+        attachments: [...existingAttachments, newItem],
+      },
+      bankSettings,
+      order.id,
+      order.createdAt,
+      effectiveRole === 'staff' ? 'staff' : 'admin'
+    );
+  };
+
+  const handleDeliverDocxToClient = async (
+    order: OrderRecord,
+    file: File,
+    opts: { isDraftOnly: boolean; isLocked: boolean; note: string }
+  ) => {
+    const existingAttachments = order.attachments || [];
+    if (existingAttachments.length >= FIELD_LIMITS.attachmentsMax) {
+      throw new Error(
+        `Đơn #${order.orderCode} đã đạt giới hạn ${FIELD_LIMITS.attachmentsMax} tệp đính kèm.`
+      );
+    }
+
+    const isDraft = opts.isDraftOnly;
+    const category: AttachmentCategory = isDraft ? 'draft' : 'final';
+    const isPaymentLocked = opts.isLocked;
+    const previewMaxPages = isPaymentLocked ? 2 : 999;
+
+    const uploaded = await uploadFileToServer(file, {
+      isLocked: isPaymentLocked,
+      category,
+      previewMaxPages,
+    });
+
+    const newItem: AttachmentItem = {
+      id: `att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      name: uploaded.fileName,
+      category,
+      sourceType: 'upload',
+      fileIdOrUrl: uploaded.url,
+      mimeType: uploaded.mimeType,
+      sizeBytes: uploaded.sizeBytes,
+      isPaymentLocked,
+      previewMaxPages,
+      uploadedAt: new Date().toISOString(),
+    };
+
+    let nextStage: OrderStage = order.stage;
+    let nextStatus: OrderStatus = order.orderStatus;
+    let nextProgress = order.progressPercent;
+    let nextNote = order.publicStatusNote;
+
+    if (isDraft) {
+      nextStage = 'drafting';
+      nextProgress = Math.max(nextProgress, 60);
+      nextNote =
+        opts.note ||
+        'Đã có bản thảo (Draft). Quý khách vui lòng kiểm tra tiến độ.';
+    } else {
+      if (order.paymentStatus === 'fully_paid') {
+        nextStage = 'delivered_revision';
+        nextStatus = 'completed';
+        nextProgress = 100;
+        nextNote =
+          opts.note ||
+          'Đã hoàn thành và bàn giao bài hoàn chỉnh cho quý khách.';
+      } else {
+        nextStage = 'awaiting_final_payment';
+        nextStatus = 'active';
+        nextProgress = 95;
+        nextNote =
+          opts.note ||
+          'Đã hoàn thành bài. Quý khách vui lòng kiểm tra và hoàn tất thanh toán để tải toàn bộ tài liệu.';
+      }
+    }
+
+    await saveOrder(
+      {
+        orderCode: order.orderCode,
+        subject: order.subject,
+        topic: order.topic,
+        wordCount: order.wordCount,
+        citationStyle: order.citationStyle,
+        outlineAndInstructions: order.outlineAndInstructions,
+        rubricNotes: order.rubricNotes,
+        deadlineAt: order.deadlineAt,
+        stage: nextStage,
+        progressPercent: nextProgress,
+        publicStatusNote: nextNote,
+        internalNotes: order.internalNotes,
+        orderStatus: nextStatus,
+        totalAmount: order.totalAmount,
+        depositAmount: order.depositAmount,
+        paidAmount: order.paidAmount,
+        paymentStatus: order.paymentStatus,
+        clientId: order.clientId,
+        clientDisplayName: order.clientDisplayName,
+        assignedStaffUid: order.assignedStaffUid,
+        assignedStaffName: order.assignedStaffName,
+        staffPayoutAmount: order.staffPayoutAmount || 0,
+        staffPayoutStatus:
+          order.staffPayoutStatus === 'paid' ? 'paid' : 'unpaid',
         staffPayoutPaidAt: order.staffPayoutPaidAt || '',
         attachments: [...existingAttachments, newItem],
       },
@@ -1067,6 +1171,7 @@ export function AdminPortalView({
                 await handleAttachHumanizedDocx(ord, file);
                 onToast(`Đã đính kèm bản thảo Word (${file.name}) vào đơn #${ord.orderCode}!`);
               }}
+              onDeliverDocxToClient={handleDeliverDocxToClient}
               onSendDocxToHumanizer={(orderCode, file) => {
                 // Download file and switch directly to humanizer tab
                 const url = URL.createObjectURL(file);

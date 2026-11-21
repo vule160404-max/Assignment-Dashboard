@@ -265,20 +265,20 @@ export function WriterPaperCanvas({
             value={format.runningHeader}
             onChange={(e) => onUpdateFormat({ runningHeader: e.target.value })}
             placeholder="TIÊU ĐỀ ĐẦU TRANG (RUNNING HEAD)..."
-            className="bg-transparent border-none focus:outline-none text-zinc-500 uppercase tracking-wider w-3/4"
+            className="bg-transparent border-none focus:outline-none text-zinc-500 uppercase tracking-wider flex-1 mr-4 min-w-0"
             style={{ fontFamily: `"${format.fontFamily}", serif` }}
           />
-          {format.includePageNumbers && <span>Page 1</span>}
+          {format.includePageNumbers && <span className="shrink-0 font-mono">Page 1</span>}
         </div>
 
-        {/* Paper Main Title */}
+        {/* Paper Main Title (Multi-line Auto-wrapping for long thesis topics) */}
         <div className="mb-6 text-center">
-          <input
-            type="text"
+          <textarea
+            rows={Math.max(1, Math.ceil((session.topic || '').length / 42))}
             value={session.topic}
             onChange={(e) => onUpdateTopic(e.target.value)}
             placeholder="NHẬP TIÊU ĐỀ BÀI NGHIÊN CỨU TẠI ĐÂY..."
-            className="w-full text-center font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-zinc-200 focus:border-[#12489B] focus:outline-none pb-1"
+            className="w-full text-center font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-zinc-200 focus:border-[#12489B] focus:outline-none pb-1 resize-none overflow-hidden leading-snug whitespace-pre-wrap break-words"
             style={{
               fontFamily: `"${format.fontFamily}", serif`,
               fontSize: `${Math.round(

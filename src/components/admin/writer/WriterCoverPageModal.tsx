@@ -369,6 +369,7 @@ export function WriterCoverPageModal({
                     value={draftTopic}
                     onChange={setDraftTopic}
                     placeholder="Nhập tên đề tài luận văn / báo cáo thực tập..."
+                    multiline
                   />
                 </div>
 
@@ -542,6 +543,7 @@ function CoverFieldRow({
   value,
   onChange,
   placeholder,
+  multiline = false,
 }: {
   checked: boolean;
   onToggle: () => void;
@@ -549,6 +551,7 @@ function CoverFieldRow({
   value: string;
   onChange: (next: string) => void;
   placeholder: string;
+  multiline?: boolean;
 }) {
   return (
     <div
@@ -567,14 +570,25 @@ function CoverFieldRow({
         />
         <span className="text-[11px] font-semibold text-zinc-700">{label}</span>
       </label>
-      <input
-        type="text"
-        value={value}
-        disabled={!checked}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full px-2.5 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-md focus:bg-white focus:outline-none focus:border-[#12489B] disabled:opacity-60"
-      />
+      {multiline ? (
+        <textarea
+          rows={2}
+          value={value}
+          disabled={!checked}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full px-2.5 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-md focus:bg-white focus:outline-none focus:border-[#12489B] disabled:opacity-60 resize-y"
+        />
+      ) : (
+        <input
+          type="text"
+          value={value}
+          disabled={!checked}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full px-2.5 py-1.5 text-xs bg-zinc-50 border border-zinc-200 rounded-md focus:bg-white focus:outline-none focus:border-[#12489B] disabled:opacity-60"
+        />
+      )}
     </div>
   );
 }

@@ -8,6 +8,7 @@ import {
   FileText,
   Layers,
   Paperclip,
+  Send,
   Sparkles,
   Wand2,
 } from 'lucide-react';
@@ -58,6 +59,7 @@ import {
 import { WriterApiSettingsModal } from './writer/WriterApiSettingsModal';
 import { WriterBriefPanel } from './writer/WriterBriefPanel';
 import { WriterCoverPageModal } from './writer/WriterCoverPageModal';
+import { WriterDeliverModal } from './writer/WriterDeliverModal';
 import { WriterOutlinePanel } from './writer/WriterOutlinePanel';
 import { WriterPaperCanvas } from './writer/WriterPaperCanvas';
 import { WriterSkillLibraryModal } from './writer/WriterSkillLibraryModal';
@@ -71,8 +73,22 @@ interface AiWriterStudioViewProps {
   orders: OrderRecord[];
   initialOrderCode?: string;
   onAttachDocxToOrder?: (order: OrderRecord, file: File) => Promise<void>;
+  onDeliverDocxToClient?: (
+    order: OrderRecord,
+    file: File,
+    opts: { isDraftOnly: boolean; isLocked: boolean; note: string }
+  ) => Promise<void>;
   onSendDocxToHumanizer?: (orderCode: string, file: File) => void;
   onToast: (msg: string) => void;
+}
+
+function formatDefaultRunningHeader(topic?: string): string {
+  if (!topic) return '';
+  const text = topic.trim().toUpperCase();
+  if (text.length <= 60) return text;
+  const sliced = text.slice(0, 60);
+  const lastSpace = sliced.lastIndexOf(' ');
+  return lastSpace > 25 ? sliced.slice(0, lastSpace) : sliced;
 }
 
 function createDefaultSession(order?: OrderRecord | null): WriterSession {
@@ -103,7 +119,7 @@ function createDefaultSession(order?: OrderRecord | null): WriterSession {
     rubricNotes: order?.rubricNotes || '',
     format: {
       ...ACADEMIC_FORMAT_PRESETS[presetKey].config,
-      runningHeader: order?.topic ? order.topic.slice(0, 50).toUpperCase() : '',
+      runningHeader: formatDefaultRunningHeader(order?.topic),
     },
     outline: defaultOutline,
     contextFiles: [],
@@ -121,6 +137,7 @@ export function AiWriterStudioView({
   orders,
   initialOrderCode = '',
   onAttachDocxToOrder,
+  onDeliverDocxToClient,
   onSendDocxToHumanizer,
   onToast,
 }: AiWriterStudioViewProps) {
@@ -179,6 +196,7 @@ export function AiWriterStudioView({
   const [showApiModal, setShowApiModal] = useState(false);
   const [showSkillModal, setShowSkillModal] = useState(false);
   const [showCoverModal, setShowCoverModal] = useState(false);
+  const [showDeliverModal, setShowDeliverModal] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
   const [concurrencyLimit, setConcurrencyLimit] = useState(2);
   const [refiningSection, setRefiningSection] = useState(false);
@@ -563,7 +581,7 @@ export function AiWriterStudioView({
       rubricNotes: ord.rubricNotes || s.rubricNotes,
       format: {
         ...ACADEMIC_FORMAT_PRESETS[presetKey].config,
-        runningHeader: ord.topic.slice(0, 50).toUpperCase(),
+        runningHeader: formatDefaultRunningHeader(ord.topic),
       },
     }));
     onToast(
@@ -1505,6 +1523,23 @@ export function AiWriterStudioView({
             </button>
           )}
 
+          {onDeliverDocxToClient && (
+            <button
+              type="button"
+              disabled={totalDraftedWords === 0}
+              onClick={() => setShowDeliverModal(true)}
+              className="btn-press px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs disabled:opacity-40 inline-flex items-center gap-1.5"
+              title="Bàn giao và đẩy bài trực tiếp lên Portal cho khách hàng mà không cần qua tab Word Humanizer"
+            >
+              <Send className="w-3.5 h-3.5" />
+              <span>
+                {linkedOrder
+                  ? `Đẩy bài cho khách (#${linkedOrder.orderCode})`
+                  : 'Đẩy bài cho khách'}
+              </span>
+            </button>
+          )}
+
           <button
             type="button"
             disabled={exportingDocx}
@@ -1673,6 +1708,23 @@ export function AiWriterStudioView({
           }));
         }}
         onClose={() => setShowCoverModal(false)}
+        onToast={onToast}
+      />
+
+      <WriterDeliverModal
+        isOpen={showDeliverModal}
+        orders={orders}
+        session={activeSession}
+        totalDraftedWords={totalDraftedWords}
+        onDeliver={async (targetOrder, opts) => {
+          if (!onDeliverDocxToClient) return;
+          const file = await buildFormattedDocxFromSession(activeSession);
+          await onDeliverDocxToClient(targetOrder, file, opts);
+          onToast(
+            `Đã bàn giao và đẩy bài thành công lên portal cho khách #${targetOrder.orderCode}!`
+          );
+        }}
+        onClose={() => setShowDeliverModal(false)}
         onToast={onToast}
       />
     </div>
