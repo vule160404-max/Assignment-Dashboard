@@ -1,16 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  BookOpen,
-  Bot,
-  Cloud,
-  CloudOff,
-  Download,
   FileText,
   Layers,
-  Paperclip,
-  Send,
-  Sparkles,
-  Wand2,
 } from 'lucide-react';
 import {
   AiRefineAction,
@@ -1394,13 +1385,21 @@ export function AiWriterStudioView({
 
   return (
     <div className="surface-enter space-y-3">
-      {/* Multi-Paper Workspace Tabs & Parallel Runner */}
+      {/* Unified Multi-Paper Studio Header & Action Bar */}
       <WriterWorkspaceTabs
         sessions={sessions}
-        activeSessionId={activeSession.id}
+        activeSession={activeSession}
         orders={orders}
         concurrencyLimit={concurrencyLimit}
         exportingAll={exportingAllDocx}
+        cloudSyncState={cloudSyncState}
+        enabledSkillsCount={enabledSkillsCount}
+        activeModelName={activeProfile.model}
+        hasApiKey={Boolean(activeProfile.apiKey.trim())}
+        linkedOrder={linkedOrder}
+        totalDraftedWords={totalDraftedWords}
+        attachingToOrder={attachingToOrder}
+        exportingDocx={exportingDocx}
         onSelectSession={setActiveSessionId}
         onAddNewBlank={handleCreateNewSession}
         onImportMultipleOrders={handleImportMultipleOrders}
@@ -1409,148 +1408,22 @@ export function AiWriterStudioView({
         onPauseAll={handlePauseAllPapers}
         onConcurrencyChange={setConcurrencyLimit}
         onExportAllDocx={() => void handleExportAllDraftedDocx()}
+        onLoadFromOrder={handleLoadFromOrder}
+        onOpenSkills={() => setShowSkillModal(true)}
+        onOpenApiSettings={() => setShowApiModal(true)}
+        onAttachToLinkedOrder={
+          linkedOrder && onAttachDocxToOrder
+            ? () => void handleAttachToLinkedOrder()
+            : undefined
+        }
+        onPushToHumanizer={
+          onSendDocxToHumanizer ? () => void handlePushToHumanizer() : undefined
+        }
+        onOpenDeliverModal={
+          onDeliverDocxToClient ? () => setShowDeliverModal(true) : undefined
+        }
+        onExportDocx={() => void handleExportDocx()}
       />
-
-      {/* Current Paper Action Bar */}
-      <div className="bg-white border border-zinc-200/90 rounded-xl px-3.5 py-2.5 shadow-2xs flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="inline-flex items-center gap-1.5 bg-blue-50 text-[#12489B] px-2.5 py-1.5 rounded-lg text-xs font-bold">
-            <Wand2 className="w-3.5 h-3.5" />
-            <span className="truncate max-w-[200px]">
-              {activeSession.title || 'Bài nghiên cứu'}
-            </span>
-          </div>
-
-          <select
-            aria-label="Nạp đề bài từ mã đơn cho tab hiện tại"
-            value={activeSession.linkedOrderCode}
-            onChange={(e) => handleLoadFromOrder(e.target.value)}
-            className="px-2.5 py-1.5 text-xs font-mono font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-lg text-slate-800 focus:outline-none focus:border-[#12489B]"
-          >
-            <option value="">-- Nạp đề từ Đơn hàng cho tab này --</option>
-            {orders.map((o) => (
-              <option key={o.id} value={o.orderCode}>
-                #{o.orderCode} · {o.subject} ({o.wordCount}w)
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Right Controls: Cloud Sync Status, Skill Library, API Chatbot, Export .DOCX */}
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span
-            title={
-              cloudSyncState === 'synced'
-                ? 'API Keys, Skills và các bài viết đang được đồng bộ thời gian thực qua Firestore giữa các trình duyệt.'
-                : cloudSyncState === 'permission_denied'
-                  ? 'Chưa thể đồng bộ đám mây vì Firestore Rules mới chưa được cập nhật lên Firebase Console.'
-                  : 'Đang kết nối đồng bộ đám mây...'
-            }
-            className={`px-2 py-1.5 text-[11px] font-medium rounded-lg border inline-flex items-center gap-1.5 ${
-              cloudSyncState === 'synced'
-                ? 'border-emerald-200/80 bg-emerald-50/70 text-emerald-700'
-                : cloudSyncState === 'permission_denied'
-                  ? 'border-amber-200 bg-amber-50 text-amber-800'
-                  : 'border-zinc-200 bg-zinc-50 text-zinc-500'
-            }`}
-          >
-            {cloudSyncState === 'permission_denied' ? (
-              <CloudOff className="w-3.5 h-3.5" />
-            ) : (
-              <Cloud className="w-3.5 h-3.5" />
-            )}
-            <span className="hidden sm:inline">
-              {cloudSyncState === 'synced'
-                ? 'Đã đồng bộ'
-                : cloudSyncState === 'permission_denied'
-                  ? 'Chưa đồng bộ Cloud'
-                  : 'Đang đồng bộ...'}
-            </span>
-          </span>
-
-          <button
-            type="button"
-            onClick={() => setShowSkillModal(true)}
-            className="btn-press px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-blue-200/80 bg-blue-50/60 text-[#12489B] hover:bg-blue-100 inline-flex items-center gap-1.5"
-          >
-            <BookOpen className="w-3.5 h-3.5" />
-            <span>Skills ({enabledSkillsCount})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowApiModal(true)}
-            className={`btn-press px-2.5 py-1.5 text-xs font-semibold rounded-lg border inline-flex items-center gap-1.5 ${
-              activeProfile.apiKey.trim()
-                ? 'border-emerald-200 bg-emerald-50/80 text-emerald-800 hover:bg-emerald-100'
-                : 'border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100'
-            }`}
-          >
-            <Bot className="w-3.5 h-3.5" />
-            <span>
-              {activeProfile.apiKey.trim()
-                ? activeProfile.model
-                : 'Cài đặt API'}
-            </span>
-          </button>
-
-          {linkedOrder && onAttachDocxToOrder && (
-            <button
-              type="button"
-              disabled={attachingToOrder || totalDraftedWords === 0}
-              onClick={() => void handleAttachToLinkedOrder()}
-              className="btn-press px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 bg-white text-slate-800 hover:bg-zinc-50 disabled:opacity-40 inline-flex items-center gap-1.5"
-            >
-              <Paperclip className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>
-                {attachingToOrder
-                  ? 'Đang lưu...'
-                  : `Gắn vào #${linkedOrder.orderCode}`}
-              </span>
-            </button>
-          )}
-
-          {onSendDocxToHumanizer && (
-            <button
-              type="button"
-              disabled={totalDraftedWords === 0}
-              onClick={() => void handlePushToHumanizer()}
-              className="btn-press px-2.5 py-1.5 text-xs font-semibold rounded-lg border border-zinc-200 bg-white text-slate-800 hover:bg-zinc-50 disabled:opacity-40 inline-flex items-center gap-1.5"
-              title="Xuất file Word và chuyển thẳng sang tab Word Humanizer"
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-              <span>Humanize</span>
-            </button>
-          )}
-
-          {onDeliverDocxToClient && (
-            <button
-              type="button"
-              disabled={totalDraftedWords === 0}
-              onClick={() => setShowDeliverModal(true)}
-              className="btn-press px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs disabled:opacity-40 inline-flex items-center gap-1.5"
-              title="Bàn giao và đẩy bài trực tiếp lên Portal cho khách hàng mà không cần qua tab Word Humanizer"
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>
-                {linkedOrder
-                  ? `Đẩy bài cho khách (#${linkedOrder.orderCode})`
-                  : 'Đẩy bài cho khách'}
-              </span>
-            </button>
-          )}
-
-          <button
-            type="button"
-            disabled={exportingDocx}
-            onClick={() => void handleExportDocx()}
-            className="btn-press px-3 py-1.5 text-xs font-semibold rounded-lg bg-[#12489B] text-white hover:bg-[#0B2559] shadow-2xs inline-flex items-center gap-1.5"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>{exportingDocx ? 'Đang xuất...' : 'Tải .DOCX'}</span>
-          </button>
-        </div>
-      </div>
 
       {/* Streamlined Single-Row Word Ribbon */}
       <WriterWordRibbon
