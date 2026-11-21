@@ -47,6 +47,181 @@ export type LineSpacingOption = 1.0 | 1.15 | 1.5 | 2.0;
 
 export type MarginPresetInch = 1.0 | 0.5 | 1.25;
 
+export type CoverPageTemplateId =
+  | 'classic_vn_thesis'
+  | 'academic_international'
+  | 'internship_report'
+  | 'modern_executive';
+
+export interface CoverPageFieldsVisibility {
+  showUniversity: boolean;
+  showFaculty: boolean;
+  showDocumentType: boolean;
+  showTopic: boolean;
+  showSubject: boolean;
+  showMajor: boolean;
+  showStudentName: boolean;
+  showStudentId: boolean;
+  showClassName: boolean;
+  showSupervisor: boolean;
+  showInternshipUnit: boolean;
+  showWordCount: boolean;
+  showSubmissionDate: boolean;
+}
+
+export interface CoverPageConfig {
+  enabled: boolean;
+  templateId: CoverPageTemplateId;
+  universityName: string;
+  facultyName: string;
+  documentTypeLabel: string;
+  majorName: string;
+  studentName: string;
+  studentId: string;
+  className: string;
+  supervisorName: string;
+  internshipUnit: string;
+  locationAndDate: string;
+  showBorder: boolean;
+  fields: CoverPageFieldsVisibility;
+}
+
+export const DEFAULT_COVER_PAGE_CONFIG: CoverPageConfig = {
+  enabled: false,
+  templateId: 'classic_vn_thesis',
+  universityName: 'TRƯỜNG ĐẠI HỌC KINH TẾ QUỐC DÂN',
+  facultyName: 'KHOA QUẢN TRỊ KINH DOANH',
+  documentTypeLabel: 'BÀI LUẬN / KHÓA LUẬN TỐT NGHIỆP',
+  majorName: 'Quản trị Kinh doanh Quốc tế',
+  studentName: '',
+  studentId: '',
+  className: '',
+  supervisorName: '',
+  internshipUnit: '',
+  locationAndDate: `Hà Nội, ${new Date().getFullYear()}`,
+  showBorder: true,
+  fields: {
+    showUniversity: true,
+    showFaculty: true,
+    showDocumentType: true,
+    showTopic: true,
+    showSubject: true,
+    showMajor: true,
+    showStudentName: true,
+    showStudentId: true,
+    showClassName: false,
+    showSupervisor: true,
+    showInternshipUnit: false,
+    showWordCount: false,
+    showSubmissionDate: true,
+  },
+};
+
+export interface CoverPageTemplateMeta {
+  id: CoverPageTemplateId;
+  name: string;
+  subtitle: string;
+  badge: string;
+  recommendedDocType: string;
+  defaultBorder: boolean;
+  recommendedFields: Partial<CoverPageFieldsVisibility>;
+}
+
+export const COVER_PAGE_TEMPLATES: CoverPageTemplateMeta[] = [
+  {
+    id: 'classic_vn_thesis',
+    name: 'Chuẩn Luận văn Việt Nam',
+    subtitle: 'Khung viền đôi trang trọng, Tên Trường/Khoa phía trên, Tên đề tài ở giữa, khối GVHD & Sinh viên cân đối.',
+    badge: 'Phổ biến nhất',
+    recommendedDocType: 'KHÓA LUẬN / LUẬN VĂN TỐT NGHIỆP',
+    defaultBorder: true,
+    recommendedFields: {
+      showUniversity: true,
+      showFaculty: true,
+      showDocumentType: true,
+      showTopic: true,
+      showSubject: false,
+      showMajor: true,
+      showStudentName: true,
+      showStudentId: true,
+      showClassName: true,
+      showSupervisor: true,
+      showInternshipUnit: false,
+      showWordCount: false,
+      showSubmissionDate: true,
+    },
+  },
+  {
+    id: 'academic_international',
+    name: 'Quốc tế (Harvard / UK / APA)',
+    subtitle: 'Tối giản thanh lịch không khung, căn giữa chuẩn đại học Anh/Úc/Mỹ, hiển thị Module & Word Count.',
+    badge: 'English / APA',
+    recommendedDocType: 'ACADEMIC RESEARCH PAPER / DISSERTATION',
+    defaultBorder: false,
+    recommendedFields: {
+      showUniversity: true,
+      showFaculty: true,
+      showDocumentType: true,
+      showTopic: true,
+      showSubject: true,
+      showMajor: true,
+      showStudentName: true,
+      showStudentId: true,
+      showClassName: false,
+      showSupervisor: true,
+      showInternshipUnit: false,
+      showWordCount: true,
+      showSubmissionDate: true,
+    },
+  },
+  {
+    id: 'internship_report',
+    name: 'Báo cáo Thực tập / Đồ án',
+    subtitle: 'Bổ sung nổi bật Đơn vị thực tập / Doanh nghiệp, Giảng viên hướng dẫn, Chuyên ngành và Khóa/Lớp.',
+    badge: 'Thực tập',
+    recommendedDocType: 'BÁO CÁO THỰC TẬP TỐT NGHIỆP',
+    defaultBorder: true,
+    recommendedFields: {
+      showUniversity: true,
+      showFaculty: true,
+      showDocumentType: true,
+      showTopic: true,
+      showSubject: false,
+      showMajor: true,
+      showStudentName: true,
+      showStudentId: true,
+      showClassName: true,
+      showSupervisor: true,
+      showInternshipUnit: true,
+      showWordCount: false,
+      showSubmissionDate: true,
+    },
+  },
+  {
+    id: 'modern_executive',
+    name: 'Hiện đại (Navy & Gold Accent)',
+    subtitle: 'Thanh nhấn học thuật Navy & Vàng đồng tinh tế, phù hợp Assignment, Capstone & Case Study.',
+    badge: 'Hiện đại',
+    recommendedDocType: 'ASSIGNMENT / CAPSTONE PROJECT',
+    defaultBorder: false,
+    recommendedFields: {
+      showUniversity: true,
+      showFaculty: false,
+      showDocumentType: true,
+      showTopic: true,
+      showSubject: true,
+      showMajor: true,
+      showStudentName: true,
+      showStudentId: true,
+      showClassName: false,
+      showSupervisor: true,
+      showInternshipUnit: false,
+      showWordCount: true,
+      showSubmissionDate: true,
+    },
+  },
+];
+
 export interface DocumentFormatConfig {
   preset: AcademicPresetKey;
   fontFamily: FontFamilyOption;
@@ -59,6 +234,7 @@ export interface DocumentFormatConfig {
   runningHeader: string;
   includePageNumbers: boolean;
   includeTableOfContents?: boolean;
+  coverPage?: CoverPageConfig;
 }
 
 export type SectionHeadingLevel = 'h1' | 'h2' | 'h3';

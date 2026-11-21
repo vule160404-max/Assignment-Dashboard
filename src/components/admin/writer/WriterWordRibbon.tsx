@@ -5,6 +5,7 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  BookMarked,
   ChevronDown,
   Eraser,
   Indent,
@@ -47,6 +48,7 @@ interface WriterWordRibbonProps {
   onFindReplace: (findText: string, replaceText: string, replaceAll: boolean) => void;
   onZoomChange: (nextZoom: number) => void;
   onAiRefineSection: (action: AiRefineAction, customPrompt?: string) => void;
+  onOpenCoverPage: () => void;
 }
 
 const FONT_FAMILIES: FontFamilyOption[] = [
@@ -87,6 +89,7 @@ export function WriterWordRibbon({
   onFindReplace,
   onZoomChange,
   onAiRefineSection,
+  onOpenCoverPage,
 }: WriterWordRibbonProps) {
   const [showFindBar, setShowFindBar] = useState(false);
   const [showAiBar, setShowAiBar] = useState(false);
@@ -332,6 +335,20 @@ export function WriterWordRibbon({
           >
             <ListTree className="w-3.5 h-3.5" />
             <span className="hidden xl:inline">Mục lục</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenCoverPage}
+            title="Thiết kế & Bật/tắt Trang bìa (Cover Page) chuẩn luận văn / báo cáo thực tập"
+            className={`btn-press px-2 py-1 rounded-md text-xs font-semibold inline-flex items-center gap-1 ${
+              format.coverPage?.enabled
+                ? 'bg-amber-50 text-amber-800 border border-amber-300/80'
+                : 'text-zinc-600 hover:bg-zinc-100 border border-transparent'
+            }`}
+          >
+            <BookMarked className="w-3.5 h-3.5" />
+            <span className="hidden xl:inline">Trang bìa</span>
           </button>
         </div>
 

@@ -46,6 +46,7 @@ import {
   ACADEMIC_FORMAT_PRESETS,
   AcademicPresetKey,
   AiChatbotSettingsStore,
+  CoverPageConfig,
   DocumentFormatConfig,
   SessionContextFile,
   SkillDocument,
@@ -54,6 +55,7 @@ import {
 } from './writer/types';
 import { WriterApiSettingsModal } from './writer/WriterApiSettingsModal';
 import { WriterBriefPanel } from './writer/WriterBriefPanel';
+import { WriterCoverPageModal } from './writer/WriterCoverPageModal';
 import { WriterOutlinePanel } from './writer/WriterOutlinePanel';
 import { WriterPaperCanvas } from './writer/WriterPaperCanvas';
 import { WriterSkillLibraryModal } from './writer/WriterSkillLibraryModal';
@@ -174,6 +176,7 @@ export function AiWriterStudioView({
   const [focusPaperMode, setFocusPaperMode] = useState(false);
   const [showApiModal, setShowApiModal] = useState(false);
   const [showSkillModal, setShowSkillModal] = useState(false);
+  const [showCoverModal, setShowCoverModal] = useState(false);
   const [zoomPercent, setZoomPercent] = useState(100);
   const [concurrencyLimit, setConcurrencyLimit] = useState(2);
   const [refiningSection, setRefiningSection] = useState(false);
@@ -1499,6 +1502,7 @@ export function AiWriterStudioView({
         onAiRefineSection={(action, customPrompt) =>
           void handleAiRefineCurrentSection(action, customPrompt)
         }
+        onOpenCoverPage={() => setShowCoverModal(true)}
       />
 
       {/* Main 2-Zone Workspace Grid: Segmented Sidebar (4 cols) + Live A4 Paper (8 cols) */}
@@ -1593,6 +1597,7 @@ export function AiWriterStudioView({
           }
           onToggleFocusPaperMode={() => setFocusPaperMode((v) => !v)}
           onUpdateFormat={handleUpdateFormat}
+          onOpenCoverPage={() => setShowCoverModal(true)}
           onUpdateSection={handleUpdateOutlineSection}
         />
       </div>
@@ -1611,6 +1616,25 @@ export function AiWriterStudioView({
         skills={skills}
         onUpdateSkills={handleUpdateSkills}
         onClose={() => setShowSkillModal(false)}
+        onToast={onToast}
+      />
+
+      <WriterCoverPageModal
+        isOpen={showCoverModal}
+        session={activeSession}
+        linkedClientName={linkedOrder?.clientDisplayName}
+        onSaveCoverPage={(coverPage: CoverPageConfig, nextTopic?: string, nextSubject?: string) => {
+          mutateActiveSession((s) => ({
+            ...s,
+            topic: typeof nextTopic === 'string' ? nextTopic : s.topic,
+            subject: typeof nextSubject === 'string' ? nextSubject : s.subject,
+            format: {
+              ...s.format,
+              coverPage,
+            },
+          }));
+        }}
+        onClose={() => setShowCoverModal(false)}
         onToast={onToast}
       />
     </div>

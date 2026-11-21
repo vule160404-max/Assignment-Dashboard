@@ -1,7 +1,9 @@
 import { RefObject, useMemo } from 'react';
-import { ListTree, Maximize2, Minimize2 } from 'lucide-react';
+import { BookMarked, ListTree, Maximize2, Minimize2 } from 'lucide-react';
 import { countWords } from '../../../lib/wordHumanizer';
+import { CoverPageSheetPreview } from './CoverPageSheetPreview';
 import {
+  COVER_PAGE_TEMPLATES,
   DocumentFormatConfig,
   SectionHeadingLevel,
   WriterOutlineSection,
@@ -27,6 +29,7 @@ interface WriterPaperCanvasProps {
   onUpdateViewMode: (mode: 'sections' | 'full_paper') => void;
   onToggleFocusPaperMode: () => void;
   onUpdateFormat: (patch: Partial<DocumentFormatConfig>) => void;
+  onOpenCoverPage?: () => void;
   onUpdateSection: (
     sectionId: string,
     patch: Partial<WriterOutlineSection>,
@@ -45,10 +48,12 @@ export function WriterPaperCanvas({
   onUpdateViewMode,
   onToggleFocusPaperMode,
   onUpdateFormat,
+  onOpenCoverPage,
   onUpdateSection,
 }: WriterPaperCanvasProps) {
   const { format } = session;
   const pagePaddingPx = Math.round(format.marginInch * 64);
+  const hasCoverPage = Boolean(format.coverPage?.enabled);
   const includeToc = format.includeTableOfContents ?? true;
   const tocHeadingTitle =
     session.writingLanguage === 'Vietnamese' ? 'MỤC LỤC' : 'TABLE OF CONTENTS';
@@ -56,12 +61,13 @@ export function WriterPaperCanvas({
   const tocEntries = useMemo<TocPreviewEntry[]>(() => {
     if (!includeToc) return [];
     const entries: TocPreviewEntry[] = [];
-    // When TOC is enabled, main content starts on Page 2 after the TOC page break
+    // When Cover Page or TOC is enabled, main content starts after their page breaks
+    const bodyStartPage = 1 + (hasCoverPage ? 1 : 0) + (includeToc ? 1 : 0);
     let cumulativeWords = 0;
     const wordsPerPage = format.lineSpacing >= 2.0 ? 275 : 350;
 
     for (const sec of session.outline) {
-      const currentPage = 2 + Math.floor(cumulativeWords / wordsPerPage);
+      const currentPage = bodyStartPage + Math.floor(cumulativeWords / wordsPerPage);
       if (sec.title.trim()) {
         entries.push({
           key: `sec_${sec.id}`,
@@ -77,7 +83,7 @@ export function WriterPaperCanvas({
         for (let idx = 0; idx < lines.length; idx++) {
           const trimmed = lines[idx].trim();
           if (!trimmed) continue;
-          const pageAtLine = 2 + Math.floor(cumulativeWords / wordsPerPage);
+          const pageAtLine = bodyStartPage + Math.floor(cumulativeWords / wordsPerPage);
           if (trimmed.startsWith('### ')) {
             entries.push({
               key: `sub_${sec.id}_${idx}`,
@@ -110,7 +116,7 @@ export function WriterPaperCanvas({
       }
     }
     return entries;
-  }, [includeToc, session.outline, format.lineSpacing]);
+  }, [includeToc, hasCoverPage, session.outline, format.lineSpacing]);
 
   return (
     <div
@@ -189,6 +195,59 @@ export function WriterPaperCanvas({
           textAlign: format.textAlign,
         }}
       >
+        {/* Cover Page (Trang bìa) Preview when enabled */}
+        {format.coverPage?.enabled && (
+          <div className="mb-8 pb-6 border-b-2 border-dashed border-zinc-300">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3 select-none">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200/80 font-sans text-[10px] font-semibold">
+                <BookMarked className="w-3 h-3" />
+                Trang bìa (Cover Page) ·{' '}
+                {COVER_PAGE_TEMPLATES.find(
+                  (t) => t.id === format.coverPage?.templateId
+                )?.name || 'Chuẩn luận văn'}
+              </span>
+              <div className="inline-flex items-center gap-2 font-sans text-[10px]">
+                {onOpenCoverPage && (
+                  <button
+                    type="button"
+                    onClick={onOpenCoverPage}
+                    className="font-semibold text-[#12489B] hover:underline"
+                  >
+                    Đổi mẫu / Chỉnh trang bìa
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateFormat({
+                      coverPage: {
+                        ...format.coverPage!,
+                        enabled: false,
+                      },
+                    })
+                  }
+                  className="font-medium text-zinc-400 hover:text-slate-700"
+                >
+                  Ẩn trang bìa
+                </button>
+              </div>
+            </div>
+
+            <CoverPageSheetPreview
+              cover={format.coverPage}
+              topic={session.topic}
+              subject={session.subject}
+              targetWordCount={session.targetWordCount}
+              writingLanguage={session.writingLanguage}
+              fontFamily={format.fontFamily}
+            />
+
+            <div className="mt-4 text-center font-sans text-[10px] text-zinc-400 uppercase tracking-widest">
+              --- Ngắt trang (Page Break) ---
+            </div>
+          </div>
+        )}
+
         {/* Running Header & Page Number Simulation */}
         <div className="flex items-center justify-between text-[10pt] text-zinc-400 pb-4 mb-6 border-b border-zinc-100 select-none">
           <input

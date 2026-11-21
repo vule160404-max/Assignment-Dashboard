@@ -356,22 +356,257 @@ function buildTableOfContentsXml(opts: {
 }
 
 /**
+ * Builds an authentic Word Cover Page (Page 1) using either a bordered 1x1 thesis frame
+ * or clean centered layout, followed by a page break before TOC / content.
+ */
+function buildCoverPageXml(session: WriterSession): string {
+  const { format } = session;
+  const cover = format.coverPage;
+  if (!cover?.enabled) return '';
+
+  const f = cover.fields;
+  const isVi = session.writingLanguage === 'Vietnamese';
+  const tpl = cover.templateId;
+  const isModern = tpl === 'modern_executive';
+  const isDoubleBorder = tpl === 'classic_vn_thesis' || tpl === 'internship_report';
+  const escapedFont = escapeXml(format.fontFamily);
+  const baseHalfPt = Math.round(format.fontSizePt * 2);
+
+  const makeCoverPara = (opts: {
+    text: string;
+    sizeHalfPt: number;
+    bold?: boolean;
+    italic?: boolean;
+    color?: string;
+    jc?: 'center' | 'left';
+    beforeTwips?: number;
+    afterTwips?: number;
+    leftIndentTwips?: number;
+  }) => {
+    const colorXml = opts.color ? `<w:color w:val="${opts.color}"/>` : '';
+    const indentXml = opts.leftIndentTwips
+      ? `<w:ind w:left="${opts.leftIndentTwips}"/>`
+      : '';
+    return `<w:p>
+      <w:pPr>
+        <w:spacing w:before="${opts.beforeTwips ?? 0}" w:after="${opts.afterTwips ?? 100}" w:line="276" w:lineRule="auto"/>
+        ${indentXml}
+        <w:jc w:val="${opts.jc || 'center'}"/>
+      </w:pPr>
+      <w:r>
+        <w:rPr>
+          <w:rFonts w:ascii="${escapedFont}" w:hAnsi="${escapedFont}" w:cs="${escapedFont}"/>
+          ${opts.bold ? '<w:b/><w:bCs/>' : ''}
+          ${opts.italic ? '<w:i/><w:iCs/>' : ''}
+          ${colorXml}
+          <w:sz w:val="${opts.sizeHalfPt}"/>
+          <w:szCs w:val="${opts.sizeHalfPt}"/>
+        </w:rPr>
+        <w:t xml:space="preserve">${escapeXml(opts.text)}</w:t>
+      </w:r>
+    </w:p>`;
+  };
+
+  const innerParagraphs: string[] = [];
+
+  if (f.showUniversity && cover.universityName.trim()) {
+    innerParagraphs.push(
+      makeCoverPara({
+        text: cover.universityName.trim().toUpperCase(),
+        sizeHalfPt: baseHalfPt + 4,
+        bold: true,
+        color: isModern ? '0B2559' : undefined,
+        beforeTwips: 240,
+        afterTwips: 80,
+      })
+    );
+  }
+
+  if (f.showFaculty && cover.facultyName.trim()) {
+    innerParagraphs.push(
+      makeCoverPara({
+        text: cover.facultyName.trim().toUpperCase(),
+        sizeHalfPt: baseHalfPt + 2,
+        bold: true,
+        beforeTwips: 0,
+        afterTwips: 160,
+      })
+    );
+  }
+
+  if (f.showDocumentType && cover.documentTypeLabel.trim()) {
+    innerParagraphs.push(
+      makeCoverPara({
+        text: cover.documentTypeLabel.trim().toUpperCase(),
+        sizeHalfPt: baseHalfPt + 4,
+        bold: true,
+        color: isModern ? '12489B' : undefined,
+        beforeTwips: 960,
+        afterTwips: 200,
+      })
+    );
+  }
+
+  if (f.showTopic && session.topic.trim()) {
+    innerParagraphs.push(
+      makeCoverPara({
+        text: session.topic.trim(),
+        sizeHalfPt: baseHalfPt + 10,
+        bold: true,
+        beforeTwips: 200,
+        afterTwips: 960,
+      })
+    );
+  }
+
+  const infoRows: Array<{ label: string; value: string }> = [];
+  if (f.showSubject && session.subject.trim()) {
+    infoRows.push({
+      label: isVi ? 'Môn học / Học phần' : 'Module / Course',
+      value: session.subject.trim(),
+    });
+  }
+  if (f.showMajor && cover.majorName.trim()) {
+    infoRows.push({
+      label: isVi ? 'Chuyên ngành' : 'Major / Programme',
+      value: cover.majorName.trim(),
+    });
+  }
+  if (f.showInternshipUnit && cover.internshipUnit.trim()) {
+    infoRows.push({
+      label: isVi ? 'Đơn vị thực tập' : 'Internship Organization',
+      value: cover.internshipUnit.trim(),
+    });
+  }
+  if (f.showSupervisor && cover.supervisorName.trim()) {
+    infoRows.push({
+      label: isVi ? 'Giảng viên hướng dẫn' : 'Supervisor',
+      value: cover.supervisorName.trim(),
+    });
+  }
+  if (f.showStudentName && cover.studentName.trim()) {
+    infoRows.push({
+      label: isVi ? 'Sinh viên thực hiện' : 'Student Name',
+      value: cover.studentName.trim(),
+    });
+  }
+  if (f.showStudentId && cover.studentId.trim()) {
+    infoRows.push({
+      label: isVi ? 'Mã số sinh viên' : 'Student ID',
+      value: cover.studentId.trim(),
+    });
+  }
+  if (f.showClassName && cover.className.trim()) {
+    infoRows.push({
+      label: isVi ? 'Lớp / Khóa' : 'Class / Cohort',
+      value: cover.className.trim(),
+    });
+  }
+  if (f.showWordCount) {
+    infoRows.push({
+      label: isVi ? 'Độ dài dự kiến' : 'Word Count',
+      value: `${session.targetWordCount.toLocaleString()} ${isVi ? 'từ' : 'words'}`,
+    });
+  }
+
+  infoRows.forEach((row, idx) => {
+    innerParagraphs.push(
+      makeCoverPara({
+        text: `${row.label}: ${row.value}`,
+        sizeHalfPt: baseHalfPt,
+        bold: false,
+        jc: 'left',
+        leftIndentTwips: 960,
+        beforeTwips: idx === 0 ? 360 : 60,
+        afterTwips: idx === infoRows.length - 1 ? 720 : 80,
+      })
+    );
+  });
+
+  if (f.showSubmissionDate && cover.locationAndDate.trim()) {
+    innerParagraphs.push(
+      makeCoverPara({
+        text: cover.locationAndDate.trim(),
+        sizeHalfPt: baseHalfPt,
+        bold: true,
+        beforeTwips: 480,
+        afterTwips: 240,
+      })
+    );
+  }
+
+  if (innerParagraphs.length === 0) {
+    innerParagraphs.push(
+      makeCoverPara({
+        text: session.topic.trim() || 'COVER PAGE',
+        sizeHalfPt: baseHalfPt + 8,
+        bold: true,
+      })
+    );
+  }
+
+  const pageBreakParagraph = `<w:p><w:r><w:br w:type="page"/></w:r></w:p>`;
+
+  if (!cover.showBorder) {
+    return `${innerParagraphs.join('\n    ')}\n    ${pageBreakParagraph}`;
+  }
+
+  const borderVal = isDoubleBorder ? 'double' : 'single';
+  const borderColor = isModern ? '0B2559' : '1E293B';
+  const borderSz = isDoubleBorder ? '12' : '16';
+  const marginTwips = Math.round((format.marginInch || 1.0) * 1440);
+  const contentWidthTwips = Math.max(7200, 11906 - marginTwips * 2);
+
+  return `<w:tbl>
+      <w:tblPr>
+        <w:tblW w:w="${contentWidthTwips}" w:type="dxa"/>
+        <w:jc w:val="center"/>
+        <w:tblBorders>
+          <w:top w:val="${borderVal}" w:sz="${borderSz}" w:space="0" w:color="${borderColor}"/>
+          <w:left w:val="${borderVal}" w:sz="${borderSz}" w:space="0" w:color="${borderColor}"/>
+          <w:bottom w:val="${borderVal}" w:sz="${borderSz}" w:space="0" w:color="${borderColor}"/>
+          <w:right w:val="${borderVal}" w:sz="${borderSz}" w:space="0" w:color="${borderColor}"/>
+        </w:tblBorders>
+        <w:tblCellMar>
+          <w:top w:w="480" w:type="dxa"/>
+          <w:left w:w="480" w:type="dxa"/>
+          <w:bottom w:w="480" w:type="dxa"/>
+          <w:right w:w="480" w:type="dxa"/>
+        </w:tblCellMar>
+      </w:tblPr>
+      <w:tr>
+        <w:trPr><w:trHeight w:val="13200" w:hRule="atLeast"/></w:trPr>
+        <w:tc>
+          <w:tcPr>
+            <w:tcW w:w="${contentWidthTwips}" w:type="dxa"/>
+            <w:vAlign w:val="center"/>
+          </w:tcPr>
+          ${innerParagraphs.join('\n          ')}
+        </w:tc>
+      </w:tr>
+    </w:tbl>
+    ${pageBreakParagraph}`;
+}
+
+/**
  * Compile a WriterSession into paragraphs and build a real OpenXML .docx File
- * preserving all typography, spacing, margin, alignment, and Table of Contents settings.
+ * preserving all typography, spacing, margin, alignment, Cover Page, and Table of Contents settings.
  */
 export async function buildFormattedDocxFromSession(
   session: WriterSession,
   customFileName?: string
 ): Promise<File> {
   const { format } = session;
+  const hasCoverPage = Boolean(format.coverPage?.enabled);
   const includeToc = format.includeTableOfContents ?? true;
+  const coverPageXml = hasCoverPage ? buildCoverPageXml(session) : '';
   const titleParagraphsXml: string[] = [];
   const bodyParagraphsXml: string[] = [];
   const collectedHeadings: CollectedTocHeading[] = [];
 
   let cumulativeWords = 0;
   const wordsPerPage = format.lineSpacing >= 2.0 ? 275 : 350;
-  const startPageOffset = includeToc ? 2 : 1;
+  const startPageOffset = 1 + (hasCoverPage ? 1 : 0) + (includeToc ? 1 : 0);
 
   // Paper Title at top if topic is present
   if (session.topic.trim()) {
@@ -510,6 +745,7 @@ export async function buildFormattedDocxFromSession(
       : '';
 
   const allParagraphsXml = [
+    ...(coverPageXml ? [coverPageXml] : []),
     ...titleParagraphsXml,
     ...(tocXml ? [tocXml] : []),
     ...bodyParagraphsXml,
