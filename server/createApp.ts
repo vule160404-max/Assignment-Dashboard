@@ -1840,6 +1840,152 @@ export function createApiApp(): express.Express {
     res.json({ ok: true, fileId, isLocked: updated.isLocked });
   });
 
+  // Server-enforced secure .DOCX preview (extracts formatted A4 pages via JSZip; trims to first N pages when payment-locked)
+  app.get('/api/files/:fileId/docx-preview', async (req, res) => {
+    const { fileId } = req.params;
+    if (!/^[a-zA-Z0-9_]+$/.test(fileId)) {
+      res.status(400).json({ error: 'Invalid fileId' });
+      return;
+    }
+
+    const meta = await getFileMeta(fileId);
+    if (!meta) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
+    const isDocx =
+      meta.mimeType.includes('wordprocessingml') ||
+      meta.originalName.toLowerCase().endsWith('.docx');
+    if (!isDocx) {
+      res.status(400).json({ error: 'Tệp này không phải định dạng Word (.docx).' });
+      return;
+    }
+
+    const fileBuffer = await getFileBinary(meta);
+    if (!fileBuffer) {
+      res.status(404).json({ error: 'Không tìm thấy tệp trên bộ nhớ lưu trữ.' });
+      return;
+    }
+
+    const teamAuth = await verifyTeamBearerToken(req.headers.authorization);
+    const isTeamAuthorized = teamAuth.authorized;
+
+    try {
+      const zip = await JSZip.loadAsync(fileBuffer);
+      const docXmlFile = zip.file('word/document.xml');
+      if (!docXmlFile) {
+        res.status(422).json({ error: 'Tệp Word (.docx) không hợp lệ.' });
+        return;
+      }
+      const xml = await docXmlFile.async('string');
+
+      const decodeXml = (s: string) =>
+        s
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&quot;/g, '"')
+          .replace(/&apos;/g, "'")
+          .replace(/&#(\d+);/g, (_m, n) => String.fromCharCode(Number(n)));
+
+      type PreviewBlock = {
+        text: string;
+        kind: 'h1' | 'h2' | 'h3' | 'p';
+        align?: 'left' | 'center' | 'right' | 'justify';
+        bold?: boolean;
+      };
+
+      const pages: PreviewBlock[][] = [[]];
+      let currentPageWords = 0;
+      let totalWords = 0;
+
+      const pMatches = xml.match(/<w:p\b[\s\S]*?<\/w:p>/g) || [];
+      for (const pXml of pMatches) {
+        const hasPageBreakBefore =
+          /<w:pageBreakBefore\b/i.test(pXml) ||
+          /<w:br\b[^>]*w:type="page"/i.test(pXml);
+
+        if (hasPageBreakBefore && pages[pages.length - 1].length > 0) {
+          pages.push([]);
+          currentPageWords = 0;
+        }
+
+        const tMatches = pXml.match(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g) || [];
+        const rawText = tMatches
+          .map((t) => decodeXml(t.replace(/<[^>]+>/g, '')))
+          .join('')
+          .replace(/\s+/g, ' ')
+          .trim();
+
+        if (!rawText) continue;
+
+        const styleMatch = pXml.match(/<w:pStyle\b[^>]*w:val="([^"]+)"/i);
+        const styleVal = (styleMatch?.[1] || '').toLowerCase();
+        const alignMatch = pXml.match(/<w:jc\b[^>]*w:val="([^"]+)"/i);
+        const rawAlign = (alignMatch?.[1] || '').toLowerCase();
+        const align: PreviewBlock['align'] =
+          rawAlign === 'center'
+            ? 'center'
+            : rawAlign === 'right'
+            ? 'right'
+            : rawAlign === 'both' || rawAlign === 'justify'
+            ? 'justify'
+            : 'left';
+
+        const isBold = /<w:b(?:\s|\/|>)/i.test(pXml) && !/<w:b\s+w:val="0"/i.test(pXml);
+        let kind: PreviewBlock['kind'] = 'p';
+        if (styleVal.includes('heading1') || styleVal === 'title' || styleVal === '1') {
+          kind = 'h1';
+        } else if (styleVal.includes('heading2') || styleVal === '2') {
+          kind = 'h2';
+        } else if (styleVal.includes('heading3') || styleVal === '3') {
+          kind = 'h3';
+        }
+
+        const words = rawText.split(/\s+/).filter(Boolean).length;
+        totalWords += words;
+
+        // Auto-paginate around ~340 words per A4 page if no explicit page break
+        if (currentPageWords + words > 360 && pages[pages.length - 1].length > 0) {
+          pages.push([]);
+          currentPageWords = 0;
+        }
+
+        pages[pages.length - 1].push({
+          text: rawText,
+          kind,
+          align,
+          bold: isBold,
+        });
+        currentPageWords += words;
+      }
+
+      const nonEmptyPages = pages.filter((pg) => pg.length > 0);
+      const totalPages = Math.max(1, nonEmptyPages.length);
+      const isLockedForViewer = !isTeamAuthorized && meta.isLocked;
+      const previewLimit = isLockedForViewer
+        ? Math.max(1, meta.previewMaxPages || 2)
+        : totalPages;
+      const visiblePages = nonEmptyPages.slice(0, previewLimit);
+      const hiddenPagesCount = Math.max(0, totalPages - visiblePages.length);
+
+      res.setHeader('Cache-Control', 'private, no-store');
+      res.json({
+        fileName: meta.originalName,
+        totalPages,
+        totalWords,
+        isLocked: isLockedForViewer,
+        previewLimit,
+        hiddenPagesCount,
+        pages: visiblePages,
+      });
+    } catch (err) {
+      console.error('DOCX preview parse error:', err);
+      res.status(500).json({ error: 'Không thể tạo bản xem trước cho tệp Word này.' });
+    }
+  });
+
   // Serve file with server-enforced payment lock & Turnitin page-window trimming
   app.get('/api/files/:fileId', async (req, res) => {
     const { fileId } = req.params;

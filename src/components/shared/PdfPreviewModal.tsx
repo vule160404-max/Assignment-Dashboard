@@ -23,6 +23,23 @@ interface RenderedPage {
   blurred: boolean;
 }
 
+interface DocxPreviewBlock {
+  text: string;
+  kind: 'h1' | 'h2' | 'h3' | 'p';
+  align?: 'left' | 'center' | 'right' | 'justify';
+  bold?: boolean;
+}
+
+interface DocxPreviewPayload {
+  fileName: string;
+  totalPages: number;
+  totalWords: number;
+  isLocked: boolean;
+  previewLimit: number;
+  hiddenPagesCount: number;
+  pages: DocxPreviewBlock[][];
+}
+
 export function PdfPreviewModal({
   attachment,
   isFullyPaid,
@@ -30,6 +47,7 @@ export function PdfPreviewModal({
   onClose,
 }: PdfPreviewModalProps) {
   const [pages, setPages] = useState<RenderedPage[]>([]);
+  const [docxPreview, setDocxPreview] = useState<DocxPreviewPayload | null>(null);
   const [totalPages, setTotalPages] = useState<number>(0);
   const [originalTotalPages, setOriginalTotalPages] = useState<number>(0);
   const [imageObjectUrl, setImageObjectUrl] = useState<string>('');
@@ -47,6 +65,13 @@ export function PdfPreviewModal({
     attachment?.sourceType === 'upload' &&
     (attachment.mimeType.includes('pdf') ||
       attachment.name.toLowerCase().endsWith('.pdf'));
+
+  const isDocx =
+    Boolean(attachment) &&
+    attachment?.sourceType === 'upload' &&
+    attachment.fileIdOrUrl.startsWith('/api/files/') &&
+    (attachment.mimeType.includes('wordprocessingml') ||
+      attachment.name.toLowerCase().endsWith('.docx'));
 
   const isImage =
     Boolean(attachment) &&
@@ -72,6 +97,7 @@ export function PdfPreviewModal({
     let createdObjectUrl = '';
 
     setPages([]);
+    setDocxPreview(null);
     setTotalPages(0);
     setOriginalTotalPages(0);
     setImageObjectUrl('');
@@ -150,6 +176,38 @@ export function PdfPreviewModal({
       };
 
       loadPdf();
+    } else if (isDocx) {
+      const loadDocx = async () => {
+        setLoading(true);
+        try {
+          const headers = isAdmin ? await getAdminAuthHeaders() : undefined;
+          const cleanUrl = attachment.fileIdOrUrl.split('?')[0];
+          const resp = await fetch(`${cleanUrl}/docx-preview`, { headers });
+          if (!resp.ok) {
+            const errJson = await resp.json().catch(() => null);
+            throw new Error(
+              errJson?.error || 'Không thể tải bản xem trước tệp Word.'
+            );
+          }
+          const data = (await resp.json()) as DocxPreviewPayload;
+          if (!cancelled) {
+            setDocxPreview(data);
+          }
+        } catch (err) {
+          if (!cancelled) {
+            setError(
+              err instanceof Error
+                ? err.message
+                : 'Không thể hiển thị bản xem trước tệp Word.'
+            );
+          }
+        } finally {
+          if (!cancelled) {
+            setLoading(false);
+          }
+        }
+      };
+      loadDocx();
     } else if (isImage && !isPaymentLockedForViewer) {
       const loadImage = async () => {
         try {
@@ -176,7 +234,7 @@ export function PdfPreviewModal({
         URL.revokeObjectURL(createdObjectUrl);
       }
     };
-  }, [attachment, isAdmin, isImage, isPdf, isPaymentLockedForViewer, isTurnitinCappedForViewer]);
+  }, [attachment, isAdmin, isDocx, isImage, isPdf, isPaymentLockedForViewer, isTurnitinCappedForViewer]);
 
   if (!attachment) return null;
 
@@ -381,7 +439,124 @@ export function PdfPreviewModal({
             </div>
           )}
 
-          {!isPdf && !isImage && (
+          {isDocx && !loading && !error && docxPreview && (
+            <div className="space-y-5 max-w-3xl mx-auto">
+              {/* Compact Word Document Meta Strip */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 rounded-xl bg-white border border-zinc-200/90 text-xs text-zinc-600 shadow-2xs">
+                <div className="flex items-center gap-2 font-medium text-slate-800">
+                  <span className="px-2 py-0.5 rounded bg-blue-50 text-[#12489B] border border-blue-200/70 font-mono text-[11px] font-semibold">
+                    .DOCX
+                  </span>
+                  <span>
+                    Tổng cộng ~{docxPreview.totalWords.toLocaleString('vi-VN')} từ ·{' '}
+                    {docxPreview.totalPages} trang
+                  </span>
+                </div>
+                {docxPreview.isLocked ? (
+                  <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-800 bg-amber-50 border border-amber-200/80 px-2.5 py-0.5 rounded-full">
+                    <Lock className="w-3 h-3" />
+                    <span>
+                      Xem trước {docxPreview.pages.length}/{docxPreview.totalPages} trang đầu
+                    </span>
+                  </span>
+                ) : (
+                  <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full">
+                    Đã mở khóa toàn bộ
+                  </span>
+                )}
+              </div>
+
+              {/* Rendered A4 Word Sheets */}
+              {docxPreview.pages.map((blocks, pageIdx) => (
+                <div
+                  key={pageIdx}
+                  onContextMenu={(e) => {
+                    if (docxPreview.isLocked) e.preventDefault();
+                  }}
+                  className={`relative bg-white border border-zinc-200/95 rounded-xl shadow-sm px-7 sm:px-12 py-8 sm:py-10 space-y-3.5 ${
+                    docxPreview.isLocked ? 'select-none' : ''
+                  }`}
+                  style={{ fontFamily: '"Times New Roman", Georgia, serif' }}
+                >
+                  <div className="flex items-center justify-between pb-3 mb-2 border-b border-zinc-100 font-sans text-[11px] text-zinc-400">
+                    <span className="truncate max-w-[75%]">{attachment.name}</span>
+                    <span className="font-mono font-semibold text-zinc-500">
+                      Trang {pageIdx + 1} / {docxPreview.totalPages}
+                    </span>
+                  </div>
+
+                  {blocks.map((block, bIdx) => {
+                    const alignClass =
+                      block.align === 'center'
+                        ? 'text-center'
+                        : block.align === 'right'
+                        ? 'text-right'
+                        : block.align === 'justify'
+                        ? 'text-justify'
+                        : 'text-left';
+
+                    if (block.kind === 'h1') {
+                      return (
+                        <h3
+                          key={bIdx}
+                          className={`text-base sm:text-lg font-bold text-slate-900 leading-snug pt-1 ${alignClass}`}
+                        >
+                          {block.text}
+                        </h3>
+                      );
+                    }
+                    if (block.kind === 'h2') {
+                      return (
+                        <h4
+                          key={bIdx}
+                          className={`text-sm sm:text-base font-bold text-slate-900 leading-snug pt-0.5 ${alignClass}`}
+                        >
+                          {block.text}
+                        </h4>
+                      );
+                    }
+                    if (block.kind === 'h3') {
+                      return (
+                        <h5
+                          key={bIdx}
+                          className={`text-sm font-semibold text-slate-800 leading-snug ${alignClass}`}
+                        >
+                          {block.text}
+                        </h5>
+                      );
+                    }
+                    return (
+                      <p
+                        key={bIdx}
+                        className={`text-[13.5px] sm:text-[14.5px] text-slate-800 leading-7 ${
+                          block.bold ? 'font-semibold' : ''
+                        } ${alignClass}`}
+                      >
+                        {block.text}
+                      </p>
+                    );
+                  })}
+                </div>
+              ))}
+
+              {/* Payment Lock Banner for Remaining Hidden Pages */}
+              {docxPreview.hiddenPagesCount > 0 && (
+                <div className="bg-white border border-zinc-200 rounded-xl p-6 text-center space-y-2.5 shadow-xs">
+                  <div className="w-10 h-10 rounded-full bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto">
+                    <Lock className="w-5 h-5 text-[#12489B]" />
+                  </div>
+                  <p className="text-sm font-bold text-slate-900">
+                    Còn {docxPreview.hiddenPagesCount} trang tiếp theo đang được bảo vệ
+                  </p>
+                  <p className="text-xs text-zinc-600 leading-relaxed max-w-md mx-auto">
+                    Hoàn tất thanh toán phần còn lại để tự động mở khóa toàn bộ bài làm và tải tệp Word (.DOCX) gốc.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!isPdf && !isDocx && !isImage && (
             <div className="bg-white border border-zinc-200 rounded-xl p-8 max-w-lg mx-auto text-center space-y-3">
               <Eye className="w-6 h-6 text-zinc-400 mx-auto" />
               <h4 className="text-sm font-semibold text-slate-900">
@@ -389,7 +564,7 @@ export function PdfPreviewModal({
               </h4>
               {isPaymentLockedForViewer ? (
                 <p className="text-xs text-zinc-600 leading-relaxed">
-                  Tệp định dạng tài liệu này đang ở chế độ khóa tải xuống cho tới khi hoàn tất thanh toán. (Mẹo: Tải lên file PDF để khách xem trước 1–2 trang đầu trực tiếp trên web).
+                  Tệp tài liệu này đang ở chế độ khóa tải xuống cho tới khi hoàn tất thanh toán.
                 </p>
               ) : (
                 <p className="text-xs text-zinc-600">
