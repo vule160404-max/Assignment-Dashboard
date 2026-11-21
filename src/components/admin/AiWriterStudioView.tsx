@@ -694,18 +694,14 @@ export function AiWriterStudioView({
       return sess;
     }
 
-    const researchLabel =
-      effectiveWriter.researchProfile.model === 'perplexity-search'
-        ? 'Perplexity /search'
-        : `Perplexity (${effectiveWriter.researchProfile.model})`;
-    const stepMsg = `Bước 1/2: ${researchLabel} đang tra cứu nguồn thực tế & trích dẫn...`;
+    const stepMsg = `Bước 1/2: Đang tra cứu nguồn web & trích dẫn chuẩn ${sess.citationStyle}...`;
     setCurrentStepLabel(stepMsg);
     onToast(stepMsg);
     const t0 = Date.now();
     const logId = pushActivityLog(
       'running',
-      'Bước 1/2 · Tra cứu nguồn web thực tế',
-      `Đang tìm nguồn chuẩn ${sess.citationStyle} cho đề tài "${(sess.topic || sess.title).slice(0, 65)}"`,
+      'Tra cứu nguồn web thực tế',
+      undefined,
       effectiveWriter.researchProfile.model
     );
 
@@ -716,10 +712,14 @@ export function AiWriterStudioView({
         signal
       );
       const elapsed = (Date.now() - t0) / 1000;
+      const urlCount = (dossier.match(/https?:\/\/[^\s)]+/g) || []).length;
       updateActivityLog(logId, {
         status: 'success',
-        title: 'Bước 1/2 · Đã thu thập nguồn & trích dẫn',
-        detail: `Lưu cache nguồn thực tế (${dossier.length.toLocaleString('vi-VN')} ký tự) để dùng chung cho toàn bài.`,
+        title:
+          urlCount > 0
+            ? `Đã tìm thấy ${urlCount} nguồn web`
+            : 'Đã thu thập nguồn thực tế',
+        detail: `Lưu bộ đệm nguồn chuẩn ${sess.citationStyle} cho toàn bài.`,
         durationSec: elapsed,
       });
       mutateSessionById(targetSessionId, (s) => ({
@@ -2078,12 +2078,26 @@ export function AiWriterStudioView({
           }
           onStopAi={handleStopActiveAi}
           currentStepLabel={currentStepLabel}
-          activeModelDisplayName={activeModelDisplayName}
-          hasResearchedSources={Boolean(activeSession.researchedSources?.trim())}
+          researchedSources={activeSession.researchedSources}
           completedSectionsCount={
             activeSession.outline.filter((s) => countWords(s.content) > 0).length
           }
           totalSectionsCount={activeSession.outline.length}
+          errorSectionsCount={
+            activeSession.outline.filter((s) => s.status === 'error').length
+          }
+          onJumpToFirstError={() => {
+            const firstErr = activeSession.outline.find(
+              (s) => s.status === 'error'
+            );
+            if (firstErr) {
+              setLeftTab('outline');
+              mutateActiveSession((s) => ({
+                ...s,
+                activeSectionId: firstErr.id,
+              }));
+            }
+          }}
           totalDraftedWords={totalDraftedWords}
           targetWordCount={activeSession.targetWordCount}
           logs={activityLogs}
