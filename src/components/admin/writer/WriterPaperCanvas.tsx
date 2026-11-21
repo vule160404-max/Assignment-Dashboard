@@ -274,23 +274,6 @@ export function WriterPaperCanvas({
           {format.includePageNumbers && <span className="shrink-0 font-mono">Page 1</span>}
         </div>
 
-        {/* Paper Main Title (Multi-line Auto-wrapping for long thesis topics) */}
-        <div className="mb-6 text-center">
-          <textarea
-            rows={Math.max(1, Math.ceil((session.topic || '').length / 42))}
-            value={session.topic}
-            onChange={(e) => onUpdateTopic(e.target.value)}
-            placeholder="NHẬP TIÊU ĐỀ BÀI NGHIÊN CỨU TẠI ĐÂY..."
-            className="w-full text-center font-bold text-slate-900 bg-transparent border-b border-transparent hover:border-zinc-200 focus:border-[#12489B] focus:outline-none pb-1 resize-none overflow-hidden leading-snug whitespace-pre-wrap break-words"
-            style={{
-              fontFamily: `"${format.fontFamily}", serif`,
-              fontSize: `${Math.round(
-                ((format.fontSizePt + 3) * zoomPercent) / 100
-              )}pt`,
-            }}
-          />
-        </div>
-
         {/* Automatic Academic Table of Contents (Mục lục chuẩn luận văn) */}
         {includeToc && tocEntries.length > 0 && (
           <div className="mb-8 pb-6 border-b-2 border-dashed border-zinc-200 select-none">

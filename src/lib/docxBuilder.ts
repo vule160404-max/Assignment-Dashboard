@@ -752,8 +752,8 @@ export async function buildFormattedDocxFromSession(
 
   const allParagraphsXml = [
     ...(coverPageXml ? [coverPageXml] : []),
-    ...titleParagraphsXml,
     ...(tocXml ? [tocXml] : []),
+    ...(!coverPageXml && !tocXml ? titleParagraphsXml : []),
     ...bodyParagraphsXml,
   ];
 
