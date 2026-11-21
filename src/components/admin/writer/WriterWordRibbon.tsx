@@ -333,11 +333,11 @@ export function WriterWordRibbon({
             className={`btn-press px-2 py-1 rounded-md text-xs font-semibold inline-flex items-center gap-1 ${
               (format.includeTableOfContents ?? true)
                 ? 'bg-blue-50 text-[#12489B] border border-blue-200/80'
-                : 'text-zinc-600 hover:bg-zinc-100 border border-transparent'
+                : 'bg-zinc-50 text-zinc-600 hover:bg-zinc-100 border border-zinc-200/80'
             }`}
           >
-            <ListTree className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">Mục lục</span>
+            <ListTree className="w-3.5 h-3.5 shrink-0" />
+            <span>Mục lục</span>
           </button>
 
           <button
@@ -346,12 +346,12 @@ export function WriterWordRibbon({
             title="Thiết kế & Bật/tắt Trang bìa (Cover Page) chuẩn luận văn / báo cáo thực tập"
             className={`btn-press px-2 py-1 rounded-md text-xs font-semibold inline-flex items-center gap-1 ${
               format.coverPage?.enabled
-                ? 'bg-amber-50 text-amber-800 border border-amber-300/80'
-                : 'text-zinc-600 hover:bg-zinc-100 border border-transparent'
+                ? 'bg-amber-50 text-amber-800 border border-amber-300/90'
+                : 'bg-zinc-50 text-slate-700 hover:bg-zinc-100 border border-zinc-200/80'
             }`}
           >
-            <BookMarked className="w-3.5 h-3.5" />
-            <span className="hidden xl:inline">Trang bìa</span>
+            <BookMarked className="w-3.5 h-3.5 shrink-0" />
+            <span>Trang bìa</span>
           </button>
         </div>
 
