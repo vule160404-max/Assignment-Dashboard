@@ -14,6 +14,7 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import Perplexity from '@perplexity-ai/perplexity_ai';
 import { analyzeDocumentIntegrity } from './integrityAnalyzer';
 
 const UPLOADS_DIR = process.env.VERCEL
@@ -1752,7 +1753,191 @@ export function createApiApp(): express.Express {
   app.get('/api/ai/perplexity/models', requireTeamAuth, handlePerplexityModelsCatalog);
   app.post('/api/ai/perplexity/models', requireTeamAuth, handlePerplexityModelsCatalog);
 
-  // Multi-Provider AI Chatbot Proxy (Perplexity Orchestrator, Gemini, OpenAI, Anthropic Claude, Custom OpenAI-Compatible)
+  const PERPLEXITY_AGENT_PRESETS = new Set([
+    'fast-search',
+    'pro-search',
+    'deep-research',
+    'advanced-deep-research',
+    'low',
+    'medium',
+    'high',
+  ]);
+
+  async function invokePerplexityAgentApi(params: {
+    apiKey: string;
+    modelOrPreset: string;
+    input: string;
+    instructions?: string;
+    temperature?: number;
+    previousResponseId?: string;
+    enableWebSearch?: boolean;
+    tools?: Array<{ type: 'web_search' | 'fetch_url' }>;
+    responseFormat?: unknown;
+  }) {
+    const client = new Perplexity({
+      apiKey: params.apiKey,
+      maxRetries: 2,
+    });
+
+    const trimmedTarget = (params.modelOrPreset || 'pro-search')
+      .trim()
+      .replace(/^preset:/i, '');
+    const isPreset = PERPLEXITY_AGENT_PRESETS.has(trimmedTarget.toLowerCase());
+
+    const reqPayload: Record<string, unknown> = {
+      input: params.input,
+    };
+
+    if (params.instructions?.trim()) {
+      reqPayload.instructions = params.instructions.trim();
+    }
+    if (typeof params.temperature === 'number') {
+      reqPayload.temperature = params.temperature;
+    }
+    if (params.previousResponseId?.trim()) {
+      reqPayload.previous_response_id = params.previousResponseId.trim();
+    }
+    if (params.responseFormat && typeof params.responseFormat === 'object') {
+      reqPayload.response_format = params.responseFormat;
+    }
+
+    if (isPreset) {
+      reqPayload.preset = trimmedTarget.toLowerCase();
+      if (Array.isArray(params.tools) && params.tools.length > 0) {
+        reqPayload.tools = params.tools;
+      }
+    } else {
+      reqPayload.model = trimmedTarget;
+      if (Array.isArray(params.tools) && params.tools.length > 0) {
+        reqPayload.tools = params.tools;
+      } else if (params.enableWebSearch !== false) {
+        reqPayload.tools = [{ type: 'web_search' as const }];
+      }
+    }
+
+    const response = await client.responses.create({
+      ...reqPayload,
+      stream: false,
+    } as Perplexity.ResponseCreateParamsNonStreaming);
+
+    const outputItems = Array.isArray(response.output) ? response.output : [];
+    const searchResults: unknown[] = [];
+    const annotations: unknown[] = [];
+
+    for (const item of outputItems) {
+      if (!item || typeof item !== 'object') continue;
+      const typed = item as {
+        type?: string;
+        results?: unknown[];
+        content?: Array<{ type?: string; text?: string; annotations?: unknown[] }>;
+      };
+      if (typed.type === 'search_results' && Array.isArray(typed.results)) {
+        searchResults.push(...typed.results);
+      }
+      if (Array.isArray(typed.content)) {
+        for (const part of typed.content) {
+          if (Array.isArray(part?.annotations)) {
+            annotations.push(...part.annotations);
+          }
+        }
+      }
+    }
+
+    const outputText = (response.output_text || '')
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .trim();
+
+    return {
+      id: response.id,
+      model: response.model || trimmedTarget,
+      output_text: outputText,
+      output: outputItems,
+      search_results: searchResults,
+      annotations,
+      usage: response.usage,
+    };
+  }
+
+  // Dedicated Perplexity Agent API endpoint (POST /v1/agent via official @perplexity-ai/perplexity_ai SDK)
+  app.post('/api/ai/perplexity/agent', requireTeamAuth, async (req, res) => {
+    const rawApiKey =
+      typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+    if (rawApiKey) {
+      const current = await getStoredAiProviderSecrets();
+      await saveStoredAiProviderSecrets({ ...current, perplexity: rawApiKey });
+    }
+    const apiKey = await resolveServerAiProviderKey('perplexity', rawApiKey);
+    if (!apiKey) {
+      res.status(400).json({
+        ok: false,
+        error:
+          'Chưa cấu hình PERPLEXITY_API_KEY trên Server Vault. Hãy nhập Perplexity API Key trong Cài đặt AI.',
+      });
+      return;
+    }
+
+    const input =
+      typeof req.body?.input === 'string'
+        ? req.body.input.trim()
+        : typeof req.body?.userPrompt === 'string'
+        ? req.body.userPrompt.trim()
+        : '';
+    if (!input) {
+      res.status(400).json({ ok: false, error: 'Trường input không được để trống.' });
+      return;
+    }
+
+    const modelOrPreset =
+      typeof req.body?.preset === 'string' && req.body.preset.trim()
+        ? req.body.preset.trim()
+        : typeof req.body?.model === 'string' && req.body.model.trim()
+        ? req.body.model.trim()
+        : 'pro-search';
+
+    try {
+      const result = await invokePerplexityAgentApi({
+        apiKey,
+        modelOrPreset,
+        input,
+        instructions:
+          typeof req.body?.instructions === 'string'
+            ? req.body.instructions
+            : typeof req.body?.systemPrompt === 'string'
+            ? req.body.systemPrompt
+            : undefined,
+        temperature:
+          typeof req.body?.temperature === 'number'
+            ? req.body.temperature
+            : undefined,
+        previousResponseId:
+          typeof req.body?.previous_response_id === 'string'
+            ? req.body.previous_response_id
+            : undefined,
+        enableWebSearch: req.body?.enableWebSearch !== false,
+        tools: Array.isArray(req.body?.tools) ? req.body.tools : undefined,
+        responseFormat: req.body?.response_format,
+      });
+
+      res.json({
+        ok: true,
+        ...result,
+      });
+    } catch (err) {
+      const status =
+        typeof (err as { status?: number })?.status === 'number'
+          ? (err as { status: number }).status
+          : 502;
+      res.status(status).json({
+        ok: false,
+        error:
+          err instanceof Error
+            ? `Perplexity Agent API lỗi: ${err.message}`
+            : 'Không thể gọi Perplexity Agent API.',
+      });
+    }
+  });
+
+  // Multi-Provider AI Chatbot Proxy (Perplexity Agent API / Orchestrator, Gemini, OpenAI, Anthropic Claude, Custom OpenAI-Compatible)
   app.post('/api/ai/generate', requireTeamAuth, async (req, res) => {
     const provider =
       typeof req.body?.provider === 'string' ? req.body.provider.trim() : 'perplexity';
@@ -1770,7 +1955,7 @@ export function createApiApp(): express.Express {
       typeof req.body?.model === 'string' && req.body.model.trim()
         ? req.body.model.trim()
         : provider === 'perplexity'
-        ? 'perplexity/kimi-k3'
+        ? 'pro-search'
         : provider === 'openai'
         ? 'gpt-4o'
         : provider === 'anthropic'
@@ -1879,6 +2064,93 @@ export function createApiApp(): express.Express {
         }
         return { resp, retryAfterHeader };
       };
+
+      const isPerplexityAgentSchema =
+        provider === 'perplexity' &&
+        (schema === 'agent' ||
+          PERPLEXITY_AGENT_PRESETS.has(model) ||
+          /\/v1\/agent\/?$/i.test(baseUrl) ||
+          /\/v1\/responses\/?$/i.test(baseUrl) ||
+          (!/\/orchestrator/i.test(baseUrl) && !/^sonar/i.test(model)));
+
+      if (isPerplexityAgentSchema) {
+        const previousResponseId =
+          typeof req.body?.previous_response_id === 'string' &&
+          req.body.previous_response_id.trim()
+            ? req.body.previous_response_id.trim()
+            : undefined;
+        const tools = Array.isArray(req.body?.tools)
+          ? req.body.tools
+          : undefined;
+        const responseFormat =
+          req.body?.response_format && typeof req.body.response_format === 'object'
+            ? (req.body.response_format as Record<string, unknown>)
+            : undefined;
+
+        try {
+          const agentResult = await invokePerplexityAgentApi({
+            apiKey,
+            modelOrPreset: model,
+            input: userPrompt,
+            instructions: systemPrompt,
+            temperature,
+            previousResponseId,
+            tools,
+            responseFormat,
+          });
+
+          res.json({
+            text: agentResult.output_text,
+            output_text: agentResult.output_text,
+            id: agentResult.id,
+            model: agentResult.model,
+            provider: 'perplexity',
+            schema: 'agent',
+            search_results: agentResult.search_results,
+            annotations: agentResult.annotations,
+            usage: agentResult.usage,
+          });
+          return;
+        } catch (err) {
+          const errObj = err as {
+            status?: number;
+            message?: string;
+            headers?: { get?: (name: string) => string | null };
+          };
+          const status =
+            typeof errObj?.status === 'number' &&
+            errObj.status >= 400 &&
+            errObj.status < 600
+              ? errObj.status
+              : 500;
+          const retryAfter = errObj?.headers?.get?.('retry-after') || undefined;
+          if (retryAfter) {
+            res.setHeader('Retry-After', retryAfter);
+          }
+          if (status === 401) {
+            res.status(401).json({
+              error:
+                'Perplexity Agent API từ chối xác thực (HTTP 401). Vui lòng kiểm tra lại Perplexity API Key trong Cài đặt AI.',
+            });
+            return;
+          }
+          if (status === 429) {
+            res.status(429).json({
+              error: `Perplexity Agent API tạm thời quá tải hoặc chạm giới hạn tốc độ (HTTP 429${
+                retryAfter ? `, Retry-After: ${retryAfter}s` : ''
+              }).`,
+              retryAfter,
+            });
+            return;
+          }
+          res.status(status).json({
+            error:
+              errObj?.message ||
+              `Perplexity Agent API lỗi HTTP ${status}. Vui lòng kiểm tra Preset hoặc Model.`,
+          });
+          return;
+        }
+      }
 
       const isPerplexityMessagesSchema =
         provider === 'perplexity' &&
