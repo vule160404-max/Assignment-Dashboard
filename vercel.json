@@ -10,6 +10,18 @@
   },
   "rewrites": [
     {
+      "source": "/api/files/(.*)",
+      "destination": "/api/server"
+    },
+    {
+      "source": "/api/health",
+      "destination": "/api/server"
+    },
+    {
+      "source": "/api/hix/(.*)",
+      "destination": "/api/server"
+    },
+    {
       "source": "/((?!api/|assets/).*)",
       "destination": "/index.html"
     }
