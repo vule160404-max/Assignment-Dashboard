@@ -54,7 +54,7 @@ export function WriterSkillLibraryModal({
       for (const file of Array.from(fileList)) {
         const text = await extractTextFromSkillFile(file);
         if (!text.trim()) continue;
-        const baseName = file.name.replace(/\.(md|txt|docx|json)$/i, '');
+        const baseName = file.name.replace(/\.(md|txt|docx|pdf|json)$/i, '');
         added.push({
           id: `skill_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
           name: baseName,
@@ -152,7 +152,7 @@ export function WriterSkillLibraryModal({
                 {skills.length} đang bật)
               </h3>
               <p className="text-xs text-zinc-500">
-                Tải lên file Skill (`.md`, `.txt`, `.docx`, `.json`) để huấn luyện AI Chatbot cách phân tích dàn ý, trích dẫn và hành văn đúng gu của bạn.
+                Tải lên file Skill (`.md`, `.txt`, `.docx`, `.pdf`, `.json`) để huấn luyện AI Chatbot cách phân tích dàn ý, trích dẫn và hành văn đúng gu của bạn.
               </p>
             </div>
           </div>
@@ -172,7 +172,7 @@ export function WriterSkillLibraryModal({
               ref={fileInputRef}
               type="file"
               multiple
-              accept=".md,.txt,.docx,.json"
+              accept=".md,.txt,.docx,.pdf,.json"
               onChange={(e) => void handleUploadSkillFiles(e.target.files)}
               className="hidden"
             />

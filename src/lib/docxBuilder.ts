@@ -1,4 +1,5 @@
 import JSZip from 'jszip';
+import * as pdfjsLib from 'pdfjs-dist';
 import {
   DocumentFormatConfig,
   SectionHeadingLevel,
@@ -15,6 +16,52 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
+async function extractTextFromPdfFile(file: File): Promise<string> {
+  if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+      'pdfjs-dist/build/pdf.worker.min.mjs',
+      import.meta.url
+    ).toString();
+  }
+  const buffer = await file.arrayBuffer();
+  const loadingTask = pdfjsLib.getDocument({ data: buffer });
+  const pdf = await loadingTask.promise;
+  try {
+    const pages: string[] = [];
+    for (let p = 1; p <= pdf.numPages; p++) {
+      const page = await pdf.getPage(p);
+      const textContent = await page.getTextContent();
+      let currentLine = '';
+      const lines: string[] = [];
+      for (const item of textContent.items) {
+        if (!('str' in item)) continue;
+        const text = item.str;
+        currentLine += text;
+        if ('hasEOL' in item && item.hasEOL) {
+          if (currentLine.trim()) lines.push(currentLine.trim());
+          currentLine = '';
+        } else if (text && !text.endsWith(' ')) {
+          currentLine += ' ';
+        }
+      }
+      if (currentLine.trim()) lines.push(currentLine.trim());
+      const pageText = lines.join('\n').trim();
+      if (pageText) {
+        pages.push(pageText);
+      }
+    }
+    const result = pages.join('\n\n').trim();
+    if (!result) {
+      throw new Error(
+        `Không đọc được chữ từ file PDF "${file.name}" (có thể file chỉ chứa ảnh scan).`
+      );
+    }
+    return result;
+  } finally {
+    await loadingTask.destroy();
+  }
+}
+
 export async function extractTextFromSkillFile(file: File): Promise<string> {
   const lower = file.name.toLowerCase();
   if (lower.endsWith('.docx')) {
@@ -23,6 +70,9 @@ export async function extractTextFromSkillFile(file: File): Promise<string> {
       .filter((p) => !p.isEmpty)
       .map((p) => (p.isHeading ? `## ${p.text}` : p.text))
       .join('\n\n');
+  }
+  if (lower.endsWith('.pdf')) {
+    return await extractTextFromPdfFile(file);
   }
   return await file.text();
 }

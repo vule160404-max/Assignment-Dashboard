@@ -193,13 +193,13 @@ export function WriterBriefPanel({
       <div className="pt-2.5 border-t border-zinc-100">
         <div className="flex items-center justify-between mb-2">
           <span className="text-[11px] font-semibold text-zinc-600">
-            Tài liệu đính kèm riêng cho bài (.md, .txt, .docx):
+            Tài liệu đính kèm riêng cho bài (.md, .txt, .docx, .pdf):
           </span>
           <input
             ref={contextFileInputRef}
             type="file"
             multiple
-            accept=".md,.txt,.docx,.json"
+            accept=".md,.txt,.docx,.pdf,.json"
             onChange={(e) => {
               void onUploadContextFiles(e.target.files);
               if (contextFileInputRef.current) {
