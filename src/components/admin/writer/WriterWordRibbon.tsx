@@ -106,7 +106,7 @@ export function WriterWordRibbon({
   };
 
   return (
-    <div className="sticky top-15 z-30 bg-white/95 backdrop-blur-md border border-zinc-200/95 rounded-xl shadow-sm ring-1 ring-slate-900/5 overflow-hidden">
+    <div className="bg-white/95 backdrop-blur-md border border-zinc-200/95 rounded-xl shadow-sm ring-1 ring-slate-900/5 overflow-hidden">
       {/* Compact Single-Row Word Ribbon */}
       <div className="px-3 py-1.5 flex flex-wrap items-center gap-1.5">
         {/* Undo / Redo */}

@@ -213,6 +213,26 @@ export function AiWriterStudioView({
   });
   const [activityLogs, setActivityLogs] = useState<WriterActivityLogEntry[]>([]);
   const [currentStepLabel, setCurrentStepLabel] = useState<string>('');
+  const ribbonWrapperRef = useRef<HTMLDivElement | null>(null);
+  const [stickyPanelsTopPx, setStickyPanelsTopPx] = useState<number>(154);
+
+  useEffect(() => {
+    const el = ribbonWrapperRef.current;
+    if (!el) return;
+    const updateOffset = () => {
+      const h = el.getBoundingClientRect().height;
+      // 60px (sticky top-15 below 56px header) + actual ribbon height + 10px breathing gap
+      setStickyPanelsTopPx(Math.max(116, Math.round(60 + h + 10)));
+    };
+    updateOffset();
+    if (typeof ResizeObserver !== 'undefined') {
+      const ro = new ResizeObserver(updateOffset);
+      ro.observe(el);
+      return () => ro.disconnect();
+    }
+    window.addEventListener('resize', updateOffset);
+    return () => window.removeEventListener('resize', updateOffset);
+  }, []);
 
   const toggleActivityPanel = () => {
     setShowActivityPanel((prev) => {
@@ -1801,39 +1821,45 @@ export function AiWriterStudioView({
         onExportDocx={() => void handleExportDocx()}
       />
 
-      {/* Streamlined Single-Row Word Ribbon */}
-      <WriterWordRibbon
-        format={activeSession.format}
-        canUndo={activeSession.historyIndex > 0}
-        canRedo={
-          activeSession.historyIndex < activeSession.historyStack.length - 1
-        }
-        zoomPercent={zoomPercent}
-        aiBusy={
-          isActivePaperOutlining || isActivePaperWriting || refiningSection
-        }
-        onUpdateFormat={handleUpdateFormat}
-        onApplyPreset={handleApplyPreset}
-        onInlineFormat={handleInlineFormat}
-        onBlockPrefix={handleBlockPrefix}
-        onUndo={handleUndo}
-        onRedo={handleRedo}
-        onFindReplace={handleFindReplace}
-        onZoomChange={setZoomPercent}
-        onAiRefineSection={(action, customPrompt) =>
-          void handleAiRefineCurrentSection(action, customPrompt)
-        }
-        onOpenCoverPage={() => setShowCoverModal(true)}
-        onRequestResetPaper={() => setShowResetConfirmModal(true)}
-      />
+      {/* Streamlined Word Ribbon (sticky wrapper measured dynamically so sidebars never overlap) */}
+      <div ref={ribbonWrapperRef} className="sticky top-15 z-30">
+        <WriterWordRibbon
+          format={activeSession.format}
+          canUndo={activeSession.historyIndex > 0}
+          canRedo={
+            activeSession.historyIndex < activeSession.historyStack.length - 1
+          }
+          zoomPercent={zoomPercent}
+          aiBusy={
+            isActivePaperOutlining || isActivePaperWriting || refiningSection
+          }
+          onUpdateFormat={handleUpdateFormat}
+          onApplyPreset={handleApplyPreset}
+          onInlineFormat={handleInlineFormat}
+          onBlockPrefix={handleBlockPrefix}
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          onFindReplace={handleFindReplace}
+          onZoomChange={setZoomPercent}
+          onAiRefineSection={(action, customPrompt) =>
+            void handleAiRefineCurrentSection(action, customPrompt)
+          }
+          onOpenCoverPage={() => setShowCoverModal(true)}
+          onRequestResetPaper={() => setShowResetConfirmModal(true)}
+        />
+      </div>
 
       {/* Main 3-Zone Workspace Grid: Brief/Outline + Live A4 Paper + Right AI Status/History Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {!focusPaperMode && (
           <div
+            style={{
+              top: `${stickyPanelsTopPx}px`,
+              maxHeight: `calc(100vh - ${stickyPanelsTopPx + 16}px)`,
+            }}
             className={`${
               showActivityPanel ? 'lg:col-span-4 xl:col-span-3' : 'lg:col-span-4'
-            } lg:sticky lg:top-[7.5rem] lg:z-20 lg:max-h-[calc(100vh-8.5rem)] lg:flex lg:flex-col bg-white border border-zinc-200/90 rounded-2xl shadow-2xs overflow-hidden`}
+            } lg:sticky lg:z-20 lg:flex lg:flex-col bg-white border border-zinc-200/90 rounded-2xl shadow-2xs overflow-hidden transition-[top] duration-150`}
           >
             {/* Segmented Tab Switcher (Brief vs Outline) */}
             <div className="shrink-0 p-1.5 bg-zinc-100/80 border-b border-zinc-200/80 grid grid-cols-2 gap-1">
@@ -1941,6 +1967,7 @@ export function AiWriterStudioView({
         <WriterActivityPanel
           isOpen={showActivityPanel}
           onToggleOpen={toggleActivityPanel}
+          stickyTopPx={stickyPanelsTopPx}
           isBusy={
             isActivePaperOutlining || isActivePaperWriting || refiningSection
           }

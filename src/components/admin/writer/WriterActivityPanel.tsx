@@ -32,6 +32,7 @@ export interface WriterActivityLogEntry {
 interface WriterActivityPanelProps {
   isOpen: boolean;
   onToggleOpen: () => void;
+  stickyTopPx?: number;
   isBusy: boolean;
   currentStepLabel: string;
   activeModelDisplayName: string;
@@ -47,6 +48,7 @@ interface WriterActivityPanelProps {
 export function WriterActivityPanel({
   isOpen,
   onToggleOpen,
+  stickyTopPx = 152,
   isBusy,
   currentStepLabel,
   activeModelDisplayName,
@@ -91,7 +93,13 @@ export function WriterActivityPanel({
   }
 
   return (
-    <aside className="xl:col-span-3 xl:sticky xl:top-[7.5rem] xl:z-20 xl:max-h-[calc(100vh-8.5rem)] xl:flex xl:flex-col bg-white border border-zinc-200/90 rounded-2xl shadow-2xs overflow-hidden">
+    <aside
+      style={{
+        top: `${stickyTopPx}px`,
+        maxHeight: `calc(100vh - ${stickyTopPx + 16}px)`,
+      }}
+      className="xl:col-span-3 xl:sticky xl:z-20 xl:flex xl:flex-col bg-white border border-zinc-200/90 rounded-2xl shadow-2xs overflow-hidden transition-[top] duration-150"
+    >
       {/* Header */}
       <div className="shrink-0 px-3.5 py-2.5 bg-zinc-50/90 border-b border-zinc-200/80 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
