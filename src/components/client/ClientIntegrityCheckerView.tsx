@@ -29,6 +29,7 @@ interface ClientIntegrityCheckerViewProps {
 
 type HighlightLayerMode = 'combined' | 'similarity' | 'ai';
 type SidebarTab = 'sources' | 'ai_forensics';
+type CheckerInputMode = 'file' | 'text';
 
 function RadialScoreRing({
   percent,
@@ -119,6 +120,7 @@ function MetricProgressBar({
 export function ClientIntegrityCheckerView({
   onToast,
 }: ClientIntegrityCheckerViewProps) {
+  const [inputMode, setInputMode] = useState<CheckerInputMode>('file');
   const [title, setTitle] = useState('');
   const [textInput, setTextInput] = useState('');
   const [uploadedFileName, setUploadedFileName] = useState('');
@@ -380,17 +382,47 @@ export function ClientIntegrityCheckerView({
           )}
         </div>
 
-        {/* Workspace Body — File-Only Dropzone (Drag & Drop, Click, or Paste File) */}
+        {/* Workspace Body — File Upload OR Direct Text Paste */}
         <div
           className="p-6 sm:p-8 space-y-5"
           onPaste={(e) => {
             const pastedFiles = e.clipboardData?.files;
             if (pastedFiles && pastedFiles.length > 0) {
               e.preventDefault();
+              setInputMode('file');
               void handleUploadDocument(pastedFiles);
             }
           }}
         >
+          {/* Mode Switcher: Upload File vs Paste Text */}
+          <div className="inline-grid grid-cols-2 p-1 rounded-xl bg-zinc-100 border border-zinc-200/80 gap-1">
+            <button
+              type="button"
+              onClick={() => setInputMode('file')}
+              className={`btn-press px-3.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors ${
+                inputMode === 'file'
+                  ? 'bg-white text-[#0B2559] shadow-2xs border border-zinc-200/80'
+                  : 'text-zinc-600 hover:text-slate-900'
+              }`}
+            >
+              <UploadCloud className="w-3.5 h-3.5 text-[#12489B]" />
+              <span>Tải tệp lên (.docx, .txt)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setInputMode('text')}
+              className={`btn-press px-3.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors ${
+                inputMode === 'text'
+                  ? 'bg-white text-[#0B2559] shadow-2xs border border-zinc-200/80'
+                  : 'text-zinc-600 hover:text-slate-900'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5 text-[#12489B]" />
+              <span>Dán / Nhập văn bản</span>
+            </button>
+          </div>
+
+          {inputMode === 'file' ? (
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -478,6 +510,50 @@ export function ClientIntegrityCheckerView({
               <span>{uploadedFileName ? 'Đổi tệp khác' : 'Chọn tệp từ máy tính'}</span>
             </button>
           </div>
+          ) : (
+          <div className="space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label className="text-xs font-semibold text-slate-800">
+                Dán hoặc nhập đoạn văn bản cần kiểm tra Đạo văn &amp; AI:
+              </label>
+              <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-500 tabular-nums">
+                <span>
+                  {inputWords.toLocaleString('vi-VN')} từ ·{' '}
+                  {textInput.length.toLocaleString('vi-VN')} / 150.000 ký tự
+                </span>
+                {textInput.trim() && (
+                  <button
+                    type="button"
+                    disabled={analyzing}
+                    onClick={() => {
+                      setTextInput('');
+                      setUploadedFileName('');
+                      setTitle('');
+                      setReport(null);
+                      setSelectedSentenceId(null);
+                    }}
+                    className="btn-press text-rose-600 hover:text-rose-700 font-sans font-semibold underline"
+                  >
+                    Xóa nội dung
+                  </button>
+                )}
+              </div>
+            </div>
+            <textarea
+              rows={9}
+              maxLength={150000}
+              disabled={analyzing}
+              value={textInput}
+              onChange={(e) => {
+                setTextInput(e.target.value);
+                if (uploadedFileName) setUploadedFileName('');
+                if (report) setReport(null);
+              }}
+              placeholder="Dán trực tiếp 1 đoạn, nhiều phần hoặc toàn bộ bài viết của bạn vào đây (tối thiểu 40 ký tự) rồi bấm Kiểm tra ngay..."
+              className="w-full p-4 text-sm leading-relaxed text-slate-800 bg-zinc-50/70 focus:bg-white border border-zinc-200 focus:border-[#12489B] rounded-2xl focus:outline-none resize-y transition-colors"
+            />
+          </div>
+          )}
 
           {/* Filter Options + Primary Action Bar */}
           <div className="pt-2 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-4">
