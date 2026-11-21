@@ -58,14 +58,27 @@ function resolveR2Config(): R2Config | null {
   const secretAccessKey = cleanEnvValue(process.env.R2_SECRET_ACCESS_KEY);
   const explicitEndpoint = cleanEnvValue(process.env.R2_ENDPOINT);
 
-  let endpoint =
-    explicitEndpoint ||
-    (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : '');
+  let endpoint = '';
+  if (explicitEndpoint) {
+    try {
+      const withScheme = /^https?:\/\//i.test(explicitEndpoint)
+        ? explicitEndpoint
+        : `https://${explicitEndpoint}`;
+      const parsed = new URL(withScheme);
+      // Only trust explicitEndpoint if it is actually a Cloudflare R2 S3 endpoint (*.r2.cloudflarestorage.com)
+      if (/\.r2\.cloudflarestorage\.com$/i.test(parsed.hostname)) {
+        endpoint = parsed.origin;
+      }
+    } catch {
+      // Ignore malformed R2_ENDPOINT and fall back to R2_ACCOUNT_ID
+    }
+  }
 
-  // Normalize endpoint: remove trailing slash and accidental /<bucket> suffix
-  endpoint = endpoint.replace(/\/+$/, '');
-  if (bucket && endpoint.endsWith(`/${bucket}`)) {
-    endpoint = endpoint.slice(0, -(bucket.length + 1));
+  // Prefer canonical S3 API endpoint derived from R2_ACCOUNT_ID whenever explicitEndpoint is empty or non-S3 (e.g. pub-*.r2.dev)
+  if (!endpoint && accountId) {
+    endpoint = `https://${accountId}.r2.cloudflarestorage.com`;
+  } else if (!endpoint && explicitEndpoint) {
+    endpoint = explicitEndpoint.replace(/\/+$/, '');
   }
 
   if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
@@ -1575,10 +1588,11 @@ export function createApiApp(): express.Express {
         };
         const errCode = s3Err?.Code || s3Err?.name || '';
         const httpCode = s3Err?.$metadata?.httpStatusCode;
+        const r2Diag = r2Config
+          ? ` | Host: ${r2Config.endpoint.replace(/^https?:\/\//i, '')} | Bucket: ${r2Config.bucket} | AccessKey: ${r2Config.accessKeyId.length} ký tự (chuẩn 32) | SecretKey: ${r2Config.secretAccessKey.length} ký tự (chuẩn 64)`
+          : '';
         const safeDetail = errCode
-          ? ` (${errCode}${httpCode ? ` / HTTP ${httpCode}` : ''}: ${(
-              s3Err?.message || ''
-            ).slice(0, 120)})`
+          ? ` (${errCode}${httpCode ? ` / HTTP ${httpCode}` : ''}${r2Diag})`
           : '';
         res.status(500).json({
           error: r2Config
