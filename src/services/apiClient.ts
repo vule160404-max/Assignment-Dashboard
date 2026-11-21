@@ -17,6 +17,8 @@ export async function uploadFileToServer(
     category?: AttachmentCategory;
     previewMaxPages?: number;
     turnitinScorePage?: number;
+    orderCode?: string;
+    versionRole?: 'latest' | 'backup' | 'attachment';
   } = {}
 ): Promise<{
   fileId: string;
@@ -24,12 +26,16 @@ export async function uploadFileToServer(
   mimeType: string;
   sizeBytes: number;
   url: string;
+  r2Key?: string;
+  storageProvider?: string;
 }> {
   const authHeaders = await getAdminAuthHeaders();
   const formData = new FormData();
   formData.append('file', file);
   formData.append('isLocked', String(Boolean(options.isLocked)));
   if (options.category) formData.append('category', options.category);
+  if (options.orderCode) formData.append('orderCode', options.orderCode);
+  if (options.versionRole) formData.append('versionRole', options.versionRole);
   if (options.previewMaxPages !== undefined) {
     formData.append('previewMaxPages', String(options.previewMaxPages));
   }
@@ -56,6 +62,8 @@ export async function uploadFileToServer(
         sizeBytes: file.size,
         isLocked: Boolean(options.isLocked),
         category: options.category || 'brief',
+        orderCode: options.orderCode,
+        versionRole: options.versionRole,
         previewMaxPages: options.previewMaxPages,
         turnitinScorePage: options.turnitinScorePage,
       }),
@@ -69,6 +77,7 @@ export async function uploadFileToServer(
         fileName: string;
         mimeType: string;
         sizeBytes: number;
+        r2Key?: string;
       };
 
       const putRes = await fetch(presigned.uploadUrl, {
@@ -97,6 +106,9 @@ export async function uploadFileToServer(
           sizeBytes: presigned.sizeBytes,
           isLocked: Boolean(options.isLocked),
           category: options.category || 'brief',
+          orderCode: options.orderCode,
+          versionRole: options.versionRole,
+          r2Key: presigned.r2Key,
           previewMaxPages: options.previewMaxPages,
           turnitinScorePage: options.turnitinScorePage,
         }),
@@ -114,10 +126,39 @@ export async function uploadFileToServer(
   }
 
   if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: 'Tải tệp lên thất bại.' }));
-    throw new Error(err.error || 'Tải tệp lên thất bại.');
+    const err = await res.json().catch(() => ({ error: `Tải tệp lên thất bại (HTTP ${res.status}).` }));
+    throw new Error(err.error || `Tải tệp lên thất bại (HTTP ${res.status}).`);
   }
   return res.json();
+}
+
+export async function moveServerFileToBackup(
+  fileIdOrUrl: string,
+  orderCode: string
+): Promise<{ r2Key?: string }> {
+  if (!fileIdOrUrl.startsWith('/api/files/')) return {};
+  const fileId = fileIdOrUrl.replace('/api/files/', '').split('?')[0];
+  if (!fileId) return {};
+
+  try {
+    const authHeaders = await getAdminAuthHeaders();
+    const res = await fetch(
+      `/api/files/${encodeURIComponent(fileId)}/move-backup`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify({ orderCode }),
+      }
+    );
+    if (!res.ok) return {};
+    const data = (await res.json().catch(() => ({}))) as { r2Key?: string };
+    return { r2Key: data.r2Key };
+  } catch {
+    return {};
+  }
 }
 
 export async function syncServerFileLock(

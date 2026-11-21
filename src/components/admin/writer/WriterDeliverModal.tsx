@@ -41,6 +41,7 @@ export function WriterDeliverModal({
   );
   const [deliveryMode, setDeliveryMode] = useState<'final' | 'draft'>('final');
   const [delivering, setDelivering] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const selectedOrder = useMemo(() => {
     return (
@@ -93,11 +94,14 @@ export function WriterDeliverModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg('');
     if (!selectedOrder) {
+      setErrorMsg('Vui lòng chọn đơn hàng cần đẩy bài.');
       onToast('Vui lòng chọn đơn hàng cần đẩy bài.');
       return;
     }
     if (totalDraftedWords === 0) {
+      setErrorMsg('Chưa có nội dung bài viết để đẩy lên cho khách.');
       onToast('Chưa có nội dung bài viết để đẩy lên cho khách.');
       return;
     }
@@ -111,7 +115,9 @@ export function WriterDeliverModal({
       });
       onClose();
     } catch (err) {
-      onToast(err instanceof Error ? err.message : 'Đẩy bài cho khách thất bại.');
+      const msg = err instanceof Error ? err.message : 'Đẩy bài cho khách thất bại.';
+      setErrorMsg(msg);
+      onToast(msg);
     } finally {
       setDelivering(false);
     }
@@ -307,25 +313,37 @@ export function WriterDeliverModal({
             />
           </div>
 
-          {/* File Output Info */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50/60 border border-blue-200/80 text-xs text-[#0B2559]">
-            <div className="flex items-center gap-2">
-              <FileCheck2 className="w-4 h-4 text-[#12489B] shrink-0" />
-              <div>
-                <div className="font-semibold">
-                  Tệp Word .DOCX chuẩn bị xuất:
-                </div>
-                <div className="text-[11px] text-zinc-600">
-                  {totalDraftedWords.toLocaleString()} từ ·{' '}
-                  {session.format.coverPage?.enabled ? 'Có trang bìa' : 'Không trang bìa'} ·{' '}
-                  {session.format.includeTableOfContents ? 'Có mục lục' : 'Không mục lục'}
+          {/* File Output Info & R2 Versioning Policy */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between p-3 rounded-xl bg-blue-50/60 border border-blue-200/80 text-xs text-[#0B2559]">
+              <div className="flex items-center gap-2">
+                <FileCheck2 className="w-4 h-4 text-[#12489B] shrink-0" />
+                <div>
+                  <div className="font-semibold">
+                    Tệp Word .DOCX chuẩn bị đẩy lên R2{selectedOrder ? ` (orders/${selectedOrder.orderCode}/latest/)` : ''}:
+                  </div>
+                  <div className="text-[11px] text-zinc-600">
+                    {totalDraftedWords.toLocaleString()} từ ·{' '}
+                    {session.format.coverPage?.enabled ? 'Có trang bìa' : 'Không trang bìa'} ·{' '}
+                    {session.format.includeTableOfContents ? 'Có mục lục' : 'Không mục lục'}
+                  </div>
                 </div>
               </div>
+              <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-white text-slate-800 border border-blue-100 shrink-0">
+                .DOCX
+              </span>
             </div>
-            <span className="font-mono text-[11px] px-2 py-0.5 rounded bg-white text-slate-800 border border-blue-100 shrink-0">
-              .DOCX
-            </span>
+            <p className="text-[11px] text-zinc-500 leading-relaxed px-1">
+              Portal khách hàng sẽ hiển thị ngay bản mới nhất này. Bản vừa bị thay thế (nếu có) sẽ được tự động lưu làm <strong>1 bản Backup</strong> trên R2, các bản cũ hơn sẽ tự động xóa.
+            </p>
           </div>
+
+          {errorMsg && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="break-words font-medium">{errorMsg}</div>
+            </div>
+          )}
 
           {/* Submit Button */}
           <div className="pt-2 flex items-center justify-end gap-2.5">

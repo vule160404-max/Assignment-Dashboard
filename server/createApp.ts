@@ -6,6 +6,7 @@ import multer from 'multer';
 import JSZip from 'jszip';
 import { PDFDocument } from 'pdf-lib';
 import {
+  CopyObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
@@ -14,7 +15,6 @@ import {
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import Perplexity from '@perplexity-ai/perplexity_ai';
 import { analyzeDocumentIntegrity } from './integrityAnalyzer.js';
 
 const UPLOADS_DIR = process.env.VERCEL
@@ -125,6 +125,9 @@ export interface StoredFileMeta {
   turnitinScorePage: number;
   uploadedAt: string;
   storageProvider?: 'cloudflare-r2' | 'local-disk';
+  orderCode?: string;
+  r2Key?: string;
+  versionRole?: 'latest' | 'backup' | 'attachment';
 }
 
 interface StoredNotificationPrefs {
@@ -176,6 +179,34 @@ function resolveSafeUploadPath(storedName: string): string | null {
 }
 
 // --- Unified Storage Helpers (Cloudflare R2 primary, local-disk fallback) ---
+function sanitizeOrderCodeForR2(orderCode?: unknown): string {
+  if (typeof orderCode !== 'string') return '';
+  return orderCode
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9_-]/g, '');
+}
+
+function buildR2ObjectKey(
+  storedName: string,
+  orderCode?: string,
+  category?: FileCategory,
+  versionRole?: 'latest' | 'backup' | 'attachment'
+): string {
+  const safeCode = sanitizeOrderCodeForR2(orderCode);
+  if (safeCode) {
+    if (versionRole === 'latest') {
+      return `orders/${safeCode}/latest/${storedName}`;
+    }
+    if (versionRole === 'backup') {
+      return `orders/${safeCode}/backup/${storedName}`;
+    }
+    const folder = category || 'attachment';
+    return `orders/${safeCode}/${folder}/${storedName}`;
+  }
+  return `files/${storedName}`;
+}
+
 function r2FileKey(storedName: string): string {
   return `files/${storedName}`;
 }
@@ -541,18 +572,20 @@ async function getFileMeta(fileId: string): Promise<StoredFileMeta | null> {
 async function saveFileBinary(
   storedName: string,
   buffer: Buffer,
-  mimeType: string
-): Promise<void> {
+  mimeType: string,
+  explicitR2Key?: string
+): Promise<string | undefined> {
   if (r2Client && r2Config) {
+    const objectKey = explicitR2Key || r2FileKey(storedName);
     await r2Client.send(
       new PutObjectCommand({
         Bucket: r2Config.bucket,
-        Key: r2FileKey(storedName),
+        Key: objectKey,
         Body: buffer,
         ContentType: mimeType || 'application/octet-stream',
       })
     );
-    return;
+    return objectKey;
   }
 
   ensureLocalUploadsDir();
@@ -561,19 +594,34 @@ async function saveFileBinary(
     throw new Error('Invalid destination path');
   }
   await fs.promises.writeFile(destPath, buffer);
+  return undefined;
 }
 
 async function getFileBinary(meta: StoredFileMeta): Promise<Buffer | null> {
   if (r2Client && r2Config && meta.storageProvider !== 'local-disk') {
+    const primaryKey = meta.r2Key || r2FileKey(meta.storedName);
     try {
       const resp = await r2Client.send(
         new GetObjectCommand({
           Bucket: r2Config.bucket,
-          Key: r2FileKey(meta.storedName),
+          Key: primaryKey,
         })
       );
       return await streamToBuffer(resp.Body);
     } catch {
+      if (meta.r2Key && meta.r2Key !== r2FileKey(meta.storedName)) {
+        try {
+          const fallbackResp = await r2Client.send(
+            new GetObjectCommand({
+              Bucket: r2Config.bucket,
+              Key: r2FileKey(meta.storedName),
+            })
+          );
+          return await streamToBuffer(fallbackResp.Body);
+        } catch {
+          return null;
+        }
+      }
       return null;
     }
   }
@@ -587,33 +635,84 @@ async function getFileBinary(meta: StoredFileMeta): Promise<Buffer | null> {
   }
 }
 
+async function moveFileToBackupStorage(
+  fileId: string,
+  orderCode: string
+): Promise<StoredFileMeta | null> {
+  const existing = await getFileMeta(fileId);
+  if (!existing) return null;
+
+  const safeCode = sanitizeOrderCodeForR2(orderCode || existing.orderCode);
+  const nextMeta: StoredFileMeta = {
+    ...existing,
+    orderCode: safeCode || existing.orderCode,
+    versionRole: 'backup',
+  };
+
+  if (r2Client && r2Config && existing.storageProvider !== 'local-disk' && safeCode) {
+    const oldKey = existing.r2Key || r2FileKey(existing.storedName);
+    const backupKey = buildR2ObjectKey(
+      existing.storedName,
+      safeCode,
+      existing.category,
+      'backup'
+    );
+    if (oldKey !== backupKey) {
+      try {
+        await r2Client.send(
+          new CopyObjectCommand({
+            Bucket: r2Config.bucket,
+            CopySource: `${r2Config.bucket}/${oldKey
+              .split('/')
+              .map((seg) => encodeURIComponent(seg))
+              .join('/')}`,
+            Key: backupKey,
+          })
+        );
+        await r2Client
+          .send(
+            new DeleteObjectCommand({
+              Bucket: r2Config.bucket,
+              Key: oldKey,
+            })
+          )
+          .catch(() => undefined);
+        nextMeta.r2Key = backupKey;
+      } catch (err) {
+        console.warn('R2 copy-to-backup fallback (keeping original key):', err);
+      }
+    } else {
+      nextMeta.r2Key = backupKey;
+    }
+  }
+
+  await saveFileMeta(nextMeta);
+  return nextMeta;
+}
+
 async function deleteFileAndMeta(fileId: string): Promise<void> {
   const existing = await getFileMeta(fileId);
 
   if (r2Client && r2Config) {
-    const tasks: Promise<unknown>[] = [
-      r2Client
-        .send(
-          new DeleteObjectCommand({
-            Bucket: r2Config.bucket,
-            Key: r2MetaKey(fileId),
-          })
-        )
-        .catch(() => undefined),
-    ];
+    const keysToDelete = new Set<string>([r2MetaKey(fileId)]);
+    if (existing?.r2Key) {
+      keysToDelete.add(existing.r2Key);
+    }
     if (existing?.storedName) {
-      tasks.push(
+      keysToDelete.add(r2FileKey(existing.storedName));
+    }
+    await Promise.all(
+      Array.from(keysToDelete).map((key) =>
         r2Client
           .send(
             new DeleteObjectCommand({
               Bucket: r2Config.bucket,
-              Key: r2FileKey(existing.storedName),
+              Key: key,
             })
           )
           .catch(() => undefined)
-      );
-    }
-    await Promise.all(tasks);
+      )
+    );
     return;
   }
 
@@ -1402,6 +1501,10 @@ export function createApiApp(): express.Express {
       const storedName = `${fileId}${ext}`;
       const isLocked = req.body?.isLocked === 'true';
       const category = parseCategory(req.body?.category);
+      const orderCode = sanitizeOrderCodeForR2(req.body?.orderCode);
+      const rawRole = typeof req.body?.versionRole === 'string' ? req.body.versionRole.trim() : '';
+      const versionRole: 'latest' | 'backup' | 'attachment' =
+        rawRole === 'latest' || rawRole === 'backup' ? rawRole : 'attachment';
       const previewMaxPages = Math.max(
         1,
         Math.min(20, Number(req.body?.previewMaxPages) || 2)
@@ -1415,6 +1518,12 @@ export function createApiApp(): express.Express {
         'latin1'
       ).toString('utf8');
       const mimeType = req.file.mimetype || 'application/octet-stream';
+      const targetR2Key = buildR2ObjectKey(
+        storedName,
+        orderCode || undefined,
+        category,
+        versionRole
+      );
 
       const meta: StoredFileMeta = {
         fileId,
@@ -1428,10 +1537,13 @@ export function createApiApp(): express.Express {
         turnitinScorePage,
         uploadedAt: new Date().toISOString(),
         storageProvider: r2Config ? 'cloudflare-r2' : 'local-disk',
+        orderCode: orderCode || undefined,
+        r2Key: r2Config ? targetR2Key : undefined,
+        versionRole,
       };
 
       try {
-        await saveFileBinary(storedName, req.file.buffer, mimeType);
+        await saveFileBinary(storedName, req.file.buffer, mimeType, targetR2Key);
         await saveFileMeta(meta);
       } catch (err) {
         console.error('File upload storage error:', err);
@@ -1449,6 +1561,7 @@ export function createApiApp(): express.Express {
         mimeType: meta.mimeType,
         sizeBytes: meta.sizeBytes,
         url: `/api/files/${fileId}`,
+        r2Key: meta.r2Key,
         storageProvider: meta.storageProvider,
       });
     }
@@ -1470,6 +1583,11 @@ export function createApiApp(): express.Express {
         ? req.body.mimeType.trim()
         : 'application/octet-stream';
     const sizeBytes = Number(req.body?.sizeBytes) || 0;
+    const category = parseCategory(req.body?.category);
+    const orderCode = sanitizeOrderCodeForR2(req.body?.orderCode);
+    const rawRole = typeof req.body?.versionRole === 'string' ? req.body.versionRole.trim() : '';
+    const versionRole: 'latest' | 'backup' | 'attachment' =
+      rawRole === 'latest' || rawRole === 'backup' ? rawRole : 'attachment';
 
     if (!fileName || !isAllowedUpload(fileName, mimeType)) {
       res.status(400).json({
@@ -1487,11 +1605,17 @@ export function createApiApp(): express.Express {
     const fileId = `${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
     const ext = sanitizeExt(fileName);
     const storedName = `${fileId}${ext}`;
+    const targetR2Key = buildR2ObjectKey(
+      storedName,
+      orderCode || undefined,
+      category,
+      versionRole
+    );
 
     try {
       const command = new PutObjectCommand({
         Bucket: r2Config.bucket,
-        Key: r2FileKey(storedName),
+        Key: targetR2Key,
         ContentType: mimeType,
       });
       const uploadUrl = await getSignedUrl(r2Client, command, {
@@ -1505,6 +1629,7 @@ export function createApiApp(): express.Express {
         fileName,
         mimeType,
         sizeBytes,
+        r2Key: targetR2Key,
         url: `/api/files/${fileId}`,
       });
     } catch (err) {
@@ -1535,6 +1660,15 @@ export function createApiApp(): express.Express {
         ? req.body.mimeType.trim()
         : 'application/octet-stream';
     const sizeBytes = Number(req.body?.sizeBytes) || 0;
+    const category = parseCategory(req.body?.category);
+    const orderCode = sanitizeOrderCodeForR2(req.body?.orderCode);
+    const rawRole = typeof req.body?.versionRole === 'string' ? req.body.versionRole.trim() : '';
+    const versionRole: 'latest' | 'backup' | 'attachment' =
+      rawRole === 'latest' || rawRole === 'backup' ? rawRole : 'attachment';
+    const explicitR2Key =
+      typeof req.body?.r2Key === 'string' && req.body.r2Key.trim()
+        ? req.body.r2Key.trim()
+        : buildR2ObjectKey(storedName, orderCode || undefined, category, versionRole);
 
     if (
       !/^[a-zA-Z0-9_]+$/.test(fileId) ||
@@ -1550,7 +1684,7 @@ export function createApiApp(): express.Express {
       await r2Client.send(
         new HeadObjectCommand({
           Bucket: r2Config.bucket,
-          Key: r2FileKey(storedName),
+          Key: explicitR2Key,
         })
       );
 
@@ -1561,7 +1695,7 @@ export function createApiApp(): express.Express {
         mimeType,
         sizeBytes,
         isLocked: Boolean(req.body?.isLocked),
-        category: parseCategory(req.body?.category),
+        category,
         previewMaxPages: Math.max(
           1,
           Math.min(20, Number(req.body?.previewMaxPages) || 2)
@@ -1572,6 +1706,9 @@ export function createApiApp(): express.Express {
         ),
         uploadedAt: new Date().toISOString(),
         storageProvider: 'cloudflare-r2',
+        orderCode: orderCode || undefined,
+        r2Key: explicitR2Key,
+        versionRole,
       };
 
       await saveFileMeta(meta);
@@ -1581,6 +1718,7 @@ export function createApiApp(): express.Express {
         mimeType,
         sizeBytes,
         url: `/api/files/${fileId}`,
+        r2Key: explicitR2Key,
         storageProvider: 'cloudflare-r2',
       });
     } catch (err) {
@@ -1589,6 +1727,27 @@ export function createApiApp(): express.Express {
         error: 'Không tìm thấy tệp trên Cloudflare R2 để xác nhận.',
       });
     }
+  });
+
+  // Move a previously active deliverable to orders/<orderCode>/backup/ on R2
+  app.post('/api/files/:fileId/move-backup', requireTeamAuth, async (req, res) => {
+    const { fileId } = req.params;
+    if (!/^[a-zA-Z0-9_]+$/.test(fileId)) {
+      res.status(400).json({ error: 'Invalid fileId' });
+      return;
+    }
+    const orderCode = sanitizeOrderCodeForR2(req.body?.orderCode);
+    const updated = await moveFileToBackupStorage(fileId, orderCode);
+    if (!updated) {
+      res.status(404).json({ error: 'Không tìm thấy tệp để chuyển sang backup.' });
+      return;
+    }
+    res.json({
+      ok: true,
+      fileId: updated.fileId,
+      r2Key: updated.r2Key,
+      versionRole: updated.versionRole,
+    });
   });
 
   // Sync payment-lock and preview window metadata from Team UI
@@ -1917,11 +2076,6 @@ export function createApiApp(): express.Express {
     tools?: Array<{ type: 'web_search' | 'fetch_url' }>;
     responseFormat?: unknown;
   }) {
-    const client = new Perplexity({
-      apiKey: params.apiKey,
-      maxRetries: 2,
-    });
-
     const trimmedTarget = (params.modelOrPreset || 'pro-search')
       .trim()
       .replace(/^preset:/i, '');
@@ -1958,10 +2112,55 @@ export function createApiApp(): express.Express {
       }
     }
 
-    const response = await client.responses.create({
-      ...reqPayload,
-      stream: false,
-    } as Perplexity.ResponseCreateParamsNonStreaming);
+    let response: {
+      id?: string;
+      model?: string;
+      output_text?: string;
+      output?: unknown[];
+      usage?: unknown;
+    };
+
+    try {
+      const mod = await import('@perplexity-ai/perplexity_ai');
+      const PerplexityCtor = mod.default || (mod as unknown as { Perplexity?: typeof mod.default }).Perplexity;
+      if (!PerplexityCtor) {
+        throw new Error('Perplexity SDK constructor unavailable');
+      }
+      const client = new PerplexityCtor({
+        apiKey: params.apiKey,
+        maxRetries: 2,
+      });
+      response = (await client.responses.create({
+        ...reqPayload,
+        stream: false,
+      } as Parameters<typeof client.responses.create>[0])) as typeof response;
+    } catch (sdkLoadErr) {
+      // Fallback to direct Perplexity Agent API HTTP endpoint if ESM/CJS dynamic load fails
+      if (
+        typeof (sdkLoadErr as { status?: number })?.status === 'number' &&
+        (sdkLoadErr as { status: number }).status >= 400
+      ) {
+        throw sdkLoadErr;
+      }
+      const httpResp = await fetch('https://api.perplexity.ai/v1/agent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${params.apiKey}`,
+        },
+        body: JSON.stringify({ ...reqPayload, stream: false }),
+      });
+      const rawJson = (await httpResp.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!httpResp.ok) {
+        const errObj = rawJson.error as { message?: string } | undefined;
+        const err = new Error(
+          errObj?.message || `Perplexity Agent API HTTP ${httpResp.status}`
+        ) as Error & { status?: number };
+        err.status = httpResp.status;
+        throw err;
+      }
+      response = rawJson as typeof response;
+    }
 
     const outputItems = Array.isArray(response.output) ? response.output : [];
     const searchResults: unknown[] = [];

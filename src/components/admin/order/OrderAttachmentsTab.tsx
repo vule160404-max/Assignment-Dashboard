@@ -193,12 +193,25 @@ export function OrderAttachmentsTab({
               className="hover-row p-4 bg-white flex flex-wrap items-center justify-between gap-3"
             >
               <div className="min-w-0">
-                <p className="text-sm font-medium text-slate-900 truncate">
-                  {att.name}
-                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-slate-900 truncate">
+                    {att.name}
+                  </p>
+                  {(att.category === 'draft' || att.category === 'final') &&
+                    (att.isBackup ? (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-600 border border-zinc-200 shrink-0">
+                        Backup gần nhất (Ẩn với khách)
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                        Bản mới nhất (Hiện trên Portal)
+                      </span>
+                    ))}
+                </div>
                 <p className="text-xs text-zinc-500 mt-0.5">
                   Loại: {att.category}
                   {att.sizeBytes > 0 && ` · ${formatBytes(att.sizeBytes)}`}
+                  {att.r2Key && ` · R2: ${att.r2Key}`}
                   {att.category === 'turnitin' &&
                     ` · Cửa sổ Turnitin: Trang 1–${(att.turnitinScorePage || 1) + 2}`}
                   {att.isPaymentLocked &&

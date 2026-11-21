@@ -1149,24 +1149,31 @@ export function ClientPortalView({
                 )}
 
                 {/* Attachments & Page-Windowed Previews */}
+                {(() => {
+                  const visibleAttachments = portal.attachments.filter(
+                    (att) => !att.isBackup
+                  );
+                  return (
                 <section className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">
                   <div className="flex items-center justify-between gap-2">
                     <h2 className="text-sm font-semibold text-slate-900">
-                      Tài liệu & Bài làm ({portal.attachments.length})
+                      Tài liệu & Bài làm ({visibleAttachments.length})
                     </h2>
                     <span className="text-xs text-zinc-500">
                       Nhấn Xem trước để kiểm tra nội dung
                     </span>
                   </div>
 
-                  {portal.attachments.length === 0 ? (
+                  {visibleAttachments.length === 0 ? (
                     <p className="text-xs text-zinc-500 py-5 text-center">
                       Chưa có tài liệu nào được đính kèm.
                     </p>
                   ) : (
                     <div className="divide-y divide-zinc-100 border border-zinc-200 rounded-xl overflow-hidden">
-                      {portal.attachments.map((att) => {
+                      {visibleAttachments.map((att) => {
                         const locked = att.isPaymentLocked && !isFullyPaid;
+                        const isDeliverable =
+                          att.category === 'draft' || att.category === 'final';
                         const safeUrl =
                           att.sourceType === 'upload'
                             ? getSafeExternalUrl(att.fileIdOrUrl)
@@ -1188,9 +1195,16 @@ export function ClientPortalView({
                             <div className="flex items-start gap-3 min-w-0">
                               <FileText className="w-4 h-4 text-zinc-400 mt-0.5 shrink-0" />
                               <div className="min-w-0">
-                                <p className="text-sm font-medium text-slate-900 truncate">
-                                  {att.name}
-                                </p>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm font-medium text-slate-900 truncate">
+                                    {att.name}
+                                  </p>
+                                  {isDeliverable && (
+                                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                                      Bản mới nhất
+                                    </span>
+                                  )}
+                                </div>
                                 <p className="text-xs text-zinc-500 mt-0.5">
                                   {CATEGORY_LABELS[att.category]}
                                   {att.sizeBytes > 0 && ` · ${formatBytes(att.sizeBytes)}`}
@@ -1247,6 +1261,8 @@ export function ClientPortalView({
                     </div>
                   )}
                 </section>
+                  );
+                })()}
 
                 {/* Revision Request Section */}
                 <section className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">

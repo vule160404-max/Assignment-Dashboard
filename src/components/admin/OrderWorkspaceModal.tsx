@@ -296,6 +296,11 @@ export function OrderWorkspaceModal({
         category: attCategory,
         previewMaxPages: previewPages,
         turnitinScorePage: scorePage,
+        orderCode: normalizeOrderCode(orderCode) || undefined,
+        versionRole:
+          attCategory === 'draft' || attCategory === 'final'
+            ? 'latest'
+            : 'attachment',
       });
       const item: AttachmentItem = {
         id: `att_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -309,6 +314,8 @@ export function OrderWorkspaceModal({
         previewMaxPages: previewPages,
         turnitinScorePage: scorePage,
         uploadedAt: new Date().toISOString(),
+        isBackup: false,
+        ...(uploaded.r2Key ? { r2Key: uploaded.r2Key } : {}),
       };
       setAttachments((prev) => [...prev, item]);
       setUnsavedUploadedUrls((prev) => [...prev, uploaded.url]);

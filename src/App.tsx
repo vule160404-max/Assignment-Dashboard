@@ -235,7 +235,7 @@ export default function App() {
           key={toast.id}
           role="status"
           aria-live="polite"
-          className="toast-enter fixed bottom-5 right-5 z-50 max-w-sm bg-[#0F172A] text-white text-xs font-medium pl-3.5 pr-2.5 py-2.5 rounded-xl border border-slate-800 shadow-[0_8px_28px_rgb(15,23,42,0.2)] flex items-center gap-2.5"
+          className="toast-enter fixed bottom-5 right-5 z-[120] max-w-sm bg-[#0F172A] text-white text-xs font-medium pl-3.5 pr-2.5 py-2.5 rounded-xl border border-slate-800 shadow-[0_8px_28px_rgb(15,23,42,0.2)] flex items-center gap-2.5"
         >
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="leading-snug">{toast.message}</span>

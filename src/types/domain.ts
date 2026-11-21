@@ -32,6 +32,9 @@ export interface AttachmentItem {
   previewMaxPages: number;
   turnitinScorePage?: number;
   uploadedAt: string;
+  isBackup?: boolean;
+  replacedAt?: string;
+  r2Key?: string;
 }
 
 export type UserRole = 'owner' | 'admin' | 'staff' | 'client';

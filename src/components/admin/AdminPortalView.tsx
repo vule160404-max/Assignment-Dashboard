@@ -22,6 +22,10 @@ import {
 } from 'lucide-react';
 import { auth, clearAllSensitiveBrowserStorage } from '../../lib/firebase';
 import {
+  deleteServerFile,
+  moveServerFileToBackup,
+} from '../../services/apiClient';
+import {
   DEFAULT_BANK_SETTINGS,
   DEFAULT_NOTIFICATION_SETTINGS,
   saveOrder,
@@ -380,15 +384,68 @@ export function AdminPortalView({
     setActiveTab('ai_writer');
   };
 
+  const rotateOrderDeliverableAttachments = async (
+    orderCode: string,
+    existingAttachments: AttachmentItem[],
+    newLatestItem: AttachmentItem
+  ): Promise<AttachmentItem[]> => {
+    const isDeliverable = (att: AttachmentItem) =>
+      att.category === 'draft' || att.category === 'final';
+
+    const nonDeliverables = existingAttachments.filter((att) => !isDeliverable(att));
+    const existingDeliverables = existingAttachments.filter(isDeliverable);
+
+    const activeDeliverables = existingDeliverables
+      .filter((att) => !att.isBackup)
+      .sort(
+        (a, b) =>
+          new Date(b.uploadedAt || 0).getTime() -
+          new Date(a.uploadedAt || 0).getTime()
+      );
+    const oldBackups = existingDeliverables.filter((att) => Boolean(att.isBackup));
+
+    const prevLatest = activeDeliverables[0] || null;
+    const toPurge: AttachmentItem[] = [
+      ...oldBackups,
+      ...activeDeliverables.slice(1),
+    ];
+
+    // Delete all older backups & superseded drafts from R2
+    await Promise.all(
+      toPurge
+        .filter((att) => att.sourceType === 'upload')
+        .map((att) => deleteServerFile(att.fileIdOrUrl).catch(() => undefined))
+    );
+
+    let demotedBackup: AttachmentItem | null = null;
+    if (prevLatest) {
+      const moved =
+        prevLatest.sourceType === 'upload'
+          ? await moveServerFileToBackup(prevLatest.fileIdOrUrl, orderCode)
+          : {};
+      demotedBackup = {
+        ...prevLatest,
+        isBackup: true,
+        replacedAt: new Date().toISOString(),
+        ...(moved.r2Key ? { r2Key: moved.r2Key } : {}),
+      };
+    }
+
+    return [
+      ...nonDeliverables,
+      newLatestItem,
+      ...(demotedBackup ? [demotedBackup] : []),
+    ];
+  };
+
   const handleAttachHumanizedDocx = async (order: OrderRecord, file: File) => {
     const existingAttachments = order.attachments || [];
-    if (existingAttachments.length >= FIELD_LIMITS.attachmentsMax) {
-      throw new Error(`Đơn #${order.orderCode} đã đạt giới hạn ${FIELD_LIMITS.attachmentsMax} tệp đính kèm.`);
-    }
 
     const uploaded = await uploadFileToServer(file, {
       isLocked: false,
       category: 'draft',
+      orderCode: order.orderCode,
+      versionRole: 'latest',
     });
 
     const newItem: AttachmentItem = {
@@ -402,7 +459,15 @@ export function AdminPortalView({
       isPaymentLocked: false,
       previewMaxPages: 999,
       uploadedAt: new Date().toISOString(),
+      isBackup: false,
+      ...(uploaded.r2Key ? { r2Key: uploaded.r2Key } : {}),
     };
+
+    const nextAttachments = await rotateOrderDeliverableAttachments(
+      order.orderCode,
+      existingAttachments,
+      newItem
+    );
 
     await saveOrder(
       {
@@ -430,7 +495,7 @@ export function AdminPortalView({
         staffPayoutAmount: order.staffPayoutAmount || 0,
         staffPayoutStatus: order.staffPayoutStatus === 'paid' ? 'paid' : 'unpaid',
         staffPayoutPaidAt: order.staffPayoutPaidAt || '',
-        attachments: [...existingAttachments, newItem],
+        attachments: nextAttachments,
       },
       bankSettings,
       order.id,
@@ -445,11 +510,6 @@ export function AdminPortalView({
     opts: { isDraftOnly: boolean; isLocked: boolean; note: string }
   ) => {
     const existingAttachments = order.attachments || [];
-    if (existingAttachments.length >= FIELD_LIMITS.attachmentsMax) {
-      throw new Error(
-        `Đơn #${order.orderCode} đã đạt giới hạn ${FIELD_LIMITS.attachmentsMax} tệp đính kèm.`
-      );
-    }
 
     const isDraft = opts.isDraftOnly;
     const category: AttachmentCategory = isDraft ? 'draft' : 'final';
@@ -460,6 +520,8 @@ export function AdminPortalView({
       isLocked: isPaymentLocked,
       category,
       previewMaxPages,
+      orderCode: order.orderCode,
+      versionRole: 'latest',
     });
 
     const newItem: AttachmentItem = {
@@ -473,7 +535,15 @@ export function AdminPortalView({
       isPaymentLocked,
       previewMaxPages,
       uploadedAt: new Date().toISOString(),
+      isBackup: false,
+      ...(uploaded.r2Key ? { r2Key: uploaded.r2Key } : {}),
     };
+
+    const nextAttachments = await rotateOrderDeliverableAttachments(
+      order.orderCode,
+      existingAttachments,
+      newItem
+    );
 
     let nextStage: OrderStage = order.stage;
     let nextStatus: OrderStatus = order.orderStatus;
@@ -531,7 +601,7 @@ export function AdminPortalView({
         staffPayoutStatus:
           order.staffPayoutStatus === 'paid' ? 'paid' : 'unpaid',
         staffPayoutPaidAt: order.staffPayoutPaidAt || '',
-        attachments: [...existingAttachments, newItem],
+        attachments: nextAttachments,
       },
       bankSettings,
       order.id,

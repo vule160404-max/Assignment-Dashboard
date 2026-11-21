@@ -2,7 +2,6 @@ import type { IncomingMessage, ServerResponse } from 'http';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import Perplexity from '@perplexity-ai/perplexity_ai';
 
 type AiProviderKeyName =
   | 'perplexity'
@@ -330,11 +329,50 @@ export default async function handler(
       }
 
       try {
-        const client = new Perplexity({ apiKey, maxRetries: 2 });
-        const response = await client.responses.create({
-          ...reqPayload,
-          stream: false,
-        } as Perplexity.ResponseCreateParamsNonStreaming);
+        let response: {
+          id?: string;
+          model?: string;
+          output_text?: string;
+          output?: unknown[];
+          usage?: unknown;
+        };
+        try {
+          const mod = await import('@perplexity-ai/perplexity_ai');
+          const PerplexityCtor = mod.default;
+          const client = new PerplexityCtor({ apiKey, maxRetries: 2 });
+          response = (await client.responses.create({
+            ...reqPayload,
+            stream: false,
+          } as Parameters<typeof client.responses.create>[0])) as typeof response;
+        } catch (sdkErr) {
+          if (
+            typeof (sdkErr as { status?: number })?.status === 'number' &&
+            (sdkErr as { status: number }).status >= 400
+          ) {
+            throw sdkErr;
+          }
+          const httpResp = await fetch('https://api.perplexity.ai/v1/agent', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({ ...reqPayload, stream: false }),
+          });
+          const rawJson = (await httpResp.json().catch(() => ({}))) as Record<
+            string,
+            unknown
+          >;
+          if (!httpResp.ok) {
+            const errObj = rawJson.error as { message?: string } | undefined;
+            const err = new Error(
+              errObj?.message || `Perplexity Agent API HTTP ${httpResp.status}`
+            ) as Error & { status?: number };
+            err.status = httpResp.status;
+            throw err;
+          }
+          response = rawJson as typeof response;
+        }
 
         const outputItems = Array.isArray(response.output) ? response.output : [];
         const searchResults: unknown[] = [];
