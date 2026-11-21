@@ -243,25 +243,175 @@ async function callGeminiDirectBrowser(
   );
 }
 
+export interface PerplexityOrchestratorModelInfo {
+  id: string;
+  owned_by?: string;
+  name?: string;
+}
+
+export async function fetchPerplexityOrchestratorModels(
+  apiKey?: string
+): Promise<{
+  models: PerplexityOrchestratorModelInfo[];
+  serverKeyConfigured: boolean;
+}> {
+  const trimmedKey = (apiKey || '').trim();
+  try {
+    const resp = await fetch('/api/ai/perplexity/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey: trimmedKey }),
+    });
+    const data = (await resp.json().catch(() => ({}))) as {
+      ok?: boolean;
+      serverKeyConfigured?: boolean;
+      models?: PerplexityOrchestratorModelInfo[];
+      error?: string;
+    };
+    if (resp.ok && Array.isArray(data.models)) {
+      return {
+        models: data.models,
+        serverKeyConfigured: Boolean(data.serverKeyConfigured),
+      };
+    }
+    if (resp.status !== 404) {
+      throw new Error(
+        data.error ||
+          `Không thể tải danh sách model từ Perplexity Orchestrator (HTTP ${resp.status}).`
+      );
+    }
+  } catch (err) {
+    if (!(err instanceof TypeError) && !trimmedKey) {
+      throw err;
+    }
+  }
+
+  if (!trimmedKey) {
+    throw new Error(
+      'Chưa có PERPLEXITY_API_KEY. Hãy đặt biến môi trường PERPLEXITY_API_KEY trên server hoặc nhập key trong Cài đặt AI.'
+    );
+  }
+
+  const directResp = await fetch(
+    'https://api.perplexity.ai/orchestrator/v1/models',
+    {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${trimmedKey}`,
+        Accept: 'application/json',
+      },
+    }
+  );
+  const directData = (await directResp.json().catch(() => ({}))) as {
+    data?: Array<{ id?: string; owned_by?: string; name?: string }>;
+    models?: Array<{ id?: string; owned_by?: string; name?: string }>;
+    error?: { message?: string };
+  };
+  if (!directResp.ok) {
+    throw new Error(
+      directData.error?.message ||
+        `Perplexity Orchestrator /v1/models trả về lỗi HTTP ${directResp.status}.`
+    );
+  }
+  const rawList = Array.isArray(directData.data)
+    ? directData.data
+    : Array.isArray(directData.models)
+    ? directData.models
+    : [];
+  const models = rawList
+    .filter((m): m is { id: string; owned_by?: string; name?: string } =>
+      Boolean(m && typeof m.id === 'string' && m.id.trim())
+    )
+    .map((m) => ({
+      id: m.id.trim(),
+      owned_by: m.owned_by,
+      name: m.name,
+    }));
+  return { models, serverKeyConfigured: false };
+}
+
 async function callOpenAiCompatibleDirectFromBrowser(
   profile: AiProviderProfile,
   systemPrompt: string,
   userPrompt: string
 ): Promise<string> {
   const apiKey = profile.apiKey.trim();
+  const modelName = profile.model.trim() || 'perplexity/kimi-k3';
   const defaultBase =
     profile.provider === 'perplexity'
-      ? 'https://api.perplexity.ai'
+      ? 'https://api.perplexity.ai/orchestrator/v1'
       : 'https://api.openai.com/v1';
   const cleanBase = (profile.baseUrl.trim() || defaultBase)
     .replace(/\/+$/, '')
     .replace(/\/chat\/completions$/i, '');
-  const url =
-    profile.provider === 'perplexity'
-      ? `${cleanBase.replace(/\/v1$/i, '')}/chat/completions`
-      : cleanBase.endsWith('/v1')
+
+  const isPerplexityMessages =
+    profile.provider === 'perplexity' &&
+    (/\/orchestrator$/i.test(cleanBase) || /\/messages$/i.test(cleanBase));
+
+  if (isPerplexityMessages) {
+    const msgUrl = cleanBase.endsWith('/messages')
+      ? cleanBase
+      : `${cleanBase}/v1/messages`;
+    const payload: Record<string, unknown> = {
+      model: modelName,
+      max_tokens: 8192,
+      temperature: profile.temperature,
+      messages: [{ role: 'user', content: userPrompt }],
+    };
+    if (systemPrompt.trim()) {
+      payload.system = systemPrompt;
+    }
+    const resp = await fetch(msgUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = (await resp.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    if (!resp.ok) {
+      const errObj = data.error as { message?: string } | undefined;
+      throw new Error(
+        errObj?.message ||
+          `Perplexity Orchestrator Messages API lỗi HTTP ${resp.status}.`
+      );
+    }
+    const contentArr = Array.isArray(data.content) ? data.content : [];
+    const text = contentArr
+      .map((block: { type?: string; text?: string }) =>
+        block?.type === 'text' ? block.text || '' : ''
+      )
+      .join('')
+      .trim();
+    if (!text) {
+      throw new Error('Perplexity Orchestrator phản hồi rỗng.');
+    }
+    return text;
+  }
+
+  let url = '';
+  if (profile.provider === 'perplexity') {
+    const isOrchestrator =
+      modelName.includes('/') || /\/orchestrator/i.test(cleanBase);
+    if (isOrchestrator) {
+      url = /\/orchestrator\/v1$/i.test(cleanBase)
+        ? `${cleanBase}/chat/completions`
+        : 'https://api.perplexity.ai/orchestrator/v1/chat/completions';
+    } else {
+      url = `${cleanBase.replace(/\/v1$/i, '')}/chat/completions`;
+    }
+  } else {
+    url = cleanBase.endsWith('/v1')
       ? `${cleanBase}/chat/completions`
       : `${cleanBase}/v1/chat/completions`;
+  }
 
   const messages: { role: string; content: string }[] = [];
   if (systemPrompt.trim()) {
@@ -276,7 +426,7 @@ async function callOpenAiCompatibleDirectFromBrowser(
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: profile.model.trim() || 'gpt-4.1',
+      model: modelName,
       messages,
       temperature: profile.temperature,
     }),
@@ -323,14 +473,14 @@ export async function callAiChatbot({
   userPrompt,
 }: AiGenerateRequest): Promise<string> {
   const apiKey = profile.apiKey.trim();
-  if (!apiKey) {
+  if (!apiKey && profile.provider !== 'perplexity' && profile.provider !== 'gemini') {
     throw new Error(
       `Chưa có API Key cho ${profile.label}. Hãy bấm nút "Cài đặt API" ở góc trên để nhập key.`
     );
   }
 
-  // For Gemini, call Google's CORS-enabled endpoint directly first (with automatic model fallback)
-  if (profile.provider === 'gemini') {
+  // For Gemini, call Google's CORS-enabled endpoint directly first when browser key is provided
+  if (profile.provider === 'gemini' && apiKey) {
     return await callGeminiDirectBrowser(profile, systemPrompt, userPrompt);
   }
 

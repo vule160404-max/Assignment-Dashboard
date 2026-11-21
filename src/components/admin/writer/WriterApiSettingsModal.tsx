@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Bot,
@@ -8,10 +8,15 @@ import {
   Globe,
   KeyRound,
   Loader2,
+  RefreshCw,
   Sparkles,
   X,
 } from 'lucide-react';
-import { callAiChatbot } from '../../../lib/aiWriterClient';
+import {
+  PerplexityOrchestratorModelInfo,
+  callAiChatbot,
+  fetchPerplexityOrchestratorModels,
+} from '../../../lib/aiWriterClient';
 import {
   AI_PROVIDER_SUGGESTED_MODELS,
   AiChatbotSettingsStore,
@@ -27,11 +32,17 @@ interface WriterApiSettingsModalProps {
   onToast: (msg: string) => void;
 }
 
-const OTHER_PROVIDERS: { key: Exclude<AiProviderType, 'perplexity'>; label: string }[] = [
+const OTHER_PROVIDERS: {
+  key: Exclude<AiProviderType, 'perplexity'>;
+  label: string;
+}[] = [
   { key: 'gemini', label: 'Google Gemini (2.5 Pro / Flash / 2.0 / 1.5)' },
   { key: 'openai', label: 'OpenAI ChatGPT (GPT-4.1 / GPT-4o / o3 / o4-mini)' },
   { key: 'anthropic', label: 'Anthropic Claude (Claude 4 / 3.7 / 3.5 Sonnet)' },
-  { key: 'custom_openai', label: 'Custom OpenAI-Compatible (OpenRouter / DeepSeek / Groq)' },
+  {
+    key: 'custom_openai',
+    label: 'Custom OpenAI-Compatible (NVIDIA NIM / OpenRouter / DeepSeek)',
+  },
 ];
 
 export function WriterApiSettingsModal({
@@ -55,15 +66,57 @@ export function WriterApiSettingsModal({
     ok: boolean;
     message: string;
   } | null>(null);
+  const [catalogModels, setCatalogModels] = useState<
+    PerplexityOrchestratorModelInfo[]
+  >([]);
+  const [loadingCatalog, setLoadingCatalog] = useState(false);
+  const [serverPerplexityKeyPresent, setServerPerplexityKeyPresent] =
+    useState(false);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (!isOpen) return;
+    setDraft(settings);
+    setTestResult(null);
+  }, [isOpen, settings]);
 
   const activeProvider = draft.activeProvider;
   const isPerplexityMode = activeProvider === 'perplexity';
   const currentProfile: AiProviderProfile = draft.profiles[activeProvider];
-  const suggestedModels = AI_PROVIDER_SUGGESTED_MODELS[activeProvider] || [];
 
-  const hasPerplexityKey = Boolean(draft.profiles.perplexity?.apiKey?.trim());
+  useEffect(() => {
+    if (!isOpen || !isPerplexityMode) return;
+    let cancelled = false;
+    const loadCatalog = async () => {
+      try {
+        const res = await fetchPerplexityOrchestratorModels(
+          draft.profiles.perplexity?.apiKey
+        );
+        if (!cancelled) {
+          setServerPerplexityKeyPresent(res.serverKeyConfigured);
+          if (res.models.length > 0) {
+            setCatalogModels(res.models);
+          }
+        }
+      } catch {
+        // Silent on initial probe if no key yet
+      }
+    };
+    void loadCatalog();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, isPerplexityMode, draft.profiles.perplexity?.apiKey]);
+
+  if (!isOpen) return null;
+
+  const suggestedModels =
+    isPerplexityMode && catalogModels.length > 0
+      ? catalogModels.map((m) => m.id)
+      : AI_PROVIDER_SUGGESTED_MODELS[activeProvider] || [];
+
+  const hasPerplexityKey =
+    Boolean(draft.profiles.perplexity?.apiKey?.trim()) ||
+    serverPerplexityKeyPresent;
   const hasOtherKey = OTHER_PROVIDERS.some((p) =>
     Boolean(draft.profiles[p.key]?.apiKey?.trim())
   );
@@ -99,6 +152,42 @@ export function WriterApiSettingsModal({
     }));
   };
 
+  const handleFetchOrchestratorCatalog = async () => {
+    setLoadingCatalog(true);
+    setTestResult(null);
+    try {
+      const res = await fetchPerplexityOrchestratorModels(
+        currentProfile.apiKey
+      );
+      setServerPerplexityKeyPresent(res.serverKeyConfigured);
+      setCatalogModels(res.models);
+      if (res.models.length > 0) {
+        const exists = res.models.some((m) => m.id === currentProfile.model);
+        if (!exists) {
+          updateCurrentProfile({
+            model: res.models[0].id,
+            baseUrl: 'https://api.perplexity.ai/orchestrator/v1',
+          });
+        }
+        onToast(
+          `Đã tải ${res.models.length} model từ Perplexity Orchestrator (/orchestrator/v1/models).`
+        );
+      } else {
+        onToast('API phản hồi thành công nhưng danh sách model trống.');
+      }
+    } catch (err) {
+      setTestResult({
+        ok: false,
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Không thể tải danh sách model từ Perplexity Orchestrator.',
+      });
+    } finally {
+      setLoadingCatalog(false);
+    }
+  };
+
   const handleTestConnection = async () => {
     setTesting(true);
     setTestResult(null);
@@ -111,7 +200,10 @@ export function WriterApiSettingsModal({
       });
       setTestResult({
         ok: true,
-        message: `Kết nối thành công (${currentProfile.model}): "${reply.slice(0, 140)}"`,
+        message: `Kết nối thành công (${currentProfile.model}): "${reply.slice(
+          0,
+          140
+        )}"`,
       });
     } catch (err) {
       setTestResult({
@@ -135,10 +227,7 @@ export function WriterApiSettingsModal({
   };
 
   return createPortal(
-    <div
-      className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4"
-      onClick={onClose}
-    >
+    <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
       <div
         className="modal-panel bg-white border border-zinc-200 rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]"
         onClick={(e) => e.stopPropagation()}
@@ -154,7 +243,7 @@ export function WriterApiSettingsModal({
                 Cài đặt Mô hình AI Nghiên cứu Học thuật
               </h3>
               <p className="text-xs text-zinc-500">
-                Chọn giữa Perplexity (chuyên tra cứu học thuật & trích dẫn thực) hoặc nhóm các mô hình AI khác.
+                Hỗ trợ Perplexity Orchestrator API (`/orchestrator/v1` — đa mô hình Claude, GPT, Gemini, Kimi bằng 1 Key) &amp; các nền tảng AI khác.
               </p>
             </div>
           </div>
@@ -169,13 +258,13 @@ export function WriterApiSettingsModal({
 
         {/* Body */}
         <div className="p-6 overflow-y-auto space-y-5">
-          {/* 1. Two Consolidated Options: Perplexity vs All Other Models */}
+          {/* 1. Two Consolidated Options: Perplexity Orchestrator vs All Other Models */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
               1. Chọn chế độ Mô hình AI
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Option A: Perplexity Academic */}
+              {/* Option A: Perplexity Orchestrator & Sonar */}
               <button
                 type="button"
                 onClick={() => selectMainCategory('perplexity')}
@@ -188,7 +277,7 @@ export function WriterApiSettingsModal({
                 <div className="flex items-start justify-between gap-2 w-full">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
                     <Globe className="w-4 h-4 text-[#12489B] shrink-0" />
-                    <span>Perplexity Academic (Sonar)</span>
+                    <span>Perplexity Orchestrator &amp; Sonar</span>
                   </div>
                   <span
                     className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
@@ -197,11 +286,11 @@ export function WriterApiSettingsModal({
                         : 'bg-blue-100/80 text-[#12489B]'
                     }`}
                   >
-                    {hasPerplexityKey ? 'Đã có Key' : 'Khuyên dùng Học thuật'}
+                    {hasPerplexityKey ? 'Đã có Key' : '1 Key Đa Model'}
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-500 leading-relaxed">
-                  Tối ưu nhất cho nghiên cứu: `sonar-deep-research`, `sonar-reasoning-pro`, `sonar-pro` tự động tìm nguồn bài báo & trích dẫn thực tế.
+                  Gọi trực tiếp Claude, GPT, Gemini, Grok, Kimi qua `https://api.perplexity.ai/orchestrator/v1` hoặc tra cứu web qua `sonar-reasoning-pro`.
                 </p>
               </button>
 
@@ -218,7 +307,7 @@ export function WriterApiSettingsModal({
                 <div className="flex items-start justify-between gap-2 w-full">
                   <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900">
                     <Sparkles className="w-4 h-4 text-[#12489B] shrink-0" />
-                    <span>Các Mô hình AI khác (Gộp chung)</span>
+                    <span>Các Mô hình AI khác (Key riêng)</span>
                   </div>
                   <span
                     className={`text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${
@@ -231,7 +320,7 @@ export function WriterApiSettingsModal({
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-500 leading-relaxed">
-                  Bao gồm Google Gemini 2.5, OpenAI GPT-4.1 / GPT-4o / o3, Anthropic Claude 4 / 3.7 Sonnet, DeepSeek & OpenRouter.
+                  Dùng API Key trực tiếp của Google Gemini, OpenAI, Anthropic Claude, NVIDIA NIM hoặc OpenRouter.
                 </p>
               </button>
             </div>
@@ -263,18 +352,29 @@ export function WriterApiSettingsModal({
 
           {/* API Key Input */}
           <div>
-            <label className="block text-xs font-semibold text-slate-800 mb-1.5">
-              2. API Key ({currentProfile.label})
-            </label>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-800">
+                2. API Key ({currentProfile.label})
+              </label>
+              {isPerplexityMode && serverPerplexityKeyPresent && (
+                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  Server đã có biến môi trường PERPLEXITY_API_KEY
+                </span>
+              )}
+            </div>
             <div className="relative">
               <KeyRound className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type={showKey ? 'text' : 'password'}
                 value={currentProfile.apiKey}
-                onChange={(e) => updateCurrentProfile({ apiKey: e.target.value })}
+                onChange={(e) =>
+                  updateCurrentProfile({ apiKey: e.target.value })
+                }
                 placeholder={
                   activeProvider === 'perplexity'
-                    ? 'pplx-...'
+                    ? serverPerplexityKeyPresent
+                      ? 'Đang dùng PERPLEXITY_API_KEY trên server (hoặc nhập pplx-... để ghi đè)'
+                      : 'pplx-...'
                     : activeProvider === 'gemini'
                     ? 'AIzaSy...'
                     : activeProvider === 'anthropic'
@@ -298,34 +398,74 @@ export function WriterApiSettingsModal({
             </div>
             <p className="text-[11px] text-zinc-500 mt-1">
               {isPerplexityMode
-                ? 'Lấy Perplexity API Key tại perplexity.ai/settings/api (bắt đầu bằng pplx-...).'
-                : 'API Key được lưu cục bộ trên trình duyệt của bạn và gọi qua kết nối bảo mật.'}
+                ? 'Tạo Perplexity API Key tại console.perplexity.ai. Bạn có thể export biến môi trường PERPLEXITY_API_KEY trên server hoặc nhập tại đây.'
+                : 'API Key được lưu cục bộ và đồng bộ an toàn qua tài khoản quản trị của bạn.'}
             </p>
           </div>
 
-          {/* Model Name + Suggested Chips */}
+          {/* Model Name + Suggested / Catalog Chips */}
           <div>
-            <label className="block text-xs font-semibold text-slate-800 mb-1.5">
-              3. Phiên bản Model ({isPerplexityMode ? 'Perplexity Sonar' : currentProfile.label})
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+              <label className="block text-xs font-semibold text-slate-800">
+                3. Phiên bản Model (
+                {isPerplexityMode
+                  ? 'Slug creator/model-name từ /orchestrator/v1/models'
+                  : currentProfile.label}
+                )
+              </label>
+
+              {isPerplexityMode && (
+                <button
+                  type="button"
+                  disabled={loadingCatalog}
+                  onClick={() => void handleFetchOrchestratorCatalog()}
+                  className="btn-press inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-semibold rounded-md bg-blue-50 text-[#12489B] border border-blue-200 hover:bg-blue-100 disabled:opacity-40"
+                >
+                  <RefreshCw
+                    className={`w-3 h-3 ${loadingCatalog ? 'animate-spin' : ''}`}
+                  />
+                  <span>
+                    {loadingCatalog
+                      ? 'Đang tải...'
+                      : 'Tải danh sách Model từ Orchestrator (/v1/models)'}
+                  </span>
+                </button>
+              )}
+            </div>
+
             <input
               type="text"
               value={currentProfile.model}
               onChange={(e) => updateCurrentProfile({ model: e.target.value })}
               placeholder={
                 isPerplexityMode
-                  ? 'sonar-deep-research, sonar-reasoning-pro, sonar-pro...'
+                  ? 'perplexity/kimi-k3, anthropic/claude-sonnet-5-5, google/gemini-4-carbon...'
                   : 'Nhập tên model (VD: gemini-2.5-pro, gpt-4.1, claude-sonnet-4-20250514...)'
               }
               className="w-full px-3 py-2 text-sm font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
             />
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-              <span className="text-[11px] text-zinc-500 mr-1">Chọn nhanh phiên bản:</span>
+
+            <div className="flex flex-wrap items-center gap-1.5 mt-2 max-h-32 overflow-y-auto">
+              <span className="text-[11px] text-zinc-500 mr-1">
+                {isPerplexityMode && catalogModels.length > 0
+                  ? `Danh mục cho phép theo Key (${catalogModels.length} model):`
+                  : 'Chọn nhanh phiên bản:'}
+              </span>
               {suggestedModels.map((m) => (
                 <button
                   key={m}
                   type="button"
-                  onClick={() => updateCurrentProfile({ model: m })}
+                  onClick={() => {
+                    const nextBase =
+                      isPerplexityMode && m.includes('/')
+                        ? currentProfile.baseUrl.includes('/orchestrator')
+                          ? currentProfile.baseUrl
+                          : 'https://api.perplexity.ai/orchestrator/v1'
+                        : isPerplexityMode && !m.includes('/')
+                        ? 'https://api.perplexity.ai'
+                        : currentProfile.baseUrl;
+                    updateCurrentProfile({ model: m, baseUrl: nextBase });
+                  }}
                   className={`btn-press px-2 py-0.5 text-xs font-mono rounded-md border ${
                     currentProfile.model === m
                       ? 'bg-[#12489B] text-white border-[#12489B]'
@@ -340,8 +480,8 @@ export function WriterApiSettingsModal({
 
           {/* Base URL & Temperature */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="sm:col-span-2">
-              <label className="block text-xs font-semibold text-slate-800 mb-1.5">
+            <div className="sm:col-span-2 space-y-1.5">
+              <label className="block text-xs font-semibold text-slate-800">
                 4. API Base URL
               </label>
               <input
@@ -352,11 +492,64 @@ export function WriterApiSettingsModal({
                 }
                 placeholder={
                   isPerplexityMode
-                    ? 'https://api.perplexity.ai'
+                    ? 'https://api.perplexity.ai/orchestrator/v1'
                     : 'https://api.openai.com/v1'
                 }
                 className="w-full px-3 py-2 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
               />
+              {isPerplexityMode && (
+                <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+                  <span className="text-[10px] text-zinc-500">Chuẩn giao thức:</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateCurrentProfile({
+                        baseUrl: 'https://api.perplexity.ai/orchestrator/v1',
+                      })
+                    }
+                    className={`px-2 py-0.5 text-[10px] font-mono rounded border ${
+                      currentProfile.baseUrl.replace(/\/+$/, '') ===
+                      'https://api.perplexity.ai/orchestrator/v1'
+                        ? 'bg-blue-50 text-[#12489B] border-blue-200 font-semibold'
+                        : 'bg-zinc-50 text-zinc-600 border-zinc-200'
+                    }`}
+                  >
+                    Orchestrator Chat Completions (/orchestrator/v1)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateCurrentProfile({
+                        baseUrl: 'https://api.perplexity.ai/orchestrator',
+                      })
+                    }
+                    className={`px-2 py-0.5 text-[10px] font-mono rounded border ${
+                      currentProfile.baseUrl.replace(/\/+$/, '') ===
+                      'https://api.perplexity.ai/orchestrator'
+                        ? 'bg-blue-50 text-[#12489B] border-blue-200 font-semibold'
+                        : 'bg-zinc-50 text-zinc-600 border-zinc-200'
+                    }`}
+                  >
+                    Orchestrator Anthropic Messages (/orchestrator)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      updateCurrentProfile({
+                        baseUrl: 'https://api.perplexity.ai',
+                      })
+                    }
+                    className={`px-2 py-0.5 text-[10px] font-mono rounded border ${
+                      currentProfile.baseUrl.replace(/\/+$/, '') ===
+                      'https://api.perplexity.ai'
+                        ? 'bg-blue-50 text-[#12489B] border-blue-200 font-semibold'
+                        : 'bg-zinc-50 text-zinc-600 border-zinc-200'
+                    }`}
+                  >
+                    Sonar Web-Grounded
+                  </button>
+                </div>
+              )}
             </div>
 
             <div>
@@ -402,7 +595,11 @@ export function WriterApiSettingsModal({
         <div className="px-6 py-4 border-t border-zinc-200 bg-zinc-50 flex items-center justify-between gap-3">
           <button
             type="button"
-            disabled={testing || !currentProfile.apiKey.trim()}
+            disabled={
+              testing ||
+              (!currentProfile.apiKey.trim() &&
+                !(isPerplexityMode && serverPerplexityKeyPresent))
+            }
             onClick={() => void handleTestConnection()}
             className="btn-press px-3.5 py-2 text-xs font-semibold rounded-lg border border-blue-200 bg-blue-50 text-[#12489B] hover:bg-blue-100 disabled:opacity-40 inline-flex items-center gap-1.5"
           >
@@ -427,7 +624,7 @@ export function WriterApiSettingsModal({
               onClick={handleSave}
               className="btn-press px-5 py-2 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] shadow-xs"
             >
-              Lưu & Sử dụng Mô hình này
+              Lưu &amp; Sử dụng Mô hình này
             </button>
           </div>
         </div>

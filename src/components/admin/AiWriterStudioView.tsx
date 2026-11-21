@@ -195,6 +195,8 @@ export function AiWriterStudioView({
   const [exportingAllDocx, setExportingAllDocx] = useState(false);
   const [attachingToOrder, setAttachingToOrder] = useState(false);
   const [cloudSyncState, setCloudSyncState] = useState<CloudSyncState>('connecting');
+  const [serverPerplexityKeyConfigured, setServerPerplexityKeyConfigured] =
+    useState(false);
 
   // Refs for background multi-session parallel execution & cloud sync loop protection
   const sessionsRef = useRef<WriterSession[]>(sessions);
@@ -213,6 +215,18 @@ export function AiWriterStudioView({
   useEffect(() => {
     saveWriterSessions(sessions);
   }, [sessions]);
+
+  // Probe whether PERPLEXITY_API_KEY is configured in server environment
+  useEffect(() => {
+    fetch('/api/ai/perplexity/models', { method: 'GET' })
+      .then((r) => r.json())
+      .then((d: { serverKeyConfigured?: boolean }) => {
+        if (d?.serverKeyConfigured) {
+          setServerPerplexityKeyConfigured(true);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   // Auto-clean any residual leading markdown hashes (# or ##) from outline content across sessions
   useEffect(() => {
@@ -468,6 +482,9 @@ export function AiWriterStudioView({
   }, [initialOrderCode, orders]);
 
   const activeProfile = aiSettings.profiles[aiSettings.activeProvider];
+  const hasEffectiveApiKey =
+    Boolean(activeProfile.apiKey.trim()) ||
+    (activeProfile.provider === 'perplexity' && serverPerplexityKeyConfigured);
   const enabledSkillsCount = useMemo(
     () => skills.filter((s) => s.enabled).length,
     [skills]
@@ -650,7 +667,7 @@ export function AiWriterStudioView({
   const handleAiGenerateOutlineForSession = async (targetSessionId: string) => {
     const sess = sessionsRef.current.find((s) => s.id === targetSessionId);
     if (!sess) return;
-    if (!activeProfile.apiKey.trim()) {
+    if (!hasEffectiveApiKey) {
       setShowApiModal(true);
       onToast('Vui lòng nhập API Key Chatbot trước khi tạo dàn ý.');
       return;
@@ -759,7 +776,7 @@ export function AiWriterStudioView({
   const handleWriteSingleSection = async (sectionId: string) => {
     if (!activeSession) return;
     const targetSessionId = activeSession.id;
-    if (!activeProfile.apiKey.trim()) {
+    if (!hasEffectiveApiKey) {
       setShowApiModal(true);
       onToast('Vui lòng nhập API Key Chatbot trước khi viết bài.');
       return;
@@ -940,7 +957,7 @@ export function AiWriterStudioView({
 
   const handleWriteCurrentPaperSequentially = async () => {
     if (!activeSession) return;
-    if (!activeProfile.apiKey.trim()) {
+    if (!hasEffectiveApiKey) {
       setShowApiModal(true);
       onToast('Vui lòng nhập API Key Chatbot trước khi chạy tự động.');
       return;
@@ -960,7 +977,7 @@ export function AiWriterStudioView({
    * using a bounded worker pool (`concurrencyLimit` papers at once).
    */
   const handleRunAllPapersParallel = async () => {
-    if (!activeProfile.apiKey.trim()) {
+    if (!hasEffectiveApiKey) {
       setShowApiModal(true);
       onToast('Vui lòng nhập API Key Chatbot trước khi chạy song song nhiều bài.');
       return;
@@ -1234,7 +1251,7 @@ export function AiWriterStudioView({
       onToast('Mục này chưa có nội dung. Hãy bấm "Viết" hoặc gõ bản nháp trước.');
       return;
     }
-    if (!activeProfile.apiKey.trim()) {
+    if (!hasEffectiveApiKey) {
       setShowApiModal(true);
       onToast('Vui lòng nhập API Key Chatbot trước.');
       return;
@@ -1395,7 +1412,7 @@ export function AiWriterStudioView({
         cloudSyncState={cloudSyncState}
         enabledSkillsCount={enabledSkillsCount}
         activeModelName={activeProfile.model}
-        hasApiKey={Boolean(activeProfile.apiKey.trim())}
+        hasApiKey={hasEffectiveApiKey}
         linkedOrder={linkedOrder}
         totalDraftedWords={totalDraftedWords}
         attachingToOrder={attachingToOrder}

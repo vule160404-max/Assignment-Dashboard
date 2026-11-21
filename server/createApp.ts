@@ -1535,18 +1535,119 @@ export function createApiApp(): express.Express {
     res.json({ ok: true });
   });
 
-  // Multi-Provider AI Chatbot Proxy (Gemini, OpenAI, Anthropic Claude, Custom OpenAI-Compatible)
+  // Perplexity Orchestrator API: Tier-Aware Model Catalog & Allowlist (GET /orchestrator/v1/models)
+  const handlePerplexityModelsCatalog = async (req: Request, res: Response) => {
+    const rawKey =
+      typeof req.body?.apiKey === 'string'
+        ? req.body.apiKey.trim()
+        : typeof req.headers['x-perplexity-key'] === 'string'
+        ? req.headers['x-perplexity-key'].trim()
+        : '';
+    const envKey = (process.env.PERPLEXITY_API_KEY || '').trim();
+    const apiKey = rawKey || envKey;
+    const serverKeyConfigured = Boolean(envKey);
+
+    if (!apiKey) {
+      res.status(400).json({
+        ok: false,
+        serverKeyConfigured,
+        error:
+          'Chưa tìm thấy PERPLEXITY_API_KEY. Hãy đặt biến môi trường PERPLEXITY_API_KEY trên server hoặc nhập Perplexity API Key trong Cài đặt AI.',
+      });
+      return;
+    }
+
+    try {
+      const resp = await fetch('https://api.perplexity.ai/orchestrator/v1/models', {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
+        },
+      });
+      const rawText = await resp.text().catch(() => '');
+      let data: Record<string, unknown> = {};
+      try {
+        data = JSON.parse(rawText) as Record<string, unknown>;
+      } catch {
+        // non-json
+      }
+
+      if (!resp.ok) {
+        const errObj = data.error as { message?: string } | undefined;
+        res.status(resp.status).json({
+          ok: false,
+          serverKeyConfigured,
+          error:
+            errObj?.message ||
+            `Không thể tải danh sách model từ Perplexity Orchestrator (HTTP ${resp.status}).`,
+        });
+        return;
+      }
+
+      const rawList = Array.isArray(data.data)
+        ? data.data
+        : Array.isArray(data.models)
+        ? data.models
+        : [];
+      const models = rawList
+        .map((item: unknown) => {
+          if (typeof item === 'string') return { id: item };
+          if (item && typeof item === 'object' && 'id' in item) {
+            const obj = item as { id?: unknown; owned_by?: unknown; name?: unknown };
+            if (typeof obj.id === 'string' && obj.id.trim()) {
+              return {
+                id: obj.id.trim(),
+                owned_by: typeof obj.owned_by === 'string' ? obj.owned_by : undefined,
+                name: typeof obj.name === 'string' ? obj.name : undefined,
+              };
+            }
+          }
+          return null;
+        })
+        .filter(
+          (m): m is { id: string; owned_by?: string; name?: string } => Boolean(m)
+        );
+
+      res.json({
+        ok: true,
+        serverKeyConfigured,
+        count: models.length,
+        models,
+      });
+    } catch (err) {
+      res.status(502).json({
+        ok: false,
+        serverKeyConfigured,
+        error:
+          err instanceof Error
+            ? `Lỗi kết nối tới Perplexity Orchestrator: ${err.message}`
+            : 'Không thể kết nối tới Perplexity Orchestrator.',
+      });
+    }
+  };
+
+  app.get('/api/ai/perplexity/models', handlePerplexityModelsCatalog);
+  app.post('/api/ai/perplexity/models', handlePerplexityModelsCatalog);
+
+  // Multi-Provider AI Chatbot Proxy (Perplexity Orchestrator, Gemini, OpenAI, Anthropic Claude, Custom OpenAI-Compatible)
   app.post('/api/ai/generate', async (req, res) => {
     const provider =
-      typeof req.body?.provider === 'string' ? req.body.provider.trim() : 'gemini';
+      typeof req.body?.provider === 'string' ? req.body.provider.trim() : 'perplexity';
     const rawApiKey =
       typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
     const apiKey =
       rawApiKey ||
-      (provider === 'gemini' ? (process.env.GEMINI_API_KEY || '').trim() : '');
+      (provider === 'perplexity'
+        ? (process.env.PERPLEXITY_API_KEY || '').trim()
+        : provider === 'gemini'
+        ? (process.env.GEMINI_API_KEY || '').trim()
+        : '');
     const model =
       typeof req.body?.model === 'string' && req.body.model.trim()
         ? req.body.model.trim()
+        : provider === 'perplexity'
+        ? 'perplexity/kimi-k3'
         : provider === 'openai'
         ? 'gpt-4o'
         : provider === 'anthropic'
@@ -1554,6 +1655,8 @@ export function createApiApp(): express.Express {
         : 'gemini-2.5-flash';
     const baseUrl =
       typeof req.body?.baseUrl === 'string' ? req.body.baseUrl.trim() : '';
+    const schema =
+      typeof req.body?.schema === 'string' ? req.body.schema.trim() : '';
     const systemPrompt =
       typeof req.body?.systemPrompt === 'string' ? req.body.systemPrompt : '';
     const userPrompt =
@@ -1630,14 +1733,47 @@ export function createApiApp(): express.Express {
         return;
       }
 
-      if (provider === 'anthropic') {
-        const cleanBase = (baseUrl || 'https://api.anthropic.com/v1').replace(
-          /\/+$/,
-          ''
-        );
+      const fetchWithRetryAfter = async (
+        targetUrl: string,
+        init: RequestInit
+      ): Promise<{ resp: globalThis.Response; retryAfterHeader: string | null }> => {
+        let resp = await fetch(targetUrl, init);
+        let retryAfterHeader = resp.headers.get('retry-after');
+        if (resp.status === 429 && retryAfterHeader) {
+          const parsedSec = Number(retryAfterHeader);
+          const waitSec =
+            Number.isFinite(parsedSec) && parsedSec > 0
+              ? parsedSec
+              : Math.max(
+                  0,
+                  Math.ceil((Date.parse(retryAfterHeader) - Date.now()) / 1000)
+                );
+          if (waitSec > 0 && waitSec <= 10) {
+            await new Promise((resolve) => setTimeout(resolve, waitSec * 1000));
+            resp = await fetch(targetUrl, init);
+            retryAfterHeader = resp.headers.get('retry-after');
+          }
+        }
+        return { resp, retryAfterHeader };
+      };
+
+      const isPerplexityMessagesSchema =
+        provider === 'perplexity' &&
+        (schema === 'messages' ||
+          /\/orchestrator\/?$/i.test(baseUrl) ||
+          /\/messages\/?$/i.test(baseUrl));
+
+      if (provider === 'anthropic' || isPerplexityMessagesSchema) {
+        const defaultMessagesBase =
+          provider === 'perplexity'
+            ? 'https://api.perplexity.ai/orchestrator'
+            : 'https://api.anthropic.com/v1';
+        const cleanBase = (baseUrl || defaultMessagesBase).replace(/\/+$/, '');
         const url = cleanBase.endsWith('/messages')
           ? cleanBase
-          : `${cleanBase}/messages`;
+          : cleanBase.endsWith('/v1')
+          ? `${cleanBase}/messages`
+          : `${cleanBase}/v1/messages`;
 
         const payload: Record<string, unknown> = {
           model,
@@ -1649,22 +1785,52 @@ export function createApiApp(): express.Express {
           payload.system = systemPrompt;
         }
 
-        const resp = await fetch(url, {
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01',
+        };
+        if (provider === 'perplexity') {
+          headers.Authorization = `Bearer ${apiKey}`;
+        }
+
+        const { resp, retryAfterHeader } = await fetchWithRetryAfter(url, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-api-key': apiKey,
-            'anthropic-version': '2023-06-01',
-          },
+          headers,
           body: JSON.stringify(payload),
         });
+        if (retryAfterHeader) {
+          res.setHeader('Retry-After', retryAfterHeader);
+        }
         const data = (await resp.json().catch(() => ({}))) as Record<string, unknown>;
         if (!resp.ok) {
           const errObj = data.error as { message?: string } | undefined;
+          const errMsg = errObj?.message || '';
+          if (provider === 'perplexity' && resp.status === 400) {
+            res.status(400).json({
+              error: `Perplexity Orchestrator báo Model "${model}" không nằm trong danh mục hợp lệ (HTTP 400: ${errMsg}). Hãy bấm "Tải danh sách Model từ Orchestrator (/v1/models)" để chọn đúng slug creator/model-name.`,
+            });
+            return;
+          }
+          if (provider === 'perplexity' && resp.status === 402) {
+            res.status(402).json({
+              error: `Perplexity Orchestrator từ chối quyền truy cập Model "${model}" do giới hạn Usage Tier hoặc số dư tín dụng (HTTP 402: ${errMsg}). Hãy chọn model phù hợp với Tier của bạn từ /orchestrator/v1/models.`,
+            });
+            return;
+          }
+          if (resp.status === 429) {
+            res.status(429).json({
+              error: `Tạm thời quá tải hoặc chạm giới hạn tốc độ (HTTP 429${
+                retryAfterHeader ? `, Retry-After: ${retryAfterHeader}s` : ''
+              }). ${errMsg}`,
+              retryAfter: retryAfterHeader,
+            });
+            return;
+          }
           res.status(resp.status).json({
             error:
-              errObj?.message ||
-              `Anthropic Claude API lỗi HTTP ${resp.status}. Vui lòng kiểm tra API Key hoặc Model.`,
+              errMsg ||
+              `Messages API (${provider}) lỗi HTTP ${resp.status}. Vui lòng kiểm tra API Key hoặc Model.`,
           });
           return;
         }
@@ -1676,24 +1842,64 @@ export function createApiApp(): express.Express {
           .join('')
           .trim();
 
-        res.json({ text, model, provider });
+        const rawUsage = data.usage as
+          | {
+              input_tokens?: number;
+              output_tokens?: number;
+              cache_creation_input_tokens?: number;
+              cache_read_input_tokens?: number;
+            }
+          | undefined;
+
+        res.json({
+          text,
+          model,
+          provider,
+          schema: 'messages',
+          usage: rawUsage
+            ? {
+                input_tokens: rawUsage.input_tokens ?? 0,
+                output_tokens: rawUsage.output_tokens ?? 0,
+                cache_creation_input_tokens:
+                  rawUsage.cache_creation_input_tokens ?? 0,
+                cache_read_input_tokens: rawUsage.cache_read_input_tokens ?? 0,
+              }
+            : undefined,
+        });
         return;
       }
 
-      // Perplexity Sonar Academic API, OpenAI, NVIDIA NIM, or Custom OpenAI-Compatible
+      // Perplexity Orchestrator API (/orchestrator/v1/chat/completions), Perplexity Sonar (/chat/completions), OpenAI, NVIDIA NIM, or Custom OpenAI-Compatible
       const defaultBaseByProvider =
         provider === 'perplexity'
-          ? 'https://api.perplexity.ai'
+          ? 'https://api.perplexity.ai/orchestrator/v1'
           : 'https://api.openai.com/v1';
       const cleanBase = (baseUrl || defaultBaseByProvider)
         .replace(/\/+$/, '')
         .replace(/\/chat\/completions$/i, '');
-      const url =
-        provider === 'perplexity'
-          ? `${cleanBase.replace(/\/v1$/i, '')}/chat/completions`
-          : cleanBase.endsWith('/v1')
+
+      let url = '';
+      if (provider === 'perplexity') {
+        const isOrchestratorSlugOrBase =
+          model.includes('/') || /\/orchestrator/i.test(cleanBase);
+        if (isOrchestratorSlugOrBase) {
+          // Perplexity Orchestrator API: https://api.perplexity.ai/orchestrator/v1/chat/completions
+          if (/\/orchestrator\/v1$/i.test(cleanBase)) {
+            url = `${cleanBase}/chat/completions`;
+          } else if (/\/orchestrator$/i.test(cleanBase)) {
+            url = `${cleanBase}/v1/chat/completions`;
+          } else {
+            url = 'https://api.perplexity.ai/orchestrator/v1/chat/completions';
+          }
+        } else {
+          // Legacy Perplexity Sonar endpoint for bare sonar* model ids: https://api.perplexity.ai/chat/completions
+          url = `${cleanBase.replace(/\/v1$/i, '')}/chat/completions`;
+        }
+      } else {
+        url = cleanBase.endsWith('/v1')
           ? `${cleanBase}/chat/completions`
           : `${cleanBase}/v1/chat/completions`;
+      }
 
       // If using NVIDIA NIM (integrate.api.nvidia.com) and user typed a short model name without vendor prefix,
       // automatically map common names or resolve from /v1/models
@@ -1727,7 +1933,7 @@ export function createApiApp(): express.Express {
       }
       messages.push({ role: 'user', content: userPrompt });
 
-      const resp = await fetch(url, {
+      const { resp, retryAfterHeader } = await fetchWithRetryAfter(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1739,6 +1945,9 @@ export function createApiApp(): express.Express {
           temperature,
         }),
       });
+      if (retryAfterHeader) {
+        res.setHeader('Retry-After', retryAfterHeader);
+      }
       const rawText = await resp.text().catch(() => '');
       let data: Record<string, unknown> = {};
       try {
@@ -1754,6 +1963,37 @@ export function createApiApp(): express.Express {
           (typeof data.detail === 'string' ? data.detail : '') ||
           (typeof data.title === 'string' ? data.title : '') ||
           rawText.trim().slice(0, 180);
+
+        if (provider === 'perplexity' && resp.status === 400) {
+          res.status(400).json({
+            error: `Perplexity Orchestrator báo Model "${resolvedModel}" không hợp lệ hoặc không có trong danh mục (HTTP 400: ${detailMsg}). Hãy bấm "Tải danh sách Model từ Orchestrator (/v1/models)" để chọn đúng slug creator/model-name.`,
+          });
+          return;
+        }
+
+        if (provider === 'perplexity' && resp.status === 401) {
+          res.status(401).json({
+            error: `Perplexity từ chối xác thực API Key (HTTP 401: ${detailMsg}). Vui lòng kiểm tra lại PERPLEXITY_API_KEY tại https://console.perplexity.ai.`,
+          });
+          return;
+        }
+
+        if (provider === 'perplexity' && resp.status === 402) {
+          res.status(402).json({
+            error: `Perplexity Orchestrator từ chối Model "${resolvedModel}" do giới hạn Usage Tier của tổ chức hoặc hết tín dụng (HTTP 402: ${detailMsg}). Hãy chọn một model được cấp quyền trong danh sách /orchestrator/v1/models.`,
+          });
+          return;
+        }
+
+        if (resp.status === 429) {
+          res.status(429).json({
+            error: `Tạm thời quá tải hoặc chạm giới hạn tốc độ (HTTP 429${
+              retryAfterHeader ? `, Retry-After: ${retryAfterHeader}s` : ''
+            }): ${detailMsg}`,
+            retryAfter: retryAfterHeader,
+          });
+          return;
+        }
 
         if (isNvidiaNim && (resp.status === 401 || resp.status === 403)) {
           res.status(resp.status).json({
@@ -1802,12 +2042,35 @@ export function createApiApp(): express.Express {
         res.status(502).json({
           error: `Model "${resolvedModel}" trả về nội dung rỗng (finish_reason: ${
             firstChoice?.finish_reason || 'không rõ'
-          }). Hãy thử lại hoặc chọn Model khác (khuyên dùng nvidia/nemotron-3-ultra-550b-a55b trên NVIDIA NIM).`,
+          }). Hãy thử lại hoặc chọn Model khác.`,
         });
         return;
       }
 
-      res.json({ text, model: resolvedModel, provider });
+      const rawUsage = data.usage as
+        | {
+            prompt_tokens?: number;
+            completion_tokens?: number;
+            total_tokens?: number;
+            prompt_tokens_details?: { cached_tokens?: number };
+          }
+        | undefined;
+
+      res.json({
+        text,
+        model: resolvedModel,
+        provider,
+        schema: 'chat_completions',
+        usage: rawUsage
+          ? {
+              prompt_tokens: rawUsage.prompt_tokens ?? 0,
+              cached_tokens:
+                rawUsage.prompt_tokens_details?.cached_tokens ?? 0,
+              completion_tokens: rawUsage.completion_tokens ?? 0,
+              total_tokens: rawUsage.total_tokens ?? 0,
+            }
+          : undefined,
+      });
     } catch (err) {
       res.status(502).json({
         error:

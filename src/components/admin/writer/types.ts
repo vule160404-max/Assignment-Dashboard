@@ -297,11 +297,19 @@ export interface WriterSession {
 
 export const AI_PROVIDER_SUGGESTED_MODELS: Record<AiProviderType, string[]> = {
   perplexity: [
-    'sonar-deep-research',
+    'perplexity/kimi-k3',
+    'anthropic/claude-sonnet-5-5',
+    'anthropic/claude-opus-5-5',
+    'anthropic/claude-haiku-5-5',
+    'google/gemini-4-carbon',
+    'google/gemini-4-argon',
+    'openai/gpt-6-sol',
+    'openai/gpt-6-astra',
+    'xai/grok-4.7',
+    'perplexity/glm-5.3',
     'sonar-reasoning-pro',
-    'sonar-reasoning',
+    'sonar-deep-research',
     'sonar-pro',
-    'sonar',
   ],
   gemini: [
     'gemini-2.5-pro',
@@ -351,10 +359,10 @@ export const DEFAULT_AI_SETTINGS: AiChatbotSettingsStore = {
   profiles: {
     perplexity: {
       provider: 'perplexity',
-      label: 'Perplexity Academic (Sonar)',
+      label: 'Perplexity Orchestrator & Sonar API',
       apiKey: '',
-      model: 'sonar-reasoning-pro',
-      baseUrl: 'https://api.perplexity.ai',
+      model: 'perplexity/kimi-k3',
+      baseUrl: 'https://api.perplexity.ai/orchestrator/v1',
       temperature: 0.2,
     },
     gemini: {
