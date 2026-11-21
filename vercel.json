@@ -4,6 +4,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/**/*.ts": {
+      "maxDuration": 60,
       "includeFiles": "{extension/hix-bridge/**,firebase-applet-config.json}"
     }
   },

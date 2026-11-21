@@ -874,11 +874,21 @@ function buildSmartPriorContext(
     const fullCombined = written
       .map((s) => `### ${s.title}\n${s.content.trim()}`)
       .join('\n\n');
-    // For short/medium papers (< 9,000 chars), keep full text verbatim for 100% citation safety
-    if (fullCombined.length <= 9000) {
-      return fullCombined;
+    const uniqueCitations = extractInTextCitations(
+      written.map((s) => s.content).join('\n')
+    );
+    const citationHeader =
+      uniqueCitations.length > 0
+        ? `--- UNIQUE IN-TEXT CITATIONS DETECTED (${uniqueCitations.length}) ---\n${uniqueCitations.join(
+            ' · '
+          )}\n\n`
+        : '';
+
+    // For short papers (<= 3,500 chars), keep full text verbatim
+    if (fullCombined.length <= 3500) {
+      return `${citationHeader}${fullCombined}`;
     }
-    // For very long papers, extract every sentence containing a year/citation marker verbatim
+    // For medium/long papers, extract every sentence containing a year/citation marker verbatim for fast, 100% 1-to-1 matching
     const citationPattern =
       /(?:\((?:[^()]{0,80}(?:19|20)\d{2}[a-z]?[^()]{0,30})\)|\bet\s+al\.?|\[\d+(?:\s*[-,]\s*\d+)*\]|https?:\/\/|doi\.org)/i;
     const blocks: string[] = [];
@@ -889,10 +899,11 @@ function buildSmartPriorContext(
         .map((s) => s.trim())
         .filter((s) => s.length > 10 && citationPattern.test(s));
       if (sentences.length > 0) {
-        blocks.push(`### ${sec.title} (Citation-bearing excerpts)\n${sentences.join(' ')}`);
+        blocks.push(`### ${sec.title} (Citations)\n${sentences.join(' ')}`);
       }
     }
-    return blocks.length > 0 ? blocks.join('\n\n') : fullCombined;
+    const bodyExtract = blocks.length > 0 ? blocks.join('\n\n') : fullCombined;
+    return `${citationHeader}${bodyExtract}`.trim();
   }
 
   const allCitations = extractInTextCitations(

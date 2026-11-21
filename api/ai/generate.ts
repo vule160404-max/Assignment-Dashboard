@@ -3,6 +3,8 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 
+export const maxDuration = 60;
+
 type AiProviderKeyName =
   | 'perplexity'
   | 'gemini'
@@ -404,7 +406,7 @@ export default async function handler(
         try {
           const mod = await import('@perplexity-ai/perplexity_ai');
           const PerplexityCtor = mod.default;
-          const client = new PerplexityCtor({ apiKey, maxRetries: 2 });
+          const client = new PerplexityCtor({ apiKey, maxRetries: 0 });
           response = (await client.responses.create({
             ...reqPayload,
             stream: false,
