@@ -68,7 +68,7 @@ export async function extractTextFromSkillFile(file: File): Promise<string> {
     const parsed = await parseDocxFile(file);
     return parsed.paragraphs
       .filter((p) => !p.isEmpty)
-      .map((p) => (p.isHeading ? `## ${p.text}` : p.text))
+      .map((p) => p.text)
       .join('\n\n');
   }
   if (lower.endsWith('.pdf')) {
@@ -628,50 +628,56 @@ export async function buildFormattedDocxFromSession(
       const currentPage =
         startPageOffset + Math.floor(cumulativeWords / wordsPerPage);
 
-      if (trimmed.startsWith('### ')) {
-        const headingText = trimmed.slice(4).trim();
+      const cleanLine = trimmed.replace(/^[ \t]*#{1,6}[ \t]*/, '').trim();
+      const isExplicitH3 =
+        trimmed.startsWith('### ') ||
+        /^\d+\.\d+\.\d+(\.\d+)*\s+[A-Za-zÀ-ỹ0-9]/.test(cleanLine);
+      const isExplicitH2 =
+        trimmed.startsWith('## ') ||
+        /^\d+\.\d+\s+[A-Za-zÀ-ỹ0-9]/.test(cleanLine);
+      const isExplicitH1 = trimmed.startsWith('# ');
+
+      if (isExplicitH3) {
         collectedHeadings.push({
-          title: headingText,
+          title: cleanLine,
           level: 'h3',
           pageNumber: currentPage,
         });
         bodyParagraphsXml.push(
           buildParagraphXml({
-            text: headingText,
+            text: cleanLine,
             format,
             role: 'h3',
           })
         );
-      } else if (trimmed.startsWith('## ')) {
-        const headingText = trimmed.slice(3).trim();
+      } else if (isExplicitH2) {
         collectedHeadings.push({
-          title: headingText,
+          title: cleanLine,
           level: 'h2',
           pageNumber: currentPage,
         });
         bodyParagraphsXml.push(
           buildParagraphXml({
-            text: headingText,
+            text: cleanLine,
             format,
             role: 'h2',
           })
         );
-      } else if (trimmed.startsWith('# ')) {
-        const headingText = trimmed.slice(2).trim();
+      } else if (isExplicitH1) {
         collectedHeadings.push({
-          title: headingText,
+          title: cleanLine,
           level: 'h1',
           pageNumber: currentPage,
         });
         bodyParagraphsXml.push(
           buildParagraphXml({
-            text: headingText,
+            text: cleanLine,
             format,
             role: 'h1',
           })
         );
-      } else if (/^[-*•]\s+/.test(trimmed)) {
-        const cleanBullet = trimmed.replace(/^[-*•]\s+/, '• ');
+      } else if (/^[-*•]\s+/.test(cleanLine)) {
+        const cleanBullet = cleanLine.replace(/^[-*•]\s+/, '• ');
         bodyParagraphsXml.push(
           buildParagraphXml({
             text: cleanBullet,
@@ -679,10 +685,10 @@ export async function buildFormattedDocxFromSession(
             role: 'bullet',
           })
         );
-      } else if (/^\d+\.\s+/.test(trimmed) && !isRefSection) {
+      } else if (/^\d+\.\s+/.test(cleanLine) && !isRefSection) {
         bodyParagraphsXml.push(
           buildParagraphXml({
-            text: trimmed,
+            text: cleanLine,
             format,
             role: 'numbered',
           })
@@ -690,7 +696,7 @@ export async function buildFormattedDocxFromSession(
       } else {
         bodyParagraphsXml.push(
           buildParagraphXml({
-            text: trimmed,
+            text: cleanLine,
             format,
             role: isRefSection ? 'reference' : 'body',
           })

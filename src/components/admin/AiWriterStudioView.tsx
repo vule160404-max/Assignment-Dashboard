@@ -20,9 +20,11 @@ import {
   loadWriterSessions,
   parseAiOutlineJson,
   refineTextWithAi,
+  sanitizeWriterSession,
   saveAiChatbotSettings,
   saveGlobalSkillLibrary,
   saveWriterSessions,
+  stripMarkdownHashesFromText,
 } from '../../lib/aiWriterClient';
 import {
   CloudSyncState,
@@ -202,6 +204,25 @@ export function AiWriterStudioView({
   useEffect(() => {
     saveWriterSessions(sessions);
   }, [sessions]);
+
+  // Auto-clean any residual leading markdown hashes (# or ##) from outline content across sessions
+  useEffect(() => {
+    setSessions((prev) => {
+      let changed = false;
+      const next = prev.map((sess) => {
+        const sanitized = sanitizeWriterSession(sess);
+        const hasOutlineDiff = sess.outline.some(
+          (sec, idx) => sec.content !== sanitized.outline[idx]?.content
+        );
+        if (hasOutlineDiff || sess.fullPaperOverride !== sanitized.fullPaperOverride) {
+          changed = true;
+          return sanitized;
+        }
+        return sess;
+      });
+      return changed ? next : prev;
+    });
+  }, []);
 
   // Real-time Firestore Cloud Sync for AI API Settings, Skills Library, and Paper Sessions
   useEffect(() => {
@@ -1084,7 +1105,7 @@ export function AiWriterStudioView({
     const lineEnd = lineEndIdx === -1 ? text.length : lineEndIdx;
     const currentLine = text.slice(lineStart, lineEnd);
     const strippedLine = currentLine.replace(
-      /^(#{1,3}\s+|[-*•]\s+|\d+\.\s+)/,
+      /^(#{1,6}\s+|[-*•]\s+|\d+\.\s+)/,
       ''
     );
 
@@ -1092,6 +1113,22 @@ export function AiWriterStudioView({
     const nextContent =
       text.slice(0, lineStart) + nextLine + text.slice(lineEnd);
     handleUpdateOutlineSection(currentSection.id, { content: nextContent }, true);
+  };
+
+  const handleCleanAllMarkdownHashes = () => {
+    if (!activeSession) return;
+    mutateActiveSession((s) => ({
+      ...s,
+      outline: s.outline.map((sec) => ({
+        ...sec,
+        content: stripMarkdownHashesFromText(sec.content),
+        guidanceNotes: stripMarkdownHashesFromText(sec.guidanceNotes),
+      })),
+      fullPaperOverride: s.fullPaperOverride
+        ? stripMarkdownHashesFromText(s.fullPaperOverride)
+        : s.fullPaperOverride,
+    }));
+    onToast('Đã xóa sạch toàn bộ dấu ## ở đầu câu trong bài làm!');
   };
 
   const handleUndo = () => {
@@ -1503,6 +1540,7 @@ export function AiWriterStudioView({
           void handleAiRefineCurrentSection(action, customPrompt)
         }
         onOpenCoverPage={() => setShowCoverModal(true)}
+        onCleanAllHashes={handleCleanAllMarkdownHashes}
       />
 
       {/* Main 2-Zone Workspace Grid: Segmented Sidebar (4 cols) + Live A4 Paper (8 cols) */}

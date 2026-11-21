@@ -14,6 +14,7 @@ import {
   SkillDocument,
   WriterSession,
 } from '../components/admin/writer/types';
+import { sanitizeWriterSession } from '../lib/aiWriterClient';
 
 export type CloudSyncState = 'connecting' | 'synced' | 'permission_denied' | 'error';
 
@@ -372,7 +373,7 @@ export function subscribeWriterSessions(
           if (!data.payloadJson) continue;
           const parsed = JSON.parse(data.payloadJson) as WriterSession;
           if (parsed && typeof parsed === 'object' && parsed.id) {
-            list.push(parsed);
+            list.push(sanitizeWriterSession(parsed));
           }
         } catch {
           // ignore malformed doc

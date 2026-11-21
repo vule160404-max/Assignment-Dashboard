@@ -1,5 +1,6 @@
 import { RefObject, useMemo } from 'react';
 import { BookMarked, ListTree, Maximize2, Minimize2 } from 'lucide-react';
+import { stripMarkdownHashesFromText } from '../../../lib/aiWriterClient';
 import { countWords } from '../../../lib/wordHumanizer';
 import { CoverPageSheetPreview } from './CoverPageSheetPreview';
 import {
@@ -84,27 +85,36 @@ export function WriterPaperCanvas({
           const trimmed = lines[idx].trim();
           if (!trimmed) continue;
           const pageAtLine = bodyStartPage + Math.floor(cumulativeWords / wordsPerPage);
-          if (trimmed.startsWith('### ')) {
+          const cleanLine = trimmed.replace(/^[ \t]*#{1,6}[ \t]*/, '').trim();
+          const isExplicitH3 =
+            trimmed.startsWith('### ') ||
+            /^\d+\.\d+\.\d+(\.\d+)*\s+[A-Za-zÀ-ỹ0-9]/.test(cleanLine);
+          const isExplicitH2 =
+            trimmed.startsWith('## ') ||
+            /^\d+\.\d+\s+[A-Za-zÀ-ỹ0-9]/.test(cleanLine);
+          const isExplicitH1 = trimmed.startsWith('# ');
+
+          if (isExplicitH3) {
             entries.push({
               key: `sub_${sec.id}_${idx}`,
               sectionId: sec.id,
-              title: trimmed.slice(4).trim(),
+              title: cleanLine,
               level: 'h3',
               pageNumber: pageAtLine,
             });
-          } else if (trimmed.startsWith('## ')) {
+          } else if (isExplicitH2) {
             entries.push({
               key: `sub_${sec.id}_${idx}`,
               sectionId: sec.id,
-              title: trimmed.slice(3).trim(),
+              title: cleanLine,
               level: 'h2',
               pageNumber: pageAtLine,
             });
-          } else if (trimmed.startsWith('# ')) {
+          } else if (isExplicitH1) {
             entries.push({
               key: `sub_${sec.id}_${idx}`,
               sectionId: sec.id,
-              title: trimmed.slice(2).trim(),
+              title: cleanLine,
               level: 'h1',
               pageNumber: pageAtLine,
             });
@@ -408,7 +418,7 @@ export function WriterPaperCanvas({
                   onChange={(e) =>
                     onUpdateSection(
                       sec.id,
-                      { content: e.target.value },
+                      { content: stripMarkdownHashesFromText(e.target.value) },
                       true
                     )
                   }

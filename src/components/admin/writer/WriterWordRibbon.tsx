@@ -49,6 +49,7 @@ interface WriterWordRibbonProps {
   onZoomChange: (nextZoom: number) => void;
   onAiRefineSection: (action: AiRefineAction, customPrompt?: string) => void;
   onOpenCoverPage: () => void;
+  onCleanAllHashes?: () => void;
 }
 
 const FONT_FAMILIES: FontFamilyOption[] = [
@@ -90,6 +91,7 @@ export function WriterWordRibbon({
   onZoomChange,
   onAiRefineSection,
   onOpenCoverPage,
+  onCleanAllHashes,
 }: WriterWordRibbonProps) {
   const [showFindBar, setShowFindBar] = useState(false);
   const [showAiBar, setShowAiBar] = useState(false);
@@ -269,6 +271,18 @@ export function WriterWordRibbon({
           >
             <ListOrdered className="w-3.5 h-3.5" />
           </button>
+
+          {onCleanAllHashes && (
+            <button
+              type="button"
+              onClick={onCleanAllHashes}
+              title="Xóa toàn bộ các dấu ## hoặc # ở đầu câu trong bài viết"
+              className="btn-press px-2 py-0.5 text-[11px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded inline-flex items-center gap-1"
+            >
+              <Eraser className="w-3 h-3 text-amber-600" />
+              <span>Bỏ dấu ##</span>
+            </button>
+          )}
         </div>
 
         {/* Alignment & First-Line Indent */}

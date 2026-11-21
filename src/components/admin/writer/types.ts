@@ -522,8 +522,9 @@ export const DEFAULT_BUILTIN_SKILLS: SkillDocument[] = [
     content: `# Skill: Standard Thesis Table of Contents & Multi-Level Heading Hierarchy
 - Structure every research paper, report, or thesis with a clean, hierarchical numbering system suitable for an automatic Word Table of Contents (TOC levels 1 to 3):
   * Level 1 (H1): Major chapters or primary sections (e.g., "1. Introduction", "2. Literature Review & Theoretical Framework", "3. Methodology / Analytical Evaluation", "4. Findings & Strategic Recommendations", "5. Conclusion", "References").
-  * Level 2 (H2): Thematic sub-sections within major chapters using Markdown "## " prefix and hierarchical numbering (e.g., "## 2.1 Conceptual Foundations", "## 2.2 Empirical Evidence & Market Reality").
-  * Level 3 (H3): Granular sub-topics when needed for long sections (>= 600 words) using Markdown "### " prefix (e.g., "### 2.2.1 Regulatory & Institutional Factors").
+  * Level 2 (H2): Thematic sub-sections within major chapters using clean hierarchical numbering WITHOUT markdown '#' symbols (e.g., "2.1 Conceptual Foundations", "2.2 Empirical Evidence & Market Reality").
+  * Level 3 (H3): Granular sub-topics when needed for long sections (>= 600 words) using clean hierarchical numbering (e.g., "2.2.1 Regulatory & Institutional Factors").
+- Strictly DO NOT prepend markdown hashtags (#, ##, ###) at the beginning of headings or sentences; write clean plain-text titles ready for Microsoft Word.
 - Keep all heading titles concise, formal, parallel in grammatical structure, and directly aligned with the assignment brief and grading rubric so the generated Table of Contents reads like a publication-grade university dissertation.
 - Never use markdown headings inside the final References / Bibliography list.`,
   },
