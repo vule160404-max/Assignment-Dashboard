@@ -360,6 +360,7 @@ export interface AiGenerateRequest {
   userPrompt: string;
   enableWebSearch?: boolean;
   maxOutputTokens?: number;
+  reasoningEffort?: 'low' | 'medium' | 'high';
   isResearchStep?: boolean;
   searchFallbackQuery?: string;
   signal?: AbortSignal;
@@ -424,6 +425,7 @@ export async function callAiChatbotDetailed({
   userPrompt,
   enableWebSearch,
   maxOutputTokens,
+  reasoningEffort,
   isResearchStep,
   searchFallbackQuery,
   signal,
@@ -447,6 +449,7 @@ export async function callAiChatbotDetailed({
       temperature: profile.temperature,
       enableWebSearch,
       maxOutputTokens,
+      reasoningEffort,
       isResearchStep,
       searchFallbackQuery,
       systemPrompt,
@@ -564,11 +567,18 @@ export async function researchSourcesWithPerplexity(
 ): Promise<string> {
   const coreTopic = (session.topic || session.title || '').trim();
   const coreSubject = (session.subject || '').trim();
-  const searchLines = [
-    `${coreTopic} ${coreSubject} peer reviewed academic study journal`.trim(),
-    `${coreTopic} empirical research data statistics 2023 2024 2025 2026`.trim(),
-    `${coreTopic} literature review theoretical framework scholarly article`.trim(),
-  ].filter(Boolean);
+  const isVi = session.writingLanguage === 'Vietnamese';
+  const searchLines = isVi
+    ? [
+        `${coreTopic} ${coreSubject} nghiên cứu khoa học tạp chí luận văn Việt Nam`.trim(),
+        `${coreTopic} thực trạng số liệu thống kê báo cáo 2023 2024 2025 2026`.trim(),
+        `${coreTopic} cơ sở lý thuyết mô hình nghiên cứu giải pháp`.trim(),
+      ].filter(Boolean)
+    : [
+        `${coreTopic} ${coreSubject} peer reviewed academic study journal`.trim(),
+        `${coreTopic} empirical research data statistics 2023 2024 2025 2026`.trim(),
+        `${coreTopic} literature review theoretical framework scholarly article`.trim(),
+      ].filter(Boolean);
   const compactSearchQuery = searchLines.join('\n');
 
   // Fast, ultra-cheap Perplexity Search API (POST /search — raw web results, 0 LLM output tokens, ~1-2s)
@@ -679,18 +689,39 @@ CRITICAL GROUNDING RULE: You MUST ground your arguments, empirical statistics, a
 ${session.researchedSources.trim()}`
     : '';
 
+  const isVi = session.writingLanguage === 'Vietnamese';
+  const docTypeLabel =
+    session.documentType === 'vn_thesis'
+      ? 'Luận văn / Tiểu luận / Khóa luận tốt nghiệp Tiếng Việt'
+      : session.documentType === 'vn_report'
+      ? 'Báo cáo Thực tập / Đồ án Doanh nghiệp Tiếng Việt'
+      : session.documentType === 'vn_research'
+      ? 'Bài Nghiên cứu Khoa học (NCKH) Tiếng Việt'
+      : isVi
+      ? 'Bài Luận / Báo cáo Học thuật Tiếng Việt'
+      : 'University Academic Essay / Research Paper';
+
+  const vietnameseRulesBlock =
+    isVi || session.writingLanguage === 'Bilingual'
+      ? `\n\n=== QUY CHUẨN VIẾT HỌC THUẬT TIẾNG VIỆT ===
+- Viết 100% bằng tiếng Việt học thuật chuẩn mực (ngôi thứ ba, khách quan, lập luận chặt chẽ, tuyệt đối không dịch máy từ tiếng Anh).
+- Dùng đúng thuật ngữ chuyên ngành tại Việt Nam (có thể chú thích thuật ngữ tiếng Anh trong ngoặc đơn ở lần đầu xuất hiện).
+- Trích dẫn nguồn chuẩn ${session.citationStyle} với tên tác giả Việt Nam hoặc quốc tế (VD: (Nguyễn Văn A, 2024), (Tổng cục Thống kê, 2025)).`
+      : '';
+
   return `You are an elite Academic Researcher & University Writing Specialist assisting inside an academic research & drafting studio.
 
 === ACTIVE SKILL FILES & SYSTEM INSTRUCTIONS ===
-${skillBlock}${contextBlock}${researchedSourcesBlock}
+${skillBlock}${contextBlock}${researchedSourcesBlock}${vietnameseRulesBlock}
 
 === ASSIGNMENT BRIEF & FORMATTING RULES ===
+- Document Type: ${docTypeLabel}
 - Subject / Course: ${session.subject || 'General Academic Research'}
 - Topic / Title: ${session.topic || 'Untitled Research Topic'}
 - Target Total Word Count: ${session.targetWordCount} words
 - Citation & Reference Style: ${session.citationStyle}
 - Writing Language: ${session.writingLanguage}
-- Tone & Academic Level: ${session.academicTone || 'University Master / High Distinction Academic Tone'}
+- Tone & Academic Level: ${session.academicTone || (isVi ? 'Chuẩn Học thuật Đại học / Thạc sĩ Việt Nam' : 'University Master / High Distinction Academic Tone')}
 - Detailed Instructions / Prompt:
 ${session.instructions || 'Follow standard scholarly structure for this topic.'}
 - Grading Rubric & Evaluation Criteria:
@@ -705,7 +736,37 @@ export async function generateOutlineWithAi(
   signal?: AbortSignal
 ): Promise<WriterOutlineSection[]> {
   const systemPrompt = buildSkillsAndContextSystemPrompt(session, skills);
-  const userPrompt = `Based on the assignment brief, rubric, target total word count (${session.targetWordCount} words), citation style (${session.citationStyle}), and all active Skill files, design a comprehensive, publication-grade academic outline with a clear Table of Contents hierarchy.
+  const isVi = session.writingLanguage === 'Vietnamese';
+
+  let vnStructureHint =
+    '1. LỜI MỞ ĐẦU (Tính cấp thiết, mục tiêu, đối tượng, phạm vi, phương pháp nghiên cứu), CHƯƠNG 1. CƠ SỞ LÝ LUẬN VÀ TỔNG QUAN NGHIÊN CỨU, CHƯƠNG 2. PHÂN TÍCH THỰC TRẠNG, CHƯƠNG 3. GIẢI PHÁP VÀ KIẾN NGHỊ, KẾT LUẬN, và mục cuối "TÀI LIỆU THAM KHẢO (' +
+    session.citationStyle +
+    ')".';
+  if (session.documentType === 'vn_report') {
+    vnStructureHint =
+      'LỜI MỞ ĐẦU, CHƯƠNG 1. TỔNG QUAN VỀ ĐƠN VỊ THỰC TẬP, CHƯƠNG 2. THỰC TRẠNG HOẠT ĐỘNG VÀ NỘI DUNG THỰC TẬP, CHƯƠNG 3. ĐÁNH GIÁ, BÀI HỌC KINH NGHIỆM VÀ KIẾN NGHỊ, KẾT LUẬN, và mục cuối "TÀI LIỆU THAM KHẢO (' +
+      session.citationStyle +
+      ')".';
+  } else if (session.documentType === 'vn_research') {
+    vnStructureHint =
+      'TÓM TẮT (ABSTRACT), 1. ĐẶT VẤN ĐỀ, 2. TỔNG QUAN NGHIÊN CỨU VÀ CƠ SỞ LÝ THUYẾT, 3. PHƯƠNG PHÁP NGHIÊN CỨU, 4. KẾT QUẢ NGHIÊN CỨU VÀ THẢO LUẬN, 5. KẾT LUẬN VÀ HÀM Ý, và mục cuối "TÀI LIỆU THAM KHẢO (' +
+      session.citationStyle +
+      ')".';
+  }
+
+  const userPrompt = isVi
+    ? `Dựa trên đề bài, tiêu chí Rubric, tổng số từ yêu cầu (${session.targetWordCount} từ), chuẩn trích dẫn (${session.citationStyle}) và các Skill đang bật, hãy lập một DÀN Ý CHI TIẾT chuẩn học thuật đại học/thạc sĩ Việt Nam hoàn toàn bằng TIẾNG VIỆT.
+
+YÊU CẦU BẮT BUỘC:
+1. Chia bài thành các chương/mục cân đối chuẩn Việt Nam theo cấu trúc: ${vnStructureHint}
+2. Tổng "targetWords" của các mục nội dung (không tính Tài liệu tham khảo) xấp xỉ ${session.targetWordCount} từ (đặt targetWords cho mục Tài liệu tham khảo khoảng 200-300).
+3. Trong "guidanceNotes" của mỗi chương lớn (>= 400 từ), nêu rõ 2-3 tiểu mục con đánh số chuẩn (VD: "Gồm các tiểu mục: 1.1. ..., 1.2. ...") để Word tự tạo Mục lục chuẩn. TUYỆT ĐỐI KHÔNG dùng dấu '#' hay '##' trong tiêu đề.
+4. CHỈ trả về duy nhất một mảng JSON hợp lệ (không giải thích thêm) với mỗi phần tử gồm:
+   - "title": string (tiêu đề tiếng Việt chuẩn, VD: "LỜI MỞ ĐẦU", "CHƯƠNG 1. CƠ SỞ LÝ LUẬN", "TÀI LIỆU THAM KHẢO (${session.citationStyle})")
+   - "headingLevel": "h1" | "h2" | "h3"
+   - "targetWords": number
+   - "guidanceNotes": string (luận điểm chính, tiểu mục con, số liệu/trích dẫn cần triển khai bằng tiếng Việt)`
+    : `Based on the assignment brief, rubric, target total word count (${session.targetWordCount} words), citation style (${session.citationStyle}), and all active Skill files, design a comprehensive, publication-grade academic outline with a clear Table of Contents hierarchy.
 
 REQUIREMENTS:
 1. Divide the paper into well-proportioned sections following a standard university thesis / academic report Table of Contents structure (e.g., numbered H1 chapters such as "1. Introduction", "2. Literature Review & Theoretical Framework", "3. Empirical Analysis & Discussion", "4. Strategic Recommendations", "5. Conclusion", plus H2 sub-sections like "2.1 ...", "2.2 ..." for longer papers, and a final "References (${session.citationStyle})" section).
@@ -732,6 +793,7 @@ Example JSON schema:
     systemPrompt,
     userPrompt,
     enableWebSearch,
+    reasoningEffort: 'low',
     signal,
   });
 
@@ -984,13 +1046,144 @@ export async function generateSectionWithAi(
   skills: SkillDocument[],
   profile: AiProviderProfile,
   enableWebSearch?: boolean,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onPartialText?: (partialText: string, progressLabel: string) => void
 ): Promise<string> {
   const sectionIdx = session.outline.findIndex((s) => s.id === targetSectionId);
   if (sectionIdx === -1) {
     throw new Error('Không tìm thấy mục dàn ý cần viết.');
   }
   const targetSection = session.outline[sectionIdx];
+
+  const normalizedHeading = targetSection.title
+    .replace(/^\d+(\.\d+)*\.?\s*/, '')
+    .trim();
+  const isReferencesSection =
+    /^(references|bibliography|works cited|tài liệu tham khảo|danh mục tài liệu tham khảo)/i.test(
+      normalizedHeading
+    );
+  const isConclusionSection =
+    /^(conclusion|kết luận|summary and conclusion)/i.test(normalizedHeading);
+
+  // FAST CHUNKED REFERENCES PIPELINE: 3 citations per batch → ~2-5s per batch, live progressive paste, ZERO 504 timeouts!
+  if (isReferencesSection) {
+    const priorText = session.outline
+      .slice(0, sectionIdx)
+      .map((s) => s.content.trim())
+      .filter(Boolean)
+      .join('\n\n');
+    const uniqueCitations = extractInTextCitations(priorText);
+
+    const leanRefSystemPrompt = `You are a precision Academic Bibliographer.
+Format ONLY complete, authentic ${session.citationStyle} reference entries matching the exact in-text citations provided.
+STRICT RULES:
+- Output ONLY the formatted reference entries (one reference paragraph per line, separated by a blank line).
+- NEVER include the assignment prompt, rubric, syllabus, or skill instructions.
+- NEVER add headings, numbering (unless IEEE), markdown '#', or conversational commentary.`;
+
+    const researchedSnippet = session.researchedSources?.trim()
+      ? `\n\n=== VERIFIED SOURCES FROM WEB RESEARCH (USE EXACT URLS/DOIS WHERE MATCHING) ===\n${session.researchedSources
+          .trim()
+          .slice(0, 4500)}`
+      : '';
+
+    const BATCH_SIZE = 3;
+    const accumulatedEntries: string[] = [];
+
+    const mergeAndSortRefs = (entries: string[]): string => {
+      const seen = new Set<string>();
+      const cleaned: string[] = [];
+      for (const rawEntry of entries) {
+        const line = stripMarkdownHashesFromText(rawEntry).trim();
+        if (!line || line.length < 15) continue;
+        // Skip accidental heading lines
+        if (/^(references|bibliography|tài liệu tham khảo)/i.test(line) && line.length < 50) {
+          continue;
+        }
+        const key = line.toLowerCase().replace(/[^a-z0-9à-ỹ]/gi, '').slice(0, 48);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        cleaned.push(line);
+      }
+      if (session.citationStyle !== 'IEEE') {
+        cleaned.sort((a, b) => a.localeCompare(b, 'vi', { sensitivity: 'base' }));
+      }
+      return cleaned.join('\n\n');
+    };
+
+    if (uniqueCitations.length > 0) {
+      const batches: string[][] = [];
+      for (let i = 0; i < uniqueCitations.length; i += BATCH_SIZE) {
+        batches.push(uniqueCitations.slice(i, i + BATCH_SIZE));
+      }
+
+      for (let b = 0; b < batches.length; b++) {
+        if (signal?.aborted) {
+          throw new DOMException('Aborted', 'AbortError');
+        }
+        const batch = batches[b];
+        const doneCountBefore = b * BATCH_SIZE;
+        const targetCountNow = Math.min(
+          uniqueCitations.length,
+          (b + 1) * BATCH_SIZE
+        );
+        onPartialText?.(
+          mergeAndSortRefs(accumulatedEntries),
+          `Đang viết Tài liệu tham khảo (${doneCountBefore + 1}–${targetCountNow}/${uniqueCitations.length} nguồn)...`
+        );
+
+        const batchPrompt = `Topic: ${session.topic || session.title}
+Citation Style: ${session.citationStyle}
+Writing Language: ${session.writingLanguage}
+
+Format ONLY the full ${session.citationStyle} bibliographic reference entries for these ${batch.length} in-text citations (batch ${b + 1}/${batches.length}):
+${batch.map((c, idx) => `${idx + 1}. ${c}`).join('\n')}${researchedSnippet}
+
+Return ONLY the ${batch.length} full reference entries (one per line, blank line between entries). No intro, no outro, no markdown '#'.`;
+
+        const rawChunk = await callAiChatbot({
+          profile,
+          systemPrompt: leanRefSystemPrompt,
+          userPrompt: batchPrompt,
+          enableWebSearch,
+          maxOutputTokens: 900,
+          reasoningEffort: 'low',
+          signal,
+        });
+
+        const chunkLines = rawChunk
+          .split(/\n+/)
+          .map((l) => l.trim())
+          .filter(Boolean);
+        accumulatedEntries.push(...chunkLines);
+
+        const mergedNow = mergeAndSortRefs(accumulatedEntries);
+        onPartialText?.(
+          mergedNow,
+          `Đã xong ${targetCountNow}/${uniqueCitations.length} nguồn tham khảo`
+        );
+      }
+
+      return mergeAndSortRefs(accumulatedEntries);
+    }
+
+    // Fallback when no in-text citations were drafted yet: 1 lean fast call
+    const fallbackPrompt = `Topic: ${session.topic || session.title}
+Citation Style: ${session.citationStyle}
+Writing Language: ${session.writingLanguage}${researchedSnippet}
+
+Provide 6 to 8 authoritative, strictly formatted ${session.citationStyle} scholarly references for this topic (one per paragraph, sorted alphabetically). Output ONLY the reference entries with no commentary.`;
+    const rawFallback = await callAiChatbot({
+      profile,
+      systemPrompt: leanRefSystemPrompt,
+      userPrompt: fallbackPrompt,
+      enableWebSearch,
+      maxOutputTokens: 1400,
+      reasoningEffort: 'low',
+      signal,
+    });
+    return stripMarkdownHashesFromText(rawFallback);
+  }
 
   const systemPrompt = buildSkillsAndContextSystemPrompt(session, skills);
 
@@ -1003,42 +1196,12 @@ export async function generateSectionWithAi(
     )
     .join('\n');
 
-  const normalizedHeading = targetSection.title
-    .replace(/^\d+(\.\d+)*\s*/, '')
-    .trim();
-  const isReferencesSection =
-    /^(references|bibliography|works cited|tài liệu tham khảo)/i.test(
-      normalizedHeading
-    );
-  const isConclusionSection =
-    /^(conclusion|kết luận|summary and conclusion)/i.test(normalizedHeading);
-
   const priorWrittenSections = buildSmartPriorContext(
     session.outline.slice(0, sectionIdx),
-    isReferencesSection
-      ? 'references'
-      : isConclusionSection
-      ? 'conclusion'
-      : 'body'
+    isConclusionSection ? 'conclusion' : 'body'
   );
 
-  const userPrompt = isReferencesSection
-    ? `Now write ONLY the final "${targetSection.title}" section for this paper.
-
-=== FULL PAPER OUTLINE ===
-${fullOutlineMap}
-
-=== PREVIOUSLY WRITTEN SECTIONS (EXTRACT ALL IN-TEXT CITATIONS FROM HERE) ===
-${priorWrittenSections || '(No prior sections drafted yet; provide authoritative scholarly references for this topic.)'}
-
-INSTRUCTIONS FOR "${targetSection.title}":
-- Compile ONLY authentic scholarly, statistical, regulatory, and industry sources that were actually cited in-text in the previously written sections above into a complete, strictly formatted ${session.citationStyle} reference list.
-- STRICT PROHIBITION: NEVER cite, list, or include the assignment prompt, grading rubric, marking criteria, course instructions, or skill guidelines as a reference entry.
-- Ensure 1-to-1 matching: every in-text citation in the body must appear here, and every entry here must be cited in-text.
-- Sort alphabetically by author surname (or numbered [1], [2]... if IEEE).
-- Include full bibliographic details (Author, A. A. (Year). Title of work. *Source*, Volume(Issue), Page range. DOI/URL).
-- Output ONLY the reference entries (one reference paragraph per line), without repeating the section heading "${targetSection.title}" at the top and without conversational filler.`
-    : `Now write ONLY Section ${sectionIdx + 1} of the paper: "${targetSection.title}".
+  const userPrompt = `Now write ONLY Section ${sectionIdx + 1} of the paper: "${targetSection.title}".
 
 === FULL PAPER OUTLINE ===
 ${fullOutlineMap}

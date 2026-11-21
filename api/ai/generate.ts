@@ -26,6 +26,7 @@ interface AiRequestBody {
   previous_response_id?: string;
   enableWebSearch?: boolean;
   maxOutputTokens?: number;
+  reasoningEffort?: 'low' | 'medium' | 'high';
   isResearchStep?: boolean;
   searchFallbackQuery?: string;
   tools?: Array<{ type: 'web_search' | 'fetch_url' }>;
@@ -435,6 +436,13 @@ export default async function handler(
           // Pure writing step (no web search): single-step fast generation
           reqPayload.max_steps = 1;
         }
+        // Keep native reasoning models (like perplexity/glm-5.3-flash) fast & responsive
+        const desiredEffort =
+          body.reasoningEffort ||
+          (/glm-5\.3/i.test(trimmedTarget) ? 'low' : undefined);
+        if (desiredEffort) {
+          reqPayload.reasoning = { effort: desiredEffort };
+        }
       }
 
       // Hard internal deadline safely below Vercel's 60s maxDuration:
@@ -453,7 +461,7 @@ export default async function handler(
       } | null = null;
 
       try {
-        const httpResp = await fetch('https://api.perplexity.ai/v1/agent', {
+        let httpResp = await fetch('https://api.perplexity.ai/v1/agent', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -463,6 +471,22 @@ export default async function handler(
           body: JSON.stringify({ ...reqPayload, stream: true }),
           signal: controller.signal,
         });
+
+        // If a model does not accept `reasoning`, immediately retry cleanly without it
+        if (httpResp.status === 400 && reqPayload.reasoning) {
+          const retryPayload = { ...reqPayload };
+          delete retryPayload.reasoning;
+          httpResp = await fetch('https://api.perplexity.ai/v1/agent', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'text/event-stream',
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({ ...retryPayload, stream: true }),
+            signal: controller.signal,
+          });
+        }
 
         if (!httpResp.ok) {
           const rawJson = (await httpResp.json().catch(() => ({}))) as Record<

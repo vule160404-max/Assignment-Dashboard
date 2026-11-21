@@ -5,7 +5,68 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { CITATION_STYLES, CitationStyle } from '../../../types/domain';
-import { WriterSession } from './types';
+import {
+  DEFAULT_COVER_PAGE_CONFIG,
+  WriterDocumentType,
+  WriterSession,
+} from './types';
+
+const QUICK_DOC_PRESETS: {
+  id: WriterDocumentType;
+  label: string;
+  language: WriterSession['writingLanguage'];
+  academicTone: string;
+  fontSizePt: number;
+  lineSpacing: 1.5 | 2.0;
+  textAlign: 'justify' | 'left';
+  coverTemplateId: 'classic_vn_thesis' | 'internship_report' | 'academic_international';
+  docTypeLabel: string;
+}[] = [
+  {
+    id: 'essay',
+    label: 'Essay (EN)',
+    language: 'English',
+    academicTone: 'High Distinction (HD) University Standard',
+    fontSizePt: 12,
+    lineSpacing: 2.0,
+    textAlign: 'left',
+    coverTemplateId: 'academic_international',
+    docTypeLabel: 'ACADEMIC RESEARCH PAPER / ESSAY',
+  },
+  {
+    id: 'vn_thesis',
+    label: 'Luận văn / Tiểu luận (VN)',
+    language: 'Vietnamese',
+    academicTone: 'Chuẩn Luận văn / Tiểu luận Đại học & Thạc sĩ Việt Nam',
+    fontSizePt: 13,
+    lineSpacing: 1.5,
+    textAlign: 'justify',
+    coverTemplateId: 'classic_vn_thesis',
+    docTypeLabel: 'TIỂU LUẬN / KHÓA LUẬN TỐT NGHIỆP',
+  },
+  {
+    id: 'vn_report',
+    label: 'Báo cáo Thực tập (VN)',
+    language: 'Vietnamese',
+    academicTone: 'Chuẩn Báo cáo Thực tập / Đồ án Doanh nghiệp Việt Nam',
+    fontSizePt: 13,
+    lineSpacing: 1.5,
+    textAlign: 'justify',
+    coverTemplateId: 'internship_report',
+    docTypeLabel: 'BÁO CÁO THỰC TẬP TỐT NGHIỆP',
+  },
+  {
+    id: 'vn_research',
+    label: 'Nghiên cứu Khoa học (VN)',
+    language: 'Vietnamese',
+    academicTone: 'Chuẩn Bài báo & Đề tài Nghiên cứu Khoa học Tiếng Việt',
+    fontSizePt: 13,
+    lineSpacing: 1.5,
+    textAlign: 'justify',
+    coverTemplateId: 'classic_vn_thesis',
+    docTypeLabel: 'ĐỀ TÀI NGHIÊN CỨU KHOA HỌC',
+  },
+];
 
 interface WriterBriefPanelProps {
   session: WriterSession;
@@ -22,8 +83,62 @@ export function WriterBriefPanel({
 }: WriterBriefPanelProps) {
   const contextFileInputRef = useRef<HTMLInputElement | null>(null);
 
+  const activeDocType: WriterDocumentType =
+    session.documentType ||
+    (session.writingLanguage === 'Vietnamese' ? 'vn_thesis' : 'essay');
+
+  const applyDocPreset = (presetId: WriterDocumentType) => {
+    const preset = QUICK_DOC_PRESETS.find((p) => p.id === presetId);
+    if (!preset) return;
+    onUpdateSession((s) => ({
+      ...s,
+      documentType: preset.id,
+      writingLanguage: preset.language,
+      academicTone: preset.academicTone,
+      format: {
+        ...s.format,
+        fontFamily: 'Times New Roman',
+        fontSizePt: preset.fontSizePt,
+        lineSpacing: preset.lineSpacing,
+        textAlign: preset.textAlign,
+        coverPage: {
+          ...DEFAULT_COVER_PAGE_CONFIG,
+          ...(s.format.coverPage || {}),
+          templateId: preset.coverTemplateId,
+          documentTypeLabel: preset.docTypeLabel,
+        },
+      },
+    }));
+  };
+
   return (
     <div className="tab-panel-enter p-4 space-y-3.5">
+      {/* 1-Click Academic Document Type Selector (VN Thesis / Report / Research & EN Essay) */}
+      <div>
+        <label className="block text-[11px] font-semibold text-zinc-600 mb-1.5">
+          Loại bài &amp; Định dạng chuẩn nhanh
+        </label>
+        <div className="grid grid-cols-2 gap-1.5">
+          {QUICK_DOC_PRESETS.map((p) => {
+            const selected = activeDocType === p.id;
+            return (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => applyDocPreset(p.id)}
+                className={`btn-press px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border text-left truncate transition-colors ${
+                  selected
+                    ? 'bg-blue-50 text-[#12489B] border-blue-300 ring-1 ring-blue-500/15'
+                    : 'bg-zinc-50/80 text-zinc-600 border-zinc-200 hover:bg-zinc-100 hover:text-slate-900'
+                }`}
+              >
+                {p.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         <div>
           <label className="block text-[11px] font-semibold text-zinc-600 mb-1">

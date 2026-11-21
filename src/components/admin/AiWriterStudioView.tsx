@@ -1115,7 +1115,20 @@ export function AiWriterStudioView({
         skills,
         activeProfile,
         effectiveWriter.enableWebSearch,
-        signal
+        signal,
+        (partialText, progressLabel) => {
+          setCurrentStepLabel(progressLabel);
+          if (partialText) {
+            mutateSessionById(targetSessionId, (s) => ({
+              ...s,
+              outline: s.outline.map((sec) =>
+                sec.id === sectionId
+                  ? { ...sec, content: partialText, status: 'generating' }
+                  : sec
+              ),
+            }));
+          }
+        }
       );
       const writtenWords = countWords(generatedText);
 
@@ -1268,7 +1281,20 @@ export function AiWriterStudioView({
           skills,
           activeProfile,
           effectiveWriter.enableWebSearch,
-          signal
+          signal,
+          (partialText, progressLabel) => {
+            setCurrentStepLabel(progressLabel);
+            if (partialText) {
+              mutateSessionById(targetSessionId, (s) => ({
+                ...s,
+                outline: s.outline.map((sec) =>
+                  sec.id === secId
+                    ? { ...sec, content: partialText, status: 'generating' }
+                    : sec
+                ),
+              }));
+            }
+          }
         );
 
         if (pausedSessionIdsRef.current.has(targetSessionId)) {

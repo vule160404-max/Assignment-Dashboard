@@ -281,12 +281,19 @@ export type WriterBatchStatus =
   | 'completed'
   | 'error';
 
+export type WriterDocumentType =
+  | 'essay'
+  | 'vn_thesis'
+  | 'vn_report'
+  | 'vn_research';
+
 export interface WriterSession {
   id: string;
   title: string;
   linkedOrderCode: string;
   subject: string;
   topic: string;
+  documentType?: WriterDocumentType;
   targetWordCount: number;
   citationStyle: CitationStyle;
   writingLanguage: 'English' | 'Vietnamese' | 'Bilingual';
@@ -553,5 +560,22 @@ export const DEFAULT_BUILTIN_SKILLS: SkillDocument[] = [
 - Strictly DO NOT prepend markdown hashtags (#, ##, ###) at the beginning of headings or sentences; write clean plain-text titles ready for Microsoft Word.
 - Keep all heading titles concise, formal, parallel in grammatical structure, and directly aligned with the assignment brief and grading rubric so the generated Table of Contents reads like a publication-grade university dissertation.
 - Never use markdown headings inside the final References / Bibliography list.`,
+  },
+  {
+    id: 'skill_vietnamese_academic',
+    name: 'Chuẩn Luận văn, Báo cáo & NCKH Tiếng Việt',
+    fileName: 'vietnamese-academic-standard.skill.md',
+    description:
+      'Quy chuẩn viết Luận văn, Tiểu luận, Báo cáo thực tập và Nghiên cứu khoa học bằng tiếng Việt chuẩn mực Đại học / Thạc sĩ Việt Nam.',
+    enabled: true,
+    isBuiltIn: true,
+    updatedAt: new Date().toISOString(),
+    content: `# Skill: Chuẩn Luận văn, Báo cáo & Nghiên cứu Khoa học Tiếng Việt
+- Chỉ áp dụng khi Ngôn ngữ viết là Tiếng Việt (Vietnamese) hoặc Song ngữ (Bilingual).
+- Sử dụng văn phong khoa học tiếng Việt chuẩn mực, khách quan, ngôi thứ ba ("nghiên cứu này chỉ ra...", "kết quả phân tích cho thấy..."), tuyệt đối tránh văn phong dịch máy từ tiếng Anh hoặc lối nói khẩu ngữ.
+- Sử dụng chính xác thuật ngữ chuyên ngành kinh tế, quản trị, giáo dục, luật, kỹ thuật tại Việt Nam (kèm thuật ngữ tiếng Anh trong ngoặc đơn ở lần xuất hiện đầu tiên nếu cần).
+- Bố cục mục con rõ ràng theo chuẩn luận văn/báo cáo Việt Nam (1.1., 1.2., 2.1.1...) bằng chữ thuần, KHÔNG dùng dấu # hay ##.
+- Khi viết phần Thực trạng hoặc Giải pháp, ưu tiên phân tích bối cảnh Việt Nam, dẫn chiếu số liệu thực tế từ Tổng cục Thống kê, Bộ/Ngành, báo cáo thường niên doanh nghiệp và các nghiên cứu khoa học uy tín (2021-2026).
+- Mục Tài liệu tham khảo trình bày chuẩn mực, khớp 1-đối-1 với trích dẫn trong bài.`,
   },
 ];
