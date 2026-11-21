@@ -113,7 +113,6 @@ export function WriterApiSettingsModal({
     stripSecretsFromAiSettings(settings)
   );
   const [showKey, setShowKey] = useState(false);
-  const [showWriterKey, setShowWriterKey] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [customModelMode, setCustomModelMode] = useState(false);
   const [customWriterModelMode, setCustomWriterModelMode] = useState(false);
@@ -160,8 +159,6 @@ export function WriterApiSettingsModal({
   const activeProvider = draft.activeProvider;
   const currentProfile: AiProviderProfile = draft.profiles[activeProvider];
   const perplexityProfile: AiProviderProfile = draft.profiles.perplexity;
-  const writerProvider = hybrid.writerProvider;
-  const writerProfile: AiProviderProfile = draft.profiles[writerProvider];
 
   const needsPerplexityCatalog =
     isOpen &&
@@ -214,10 +211,7 @@ export function WriterApiSettingsModal({
       ? Array.from(new Set([...PERPLEXITY_PRESETS, ...perplexityCatalogIds]))
       : AI_PROVIDER_SUGGESTED_MODELS[activeProvider] || [];
 
-  const writerSuggestedModels =
-    writerProvider === 'perplexity'
-      ? perplexityCatalogIds
-      : AI_PROVIDER_SUGGESTED_MODELS[writerProvider] || [];
+  const writerSuggestedModels = perplexityCatalogIds;
 
   const updateProfile = (
     provider: AiProviderType,
@@ -385,10 +379,8 @@ export function WriterApiSettingsModal({
   };
 
   const canTest = hybrid.enabled
-    ? (Boolean(perplexityProfile.apiKey.trim()) ||
-        Boolean(serverKeysConfigured.perplexity)) &&
-      (Boolean(writerProfile.apiKey.trim()) ||
-        Boolean(serverKeysConfigured[writerProvider]))
+    ? Boolean(perplexityProfile.apiKey.trim()) ||
+      Boolean(serverKeysConfigured.perplexity)
     : Boolean(currentProfile.apiKey.trim()) ||
       Boolean(serverKeysConfigured[activeProvider]);
 
@@ -478,7 +470,7 @@ export function WriterApiSettingsModal({
               }`}
             >
               <Layers className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>Kết hợp 2 bước (Tiết kiệm)</span>
+              <span>Perplexity 2 bước (Tiết kiệm)</span>
             </button>
             <button
               type="button"
@@ -494,270 +486,167 @@ export function WriterApiSettingsModal({
             </button>
           </div>
 
-          {/* MODE A: HYBRID 2-STEP PIPELINE */}
+          {/* MODE A: PERPLEXITY-ONLY 2-STEP PIPELINE */}
           {hybrid.enabled ? (
-            <div className="space-y-2">
-              {/* Step 1: Perplexity Research */}
-              <div className="p-3.5 rounded-xl border border-blue-200/80 bg-blue-50/30 space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
+            <div className="space-y-3">
+              {/* Shared Perplexity API Key (single key for both steps) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-semibold text-slate-800">
+                    Perplexity API Key (Dùng chung cho cả 2 bước)
+                  </label>
+                  {serverKeysConfigured.perplexity && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                      <ShieldCheck className="w-3 h-3" />
+                      <span>Đã lưu trên Server</span>
+                    </span>
+                  )}
+                </div>
+                <div className="relative">
+                  <KeyRound className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type={showKey ? 'text' : 'password'}
+                    autoComplete="off"
+                    value={perplexityProfile.apiKey}
+                    onChange={(e) =>
+                      updateProfile('perplexity', { apiKey: e.target.value })
+                    }
+                    placeholder={
+                      serverKeysConfigured.perplexity
+                        ? '•••••••••••••••••••••••• (Nhập key mới nếu muốn đổi)'
+                        : 'Nhập Perplexity API Key (pplx-...)'
+                    }
+                    className="w-full pl-9 pr-9 py-2 text-xs font-mono bg-white border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowKey((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
+                  >
+                    {showKey ? (
+                      <EyeOff className="w-4 h-4" />
+                    ) : (
+                      <Eye className="w-4 h-4" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Clean 2-Step Pipeline Stack */}
+              <div className="space-y-2">
+                {/* Step 1: Perplexity Web Research */}
+                <div className="p-3.5 rounded-xl border border-blue-200/80 bg-blue-50/30 space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-[#12489B] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
                       1
                     </span>
                     <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                       <Globe className="w-3.5 h-3.5 text-[#12489B] shrink-0" />
-                      <span>Perplexity · Tra cứu nguồn &amp; Trích dẫn mới nhất</span>
+                      <span>Tra cứu nguồn &amp; Trích dẫn mới nhất (Perplexity)</span>
                     </div>
                   </div>
-                  {serverKeysConfigured.perplexity && (
-                    <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full shrink-0">
-                      Đã lưu Key
-                    </span>
-                  )}
+
+                  <select
+                    value={hybrid.researchModel}
+                    onChange={(e) =>
+                      updateHybrid({ researchModel: e.target.value })
+                    }
+                    className="w-full px-3 py-2 text-xs font-medium bg-white border border-zinc-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#12489B]"
+                  >
+                    {HYBRID_RESEARCH_OPTIONS.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <p className="text-[11px] text-zinc-500">
+                    {hybrid.researchModel === 'perplexity-search'
+                      ? 'Lấy 12 kết quả web & URL thật qua POST /search — 0 token output LLM.'
+                      : 'Chạy 1 lần cho mỗi đề tài qua /v1/agent để thu thập nguồn & trích dẫn chuẩn.'}
+                  </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[11px] font-medium text-zinc-600 mb-1">
-                      Chế độ tìm kiếm
-                    </label>
-                    <select
-                      value={hybrid.researchModel}
-                      onChange={(e) =>
-                        updateHybrid({ researchModel: e.target.value })
-                      }
-                      className="w-full px-2.5 py-2 text-xs font-medium bg-white border border-zinc-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#12489B]"
-                    >
-                      {HYBRID_RESEARCH_OPTIONS.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+                {/* Flow connector */}
+                <div className="flex items-center justify-center -my-1">
+                  <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 border border-zinc-200 text-[10px] font-medium text-zinc-500">
+                    <ArrowDown className="w-3 h-3 text-[#12489B]" />
+                    <span>Đẩy nguồn thật sang Bước 2 · Tự tắt Web Search khi viết</span>
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-[11px] font-medium text-zinc-600 mb-1">
-                      Perplexity API Key
-                    </label>
-                    <div className="relative">
-                      <KeyRound className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                      <input
-                        type={showKey ? 'text' : 'password'}
-                        autoComplete="off"
-                        value={perplexityProfile.apiKey}
-                        onChange={(e) =>
-                          updateProfile('perplexity', { apiKey: e.target.value })
-                        }
-                        placeholder={
-                          serverKeysConfigured.perplexity
-                            ? '•••••••• (Nhập để đổi)'
-                            : 'pplx-...'
-                        }
-                        className="w-full pl-8 pr-8 py-2 text-xs font-mono bg-white border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
-                      />
+                {/* Step 2: Perplexity Writer Model Only */}
+                <div className="p-3.5 rounded-xl border border-zinc-200 bg-white space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+                        2
+                      </span>
+                      <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                        <PenTool className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Model Perplexity viết bài hoàn chỉnh</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
                       <button
                         type="button"
-                        onClick={() => setShowKey((v) => !v)}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
+                        disabled={loadingCatalog}
+                        onClick={() => void handleRefreshPerplexityModels()}
+                        className="btn-press inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-md bg-zinc-100 text-zinc-700 hover:bg-zinc-200 disabled:opacity-40"
+                        title="Tải danh sách model theo Perplexity Key"
                       >
-                        {showKey ? (
-                          <EyeOff className="w-3.5 h-3.5" />
-                        ) : (
-                          <Eye className="w-3.5 h-3.5" />
-                        )}
+                        <RefreshCw
+                          className={`w-3 h-3 ${loadingCatalog ? 'animate-spin' : ''}`}
+                        />
+                        <span>Đồng bộ</span>
                       </button>
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-[11px] text-zinc-500">
-                  {hybrid.researchModel === 'perplexity-search'
-                    ? 'Chỉ lấy 12 kết quả web & URL thật qua POST /search — 0 token output LLM.'
-                    : 'Chạy 1 lần cho mỗi đề tài qua /v1/agent để thu thập nguồn & trích dẫn chuẩn.'}
-                </p>
-              </div>
-
-              {/* Clean flow connector */}
-              <div className="flex items-center justify-center -my-1">
-                <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-zinc-100 border border-zinc-200 text-[10px] font-medium text-zinc-500">
-                  <ArrowDown className="w-3 h-3 text-[#12489B]" />
-                  <span>Đẩy nguồn thật sang model viết bài</span>
-                </div>
-              </div>
-
-              {/* Step 2: Writer Model (GLM-5.3-Flash / GLM-5.3 / Other) */}
-              <div className="p-3.5 rounded-xl border border-zinc-200 bg-white space-y-2.5">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">
-                      2
-                    </span>
-                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                      <PenTool className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      <span>Viết bài hoàn chỉnh (Dùng nguồn từ Bước 1)</span>
-                    </div>
-                  </div>
-                  {writerProvider === 'perplexity' && (
-                    <button
-                      type="button"
-                      disabled={loadingCatalog}
-                      onClick={() => void handleRefreshPerplexityModels()}
-                      className="btn-press inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold rounded-md bg-zinc-100 text-zinc-700 hover:bg-zinc-200 disabled:opacity-40 shrink-0"
-                      title="Tải danh sách model theo Perplexity Key"
-                    >
-                      <RefreshCw
-                        className={`w-3 h-3 ${loadingCatalog ? 'animate-spin' : ''}`}
-                      />
-                      <span>Đồng bộ</span>
-                    </button>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[11px] font-medium text-zinc-600 mb-1">
-                      Nền tảng viết bài
-                    </label>
-                    <select
-                      value={writerProvider}
-                      onChange={(e) => {
-                        const nextProv = e.target.value as AiProviderType;
-                        const defaultModel =
-                          nextProv === 'perplexity'
-                            ? 'perplexity/glm-5.3-flash'
-                            : nextProv === 'custom_openai'
-                            ? 'z-ai/glm-5.3-flash'
-                            : draft.profiles[nextProv].model;
-                        setCustomWriterModelMode(false);
-                        updateHybrid({
-                          writerProvider: nextProv,
-                          writerModel: defaultModel,
-                        });
-                      }}
-                      className="w-full px-2.5 py-2 text-xs font-medium bg-white border border-zinc-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#12489B]"
-                    >
-                      {PROVIDER_OPTIONS.map((p) => (
-                        <option key={p.key} value={p.key}>
-                          {p.key === 'perplexity'
-                            ? 'Perplexity (Dùng chung Key)'
-                            : p.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-[11px] font-medium text-zinc-600">
-                        Model viết bài
-                      </label>
                       <button
                         type="button"
                         onClick={() => setCustomWriterModelMode((v) => !v)}
                         className="text-[10px] font-medium text-[#12489B] hover:underline"
                       >
-                        {customWriterModelMode ? 'Chọn từ danh sách' : 'Tự nhập'}
+                        {customWriterModelMode ? 'Danh sách' : 'Tự nhập'}
                       </button>
                     </div>
-                    {customWriterModelMode ||
-                    !writerSuggestedModels.includes(hybrid.writerModel) ? (
-                      <input
-                        type="text"
-                        value={hybrid.writerModel}
-                        onChange={(e) =>
-                          updateHybrid({ writerModel: e.target.value })
-                        }
-                        placeholder="perplexity/glm-5.3-flash"
-                        className="w-full px-2.5 py-2 text-xs font-mono bg-white border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
-                      />
-                    ) : (
-                      <select
-                        value={hybrid.writerModel}
-                        onChange={(e) =>
-                          updateHybrid({ writerModel: e.target.value })
-                        }
-                        className="w-full px-2.5 py-2 text-xs font-mono bg-white border border-zinc-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#12489B]"
-                      >
-                        {writerSuggestedModels.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
-                    )}
                   </div>
-                </div>
 
-                {writerProvider === 'perplexity' ? (
+                  {customWriterModelMode ||
+                  !writerSuggestedModels.includes(hybrid.writerModel) ? (
+                    <input
+                      type="text"
+                      value={hybrid.writerModel}
+                      onChange={(e) =>
+                        updateHybrid({
+                          writerProvider: 'perplexity',
+                          writerModel: e.target.value,
+                        })
+                      }
+                      placeholder="perplexity/glm-5.3-flash"
+                      className="w-full px-3 py-2 text-xs font-mono bg-white border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
+                    />
+                  ) : (
+                    <select
+                      value={hybrid.writerModel}
+                      onChange={(e) =>
+                        updateHybrid({
+                          writerProvider: 'perplexity',
+                          writerModel: e.target.value,
+                        })
+                      }
+                      className="w-full px-3 py-2 text-xs font-mono bg-white border border-zinc-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#12489B]"
+                    >
+                      {writerSuggestedModels.map((m) => (
+                        <option key={m} value={m}>
+                          {m}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+
                   <p className="text-[11px] text-zinc-500">
-                    Dùng chung Perplexity Key ở Bước 1 · Tự động tắt Web Search ở bước viết để tối ưu chi phí output.
+                    Khuyên dùng <code className="text-slate-700 font-semibold">perplexity/glm-5.3-flash</code> hoặc <code className="text-slate-700 font-semibold">perplexity/glm-5.3</code> để viết bài dài nhanh và tối ưu chi phí.
                   </p>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 border-t border-zinc-100">
-                    <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="text-[11px] font-medium text-zinc-600">
-                          API Key ({getProviderShortLabel(writerProvider)})
-                        </label>
-                        {serverKeysConfigured[writerProvider] && (
-                          <span className="text-[10px] font-semibold text-emerald-700">
-                            Đã lưu Server
-                          </span>
-                        )}
-                      </div>
-                      <div className="relative">
-                        <KeyRound className="w-3.5 h-3.5 text-zinc-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
-                        <input
-                          type={showWriterKey ? 'text' : 'password'}
-                          autoComplete="off"
-                          value={writerProfile.apiKey}
-                          onChange={(e) =>
-                            updateProfile(writerProvider, {
-                              apiKey: e.target.value,
-                            })
-                          }
-                          placeholder={
-                            serverKeysConfigured[writerProvider]
-                              ? '•••••••• (Nhập để đổi)'
-                              : 'Nhập API Key...'
-                          }
-                          className="w-full pl-8 pr-8 py-2 text-xs font-mono bg-white border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowWriterKey((v) => !v)}
-                          className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-700"
-                        >
-                          {showWriterKey ? (
-                            <EyeOff className="w-3.5 h-3.5" />
-                          ) : (
-                            <Eye className="w-3.5 h-3.5" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-
-                    {writerProvider === 'custom_openai' && (
-                      <div>
-                        <label className="block text-[11px] font-medium text-zinc-600 mb-1">
-                          Base URL (NIM / OpenRouter / Zhipu)
-                        </label>
-                        <input
-                          type="text"
-                          value={writerProfile.baseUrl}
-                          onChange={(e) =>
-                            updateProfile('custom_openai', {
-                              baseUrl: e.target.value,
-                            })
-                          }
-                          placeholder="https://integrate.api.nvidia.com/v1"
-                          className="w-full px-2.5 py-2 text-xs font-mono bg-white border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
+                </div>
               </div>
             </div>
           ) : (

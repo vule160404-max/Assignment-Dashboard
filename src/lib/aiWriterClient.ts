@@ -56,22 +56,19 @@ export function normalizeHybridPipeline(
 ): AiHybridPipelineConfig {
   const rawResearch =
     typeof raw?.researchModel === 'string' ? raw.researchModel.trim() : '';
+  const rawWriterModel =
+    typeof raw?.writerModel === 'string' ? raw.writerModel.trim() : '';
   return {
     enabled: Boolean(raw?.enabled),
     researchModel:
       rawResearch && !/^sonar/i.test(rawResearch)
         ? rawResearch
         : DEFAULT_HYBRID_PIPELINE.researchModel,
-    writerProvider:
-      raw?.writerProvider &&
-      (['perplexity', 'gemini', 'openai', 'anthropic', 'custom_openai'] as AiProviderType[]).includes(
-        raw.writerProvider
-      )
-        ? raw.writerProvider
-        : DEFAULT_HYBRID_PIPELINE.writerProvider,
+    // Hybrid 2-step pipeline is dedicated exclusively to Perplexity (shared API key)
+    writerProvider: 'perplexity',
     writerModel:
-      typeof raw?.writerModel === 'string' && raw.writerModel.trim()
-        ? raw.writerModel.trim()
+      rawWriterModel && rawWriterModel.includes('/')
+        ? rawWriterModel
         : DEFAULT_HYBRID_PIPELINE.writerModel,
   };
 }
