@@ -40,15 +40,33 @@ interface R2Config {
   secretAccessKey: string;
 }
 
+function cleanEnvValue(raw?: string): string {
+  const trimmed = (raw || '').trim();
+  if (
+    (trimmed.startsWith('"') && trimmed.endsWith('"')) ||
+    (trimmed.startsWith("'") && trimmed.endsWith("'"))
+  ) {
+    return trimmed.slice(1, -1).trim();
+  }
+  return trimmed;
+}
+
 function resolveR2Config(): R2Config | null {
-  const accountId = (process.env.R2_ACCOUNT_ID || '').trim();
-  const explicitEndpoint = (process.env.R2_ENDPOINT || '').trim();
-  const endpoint =
+  const accountId = cleanEnvValue(process.env.R2_ACCOUNT_ID);
+  const bucket = cleanEnvValue(process.env.R2_BUCKET || process.env.R2_BUCKET_NAME);
+  const accessKeyId = cleanEnvValue(process.env.R2_ACCESS_KEY_ID);
+  const secretAccessKey = cleanEnvValue(process.env.R2_SECRET_ACCESS_KEY);
+  const explicitEndpoint = cleanEnvValue(process.env.R2_ENDPOINT);
+
+  let endpoint =
     explicitEndpoint ||
     (accountId ? `https://${accountId}.r2.cloudflarestorage.com` : '');
-  const bucket = (process.env.R2_BUCKET || '').trim();
-  const accessKeyId = (process.env.R2_ACCESS_KEY_ID || '').trim();
-  const secretAccessKey = (process.env.R2_SECRET_ACCESS_KEY || '').trim();
+
+  // Normalize endpoint: remove trailing slash and accidental /<bucket> suffix
+  endpoint = endpoint.replace(/\/+$/, '');
+  if (bucket && endpoint.endsWith(`/${bucket}`)) {
+    endpoint = endpoint.slice(0, -(bucket.length + 1));
+  }
 
   if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
     return null;
@@ -63,6 +81,8 @@ const r2Client = r2Config
       region: 'auto',
       endpoint: r2Config.endpoint,
       forcePathStyle: true,
+      requestChecksumCalculation: 'WHEN_REQUIRED',
+      responseChecksumValidation: 'WHEN_REQUIRED',
       credentials: {
         accessKeyId: r2Config.accessKeyId,
         secretAccessKey: r2Config.secretAccessKey,
@@ -1547,9 +1567,22 @@ export function createApiApp(): express.Express {
         await saveFileMeta(meta);
       } catch (err) {
         console.error('File upload storage error:', err);
+        const s3Err = err as {
+          name?: string;
+          Code?: string;
+          message?: string;
+          $metadata?: { httpStatusCode?: number };
+        };
+        const errCode = s3Err?.Code || s3Err?.name || '';
+        const httpCode = s3Err?.$metadata?.httpStatusCode;
+        const safeDetail = errCode
+          ? ` (${errCode}${httpCode ? ` / HTTP ${httpCode}` : ''}: ${(
+              s3Err?.message || ''
+            ).slice(0, 120)})`
+          : '';
         res.status(500).json({
           error: r2Config
-            ? 'Không thể lưu tệp lên Cloudflare R2. Vui lòng kiểm tra cấu hình Bucket/Key.'
+            ? `Không thể lưu tệp lên Cloudflare R2${safeDetail}. Vui lòng kiểm tra cấu hình Bucket/Key.`
             : 'Không thể lưu tệp lên máy chủ.',
         });
         return;
