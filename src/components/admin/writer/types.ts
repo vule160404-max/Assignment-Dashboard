@@ -58,6 +58,7 @@ export interface DocumentFormatConfig {
   paragraphSpacingAfterPt: number;
   runningHeader: string;
   includePageNumbers: boolean;
+  includeTableOfContents?: boolean;
 }
 
 export type SectionHeadingLevel = 'h1' | 'h2' | 'h3';
@@ -232,6 +233,7 @@ export const ACADEMIC_FORMAT_PRESETS: Record<
       firstLineIndent: true,
       paragraphSpacingAfterPt: 0,
       includePageNumbers: true,
+      includeTableOfContents: true,
     },
   },
   MLA9: {
@@ -247,6 +249,7 @@ export const ACADEMIC_FORMAT_PRESETS: Record<
       firstLineIndent: true,
       paragraphSpacingAfterPt: 0,
       includePageNumbers: true,
+      includeTableOfContents: true,
     },
   },
   HARVARD: {
@@ -262,6 +265,7 @@ export const ACADEMIC_FORMAT_PRESETS: Record<
       firstLineIndent: false,
       paragraphSpacingAfterPt: 6,
       includePageNumbers: true,
+      includeTableOfContents: true,
     },
   },
   IEEE: {
@@ -277,6 +281,7 @@ export const ACADEMIC_FORMAT_PRESETS: Record<
       firstLineIndent: true,
       paragraphSpacingAfterPt: 4,
       includePageNumbers: true,
+      includeTableOfContents: true,
     },
   },
 };
@@ -328,5 +333,22 @@ export const DEFAULT_BUILTIN_SKILLS: SkillDocument[] = [
 - Before drafting each section, map the section's arguments directly to the grading rubric criteria and weighting.
 - Address all command verbs in the prompt (e.g., "Critically evaluate", "Compare and contrast", "Propose evidence-based recommendations").
 - Ensure terminology and sub-headings clearly signal to the grader where each rubric criterion is being fulfilled.`,
+  },
+  {
+    id: 'skill_toc_hierarchy',
+    name: 'Thesis Table of Contents & Multi-Level Heading Skill',
+    fileName: 'thesis-table-of-contents.skill.md',
+    description:
+      'Chuẩn hóa cấu trúc Mục lục (Table of Contents) đa cấp (H1 / H2 / H3: 1., 1.1, 1.2, 2., 2.1...) chuẩn luận văn, khóa luận và báo cáo học thuật.',
+    enabled: true,
+    isBuiltIn: true,
+    updatedAt: new Date().toISOString(),
+    content: `# Skill: Standard Thesis Table of Contents & Multi-Level Heading Hierarchy
+- Structure every research paper, report, or thesis with a clean, hierarchical numbering system suitable for an automatic Word Table of Contents (TOC levels 1 to 3):
+  * Level 1 (H1): Major chapters or primary sections (e.g., "1. Introduction", "2. Literature Review & Theoretical Framework", "3. Methodology / Analytical Evaluation", "4. Findings & Strategic Recommendations", "5. Conclusion", "References").
+  * Level 2 (H2): Thematic sub-sections within major chapters using Markdown "## " prefix and hierarchical numbering (e.g., "## 2.1 Conceptual Foundations", "## 2.2 Empirical Evidence & Market Reality").
+  * Level 3 (H3): Granular sub-topics when needed for long sections (>= 600 words) using Markdown "### " prefix (e.g., "### 2.2.1 Regulatory & Institutional Factors").
+- Keep all heading titles concise, formal, parallel in grammatical structure, and directly aligned with the assignment brief and grading rubric so the generated Table of Contents reads like a publication-grade university dissertation.
+- Never use markdown headings inside the final References / Bibliography list.`,
   },
 ];

@@ -1,11 +1,20 @@
-import { RefObject } from 'react';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { RefObject, useMemo } from 'react';
+import { ListTree, Maximize2, Minimize2 } from 'lucide-react';
 import { countWords } from '../../../lib/wordHumanizer';
 import {
   DocumentFormatConfig,
+  SectionHeadingLevel,
   WriterOutlineSection,
   WriterSession,
 } from './types';
+
+interface TocPreviewEntry {
+  key: string;
+  sectionId: string;
+  title: string;
+  level: SectionHeadingLevel;
+  pageNumber: number;
+}
 
 interface WriterPaperCanvasProps {
   session: WriterSession;
@@ -40,6 +49,68 @@ export function WriterPaperCanvas({
 }: WriterPaperCanvasProps) {
   const { format } = session;
   const pagePaddingPx = Math.round(format.marginInch * 64);
+  const includeToc = format.includeTableOfContents ?? true;
+  const tocHeadingTitle =
+    session.writingLanguage === 'Vietnamese' ? 'MỤC LỤC' : 'TABLE OF CONTENTS';
+
+  const tocEntries = useMemo<TocPreviewEntry[]>(() => {
+    if (!includeToc) return [];
+    const entries: TocPreviewEntry[] = [];
+    // When TOC is enabled, main content starts on Page 2 after the TOC page break
+    let cumulativeWords = 0;
+    const wordsPerPage = format.lineSpacing >= 2.0 ? 275 : 350;
+
+    for (const sec of session.outline) {
+      const currentPage = 2 + Math.floor(cumulativeWords / wordsPerPage);
+      if (sec.title.trim()) {
+        entries.push({
+          key: `sec_${sec.id}`,
+          sectionId: sec.id,
+          title: sec.title.trim(),
+          level: sec.headingLevel || 'h1',
+          pageNumber: currentPage,
+        });
+      }
+
+      if (sec.content.trim()) {
+        const lines = sec.content.split(/\r?\n/);
+        for (let idx = 0; idx < lines.length; idx++) {
+          const trimmed = lines[idx].trim();
+          if (!trimmed) continue;
+          const pageAtLine = 2 + Math.floor(cumulativeWords / wordsPerPage);
+          if (trimmed.startsWith('### ')) {
+            entries.push({
+              key: `sub_${sec.id}_${idx}`,
+              sectionId: sec.id,
+              title: trimmed.slice(4).trim(),
+              level: 'h3',
+              pageNumber: pageAtLine,
+            });
+          } else if (trimmed.startsWith('## ')) {
+            entries.push({
+              key: `sub_${sec.id}_${idx}`,
+              sectionId: sec.id,
+              title: trimmed.slice(3).trim(),
+              level: 'h2',
+              pageNumber: pageAtLine,
+            });
+          } else if (trimmed.startsWith('# ')) {
+            entries.push({
+              key: `sub_${sec.id}_${idx}`,
+              sectionId: sec.id,
+              title: trimmed.slice(2).trim(),
+              level: 'h1',
+              pageNumber: pageAtLine,
+            });
+          }
+          cumulativeWords += countWords(trimmed);
+        }
+      } else {
+        cumulativeWords += sec.targetWords || 250;
+      }
+    }
+    return entries;
+  }, [includeToc, session.outline, format.lineSpacing]);
 
   return (
     <div
@@ -147,6 +218,71 @@ export function WriterPaperCanvas({
             }}
           />
         </div>
+
+        {/* Automatic Academic Table of Contents (Mục lục chuẩn luận văn) */}
+        {includeToc && tocEntries.length > 0 && (
+          <div className="mb-8 pb-6 border-b-2 border-dashed border-zinc-200 select-none">
+            <div className="flex items-center justify-between gap-2 mb-3">
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-blue-50 text-[#12489B] border border-blue-200/80 font-sans text-[10px] font-semibold">
+                <ListTree className="w-3 h-3" />
+                Mục lục tự động (Chuẩn Word TOC · Bấm vào mục để chuyển nhanh)
+              </span>
+              <button
+                type="button"
+                onClick={() => onUpdateFormat({ includeTableOfContents: false })}
+                className="font-sans text-[10px] font-medium text-zinc-400 hover:text-slate-700"
+              >
+                Ẩn mục lục
+              </button>
+            </div>
+
+            <div
+              className="text-center font-bold text-slate-900 mb-3 tracking-wide"
+              style={{
+                fontFamily: `"${format.fontFamily}", serif`,
+                fontSize: `${Math.round(
+                  ((format.fontSizePt + 2) * zoomPercent) / 100
+                )}pt`,
+              }}
+            >
+              {tocHeadingTitle}
+            </div>
+
+            <div className="space-y-1.5">
+              {tocEntries.map((item) => {
+                const indentCls =
+                  item.level === 'h3'
+                    ? 'pl-8 text-zinc-700 italic'
+                    : item.level === 'h2'
+                    ? 'pl-4 text-slate-800'
+                    : 'font-bold text-slate-900';
+                return (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => onSelectSection(item.sectionId)}
+                    className={`w-full flex items-baseline gap-2 text-left hover:text-[#12489B] group ${indentCls}`}
+                    style={{
+                      fontFamily: `"${format.fontFamily}", serif`,
+                      fontSize: `${Math.round(
+                        (format.fontSizePt * zoomPercent) / 100
+                      )}pt`,
+                      lineHeight: 1.45,
+                    }}
+                  >
+                    <span className="shrink-0 max-w-[82%] truncate group-hover:underline">
+                      {item.title}
+                    </span>
+                    <span className="flex-1 border-b border-dotted border-zinc-300 mx-1" />
+                    <span className="shrink-0 font-mono text-[0.92em] tabular-nums text-zinc-600">
+                      {item.pageNumber}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Paper Sections */}
         <div className="space-y-5">

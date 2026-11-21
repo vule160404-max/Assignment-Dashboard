@@ -118,7 +118,8 @@ Cloudflare R2 lưu các **tệp nhị phân nặng và metadata gắn với file
 - **Admin Portal & CRM:** `src/components/admin/AdminPortalView.tsx`, `AdminAuthGate.tsx`, `OrderWorkspaceModal.tsx`, `ClientsCrmView.tsx`, `CalendarView.tsx`, `RevenueDashboardView.tsx`, `TeamManagementView.tsx`, `BankSettingsView.tsx`
 - **AI Writer Studio:** `src/components/admin/AiWriterStudioView.tsx`, `src/components/admin/writer/*`, `src/lib/aiWriterClient.ts`, `src/lib/docxBuilder.ts`
   - Hỗ trợ đa tab viết song song nhiều bài, ưu tiên Perplexity Academic + các AI Provider khác (Gemini, OpenAI, Claude, Custom OpenAI/NVIDIA NIM).
-  - Skill tích hợp `skill_citation_mastery` ép AI chỉ trích dẫn nguồn học thuật thực sự xuất hiện trong bài ở mục References, tuyệt đối không trích dẫn Rubric/đề bài/hướng dẫn.
+  - Skill tích hợp `skill_citation_mastery` ép AI chỉ trích dẫn nguồn học thuật thực sự xuất hiện trong bài ở mục References (không trích dẫn Rubric/đề bài), và `skill_toc_hierarchy` chuẩn hóa hệ thống tiêu đề đa cấp (`H1` / `H2` / `H3`: `1.`, `1.1`, `1.2`...).
+  - Hỗ trợ **Mục lục tự động chuẩn luận văn (Table of Contents)**: nút bật/tắt `Mục lục` trên `WriterWordRibbon`, hiển thị mục lục tương tác kèm chấm dẫn (dot leader) & số trang ước tính trên trang A4 (`WriterPaperCanvas`), và xuất `.docx` kèm trường OpenXML `<w:sdt>` (`TOC \o "1-3" \h \z \u`), `<w:outlineLvl>` cho `Heading1..3`, số trang footer và `<w:updateFields w:val="true"/>` trong `word/settings.xml`.
   - `writerSyncService.ts` đồng bộ thời gian thực qua Firestore (`aiWriterSettings`, `aiWriterSkills`, `aiWriterSessions`) kèm Smart Merge lần đầu (gộp API key từ Chrome + Skills từ Edge mà không mất dữ liệu hai bên).
 - **Word Document Tooling (`WordHumanizerView.tsx` + `src/components/admin/humanizer/*`):**
   - Xử lý định dạng/checkpoint tài liệu `.docx` (hỗ trợ xóa từng checkpoint hoặc xóa tất cả checkpoint đã lưu tự động).

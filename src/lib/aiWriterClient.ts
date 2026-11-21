@@ -445,16 +445,17 @@ export async function generateOutlineWithAi(
   profile: AiProviderProfile
 ): Promise<WriterOutlineSection[]> {
   const systemPrompt = buildSkillsAndContextSystemPrompt(session, skills);
-  const userPrompt = `Based on the assignment brief, rubric, target total word count (${session.targetWordCount} words), citation style (${session.citationStyle}), and all active Skill files, design a comprehensive, logical step-by-step academic outline.
+  const userPrompt = `Based on the assignment brief, rubric, target total word count (${session.targetWordCount} words), citation style (${session.citationStyle}), and all active Skill files, design a comprehensive, publication-grade academic outline with a clear Table of Contents hierarchy.
 
 REQUIREMENTS:
-1. Divide the paper into well-proportioned sections (e.g., Title/Abstract if needed, Introduction, thematic Body / Analysis / Literature / Methodology / Discussion sections tailored specifically to the topic & rubric, Conclusion, and a final References / Bibliography section).
+1. Divide the paper into well-proportioned sections following a standard university thesis / academic report Table of Contents structure (e.g., numbered H1 chapters such as "1. Introduction", "2. Literature Review & Theoretical Framework", "3. Empirical Analysis & Discussion", "4. Strategic Recommendations", "5. Conclusion", plus H2 sub-sections like "2.1 ...", "2.2 ..." for longer papers, and a final "References (${session.citationStyle})" section).
 2. The sum of "targetWords" across all prose sections should equal approximately ${session.targetWordCount} words (set targetWords for the References section to ~150-300).
-3. Return ONLY a valid JSON array (no extra commentary) where each item has:
-   - "title": string (exact academic heading, e.g. "1. Introduction", "2. Theoretical Framework & Literature Review", "References")
+3. In "guidanceNotes" for each major H1 body section (>= 400 words), specify 2-3 numbered H2 sub-headings (e.g. "Include sub-headings: ## 2.1 ..., ## 2.2 ...") so the automatic Word Table of Contents captures both H1 and H2 levels cleanly.
+4. Return ONLY a valid JSON array (no extra commentary) where each item has:
+   - "title": string (exact numbered academic heading, e.g. "1. Introduction", "2. Theoretical Framework & Literature Review", "References (${session.citationStyle})")
    - "headingLevel": "h1" | "h2" | "h3"
    - "targetWords": number
-   - "guidanceNotes": string (detailed bullet points of arguments, key concepts, rubric criteria, and types of citations to cover in this section)
+   - "guidanceNotes": string (detailed arguments, sub-headings to include, rubric criteria, and types of citations to cover in this section)
 
 Example JSON schema:
 [
@@ -462,7 +463,7 @@ Example JSON schema:
     "title": "1. Introduction",
     "headingLevel": "h1",
     "targetWords": 300,
-    "guidanceNotes": "Define core problem, research background, thesis statement, and structure."
+    "guidanceNotes": "Define core problem, research background, thesis statement, and paper structure. Include ## 1.1 Background & Context and ## 1.2 Research Objectives."
   }
 ]`;
 
@@ -657,9 +658,10 @@ ${targetSection.guidanceNotes || 'Develop scholarly arguments with peer-reviewed
 
 STRICT OUTPUT RULES:
 1. Do NOT repeat the section heading "${targetSection.title}" on the first line (the editor renders the heading automatically).
-2. Write well-structured, cohesive academic paragraphs in ${session.writingLanguage} with authentic ${session.citationStyle} in-text citations.
-3. Ensure smooth transition from the previous section and strictly fulfill the rubric and active Skill files.
-4. Output ONLY the academic text for this section, with zero meta-commentary or markdown code fences.`;
+2. If this section is a major chapter (${targetSection.targetWords} words >= 350 words and headingLevel is "${targetSection.headingLevel}"), organize the prose with 2 to 4 clear, numbered Markdown sub-headings (e.g. "## X.1 Sub-section Title", and "### X.1.1 ..." if >= 700 words) matching the section number so the automatic Word Table of Contents (TOC) renders a complete multi-level thesis hierarchy.
+3. Write well-structured, cohesive academic paragraphs in ${session.writingLanguage} with authentic ${session.citationStyle} in-text citations.
+4. Ensure smooth transition from the previous section and strictly fulfill the rubric and active Skill files.
+5. Output ONLY the academic text for this section, with zero meta-commentary or markdown code fences.`;
 
   return callAiChatbot({
     profile,

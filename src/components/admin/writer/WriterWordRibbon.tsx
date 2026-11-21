@@ -11,6 +11,7 @@ import {
   Italic,
   List,
   ListOrdered,
+  ListTree,
   Redo2,
   Replace,
   Search,
@@ -313,6 +314,24 @@ export function WriterWordRibbon({
             }`}
           >
             <Indent className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              onUpdateFormat({
+                includeTableOfContents: !(format.includeTableOfContents ?? true),
+              })
+            }
+            title="Bật/tắt Mục lục tự động chuẩn luận văn (Table of Contents) khi xem & xuất .DOCX"
+            className={`btn-press px-2 py-1 rounded-md text-xs font-semibold inline-flex items-center gap-1 ${
+              (format.includeTableOfContents ?? true)
+                ? 'bg-blue-50 text-[#12489B] border border-blue-200/80'
+                : 'text-zinc-600 hover:bg-zinc-100 border border-transparent'
+            }`}
+          >
+            <ListTree className="w-3.5 h-3.5" />
+            <span className="hidden xl:inline">Mục lục</span>
           </button>
         </div>
 
