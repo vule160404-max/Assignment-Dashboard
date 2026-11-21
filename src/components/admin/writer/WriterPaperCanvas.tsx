@@ -24,6 +24,7 @@ interface WriterPaperCanvasProps {
   currentSectionId: string;
   zoomPercent: number;
   focusPaperMode: boolean;
+  containerClassName?: string;
   activeTextareaRef: RefObject<HTMLTextAreaElement | null>;
   onSelectSection: (sectionId: string) => void;
   onUpdateTopic: (nextTopic: string) => void;
@@ -43,6 +44,7 @@ export function WriterPaperCanvas({
   currentSectionId,
   zoomPercent,
   focusPaperMode,
+  containerClassName,
   activeTextareaRef,
   onSelectSection,
   onUpdateTopic,
@@ -131,7 +133,8 @@ export function WriterPaperCanvas({
   return (
     <div
       className={`${
-        focusPaperMode ? 'lg:col-span-12' : 'lg:col-span-8'
+        containerClassName ||
+        (focusPaperMode ? 'lg:col-span-12' : 'lg:col-span-8')
       } bg-zinc-200/65 border border-zinc-300/90 rounded-2xl p-4 sm:p-6 overflow-x-auto`}
     >
       {/* Paper Top Info Strip */}

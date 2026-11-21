@@ -57,6 +57,11 @@ import {
   WriterSession,
 } from './writer/types';
 import { WriterApiSettingsModal } from './writer/WriterApiSettingsModal';
+import {
+  WriterActivityLogEntry,
+  WriterActivityPanel,
+  WriterActivityStatus,
+} from './writer/WriterActivityPanel';
 import { WriterBriefPanel } from './writer/WriterBriefPanel';
 import { WriterCoverPageModal } from './writer/WriterCoverPageModal';
 import { WriterDeliverModal } from './writer/WriterDeliverModal';
@@ -198,6 +203,71 @@ export function AiWriterStudioView({
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [showDeliverModal, setShowDeliverModal] = useState(false);
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
+  const [showActivityPanel, setShowActivityPanel] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem('assigntrack_ai_writer_activity_open_v1');
+      return saved === null ? true : saved === '1';
+    } catch {
+      return true;
+    }
+  });
+  const [activityLogs, setActivityLogs] = useState<WriterActivityLogEntry[]>([]);
+  const [currentStepLabel, setCurrentStepLabel] = useState<string>('');
+
+  const toggleActivityPanel = () => {
+    setShowActivityPanel((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(
+          'assigntrack_ai_writer_activity_open_v1',
+          next ? '1' : '0'
+        );
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
+
+  const formatNowTime = () => {
+    const d = new Date();
+    return d.toLocaleTimeString('vi-VN', {
+      hour12: false,
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
+  };
+
+  const pushActivityLog = (
+    status: WriterActivityStatus,
+    title: string,
+    detail?: string,
+    model?: string,
+    durationSec?: number
+  ): string => {
+    const id = `act_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const entry: WriterActivityLogEntry = {
+      id,
+      timestamp: formatNowTime(),
+      status,
+      title,
+      detail,
+      model,
+      durationSec,
+    };
+    setActivityLogs((prev) => [entry, ...prev].slice(0, 50));
+    return id;
+  };
+
+  const updateActivityLog = (
+    id: string,
+    patch: Partial<WriterActivityLogEntry>
+  ) => {
+    setActivityLogs((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, ...patch } : item))
+    );
+  };
   const [resetScope, setResetScope] = useState<
     'content_and_outline' | 'content_only' | 'everything'
   >('content_and_outline');
@@ -545,26 +615,56 @@ export function AiWriterStudioView({
       return sess;
     }
 
-    onToast(
-      `Bước 1/2: Perplexity (${effectiveWriter.researchProfile.model}) đang tra cứu nguồn thực tế & trích dẫn...`
+    const researchLabel =
+      effectiveWriter.researchProfile.model === 'perplexity-search'
+        ? 'Perplexity /search'
+        : `Perplexity (${effectiveWriter.researchProfile.model})`;
+    const stepMsg = `Bước 1/2: ${researchLabel} đang tra cứu nguồn thực tế & trích dẫn...`;
+    setCurrentStepLabel(stepMsg);
+    onToast(stepMsg);
+    const t0 = Date.now();
+    const logId = pushActivityLog(
+      'running',
+      'Bước 1/2 · Tra cứu nguồn web thực tế',
+      `Đang tìm nguồn chuẩn ${sess.citationStyle} cho đề tài "${(sess.topic || sess.title).slice(0, 65)}"`,
+      effectiveWriter.researchProfile.model
     );
-    const dossier = await researchSourcesWithPerplexity(
-      sess,
-      effectiveWriter.researchProfile
-    );
-    mutateSessionById(targetSessionId, (s) => ({
-      ...s,
-      researchedSources: dossier,
-      researchedSourcesTopic: topicKey,
-    }));
-    onToast(
-      `Bước 2/2: Đã thu thập xong nguồn chuẩn! Đang chuyển sang ${activeProfile.model} viết bài...`
-    );
-    return {
-      ...sess,
-      researchedSources: dossier,
-      researchedSourcesTopic: topicKey,
-    };
+
+    try {
+      const dossier = await researchSourcesWithPerplexity(
+        sess,
+        effectiveWriter.researchProfile
+      );
+      const elapsed = (Date.now() - t0) / 1000;
+      updateActivityLog(logId, {
+        status: 'success',
+        title: 'Bước 1/2 · Đã thu thập nguồn & trích dẫn',
+        detail: `Lưu cache nguồn thực tế (${dossier.length.toLocaleString('vi-VN')} ký tự) để dùng chung cho toàn bài.`,
+        durationSec: elapsed,
+      });
+      mutateSessionById(targetSessionId, (s) => ({
+        ...s,
+        researchedSources: dossier,
+        researchedSourcesTopic: topicKey,
+      }));
+      const nextMsg = `Bước 2/2: Chuyển nguồn sang ${activeProfile.model.replace(/^perplexity\//, '')} để viết bài...`;
+      setCurrentStepLabel(nextMsg);
+      onToast(nextMsg);
+      return {
+        ...sess,
+        researchedSources: dossier,
+        researchedSourcesTopic: topicKey,
+      };
+    } catch (err) {
+      updateActivityLog(logId, {
+        status: 'error',
+        title: 'Bước 1/2 · Tra cứu nguồn thất bại',
+        detail: err instanceof Error ? err.message : 'Lỗi gọi Perplexity',
+        durationSec: (Date.now() - t0) / 1000,
+      });
+      setCurrentStepLabel('');
+      throw err;
+    }
   };
 
   // Mutate a specific session by ID (safe for background concurrent tasks)
@@ -759,9 +859,20 @@ export function AiWriterStudioView({
       batchErrorMsg: undefined,
     }));
 
+    const t0 = Date.now();
+    let outlineLogId = '';
     try {
       const preparedSess =
         (await ensureHybridSourcesForSession(targetSessionId)) || sess;
+      setCurrentStepLabel(
+        `Đang lập dàn ý chuẩn ${sess.citationStyle} (${sess.targetWordCount} từ)...`
+      );
+      outlineLogId = pushActivityLog(
+        'running',
+        'Đang lập dàn ý học thuật',
+        `Đề tài: "${(sess.topic || sess.title).slice(0, 70)}"`,
+        activeProfile.model.replace(/^perplexity\//, '')
+      );
       const sections = await generateOutlineWithAi(
         preparedSess,
         skills,
@@ -774,12 +885,28 @@ export function AiWriterStudioView({
         activeSectionId: sections[0]?.id || '',
         batchStatus: 'idle',
       }));
+      updateActivityLog(outlineLogId, {
+        status: 'success',
+        title: `Đã lập xong dàn ý (${sections.length} mục)`,
+        detail: sections.map((sec) => sec.title).slice(0, 3).join(' · '),
+        durationSec: (Date.now() - t0) / 1000,
+      });
+      setCurrentStepLabel('');
       onToast(
         `AI (${activeModelDisplayName}) đã lập dàn ý ${sections.length} mục cho "${sess.title}".`
       );
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : 'Tạo dàn ý bằng AI thất bại.';
+      if (outlineLogId) {
+        updateActivityLog(outlineLogId, {
+          status: 'error',
+          title: 'Lập dàn ý thất bại',
+          detail: msg,
+          durationSec: (Date.now() - t0) / 1000,
+        });
+      }
+      setCurrentStepLabel('');
       mutateSessionById(targetSessionId, (s) => ({
         ...s,
         batchStatus: 'error',
@@ -875,11 +1002,22 @@ export function AiWriterStudioView({
       ),
     }));
 
+    const targetSecObj = activeSession.outline.find((s) => s.id === sectionId);
+    const secLabel = targetSecObj?.title || 'Mục dàn ý';
+    const t0 = Date.now();
+    let secLogId = '';
     try {
       const preparedSession =
         (await ensureHybridSourcesForSession(targetSessionId)) ||
         sessionsRef.current.find((s) => s.id === targetSessionId) ||
         activeSession;
+      setCurrentStepLabel(`Đang viết mục: ${secLabel}...`);
+      secLogId = pushActivityLog(
+        'running',
+        `Đang viết: ${secLabel}`,
+        `Mục tiêu ~${targetSecObj?.targetWords || 300} từ`,
+        activeProfile.model.replace(/^perplexity\//, '')
+      );
       const generatedText = await generateSectionWithAi(
         preparedSession,
         sectionId,
@@ -887,6 +1025,7 @@ export function AiWriterStudioView({
         activeProfile,
         effectiveWriter.enableWebSearch
       );
+      const writtenWords = countWords(generatedText);
 
       mutateSessionById(
         targetSessionId,
@@ -905,10 +1044,26 @@ export function AiWriterStudioView({
         }),
         true
       );
+      updateActivityLog(secLogId, {
+        status: 'success',
+        title: `Hoàn tất: ${secLabel}`,
+        detail: `Đã viết ${writtenWords.toLocaleString('vi-VN')} từ.`,
+        durationSec: (Date.now() - t0) / 1000,
+      });
+      setCurrentStepLabel('');
       onToast('Đã viết xong mục dàn ý!');
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : 'Lỗi khi gọi AI viết mục này.';
+      if (secLogId) {
+        updateActivityLog(secLogId, {
+          status: 'error',
+          title: `Lỗi viết mục: ${secLabel}`,
+          detail: msg,
+          durationSec: (Date.now() - t0) / 1000,
+        });
+      }
+      setCurrentStepLabel('');
       mutateSessionById(targetSessionId, (s) => ({
         ...s,
         outline: s.outline.map((sec) =>
@@ -949,8 +1104,15 @@ export function AiWriterStudioView({
 
       const sectionIds = initialSnap.outline.map((sec) => sec.id);
 
-      for (const secId of sectionIds) {
+      for (let i = 0; i < sectionIds.length; i++) {
+        const secId = sectionIds[i];
         if (pausedSessionIdsRef.current.has(targetSessionId)) {
+          setCurrentStepLabel('');
+          pushActivityLog(
+            'warning',
+            'Đã tạm dừng viết bài',
+            `Tạm dừng trước mục ${i + 1}/${sectionIds.length}.`
+          );
           mutateSessionById(targetSessionId, (s) => ({
             ...s,
             batchStatus: 'paused',
@@ -980,6 +1142,17 @@ export function AiWriterStudioView({
           ),
         }));
 
+        const secStart = Date.now();
+        setCurrentStepLabel(
+          `Đang viết (${i + 1}/${sectionIds.length}): ${secObj.title}...`
+        );
+        const batchSecLogId = pushActivityLog(
+          'running',
+          `Viết mục ${i + 1}/${sectionIds.length}: ${secObj.title}`,
+          `Mục tiêu ~${secObj.targetWords} từ`,
+          activeProfile.model.replace(/^perplexity\//, '')
+        );
+
         const latestBeforeCall =
           sessionsRef.current.find((s) => s.id === targetSessionId) ||
           currentSnap;
@@ -993,6 +1166,12 @@ export function AiWriterStudioView({
         );
 
         if (pausedSessionIdsRef.current.has(targetSessionId)) {
+          updateActivityLog(batchSecLogId, {
+            status: 'warning',
+            title: `Đã tạm dừng ở mục: ${secObj.title}`,
+            durationSec: (Date.now() - secStart) / 1000,
+          });
+          setCurrentStepLabel('');
           mutateSessionById(targetSessionId, (s) => ({
             ...s,
             batchStatus: 'paused',
@@ -1002,6 +1181,13 @@ export function AiWriterStudioView({
           }));
           return;
         }
+
+        updateActivityLog(batchSecLogId, {
+          status: 'success',
+          title: `Xong mục ${i + 1}/${sectionIds.length}: ${secObj.title}`,
+          detail: `Đã viết ${countWords(generatedText).toLocaleString('vi-VN')} từ.`,
+          durationSec: (Date.now() - secStart) / 1000,
+        });
 
         mutateSessionById(
           targetSessionId,
@@ -1026,11 +1212,20 @@ export function AiWriterStudioView({
         ...s,
         batchStatus: 'completed',
       }));
+      setCurrentStepLabel('');
+      pushActivityLog(
+        'success',
+        'Hoàn tất viết toàn bộ bài!',
+        `Đã hoàn thành ${sectionIds.length} mục cho "${initialSnap.title}".`,
+        activeProfile.model.replace(/^perplexity\//, '')
+      );
     } catch (err) {
       const msg =
         err instanceof Error
           ? err.message
           : 'Quá trình viết bài tự động bị gián đoạn.';
+      setCurrentStepLabel('');
+      pushActivityLog('error', 'Viết bài bị gián đoạn', msg);
       mutateSessionById(targetSessionId, (s) => ({
         ...s,
         batchStatus: 'error',
@@ -1632,10 +1827,14 @@ export function AiWriterStudioView({
         onRequestResetPaper={() => setShowResetConfirmModal(true)}
       />
 
-      {/* Main 2-Zone Workspace Grid: Segmented Sidebar (4 cols) + Live A4 Paper (8 cols) */}
+      {/* Main 3-Zone Workspace Grid: Brief/Outline + Live A4 Paper + Right AI Status/History Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
         {!focusPaperMode && (
-          <div className="lg:col-span-4 lg:sticky lg:top-[7.5rem] lg:z-20 lg:max-h-[calc(100vh-8.5rem)] lg:flex lg:flex-col bg-white border border-zinc-200/90 rounded-2xl shadow-2xs overflow-hidden">
+          <div
+            className={`${
+              showActivityPanel ? 'lg:col-span-4 xl:col-span-3' : 'lg:col-span-4'
+            } lg:sticky lg:top-[7.5rem] lg:z-20 lg:max-h-[calc(100vh-8.5rem)] lg:flex lg:flex-col bg-white border border-zinc-200/90 rounded-2xl shadow-2xs overflow-hidden`}
+          >
             {/* Segmented Tab Switcher (Brief vs Outline) */}
             <div className="shrink-0 p-1.5 bg-zinc-100/80 border-b border-zinc-200/80 grid grid-cols-2 gap-1">
               <button
@@ -1714,6 +1913,15 @@ export function AiWriterStudioView({
           currentSectionId={currentSection?.id || ''}
           zoomPercent={zoomPercent}
           focusPaperMode={focusPaperMode}
+          containerClassName={
+            focusPaperMode
+              ? showActivityPanel
+                ? 'lg:col-span-12 xl:col-span-9'
+                : 'lg:col-span-12'
+              : showActivityPanel
+              ? 'lg:col-span-8 xl:col-span-6'
+              : 'lg:col-span-8'
+          }
           activeTextareaRef={activeTextareaRef}
           onSelectSection={(secId) =>
             mutateActiveSession((s) => ({ ...s, activeSectionId: secId }))
@@ -1728,6 +1936,25 @@ export function AiWriterStudioView({
           onUpdateFormat={handleUpdateFormat}
           onOpenCoverPage={() => setShowCoverModal(true)}
           onUpdateSection={handleUpdateOutlineSection}
+        />
+
+        <WriterActivityPanel
+          isOpen={showActivityPanel}
+          onToggleOpen={toggleActivityPanel}
+          isBusy={
+            isActivePaperOutlining || isActivePaperWriting || refiningSection
+          }
+          currentStepLabel={currentStepLabel}
+          activeModelDisplayName={activeModelDisplayName}
+          hasResearchedSources={Boolean(activeSession.researchedSources?.trim())}
+          completedSectionsCount={
+            activeSession.outline.filter((s) => countWords(s.content) > 0).length
+          }
+          totalSectionsCount={activeSession.outline.length}
+          totalDraftedWords={totalDraftedWords}
+          targetWordCount={activeSession.targetWordCount}
+          logs={activityLogs}
+          onClearLogs={() => setActivityLogs([])}
         />
       </div>
 

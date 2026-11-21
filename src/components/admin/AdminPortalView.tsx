@@ -6,12 +6,15 @@ import {
   Check,
   Copy,
   CreditCard,
+  ExternalLink,
   FileSpreadsheet,
   FileText,
   LayoutList,
   LogOut,
   Menu,
   MessageSquare,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Search,
   ShieldCheck,
@@ -139,6 +142,28 @@ export function AdminPortalView({
 }: AdminPortalViewProps) {
   const [activeTab, setActiveTabState] = useState<AdminTab>(resolveInitialAdminTab);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('assigntrack_admin_sidebar_collapsed_v1') === '1';
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(
+          'assigntrack_admin_sidebar_collapsed_v1',
+          next ? '1' : '0'
+        );
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   const setActiveTab = (nextTab: AdminTab) => {
     setActiveTabState(nextTab);
@@ -751,16 +776,44 @@ export function AdminPortalView({
 
   return (
     <div className="min-h-screen bg-[#FAFAFA] text-[#0F172A] flex">
-      {/* Desktop 240px Sidebar */}
-      <aside className="hidden md:flex md:w-60 md:flex-col md:fixed md:inset-y-0 bg-white border-r border-zinc-200/80">
-        <div className="px-4 h-14 border-b border-zinc-200/80 flex items-center justify-between gap-2">
-          <BrandLogo className="min-w-0" />
-          <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-blue-50 text-[#12489B] shrink-0">
-            {roleLabel}
-          </span>
+      {/* Desktop Collapsible Sidebar (240px expanded / 68px icon rail) */}
+      <aside
+        className={`hidden md:flex md:flex-col md:fixed md:inset-y-0 bg-white border-r border-zinc-200/80 transition-[width] duration-200 ease-out z-30 ${
+          sidebarCollapsed ? 'md:w-[68px]' : 'md:w-60'
+        }`}
+      >
+        <div
+          className={`h-14 border-b border-zinc-200/80 flex items-center ${
+            sidebarCollapsed
+              ? 'justify-center px-2'
+              : 'justify-between gap-2 px-3.5'
+          }`}
+        >
+          {!sidebarCollapsed && <BrandLogo className="min-w-0" />}
+          <button
+            type="button"
+            onClick={toggleSidebarCollapsed}
+            title={
+              sidebarCollapsed
+                ? 'Mở rộng thanh điều hướng'
+                : 'Thu gọn thanh điều hướng'
+            }
+            aria-label={
+              sidebarCollapsed
+                ? 'Mở rộng thanh điều hướng'
+                : 'Thu gọn thanh điều hướng'
+            }
+            className="btn-press p-1.5 rounded-lg text-zinc-500 hover:text-[#12489B] hover:bg-blue-50/80 shrink-0"
+          >
+            {sidebarCollapsed ? (
+              <PanelLeftOpen className="w-4 h-4" />
+            ) : (
+              <PanelLeftClose className="w-4 h-4" />
+            )}
+          </button>
         </div>
 
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className={`flex-1 space-y-1 ${sidebarCollapsed ? 'p-2' : 'p-3'}`}>
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = activeTab === item.key;
@@ -769,51 +822,101 @@ export function AdminPortalView({
                 key={item.key}
                 type="button"
                 onClick={() => setActiveTab(item.key)}
-                className={`btn-press w-full flex items-center justify-between gap-2 px-3 py-2 text-sm font-medium rounded-lg whitespace-nowrap ${
+                title={sidebarCollapsed ? item.label : undefined}
+                className={`btn-press relative w-full flex items-center text-sm font-medium rounded-lg whitespace-nowrap ${
+                  sidebarCollapsed
+                    ? 'justify-center p-2.5'
+                    : 'justify-between gap-2 px-3 py-2'
+                } ${
                   active
                     ? 'bg-blue-50 text-[#12489B]'
                     : 'text-zinc-600 hover:bg-zinc-100/80 hover:text-slate-900'
                 }`}
               >
-                <span className="flex items-center gap-2.5 min-w-0">
+                <span
+                  className={`flex items-center min-w-0 ${
+                    sidebarCollapsed ? 'justify-center' : 'gap-2.5'
+                  }`}
+                >
                   <Icon className="w-4 h-4 shrink-0" />
-                  <span className="truncate">{item.label}</span>
+                  {!sidebarCollapsed && (
+                    <span className="truncate">{item.label}</span>
+                  )}
                 </span>
-                {item.badge !== undefined && (
-                  <span className="font-mono text-[11px] font-semibold text-[#DC2626] tabular-nums">
-                    {item.badge}
-                  </span>
-                )}
+                {item.badge !== undefined &&
+                  (sidebarCollapsed ? (
+                    <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-[#DC2626]" />
+                  ) : (
+                    <span className="font-mono text-[11px] font-semibold text-[#DC2626] tabular-nums">
+                      {item.badge}
+                    </span>
+                  ))}
               </button>
             );
           })}
         </nav>
 
-        <div className="p-3 border-t border-zinc-200/80 space-y-2">
-          <button
-            type="button"
-            onClick={() => onSwitchToClientPortal()}
-            className="btn-press w-full px-3 py-2 text-xs font-medium text-left text-zinc-700 bg-zinc-100 hover:bg-zinc-200/80 rounded-lg"
-          >
-            Xem cổng Khách hàng →
-          </button>
+        <div
+          className={`border-t border-zinc-200/80 space-y-2 ${
+            sidebarCollapsed ? 'p-2 flex flex-col items-center' : 'p-3'
+          }`}
+        >
+          {sidebarCollapsed ? (
+            <>
+              <button
+                type="button"
+                onClick={() => onSwitchToClientPortal()}
+                title="Xem cổng Khách hàng"
+                aria-label="Xem cổng Khách hàng"
+                className="btn-press p-2 text-zinc-600 bg-zinc-100 hover:bg-zinc-200/80 rounded-lg"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                title={`Đăng xuất (${user.email})`}
+                aria-label="Đăng xuất"
+                className="btn-press p-2 text-zinc-400 hover:text-slate-900 hover:bg-zinc-100 rounded-lg"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={() => onSwitchToClientPortal()}
+                className="btn-press w-full px-3 py-2 text-xs font-medium text-left text-zinc-700 bg-zinc-100 hover:bg-zinc-200/80 rounded-lg"
+              >
+                Xem cổng Khách hàng →
+              </button>
 
-          <div className="px-2 py-1.5 flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-slate-800 truncate">
-                {userProfile?.displayName || user.displayName || roleLabel}
-              </p>
-              <p className="text-[11px] text-zinc-500 truncate">{user.email}</p>
-            </div>
-            <button
-              type="button"
-              onClick={handleSignOut}
-              aria-label="Đăng xuất"
-              className="btn-press p-1.5 text-zinc-400 hover:text-slate-900 rounded-md shrink-0"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-            </button>
-          </div>
+              <div className="px-2 py-1.5 flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <p className="text-xs font-medium text-slate-800 truncate">
+                      {userProfile?.displayName || user.displayName || roleLabel}
+                    </p>
+                    <span className="text-[9px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-blue-50 text-[#12489B] shrink-0">
+                      {roleLabel}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 truncate">
+                    {user.email}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  aria-label="Đăng xuất"
+                  className="btn-press p-1.5 text-zinc-400 hover:text-slate-900 rounded-md shrink-0"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </aside>
 
@@ -890,10 +993,14 @@ export function AdminPortalView({
       )}
 
       {/* Main Content Area */}
-      <div className="flex-1 md:pl-60 flex flex-col min-w-0">
+      <div
+        className={`flex-1 flex flex-col min-w-0 transition-[padding] duration-200 ease-out ${
+          sidebarCollapsed ? 'md:pl-[68px]' : 'md:pl-60'
+        }`}
+      >
         {/* Translucent Contextual Top Header */}
         <header className="sticky-glass border-b border-zinc-200/80 px-5 h-14 flex items-center justify-between gap-4 sticky top-0 z-20">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
@@ -901,6 +1008,22 @@ export function AdminPortalView({
               aria-label="Mở menu"
             >
               <Menu className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              onClick={toggleSidebarCollapsed}
+              title={
+                sidebarCollapsed
+                  ? 'Mở rộng thanh điều hướng'
+                  : 'Thu gọn thanh điều hướng'
+              }
+              className="btn-press hidden md:inline-flex p-1.5 text-zinc-500 hover:text-[#12489B] hover:bg-blue-50/80 rounded-lg"
+            >
+              {sidebarCollapsed ? (
+                <PanelLeftOpen className="w-4 h-4" />
+              ) : (
+                <PanelLeftClose className="w-4 h-4" />
+              )}
             </button>
             <span className="text-sm font-semibold text-slate-900 truncate">
               {navItems.find((n) => n.key === activeTab)?.label}
@@ -920,8 +1043,8 @@ export function AdminPortalView({
         </header>
 
         <main
-          className={`p-5 sm:p-6 w-full mx-auto space-y-6 ${
-            activeTab === 'ai_writer' ? 'max-w-[1440px]' : 'max-w-6xl'
+          className={`p-4 sm:p-5 w-full mx-auto space-y-6 ${
+            activeTab === 'ai_writer' ? 'max-w-[1720px]' : 'max-w-6xl'
           }`}
         >
           {activeTab === 'orders' && (
