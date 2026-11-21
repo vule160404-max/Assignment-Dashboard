@@ -551,6 +551,26 @@ export async function researchSourcesWithPerplexity(
   session: WriterSession,
   researchProfile: AiProviderProfile
 ): Promise<string> {
+  // Fast, ultra-cheap Perplexity Search API (POST /search — raw web results, 0 LLM output tokens)
+  if (researchProfile.model === 'perplexity-search') {
+    const coreTopic = (session.topic || session.title || '').trim();
+    const coreSubject = (session.subject || '').trim();
+    const searchLines = [
+      `${coreTopic} ${coreSubject} peer reviewed academic study journal`.trim(),
+      `${coreTopic} empirical research data statistics 2023 2024 2025 2026`.trim(),
+      `${coreTopic} literature review theoretical framework scholarly article`.trim(),
+    ].filter(Boolean);
+
+    const res = await callAiChatbotDetailed({
+      profile: researchProfile,
+      systemPrompt: '',
+      userPrompt: searchLines.join('\n'),
+      enableWebSearch: true,
+    });
+
+    return `RAW REAL-TIME WEB & SCHOLARLY SOURCES (Perplexity Search API — Format citations strictly in ${session.citationStyle}):\n\n${res.text}`.trim();
+  }
+
   const systemPrompt = `You are a precision Academic Citation & Web Research Assistant.
 Your ONLY job is to search the live web for the latest, authoritative, real-world academic papers, peer-reviewed journal articles, official reports, and verified statistics relevant to the assignment topic.
 DO NOT write an essay or long prose. Keep your response concise, structured, and strictly factual to minimize output tokens.`;

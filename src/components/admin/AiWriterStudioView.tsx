@@ -514,7 +514,11 @@ export function AiWriterStudioView({
     ? hasPerplexityKey && hasWriterKey
     : hasWriterKey;
   const activeModelDisplayName = effectiveWriter.isHybrid
-    ? `${effectiveWriter.researchProfile.model} → ${activeProfile.model.replace(/^perplexity\//, '')}`
+    ? `${
+        effectiveWriter.researchProfile.model === 'perplexity-search'
+          ? 'PPLX /search'
+          : effectiveWriter.researchProfile.model.replace(/^perplexity\//, '')
+      } → ${activeProfile.model.replace(/^perplexity\//, '')}`
     : activeProfile.model;
   const enabledSkillsCount = useMemo(
     () => skills.filter((s) => s.enabled).length,

@@ -2410,6 +2410,72 @@ export function createApiApp(): express.Express {
         return { resp, retryAfterHeader };
       };
 
+      // Perplexity Search API (POST https://api.perplexity.ai/search — raw ranked web results, 0 LLM output tokens)
+      const isPerplexitySearchApi =
+        provider === 'perplexity' &&
+        (schema === 'search' || model === 'perplexity-search');
+
+      if (isPerplexitySearchApi) {
+        const queries = String(userPrompt || '')
+          .split(/\r?\n/)
+          .map((line: string) => line.trim())
+          .filter(Boolean)
+          .slice(0, 5);
+        const searchPayload = {
+          query: queries.length > 1 ? queries : queries[0] || userPrompt.trim(),
+          max_results: 12,
+        };
+        const httpResp = await fetch('https://api.perplexity.ai/search', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify(searchPayload),
+        });
+        const rawJson = (await httpResp.json().catch(() => ({}))) as {
+          id?: string;
+          results?: Array<{
+            title?: string;
+            url?: string;
+            snippet?: string;
+            date?: string;
+            last_updated?: string;
+          }>;
+          error?: { message?: string };
+          detail?: string;
+        };
+        if (!httpResp.ok) {
+          res.status(httpResp.status).json({
+            error:
+              rawJson?.error?.message ||
+              rawJson?.detail ||
+              `Perplexity Search API lỗi HTTP ${httpResp.status}.`,
+          });
+          return;
+        }
+        const results = Array.isArray(rawJson.results) ? rawJson.results : [];
+        const formattedText =
+          results.length > 0
+            ? results
+                .map((r, idx) => {
+                  const dateLabel = r.date || r.last_updated || 'n.d.';
+                  return `[${idx + 1}] ${r.title || 'Untitled Source'} (${dateLabel})\nURL: ${r.url || ''}\nExcerpt: ${(r.snippet || '').trim()}`;
+                })
+                .join('\n\n')
+            : 'No web search results returned.';
+
+        res.json({
+          text: formattedText,
+          id: rawJson.id,
+          model: 'perplexity-search',
+          provider: 'perplexity',
+          schema: 'search',
+          search_results: results,
+        });
+        return;
+      }
+
       const isPerplexityAgentSchema =
         provider === 'perplexity' &&
         schema !== 'sonar' &&

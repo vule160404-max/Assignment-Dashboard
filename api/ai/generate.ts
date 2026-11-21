@@ -287,6 +287,72 @@ export default async function handler(
       return;
     }
 
+    // Perplexity Search API (POST https://api.perplexity.ai/search — raw ranked web results, 0 LLM output tokens)
+    const isPerplexitySearchApi =
+      provider === 'perplexity' &&
+      (schema === 'search' || model === 'perplexity-search');
+
+    if (isPerplexitySearchApi) {
+      const queries = userPrompt
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .slice(0, 5);
+      const searchPayload = {
+        query: queries.length > 1 ? queries : queries[0] || userPrompt.trim(),
+        max_results: 12,
+      };
+      const httpResp = await fetch('https://api.perplexity.ai/search', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify(searchPayload),
+      });
+      const rawJson = (await httpResp.json().catch(() => ({}))) as {
+        id?: string;
+        results?: Array<{
+          title?: string;
+          url?: string;
+          snippet?: string;
+          date?: string;
+          last_updated?: string;
+        }>;
+        error?: { message?: string };
+        detail?: string;
+      };
+      if (!httpResp.ok) {
+        sendJson(res, httpResp.status, {
+          error:
+            rawJson?.error?.message ||
+            rawJson?.detail ||
+            `Perplexity Search API lỗi HTTP ${httpResp.status}.`,
+        });
+        return;
+      }
+      const results = Array.isArray(rawJson.results) ? rawJson.results : [];
+      const formattedText =
+        results.length > 0
+          ? results
+              .map((r, idx) => {
+                const dateLabel = r.date || r.last_updated || 'n.d.';
+                return `[${idx + 1}] ${r.title || 'Untitled Source'} (${dateLabel})\nURL: ${r.url || ''}\nExcerpt: ${(r.snippet || '').trim()}`;
+              })
+              .join('\n\n')
+          : 'No web search results returned.';
+
+      sendJson(res, 200, {
+        text: formattedText,
+        id: rawJson.id,
+        model: 'perplexity-search',
+        provider: 'perplexity',
+        schema: 'search',
+        search_results: results,
+      });
+      return;
+    }
+
     // Perplexity Agent API (POST https://api.perplexity.ai/v1/agent via official @perplexity-ai/perplexity_ai SDK)
     // Sonar models (sonar, sonar-pro, sonar-reasoning-pro, sonar-deep-research) route to /chat/completions.
     const isPerplexityAgentSchema =
