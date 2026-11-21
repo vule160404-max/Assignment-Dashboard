@@ -54,11 +54,13 @@ function normalizePerplexityBaseUrl(url?: string, model?: string): string {
 export function normalizeHybridPipeline(
   raw?: Partial<AiHybridPipelineConfig> | null
 ): AiHybridPipelineConfig {
+  const rawResearch =
+    typeof raw?.researchModel === 'string' ? raw.researchModel.trim() : '';
   return {
     enabled: Boolean(raw?.enabled),
     researchModel:
-      typeof raw?.researchModel === 'string' && raw.researchModel.trim()
-        ? raw.researchModel.trim()
+      rawResearch && !/^sonar/i.test(rawResearch)
+        ? rawResearch
         : DEFAULT_HYBRID_PIPELINE.researchModel,
     writerProvider:
       raw?.writerProvider &&

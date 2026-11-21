@@ -51,7 +51,7 @@ const PROVIDER_OPTIONS: {
   label: string;
   shortLabel: string;
 }[] = [
-  { key: 'perplexity', label: 'Perplexity (Agent API & Sonar)', shortLabel: 'Perplexity' },
+  { key: 'perplexity', label: 'Perplexity Agent API (/v1/agent)', shortLabel: 'Perplexity' },
   {
     key: 'custom_openai',
     label: 'Custom OpenAI (GLM / NVIDIA NIM / OpenRouter / DeepSeek)',
@@ -63,11 +63,17 @@ const PROVIDER_OPTIONS: {
 ];
 
 const HYBRID_RESEARCH_OPTIONS: { value: string; label: string }[] = [
-  { value: 'fast-search', label: 'fast-search · Nhanh & Tiết kiệm (Agent)' },
-  { value: 'pro-search', label: 'pro-search · Cân bằng học thuật (Agent)' },
-  { value: 'sonar', label: 'sonar · Tìm kiếm Web tiêu chuẩn (Sonar)' },
-  { value: 'sonar-pro', label: 'sonar-pro · Tìm kiếm chuyên sâu (Sonar)' },
-  { value: 'deep-research', label: 'deep-research · Nghiên cứu tổng hợp (Agent)' },
+  { value: 'fast-search', label: 'fast-search · Agent Preset (Nhanh & Rẻ)' },
+  { value: 'pro-search', label: 'pro-search · Agent Preset (Cân bằng học thuật)' },
+  { value: 'deep-research', label: 'deep-research · Agent Preset (Chuyên sâu)' },
+  {
+    value: 'perplexity/glm-5.3-flash',
+    label: 'perplexity/glm-5.3-flash + Web Search (Siêu tiết kiệm)',
+  },
+  {
+    value: 'perplexity/glm-5.3',
+    label: 'perplexity/glm-5.3 + Web Search (Chuẩn xác cao)',
+  },
 ];
 
 const PERPLEXITY_PRESETS = [
@@ -75,12 +81,6 @@ const PERPLEXITY_PRESETS = [
   'pro-search',
   'deep-research',
   'advanced-deep-research',
-];
-
-const PERPLEXITY_SONAR_MODELS = [
-  'sonar',
-  'sonar-pro',
-  'sonar-reasoning-pro',
 ];
 
 const DEFAULT_PERPLEXITY_WRITER_MODELS = [
@@ -209,13 +209,7 @@ export function WriterApiSettingsModal({
 
   const singleSuggestedModels =
     activeProvider === 'perplexity'
-      ? Array.from(
-          new Set([
-            ...PERPLEXITY_PRESETS,
-            ...PERPLEXITY_SONAR_MODELS,
-            ...perplexityCatalogIds,
-          ])
-        )
+      ? Array.from(new Set([...PERPLEXITY_PRESETS, ...perplexityCatalogIds]))
       : AI_PROVIDER_SUGGESTED_MODELS[activeProvider] || [];
 
   const writerSuggestedModels =
@@ -389,9 +383,6 @@ export function WriterApiSettingsModal({
         Boolean(serverKeysConfigured[writerProvider]))
     : Boolean(currentProfile.apiKey.trim()) ||
       Boolean(serverKeysConfigured[activeProvider]);
-
-  const isSinglePerplexitySonar =
-    activeProvider === 'perplexity' && /^sonar/i.test(currentProfile.model);
 
   return createPortal(
     <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
@@ -813,45 +804,30 @@ export function WriterApiSettingsModal({
                     <input
                       type="text"
                       value={currentProfile.model}
-                      onChange={(e) => {
-                        const val = e.target.value;
+                      onChange={(e) =>
                         updateProfile(activeProvider, {
-                          model: val,
+                          model: e.target.value,
                           ...(activeProvider === 'perplexity'
-                            ? {
-                                baseUrl: /^sonar/i.test(val.trim())
-                                  ? 'https://api.perplexity.ai'
-                                  : 'https://api.perplexity.ai/v1/agent',
-                              }
+                            ? { baseUrl: 'https://api.perplexity.ai/v1/agent' }
                             : {}),
-                        });
-                      }}
+                        })
+                      }
                       placeholder="Nhập tên model..."
                       className="w-full px-3 py-2 text-xs font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
                     />
                   ) : activeProvider === 'perplexity' ? (
                     <select
                       value={currentProfile.model}
-                      onChange={(e) => {
-                        const val = e.target.value;
+                      onChange={(e) =>
                         updateProfile('perplexity', {
-                          model: val,
-                          baseUrl: /^sonar/i.test(val)
-                            ? 'https://api.perplexity.ai'
-                            : 'https://api.perplexity.ai/v1/agent',
-                        });
-                      }}
+                          model: e.target.value,
+                          baseUrl: 'https://api.perplexity.ai/v1/agent',
+                        })
+                      }
                       className="w-full px-3 py-2 text-xs font-mono bg-white border border-zinc-300 rounded-lg text-slate-900 focus:outline-none focus:border-[#12489B]"
                     >
                       <optgroup label="Agent Presets (Tìm kiếm Web)">
                         {PERPLEXITY_PRESETS.map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </optgroup>
-                      <optgroup label="Sonar (Tìm kiếm trực tiếp)">
-                        {PERPLEXITY_SONAR_MODELS.map((m) => (
                           <option key={m} value={m}>
                             {m}
                           </option>
@@ -929,51 +905,6 @@ export function WriterApiSettingsModal({
                   </button>
                 </div>
               </div>
-
-              {/* Clean Perplexity Protocol Indicator (Agent API vs Sonar only — NO Orchestrator) */}
-              {activeProvider === 'perplexity' && (
-                <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-zinc-50 border border-zinc-200/80">
-                  <span className="text-[11px] text-zinc-500">Giao thức:</span>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateProfile('perplexity', {
-                          baseUrl: 'https://api.perplexity.ai/v1/agent',
-                          model: isSinglePerplexitySonar
-                            ? 'pro-search'
-                            : currentProfile.model,
-                        })
-                      }
-                      className={`px-2.5 py-0.5 text-[11px] font-medium rounded-md border ${
-                        !isSinglePerplexitySonar
-                          ? 'bg-blue-50 text-[#12489B] border-blue-200 font-semibold'
-                          : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
-                      }`}
-                    >
-                      Agent API
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        updateProfile('perplexity', {
-                          baseUrl: 'https://api.perplexity.ai',
-                          model: isSinglePerplexitySonar
-                            ? currentProfile.model
-                            : 'sonar-pro',
-                        })
-                      }
-                      className={`px-2.5 py-0.5 text-[11px] font-medium rounded-md border ${
-                        isSinglePerplexitySonar
-                          ? 'bg-blue-50 text-[#12489B] border-blue-200 font-semibold'
-                          : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-100'
-                      }`}
-                    >
-                      Sonar
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Collapsible Advanced Settings (Base URL & Temperature) */}
               <div className="border-t border-zinc-100 pt-2">
