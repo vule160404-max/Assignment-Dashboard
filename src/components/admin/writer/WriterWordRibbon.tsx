@@ -15,6 +15,7 @@ import {
   ListTree,
   Redo2,
   Replace,
+  RotateCcw,
   Search,
   Sparkles,
   Underline,
@@ -49,7 +50,7 @@ interface WriterWordRibbonProps {
   onZoomChange: (nextZoom: number) => void;
   onAiRefineSection: (action: AiRefineAction, customPrompt?: string) => void;
   onOpenCoverPage: () => void;
-  onCleanAllHashes?: () => void;
+  onRequestResetPaper?: () => void;
 }
 
 const FONT_FAMILIES: FontFamilyOption[] = [
@@ -91,7 +92,7 @@ export function WriterWordRibbon({
   onZoomChange,
   onAiRefineSection,
   onOpenCoverPage,
-  onCleanAllHashes,
+  onRequestResetPaper,
 }: WriterWordRibbonProps) {
   const [showFindBar, setShowFindBar] = useState(false);
   const [showAiBar, setShowAiBar] = useState(false);
@@ -271,18 +272,6 @@ export function WriterWordRibbon({
           >
             <ListOrdered className="w-3.5 h-3.5" />
           </button>
-
-          {onCleanAllHashes && (
-            <button
-              type="button"
-              onClick={onCleanAllHashes}
-              title="Xóa toàn bộ các dấu ## hoặc # ở đầu câu trong bài viết"
-              className="btn-press px-2 py-0.5 text-[11px] font-semibold text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 rounded inline-flex items-center gap-1"
-            >
-              <Eraser className="w-3 h-3 text-amber-600" />
-              <span>Bỏ dấu ##</span>
-            </button>
-          )}
         </div>
 
         {/* Alignment & First-Line Indent */}
@@ -407,8 +396,20 @@ export function WriterWordRibbon({
           </select>
         </div>
 
-        {/* Right Tools: AI Assistant Drawer Toggle, Find/Replace, Zoom */}
+        {/* Right Tools: Reset Content, AI Assistant Drawer Toggle, Find/Replace, Zoom */}
         <div className="inline-flex items-center gap-1.5 ml-auto">
+          {onRequestResetPaper && (
+            <button
+              type="button"
+              onClick={onRequestResetPaper}
+              title="Xóa nội dung đang làm để làm lại từ đầu"
+              className="btn-press px-2.5 py-1 text-xs font-semibold rounded-md inline-flex items-center gap-1 border bg-rose-50/80 text-rose-700 border-rose-200 hover:bg-rose-100"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Xóa nội dung</span>
+            </button>
+          )}
+
           <button
             type="button"
             onClick={() => setShowAiBar((v) => !v)}

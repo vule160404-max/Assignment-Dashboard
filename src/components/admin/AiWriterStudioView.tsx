@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
+  AlertTriangle,
   FileText,
   Layers,
+  RotateCcw,
+  Trash2,
+  X,
 } from 'lucide-react';
 import {
   AiRefineAction,
@@ -190,6 +195,10 @@ export function AiWriterStudioView({
   const [showSkillModal, setShowSkillModal] = useState(false);
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [showDeliverModal, setShowDeliverModal] = useState(false);
+  const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
+  const [resetScope, setResetScope] = useState<
+    'content_and_outline' | 'content_only' | 'everything'
+  >('content_and_outline');
   const [zoomPercent, setZoomPercent] = useState(100);
   const [concurrencyLimit, setConcurrencyLimit] = useState(2);
   const [refiningSection, setRefiningSection] = useState(false);
@@ -1145,20 +1154,75 @@ export function AiWriterStudioView({
     handleUpdateOutlineSection(currentSection.id, { content: nextContent }, true);
   };
 
-  const handleCleanAllMarkdownHashes = () => {
+  const handleConfirmResetPaper = () => {
     if (!activeSession) return;
-    mutateActiveSession((s) => ({
-      ...s,
-      outline: s.outline.map((sec) => ({
-        ...sec,
-        content: stripMarkdownHashesFromText(sec.content),
-        guidanceNotes: stripMarkdownHashesFromText(sec.guidanceNotes),
-      })),
-      fullPaperOverride: s.fullPaperOverride
-        ? stripMarkdownHashesFromText(s.fullPaperOverride)
-        : s.fullPaperOverride,
-    }));
-    onToast('Đã xóa sạch toàn bộ dấu ## ở đầu câu trong bài làm!');
+    pausedSessionIdsRef.current.add(activeSession.id);
+
+    if (resetScope === 'content_only') {
+      mutateActiveSession((s) => ({
+        ...s,
+        batchStatus: 'idle',
+        batchErrorMsg: undefined,
+        fullPaperOverride: '',
+        historyStack: [],
+        historyIndex: -1,
+        outline: s.outline.map((sec) => ({
+          ...sec,
+          content: '',
+          status: 'idle',
+          errorMsg: undefined,
+        })),
+      }));
+      setLeftTab('outline');
+      setShowResetConfirmModal(false);
+      onToast(
+        'Đã xóa toàn bộ nội dung chữ đã viết (giữ nguyên Đề bài & khung Dàn ý) để viết lại!'
+      );
+      return;
+    }
+
+    if (resetScope === 'everything') {
+      const fresh = createDefaultSession(null);
+      mutateActiveSession((s) => ({
+        ...fresh,
+        id: s.id,
+        format: {
+          ...fresh.format,
+          fontFamily: s.format.fontFamily,
+          fontSizePt: s.format.fontSizePt,
+        },
+      }));
+      setLeftTab('brief');
+      setShowResetConfirmModal(false);
+      onToast(
+        'Đã xóa trắng toàn bộ nội dung, dàn ý & đề bài để bắt đầu bài mới từ đầu!'
+      );
+      return;
+    }
+
+    // Default: 'content_and_outline' — reset written content and outline back to default while keeping brief/rubric/order link
+    mutateActiveSession((s) => {
+      const resetOutline = parseAiOutlineJson(
+        '',
+        s.targetWordCount,
+        s.citationStyle
+      );
+      return {
+        ...s,
+        outline: resetOutline,
+        activeSectionId: resetOutline[0]?.id || '',
+        fullPaperOverride: '',
+        batchStatus: 'idle',
+        batchErrorMsg: undefined,
+        historyStack: [],
+        historyIndex: -1,
+      };
+    });
+    setLeftTab('brief');
+    setShowResetConfirmModal(false);
+    onToast(
+      'Đã xóa toàn bộ bài viết & dàn ý đang làm (giữ lại Đề bài & Rubric) để làm lại từ đầu!'
+    );
   };
 
   const handleUndo = () => {
@@ -1469,7 +1533,7 @@ export function AiWriterStudioView({
           void handleAiRefineCurrentSection(action, customPrompt)
         }
         onOpenCoverPage={() => setShowCoverModal(true)}
-        onCleanAllHashes={handleCleanAllMarkdownHashes}
+        onRequestResetPaper={() => setShowResetConfirmModal(true)}
       />
 
       {/* Main 2-Zone Workspace Grid: Segmented Sidebar (4 cols) + Live A4 Paper (8 cols) */}
@@ -1623,6 +1687,158 @@ export function AiWriterStudioView({
         onClose={() => setShowDeliverModal(false)}
         onToast={onToast}
       />
+
+      {showResetConfirmModal &&
+        createPortal(
+          <div className="modal-backdrop fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+            <div
+              className="modal-panel bg-white border border-zinc-200 rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-zinc-200 flex items-center justify-between bg-rose-50/70">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-lg bg-rose-100 border border-rose-200 flex items-center justify-center text-rose-700">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Xác nhận xóa toàn bộ nội dung đang làm
+                    </h3>
+                    <p className="text-xs text-zinc-500">
+                      Xóa bài đang viết sai để làm lại từ đầu theo đúng phạm vi bạn chọn.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirmModal(false)}
+                  className="btn-press p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 space-y-4">
+                <div className="p-3 rounded-xl bg-zinc-50 border border-zinc-200/90 space-y-1">
+                  <div className="flex items-center justify-between gap-2 text-xs">
+                    <span className="font-semibold text-slate-800 truncate">
+                      {activeSession.title || 'Bài nghiên cứu đang mở'}
+                    </span>
+                    <span className="font-mono font-semibold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md shrink-0">
+                      {totalDraftedWords.toLocaleString('vi-VN')} từ ·{' '}
+                      {activeSession.outline.length} mục
+                    </span>
+                  </div>
+                  {activeSession.topic && (
+                    <p className="text-[11px] text-zinc-500 line-clamp-2">
+                      Đề tài: {activeSession.topic}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-slate-800">
+                    Chọn phạm vi nội dung muốn xóa để làm lại:
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${
+                      resetScope === 'content_and_outline'
+                        ? 'border-rose-600 bg-rose-50/50 ring-1 ring-rose-500/20'
+                        : 'border-zinc-200 hover:bg-zinc-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="writer_reset_scope"
+                      checked={resetScope === 'content_and_outline'}
+                      onChange={() => setResetScope('content_and_outline')}
+                      className="mt-0.5 accent-rose-600"
+                    />
+                    <div className="text-xs">
+                      <div className="font-bold text-slate-900">
+                        Xóa toàn bộ bài viết &amp; dàn ý (Giữ lại Đề bài &amp; Rubric)
+                      </div>
+                      <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">
+                        Xóa sạch phần chữ đã viết và dàn ý cũ để AI lập lại dàn ý mới từ đầu. Giữ nguyên môn học, chủ đề, yêu cầu đề bài, Rubric và tài liệu đính kèm.
+                      </p>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${
+                      resetScope === 'content_only'
+                        ? 'border-rose-600 bg-rose-50/50 ring-1 ring-rose-500/20'
+                        : 'border-zinc-200 hover:bg-zinc-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="writer_reset_scope"
+                      checked={resetScope === 'content_only'}
+                      onChange={() => setResetScope('content_only')}
+                      className="mt-0.5 accent-rose-600"
+                    />
+                    <div className="text-xs">
+                      <div className="font-bold text-slate-900">
+                        Chỉ xóa phần chữ đã viết (Giữ nguyên Đề bài &amp; khung Dàn ý)
+                      </div>
+                      <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">
+                        Xóa toàn bộ đoạn văn bên trong các mục về 0 từ để bấm viết lại, nhưng vẫn giữ nguyên danh sách các mục dàn ý hiện tại.
+                      </p>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-colors ${
+                      resetScope === 'everything'
+                        ? 'border-rose-600 bg-rose-50/50 ring-1 ring-rose-500/20'
+                        : 'border-zinc-200 hover:bg-zinc-50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="writer_reset_scope"
+                      checked={resetScope === 'everything'}
+                      onChange={() => setResetScope('everything')}
+                      className="mt-0.5 accent-rose-600"
+                    />
+                    <div className="text-xs">
+                      <div className="font-bold text-slate-900">
+                        Xóa trắng hoàn toàn 100% (Xóa cả Đề bài, Rubric, Dàn ý &amp; Bài viết)
+                      </div>
+                      <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed">
+                        Làm mới toàn bộ tab này về trạng thái trang giấy trắng tinh ban đầu.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-5 py-3.5 border-t border-zinc-200 bg-zinc-50 flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setShowResetConfirmModal(false)}
+                  className="btn-press px-4 py-2 text-xs font-semibold text-zinc-700 bg-white border border-zinc-200 hover:bg-zinc-100 rounded-lg"
+                >
+                  Hủy bỏ (Giữ nguyên)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmResetPaper}
+                  className="btn-press px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg inline-flex items-center gap-1.5 shadow-2xs"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Xác nhận xóa &amp; Làm lại từ đầu</span>
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }
