@@ -102,6 +102,7 @@ export function OrderWorkspaceModal({
   const [newClientName, setNewClientName] = useState('');
   const [newClientZalo, setNewClientZalo] = useState('');
   const [newClientSchool, setNewClientSchool] = useState('');
+  const [newClientMajor, setNewClientMajor] = useState('');
   const [newClientTier, setNewClientTier] = useState<ClientTier>('new');
 
   const [subject, setSubject] = useState('');
@@ -212,6 +213,7 @@ export function OrderWorkspaceModal({
       setNewClientName('');
       setNewClientZalo('');
       setNewClientSchool('');
+      setNewClientMajor('');
       setNewClientTier('new');
       setSubject('');
       setTopic('');
@@ -258,17 +260,6 @@ export function OrderWorkspaceModal({
     }
     onClose();
   }, [onClose, unsavedUploadedUrls]);
-
-  useEffect(() => {
-    if (!isOpen || previewAtt) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        handleCloseModal();
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, previewAtt, handleCloseModal]);
 
   if (!isOpen) return null;
 
@@ -414,10 +405,14 @@ export function OrderWorkspaceModal({
             setSaving(false);
             return;
           }
+          const combinedSchoolMajor = [newClientSchool.trim(), newClientMajor.trim()]
+            .filter(Boolean)
+            .join(' · ')
+            .slice(0, FIELD_LIMITS.schoolMax);
           resolvedClientId = await saveClient({
             displayName: newClientName.trim(),
             zaloNumber: newClientZalo.trim(),
-            schoolMajor: newClientSchool.trim(),
+            schoolMajor: combinedSchoolMajor,
             tier: newClientTier,
             socialLink: '',
             notes: '',
@@ -596,7 +591,6 @@ export function OrderWorkspaceModal({
       role="dialog"
       aria-modal="true"
       className="modal-backdrop fixed inset-0 z-40 bg-slate-950/50 backdrop-blur-[2px] flex items-center justify-center p-3 sm:p-5"
-      onClick={handleCloseModal}
     >
       <div
         className="modal-panel bg-white border border-zinc-200 rounded-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden shadow-[0_24px_60px_rgb(15,23,42,0.22)]"
@@ -811,52 +805,116 @@ export function OrderWorkspaceModal({
                     </div>
 
                     {!showNewClientInline ? (
-                      <select
-                        value={clientId}
-                        onChange={(e) => setClientId(e.target.value)}
-                        className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
-                      >
-                        <option value="">-- Chọn khách hàng --</option>
-                        {clients.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.displayName} {c.zaloNumber ? `(${c.zaloNumber})` : ''}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <input
-                          type="text"
-                          placeholder="Tên / Nickname *"
-                          value={newClientName}
-                          onChange={(e) => setNewClientName(e.target.value)}
-                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Số Zalo"
-                          value={newClientZalo}
-                          onChange={(e) => setNewClientZalo(e.target.value)}
-                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
-                        />
-                        <input
-                          type="text"
-                          placeholder="Trường / Chuyên ngành"
-                          value={newClientSchool}
-                          onChange={(e) => setNewClientSchool(e.target.value)}
-                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
-                        />
+                      <div className="space-y-2">
                         <select
-                          value={newClientTier}
-                          onChange={(e) => setNewClientTier(e.target.value as ClientTier)}
-                          className="px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
+                          value={clientId}
+                          onChange={(e) => setClientId(e.target.value)}
+                          className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                         >
-                          {CLIENT_TIERS.map((t) => (
-                            <option key={t.key} value={t.key}>
-                              {t.label}
+                          <option value="">-- Chọn khách hàng --</option>
+                          {clients.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.displayName} {c.zaloNumber ? `(${c.zaloNumber})` : ''}
                             </option>
                           ))}
                         </select>
+                        {(() => {
+                          const selectedClient = clients.find((c) => c.id === clientId);
+                          const raw = selectedClient?.schoolMajor?.trim();
+                          if (!raw) return null;
+                          const parts = raw.includes(' · ')
+                            ? raw.split(' · ')
+                            : raw.includes(' / ')
+                              ? raw.split(' / ')
+                              : raw.includes(' - ')
+                                ? raw.split(' - ')
+                                : [raw];
+                          const schoolLabel = parts[0]?.trim() || '';
+                          const majorLabel = parts.slice(1).join(' · ').trim();
+                          return (
+                            <div className="bg-white border border-zinc-200/80 rounded-lg px-3 py-2 text-xs space-y-1">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-zinc-500">Trường học:</span>
+                                <span className="font-medium text-slate-900">{schoolLabel || '—'}</span>
+                              </div>
+                              {majorLabel && (
+                                <div className="flex items-center justify-between gap-2 border-t border-zinc-100 pt-1">
+                                  <span className="text-zinc-500">Tên ngành:</span>
+                                  <span className="font-medium text-slate-900">{majorLabel}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[11px] font-medium text-zinc-600 mb-1">
+                              Tên / Nickname *
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="VD: Minh Anh"
+                              value={newClientName}
+                              onChange={(e) => setNewClientName(e.target.value)}
+                              className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[11px] font-medium text-zinc-600 mb-1">
+                              Số Zalo
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="VD: 0912345678"
+                              value={newClientZalo}
+                              onChange={(e) => setNewClientZalo(e.target.value)}
+                              className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-zinc-600 mb-1">
+                            Trường học
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="VD: Đại học Kinh tế Quốc dân (NEU)"
+                            value={newClientSchool}
+                            onChange={(e) => setNewClientSchool(e.target.value)}
+                            className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-zinc-600 mb-1">
+                            Tên ngành / Chuyên ngành
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="VD: Quản trị kinh doanh / International Business"
+                            value={newClientMajor}
+                            onChange={(e) => setNewClientMajor(e.target.value)}
+                            className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-medium text-zinc-600 mb-1">
+                            Phân loại khách hàng
+                          </label>
+                          <select
+                            value={newClientTier}
+                            onChange={(e) => setNewClientTier(e.target.value as ClientTier)}
+                            className="w-full px-3 py-2 text-sm bg-white border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
+                          >
+                            {CLIENT_TIERS.map((t) => (
+                              <option key={t.key} value={t.key}>
+                                {t.label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
                     )}
                   </div>

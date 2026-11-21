@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Plus, Search, Trash2, User, X } from 'lucide-react';
 import { deleteClient, saveClient } from '../../services/firestoreService';
 import { formatVnd } from '../../lib/utils';
@@ -9,6 +9,24 @@ import {
   FIELD_LIMITS,
   OrderRecord,
 } from '../../types/domain';
+
+function splitSchoolAndMajor(raw?: string): { school: string; major: string } {
+  const text = (raw || '').trim();
+  if (!text) return { school: '', major: '' };
+  const sep = text.includes(' · ')
+    ? ' · '
+    : text.includes(' / ')
+      ? ' / '
+      : text.includes(' - ')
+        ? ' - '
+        : null;
+  if (!sep) return { school: text, major: '' };
+  const parts = text.split(sep);
+  return {
+    school: (parts[0] || '').trim(),
+    major: parts.slice(1).join(' · ').trim(),
+  };
+}
 
 interface ClientsCrmViewProps {
   clients: ClientRecord[];
@@ -29,39 +47,32 @@ export function ClientsCrmView({
   const [displayName, setDisplayName] = useState('');
   const [zaloNumber, setZaloNumber] = useState('');
   const [socialLink, setSocialLink] = useState('');
-  const [schoolMajor, setSchoolMajor] = useState('');
+  const [schoolName, setSchoolName] = useState('');
+  const [majorName, setMajorName] = useState('');
   const [tier, setTier] = useState<ClientTier>('new');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-
-  useEffect(() => {
-    if (!showForm) return;
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setShowForm(false);
-      }
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [showForm]);
 
   const openNew = () => {
     setEditing(null);
     setDisplayName('');
     setZaloNumber('');
     setSocialLink('');
-    setSchoolMajor('');
+    setSchoolName('');
+    setMajorName('');
     setTier('new');
     setNotes('');
     setShowForm(true);
   };
 
   const openEdit = (c: ClientRecord) => {
+    const parsed = splitSchoolAndMajor(c.schoolMajor);
     setEditing(c);
     setDisplayName(c.displayName);
     setZaloNumber(c.zaloNumber || '');
     setSocialLink(c.socialLink || '');
-    setSchoolMajor(c.schoolMajor || '');
+    setSchoolName(parsed.school);
+    setMajorName(parsed.major);
     setTier(c.tier);
     setNotes(c.notes || '');
     setShowForm(true);
@@ -101,12 +112,16 @@ export function ClientsCrmView({
     if (!displayName.trim()) return;
     setSaving(true);
     try {
+      const combinedSchoolMajor = [schoolName.trim(), majorName.trim()]
+        .filter(Boolean)
+        .join(' · ')
+        .slice(0, FIELD_LIMITS.schoolMax);
       await saveClient(
         {
           displayName: displayName.trim(),
           zaloNumber: zaloNumber.trim(),
           socialLink: socialLink.trim(),
-          schoolMajor: schoolMajor.trim(),
+          schoolMajor: combinedSchoolMajor,
           tier,
           notes: notes.trim(),
         },
@@ -237,7 +252,22 @@ export function ClientsCrmView({
                         {c.zaloNumber || c.socialLink || '—'}
                       </td>
                       <td className="py-3 px-4 text-xs text-zinc-600">
-                        {c.schoolMajor || '—'}
+                        {(() => {
+                          const parsed = splitSchoolAndMajor(c.schoolMajor);
+                          if (!parsed.school && !parsed.major) return '—';
+                          return (
+                            <div className="space-y-0.5">
+                              <div className="font-medium text-slate-800">
+                                {parsed.school || '—'}
+                              </div>
+                              {parsed.major && (
+                                <div className="text-[11px] text-zinc-500">
+                                  {parsed.major}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="py-3 px-4 text-xs">
                         <span className={`font-medium ${tierColorMap[c.tier]}`}>
@@ -287,7 +317,6 @@ export function ClientsCrmView({
           role="dialog"
           aria-modal="true"
           className="modal-backdrop fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-[2px] flex items-center justify-center p-4"
-          onClick={() => setShowForm(false)}
         >
           <form
             onSubmit={handleSave}
@@ -369,13 +398,28 @@ export function ClientsCrmView({
 
               <div>
                 <label className="block text-xs font-medium text-zinc-700 mb-1">
-                  Trường học / Chuyên ngành
+                  Trường học
                 </label>
                 <input
                   type="text"
-                  maxLength={FIELD_LIMITS.schoolMax}
-                  value={schoolMajor}
-                  onChange={(e) => setSchoolMajor(e.target.value)}
+                  maxLength={80}
+                  placeholder="VD: Đại học Ngoại thương (FTU)"
+                  value={schoolName}
+                  onChange={(e) => setSchoolName(e.target.value)}
+                  className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-zinc-700 mb-1">
+                  Tên ngành / Chuyên ngành
+                </label>
+                <input
+                  type="text"
+                  maxLength={76}
+                  placeholder="VD: Kinh tế đối ngoại / International Business"
+                  value={majorName}
+                  onChange={(e) => setMajorName(e.target.value)}
                   className="w-full px-3 py-2 text-sm bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#12489B]/20 focus:border-[#12489B]"
                 />
               </div>
