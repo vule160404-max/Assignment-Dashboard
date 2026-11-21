@@ -69,49 +69,38 @@ export interface SavedHumanizeCheckpoint {
 }
 
 const CHECKPOINT_STORAGE_KEY = 'assigntrack_hix_checkpoints_v1';
+let inMemoryCheckpoints: Record<string, SavedHumanizeCheckpoint> = {};
 
 export function readCheckpoints(): Record<string, SavedHumanizeCheckpoint> {
   try {
-    const raw = window.localStorage.getItem(CHECKPOINT_STORAGE_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw);
-    return parsed && typeof parsed === 'object'
-      ? (parsed as Record<string, SavedHumanizeCheckpoint>)
-      : {};
+    window.localStorage.removeItem(CHECKPOINT_STORAGE_KEY);
   } catch {
-    return {};
+    // ignore
   }
+  return { ...inMemoryCheckpoints };
 }
 
 export function writeCheckpoint(entry: SavedHumanizeCheckpoint): void {
-  try {
-    const all = readCheckpoints();
-    all[entry.fingerprint] = entry;
-    const sorted = Object.values(all)
-      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-      .slice(0, 8);
-    const trimmed: Record<string, SavedHumanizeCheckpoint> = {};
-    sorted.forEach((item) => {
-      trimmed[item.fingerprint] = item;
-    });
-    window.localStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(trimmed));
-  } catch {
-    // Ignore storage quota errors
-  }
+  const all = { ...inMemoryCheckpoints, [entry.fingerprint]: entry };
+  const sorted = Object.values(all)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
+    .slice(0, 8);
+  const trimmed: Record<string, SavedHumanizeCheckpoint> = {};
+  sorted.forEach((item) => {
+    trimmed[item.fingerprint] = item;
+  });
+  inMemoryCheckpoints = trimmed;
 }
 
 export function removeCheckpoint(fingerprint: string): void {
-  try {
-    const all = readCheckpoints();
-    if (!all[fingerprint]) return;
-    delete all[fingerprint];
-    window.localStorage.setItem(CHECKPOINT_STORAGE_KEY, JSON.stringify(all));
-  } catch {
-    // Ignore
-  }
+  if (!inMemoryCheckpoints[fingerprint]) return;
+  const next = { ...inMemoryCheckpoints };
+  delete next[fingerprint];
+  inMemoryCheckpoints = next;
 }
 
 export function clearAllCheckpoints(): void {
+  inMemoryCheckpoints = {};
   try {
     window.localStorage.removeItem(CHECKPOINT_STORAGE_KEY);
   } catch {

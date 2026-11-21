@@ -18,7 +18,6 @@ import {
   UserPlus,
 } from 'lucide-react';
 import {
-  ADMIN_EMAIL,
   FIREBASE_AUTH_PROVIDERS_URL,
   auth,
   mapFirebaseAuthError,
@@ -143,50 +142,6 @@ export function AdminAuthGate({
       await onRefreshProfile();
       onToast('Đăng nhập hệ thống Điều hành thành công.');
     } catch (err) {
-      const code =
-        typeof err === 'object' && err !== null && 'code' in err
-          ? String((err as { code?: unknown }).code || '')
-          : '';
-
-      if (
-        normalizedEmail === ADMIN_EMAIL.toLowerCase() &&
-        (code === 'auth/user-not-found' || code === 'auth/invalid-credential')
-      ) {
-        try {
-          const verifyRes = await fetch('/api/auth/verify-owner-bootstrap', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: normalizedEmail, password: loginPassword }),
-          });
-          if (verifyRes.ok) {
-            const verifyData = (await verifyRes.json()) as { allowed?: boolean };
-            if (verifyData.allowed) {
-              const created = await createUserWithEmailAndPassword(
-                auth,
-                normalizedEmail,
-                loginPassword
-              );
-              await updateProfile(created.user, { displayName: 'Chủ hệ thống' });
-              if (!created.user.emailVerified) {
-                await sendEmailVerification(created.user).catch(() => undefined);
-                await onRefreshProfile();
-                onToast('Đã khởi tạo Chủ hệ thống. Vui lòng kiểm tra email để xác minh tài khoản.');
-                return;
-              }
-              await ensureOwnerOrReadProfile(created.user);
-              await onRefreshProfile();
-              onToast('Đăng nhập hệ thống Điều hành thành công.');
-              return;
-            }
-          }
-        } catch (createErr) {
-          const mappedCreate = mapFirebaseAuthError(createErr);
-          setAuthError(mappedCreate.message);
-          setProviderDisabledError(mappedCreate.isProviderDisabled);
-          return;
-        }
-      }
-
       const mapped = mapFirebaseAuthError(err);
       setAuthError(mapped.message);
       setProviderDisabledError(mapped.isProviderDisabled);

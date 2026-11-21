@@ -1,55 +1,207 @@
 import {
   AiChatbotSettingsStore,
   AiProviderProfile,
+  AiProviderType,
   DEFAULT_AI_SETTINGS,
   DEFAULT_BUILTIN_SKILLS,
   SkillDocument,
   WriterOutlineSection,
   WriterSession,
 } from '../components/admin/writer/types';
+import { auth } from './firebase';
 
 const AI_SETTINGS_STORAGE_KEY = 'assigntrack_ai_writer_settings_v1';
 const SKILL_LIBRARY_STORAGE_KEY = 'assigntrack_ai_skill_library_v1';
 const WRITER_SESSIONS_STORAGE_KEY = 'assigntrack_ai_writer_sessions_v1';
 
+const pendingLegacyKeysToMigrate: Partial<Record<AiProviderType, string>> = {};
+
+export function queueLegacyAiKeysForServerMigration(
+  profiles?: Partial<Record<AiProviderType, Partial<AiProviderProfile>>>
+): boolean {
+  if (!profiles || typeof profiles !== 'object') return false;
+  let foundAny = false;
+  const keys: AiProviderType[] = [
+    'perplexity',
+    'gemini',
+    'openai',
+    'anthropic',
+    'custom_openai',
+  ];
+  for (const k of keys) {
+    const rawKey = (profiles[k]?.apiKey || '').trim();
+    if (rawKey) {
+      pendingLegacyKeysToMigrate[k] = rawKey;
+      foundAny = true;
+    }
+  }
+  return foundAny;
+}
+
+export function stripSecretsFromAiSettings(
+  store: AiChatbotSettingsStore
+): AiChatbotSettingsStore {
+  return {
+    activeProvider: store.activeProvider,
+    profiles: {
+      perplexity: { ...store.profiles.perplexity, apiKey: '' },
+      gemini: { ...store.profiles.gemini, apiKey: '' },
+      openai: { ...store.profiles.openai, apiKey: '' },
+      anthropic: { ...store.profiles.anthropic, apiKey: '' },
+      custom_openai: { ...store.profiles.custom_openai, apiKey: '' },
+    },
+  };
+}
+
+async function getTeamAuthHeaders(): Promise<Record<string, string>> {
+  const current = auth.currentUser;
+  if (!current) return {};
+  try {
+    const token = await current.getIdToken();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
+
+export async function syncServerAiKeysStatus(): Promise<
+  Record<AiProviderType, boolean>
+> {
+  const defaultStatus: Record<AiProviderType, boolean> = {
+    perplexity: false,
+    gemini: false,
+    openai: false,
+    anthropic: false,
+    custom_openai: false,
+  };
+  const authHeaders = await getTeamAuthHeaders();
+  if (!authHeaders.Authorization) return defaultStatus;
+
+  const pendingEntries = Object.entries(pendingLegacyKeysToMigrate).filter(
+    ([, v]) => Boolean(v && v.trim())
+  );
+  try {
+    if (pendingEntries.length > 0) {
+      const keysPayload: Partial<Record<AiProviderType, string>> = {};
+      for (const [k, v] of pendingEntries) {
+        keysPayload[k as AiProviderType] = v;
+        delete pendingLegacyKeysToMigrate[k as AiProviderType];
+      }
+      const resp = await fetch('/api/ai/keys', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders,
+        },
+        body: JSON.stringify({ keys: keysPayload }),
+      });
+      const data = (await resp.json().catch(() => ({}))) as {
+        configured?: Record<AiProviderType, boolean>;
+      };
+      if (resp.ok && data.configured) {
+        return { ...defaultStatus, ...data.configured };
+      }
+    }
+
+    const resp = await fetch('/api/ai/keys/status', {
+      method: 'GET',
+      headers: authHeaders,
+    });
+    const data = (await resp.json().catch(() => ({}))) as {
+      configured?: Record<AiProviderType, boolean>;
+    };
+    if (resp.ok && data.configured) {
+      return { ...defaultStatus, ...data.configured };
+    }
+  } catch {
+    // ignore transient offline
+  }
+  return defaultStatus;
+}
+
+export async function saveAiProviderKeyToServerVault(
+  provider: AiProviderType,
+  apiKey: string,
+  clear = false
+): Promise<Record<AiProviderType, boolean>> {
+  const authHeaders = await getTeamAuthHeaders();
+  const resp = await fetch('/api/ai/keys', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders,
+    },
+    body: JSON.stringify({ provider, apiKey: apiKey.trim(), clear }),
+  });
+  const data = (await resp.json().catch(() => ({}))) as {
+    configured?: Record<AiProviderType, boolean>;
+    error?: string;
+  };
+  if (!resp.ok) {
+    throw new Error(data.error || 'Không thể lưu API Key vào kho bảo mật Server.');
+  }
+  return (
+    data.configured || {
+      perplexity: false,
+      gemini: false,
+      openai: false,
+      anthropic: false,
+      custom_openai: false,
+    }
+  );
+}
+
 export function loadAiChatbotSettings(): AiChatbotSettingsStore {
   try {
     const raw = localStorage.getItem(AI_SETTINGS_STORAGE_KEY);
-    if (!raw) return DEFAULT_AI_SETTINGS;
+    if (!raw) return stripSecretsFromAiSettings(DEFAULT_AI_SETTINGS);
     const parsed = JSON.parse(raw) as Partial<AiChatbotSettingsStore>;
-    return {
-      activeProvider: parsed.activeProvider || DEFAULT_AI_SETTINGS.activeProvider,
+    const hadLegacyKeys = queueLegacyAiKeysForServerMigration(parsed.profiles);
+    const normalized: AiChatbotSettingsStore = stripSecretsFromAiSettings({
+      activeProvider:
+        parsed.activeProvider || DEFAULT_AI_SETTINGS.activeProvider,
       profiles: {
         perplexity: {
           ...DEFAULT_AI_SETTINGS.profiles.perplexity,
           ...(parsed.profiles?.perplexity || {}),
+          apiKey: '',
         },
         gemini: {
           ...DEFAULT_AI_SETTINGS.profiles.gemini,
           ...(parsed.profiles?.gemini || {}),
+          apiKey: '',
         },
         openai: {
           ...DEFAULT_AI_SETTINGS.profiles.openai,
           ...(parsed.profiles?.openai || {}),
+          apiKey: '',
         },
         anthropic: {
           ...DEFAULT_AI_SETTINGS.profiles.anthropic,
           ...(parsed.profiles?.anthropic || {}),
+          apiKey: '',
         },
         custom_openai: {
           ...DEFAULT_AI_SETTINGS.profiles.custom_openai,
           ...(parsed.profiles?.custom_openai || {}),
+          apiKey: '',
         },
       },
-    };
+    });
+    if (hadLegacyKeys) {
+      localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
+    }
+    return normalized;
   } catch {
-    return DEFAULT_AI_SETTINGS;
+    return stripSecretsFromAiSettings(DEFAULT_AI_SETTINGS);
   }
 }
 
 export function saveAiChatbotSettings(store: AiChatbotSettingsStore): void {
   try {
-    localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(store));
+    queueLegacyAiKeysForServerMigration(store.profiles);
+    const scrubbed = stripSecretsFromAiSettings(store);
+    localStorage.setItem(AI_SETTINGS_STORAGE_KEY, JSON.stringify(scrubbed));
   } catch {
     // ignore storage quota errors
   }
@@ -121,18 +273,18 @@ export function sanitizeWriterSession(session: WriterSession): WriterSession {
 
 export function loadWriterSessions(): WriterSession[] {
   try {
-    const raw = localStorage.getItem(WRITER_SESSIONS_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as WriterSession[];
-    return Array.isArray(parsed) ? parsed.map(sanitizeWriterSession) : [];
+    // Purge any legacy localStorage session cache so customer essays are never readable via DevTools LocalStorage
+    localStorage.removeItem(WRITER_SESSIONS_STORAGE_KEY);
   } catch {
-    return [];
+    // ignore
   }
+  return [];
 }
 
-export function saveWriterSessions(sessions: WriterSession[]): void {
+export function saveWriterSessions(_sessions: WriterSession[]): void {
   try {
-    localStorage.setItem(WRITER_SESSIONS_STORAGE_KEY, JSON.stringify(sessions));
+    // Do not persist customer essay content in browser LocalStorage; sessions sync via authenticated Firestore
+    localStorage.removeItem(WRITER_SESSIONS_STORAGE_KEY);
   } catch {
     // ignore
   }
@@ -142,105 +294,6 @@ export interface AiGenerateRequest {
   profile: AiProviderProfile;
   systemPrompt: string;
   userPrompt: string;
-}
-
-const GEMINI_FALLBACK_MODELS = [
-  'gemini-2.5-flash',
-  'gemini-2.0-flash',
-  'gemini-1.5-flash-latest',
-  'gemini-1.5-flash',
-];
-
-async function callGeminiDirectBrowser(
-  profile: AiProviderProfile,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<string> {
-  const apiKey = profile.apiKey.trim();
-  const cleanBase = (
-    profile.baseUrl.trim() ||
-    'https://generativelanguage.googleapis.com/v1beta'
-  ).replace(/\/+$/, '');
-
-  const requestedModel = (profile.model.trim() || 'gemini-2.5-flash').replace(
-    /^models\//i,
-    ''
-  );
-  const candidateModels = Array.from(
-    new Set([requestedModel, ...GEMINI_FALLBACK_MODELS])
-  );
-
-  let lastError = '';
-
-  for (const modelName of candidateModels) {
-    const url = `${cleanBase}/models/${encodeURIComponent(
-      modelName
-    )}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-    const payload: Record<string, unknown> = {
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: userPrompt }],
-        },
-      ],
-      generationConfig: {
-        temperature: profile.temperature,
-      },
-    };
-    if (systemPrompt.trim()) {
-      payload.systemInstruction = {
-        parts: [{ text: systemPrompt }],
-      };
-    }
-
-    const resp = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const data = (await resp.json().catch(() => ({}))) as Record<
-      string,
-      unknown
-    >;
-
-    if (resp.ok) {
-      const candidates = Array.isArray(data.candidates) ? data.candidates : [];
-      const firstCandidate = candidates[0] as
-        | { content?: { parts?: { text?: string }[] } }
-        | undefined;
-      const text = (firstCandidate?.content?.parts || [])
-        .map((p) => p.text || '')
-        .join('')
-        .trim();
-      if (text) return text;
-    }
-
-    const errObj = data.error as
-      | { message?: string; status?: string; code?: number }
-      | undefined;
-    const errMsg = errObj?.message || `HTTP ${resp.status}`;
-    lastError = errMsg;
-
-    // If model is not found (404), try the next fallback Gemini model
-    if (resp.status === 404) {
-      continue;
-    }
-
-    // If billing / quota / invalid key error (400, 403, 429), surface exact instructions
-    if (resp.status === 403 || resp.status === 429 || /billing|quota|payment/i.test(errMsg)) {
-      throw new Error(
-        `Google Gemini từ chối Key (${errMsg}). Lưu ý: Nếu trên Google AI Studio dự án đang báo "Payment required", bạn hãy bấm "Create API key in a new project" trên AI Studio để tạo Key Free Tier mới.`
-      );
-    }
-
-    throw new Error(`Google Gemini API lỗi: ${errMsg}`);
-  }
-
-  throw new Error(
-    `Không tìm thấy Model Gemini phù hợp hoặc Project Google Cloud của Key này đang bị khóa ("Payment required"). Chi tiết từ Google: ${lastError}`
-  );
 }
 
 export interface PerplexityOrchestratorModelInfo {
@@ -256,215 +309,31 @@ export async function fetchPerplexityOrchestratorModels(
   serverKeyConfigured: boolean;
 }> {
   const trimmedKey = (apiKey || '').trim();
-  try {
-    const resp = await fetch('/api/ai/perplexity/models', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ apiKey: trimmedKey }),
-    });
-    const data = (await resp.json().catch(() => ({}))) as {
-      ok?: boolean;
-      serverKeyConfigured?: boolean;
-      models?: PerplexityOrchestratorModelInfo[];
-      error?: string;
-    };
-    if (resp.ok && Array.isArray(data.models)) {
-      return {
-        models: data.models,
-        serverKeyConfigured: Boolean(data.serverKeyConfigured),
-      };
-    }
-    if (resp.status !== 404) {
-      throw new Error(
-        data.error ||
-          `Không thể tải danh sách model từ Perplexity Orchestrator (HTTP ${resp.status}).`
-      );
-    }
-  } catch (err) {
-    if (!(err instanceof TypeError) && !trimmedKey) {
-      throw err;
-    }
-  }
-
-  if (!trimmedKey) {
-    throw new Error(
-      'Chưa có PERPLEXITY_API_KEY. Hãy đặt biến môi trường PERPLEXITY_API_KEY trên server hoặc nhập key trong Cài đặt AI.'
-    );
-  }
-
-  const directResp = await fetch(
-    'https://api.perplexity.ai/orchestrator/v1/models',
-    {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${trimmedKey}`,
-        Accept: 'application/json',
-      },
-    }
-  );
-  const directData = (await directResp.json().catch(() => ({}))) as {
-    data?: Array<{ id?: string; owned_by?: string; name?: string }>;
-    models?: Array<{ id?: string; owned_by?: string; name?: string }>;
-    error?: { message?: string };
-  };
-  if (!directResp.ok) {
-    throw new Error(
-      directData.error?.message ||
-        `Perplexity Orchestrator /v1/models trả về lỗi HTTP ${directResp.status}.`
-    );
-  }
-  const rawList = Array.isArray(directData.data)
-    ? directData.data
-    : Array.isArray(directData.models)
-    ? directData.models
-    : [];
-  const models = rawList
-    .filter((m): m is { id: string; owned_by?: string; name?: string } =>
-      Boolean(m && typeof m.id === 'string' && m.id.trim())
-    )
-    .map((m) => ({
-      id: m.id.trim(),
-      owned_by: m.owned_by,
-      name: m.name,
-    }));
-  return { models, serverKeyConfigured: false };
-}
-
-async function callOpenAiCompatibleDirectFromBrowser(
-  profile: AiProviderProfile,
-  systemPrompt: string,
-  userPrompt: string
-): Promise<string> {
-  const apiKey = profile.apiKey.trim();
-  const modelName = profile.model.trim() || 'perplexity/kimi-k3';
-  const defaultBase =
-    profile.provider === 'perplexity'
-      ? 'https://api.perplexity.ai/orchestrator/v1'
-      : 'https://api.openai.com/v1';
-  const cleanBase = (profile.baseUrl.trim() || defaultBase)
-    .replace(/\/+$/, '')
-    .replace(/\/chat\/completions$/i, '');
-
-  const isPerplexityMessages =
-    profile.provider === 'perplexity' &&
-    (/\/orchestrator$/i.test(cleanBase) || /\/messages$/i.test(cleanBase));
-
-  if (isPerplexityMessages) {
-    const msgUrl = cleanBase.endsWith('/messages')
-      ? cleanBase
-      : `${cleanBase}/v1/messages`;
-    const payload: Record<string, unknown> = {
-      model: modelName,
-      max_tokens: 8192,
-      temperature: profile.temperature,
-      messages: [{ role: 'user', content: userPrompt }],
-    };
-    if (systemPrompt.trim()) {
-      payload.system = systemPrompt;
-    }
-    const resp = await fetch(msgUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(payload),
-    });
-    const data = (await resp.json().catch(() => ({}))) as Record<
-      string,
-      unknown
-    >;
-    if (!resp.ok) {
-      const errObj = data.error as { message?: string } | undefined;
-      throw new Error(
-        errObj?.message ||
-          `Perplexity Orchestrator Messages API lỗi HTTP ${resp.status}.`
-      );
-    }
-    const contentArr = Array.isArray(data.content) ? data.content : [];
-    const text = contentArr
-      .map((block: { type?: string; text?: string }) =>
-        block?.type === 'text' ? block.text || '' : ''
-      )
-      .join('')
-      .trim();
-    if (!text) {
-      throw new Error('Perplexity Orchestrator phản hồi rỗng.');
-    }
-    return text;
-  }
-
-  let url = '';
-  if (profile.provider === 'perplexity') {
-    const isOrchestrator =
-      modelName.includes('/') || /\/orchestrator/i.test(cleanBase);
-    if (isOrchestrator) {
-      url = /\/orchestrator\/v1$/i.test(cleanBase)
-        ? `${cleanBase}/chat/completions`
-        : 'https://api.perplexity.ai/orchestrator/v1/chat/completions';
-    } else {
-      url = `${cleanBase.replace(/\/v1$/i, '')}/chat/completions`;
-    }
-  } else {
-    url = cleanBase.endsWith('/v1')
-      ? `${cleanBase}/chat/completions`
-      : `${cleanBase}/v1/chat/completions`;
-  }
-
-  const messages: { role: string; content: string }[] = [];
-  if (systemPrompt.trim()) {
-    messages.push({ role: 'system', content: systemPrompt });
-  }
-  messages.push({ role: 'user', content: userPrompt });
-
-  const resp = await fetch(url, {
+  const authHeaders = await getTeamAuthHeaders();
+  const resp = await fetch('/api/ai/perplexity/models', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
+      ...authHeaders,
     },
-    body: JSON.stringify({
-      model: modelName,
-      messages,
-      temperature: profile.temperature,
-    }),
+    body: JSON.stringify({ apiKey: trimmedKey }),
   });
-
-  const rawText = await resp.text().catch(() => '');
-  let data: Record<string, unknown> = {};
-  try {
-    data = JSON.parse(rawText) as Record<string, unknown>;
-  } catch {
-    // non-json
+  const data = (await resp.json().catch(() => ({}))) as {
+    ok?: boolean;
+    serverKeyConfigured?: boolean;
+    models?: PerplexityOrchestratorModelInfo[];
+    error?: string;
+  };
+  if (resp.ok && Array.isArray(data.models)) {
+    return {
+      models: data.models,
+      serverKeyConfigured: Boolean(data.serverKeyConfigured),
+    };
   }
-
-  if (!resp.ok) {
-    const errObj = data.error as { message?: string } | undefined;
-    const detail =
-      errObj?.message ||
-      (typeof data.detail === 'string' ? data.detail : '') ||
-      (typeof data.title === 'string' ? data.title : '') ||
-      rawText.trim().slice(0, 180);
-    throw new Error(
-      detail ||
-        `API (${url}) trả về lỗi HTTP ${resp.status}.`
-    );
-  }
-
-  const choices = Array.isArray(data.choices) ? data.choices : [];
-  const firstChoice = choices[0] as
-    | { message?: { content?: string } }
-    | undefined;
-  const text = (firstChoice?.message?.content || '')
-    .replace(/<think>[\s\S]*?<\/think>/gi, '')
-    .trim();
-
-  if (!text) {
-    throw new Error('Chatbot phản hồi rỗng. Vui lòng kiểm tra lại Model.');
-  }
-  return text;
+  throw new Error(
+    data.error ||
+      `Không thể tải danh sách model từ Perplexity Orchestrator (HTTP ${resp.status}).`
+  );
 }
 
 export async function callAiChatbot({
@@ -472,101 +341,54 @@ export async function callAiChatbot({
   systemPrompt,
   userPrompt,
 }: AiGenerateRequest): Promise<string> {
-  const apiKey = profile.apiKey.trim();
-  if (!apiKey && profile.provider !== 'perplexity' && profile.provider !== 'gemini') {
-    throw new Error(
-      `Chưa có API Key cho ${profile.label}. Hãy bấm nút "Cài đặt API" ở góc trên để nhập key.`
-    );
-  }
+  const transientKey = profile.apiKey.trim();
+  const authHeaders = await getTeamAuthHeaders();
 
-  // For Gemini, call Google's CORS-enabled endpoint directly first when browser key is provided
-  if (profile.provider === 'gemini' && apiKey) {
-    return await callGeminiDirectBrowser(profile, systemPrompt, userPrompt);
-  }
+  const resp = await fetch('/api/ai/generate', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...authHeaders,
+    },
+    body: JSON.stringify({
+      provider: profile.provider,
+      apiKey: transientKey,
+      baseUrl: profile.baseUrl.trim(),
+      model: profile.model.trim(),
+      temperature: profile.temperature,
+      systemPrompt,
+      userPrompt,
+    }),
+  });
 
+  const rawRespText = await resp.text().catch(() => '');
+  let data: {
+    text?: string;
+    model?: string;
+    error?: string;
+  } = {};
   try {
-    const resp = await fetch('/api/ai/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        provider: profile.provider,
-        apiKey,
-        baseUrl: profile.baseUrl.trim(),
-        model: profile.model.trim(),
-        temperature: profile.temperature,
-        systemPrompt,
-        userPrompt,
-      }),
-    });
-
-    const rawRespText = await resp.text().catch(() => '');
-    let data: {
-      text?: string;
-      model?: string;
-      error?: string;
-    } = {};
-    try {
-      data = JSON.parse(rawRespText) as typeof data;
-    } catch {
-      // non-json response
-    }
-
-    if (resp.ok && data.text?.trim()) {
-      return data.text.trim();
-    }
-
-    // If the web app is currently hosted on a static-only host where /api/ai/generate returns 404
-    // (no JSON `data.error` from our Express route), try calling the OpenAI/Perplexity endpoint directly
-    if (
-      resp.status === 404 &&
-      (!data.error || data.error === 'API endpoint not found.')
-    ) {
-      if (profile.provider !== 'anthropic') {
-        try {
-          return await callOpenAiCompatibleDirectFromBrowser(
-            profile,
-            systemPrompt,
-            userPrompt
-          );
-        } catch (directErr) {
-          if (
-            directErr instanceof TypeError &&
-            /integrate\.api\.nvidia\.com/i.test(profile.baseUrl)
-          ) {
-            throw new Error(
-              'Máy chủ Web hiện tại chưa nạp route Backend (/api/ai/generate trả về 404) và NVIDIA NIM chặn gọi trực tiếp từ trình duyệt (CORS). Hãy đợi Vercel hoàn tất Build bản mới hoặc chạy lệnh `npm run dev` trên máy.'
-            );
-          }
-          throw directErr;
-        }
-      }
-    }
-
-    const rawSnippet = rawRespText
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 180);
-
-    throw new Error(
-      data.error ||
-        (rawSnippet
-          ? `Không thể gọi ${profile.label} (HTTP ${resp.status}: ${rawSnippet}).`
-          : `Không thể gọi ${profile.label} (HTTP ${resp.status}).`)
-    );
-  } catch (err) {
-    if (
-      err instanceof TypeError &&
-      profile.provider !== 'anthropic'
-    ) {
-      return await callOpenAiCompatibleDirectFromBrowser(
-        profile,
-        systemPrompt,
-        userPrompt
-      );
-    }
-    throw err;
+    data = JSON.parse(rawRespText) as typeof data;
+  } catch {
+    // non-json response
   }
+
+  if (resp.ok && data.text?.trim()) {
+    return data.text.trim();
+  }
+
+  const rawSnippet = rawRespText
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 180);
+
+  throw new Error(
+    data.error ||
+      (rawSnippet
+        ? `Không thể gọi ${profile.label} (HTTP ${resp.status}: ${rawSnippet}).`
+        : `Không thể gọi ${profile.label} (HTTP ${resp.status}).`)
+  );
 }
 
 export function buildSkillsAndContextSystemPrompt(

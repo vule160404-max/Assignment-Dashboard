@@ -14,7 +14,12 @@ import {
   SkillDocument,
   WriterSession,
 } from '../components/admin/writer/types';
-import { sanitizeWriterSession } from '../lib/aiWriterClient';
+import {
+  queueLegacyAiKeysForServerMigration,
+  sanitizeWriterSession,
+  stripSecretsFromAiSettings,
+  syncServerAiKeysStatus,
+} from '../lib/aiWriterClient';
 
 export type CloudSyncState = 'connecting' | 'synced' | 'permission_denied' | 'error';
 
@@ -39,8 +44,11 @@ function isPermissionDeniedError(error: unknown): boolean {
 export function normalizeAiSettings(
   parsed: Partial<AiChatbotSettingsStore> | null | undefined
 ): AiChatbotSettingsStore {
-  if (!parsed || typeof parsed !== 'object') return DEFAULT_AI_SETTINGS;
-  return {
+  if (!parsed || typeof parsed !== 'object') {
+    return stripSecretsFromAiSettings(DEFAULT_AI_SETTINGS);
+  }
+  queueLegacyAiKeysForServerMigration(parsed.profiles);
+  return stripSecretsFromAiSettings({
     activeProvider:
       parsed.activeProvider && PROVIDER_KEYS.includes(parsed.activeProvider)
         ? parsed.activeProvider
@@ -49,66 +57,41 @@ export function normalizeAiSettings(
       perplexity: {
         ...DEFAULT_AI_SETTINGS.profiles.perplexity,
         ...(parsed.profiles?.perplexity || {}),
+        apiKey: '',
       },
       gemini: {
         ...DEFAULT_AI_SETTINGS.profiles.gemini,
         ...(parsed.profiles?.gemini || {}),
+        apiKey: '',
       },
       openai: {
         ...DEFAULT_AI_SETTINGS.profiles.openai,
         ...(parsed.profiles?.openai || {}),
+        apiKey: '',
       },
       anthropic: {
         ...DEFAULT_AI_SETTINGS.profiles.anthropic,
         ...(parsed.profiles?.anthropic || {}),
+        apiKey: '',
       },
       custom_openai: {
         ...DEFAULT_AI_SETTINGS.profiles.custom_openai,
         ...(parsed.profiles?.custom_openai || {}),
+        apiKey: '',
       },
     },
-  };
+  });
 }
 
-/**
- * First-time merge when a browser connects to cloud:
- * Preserves any non-empty local API key (e.g., NVIDIA NIM configured on Chrome)
- * if the cloud profile for that provider does not have an API key yet.
- */
 export function mergeAiSettingsInitial(
   local: AiChatbotSettingsStore,
   cloud: AiChatbotSettingsStore
 ): { merged: AiChatbotSettingsStore; shouldPushBack: boolean } {
-  let shouldPushBack = false;
-  const mergedProfiles = { ...cloud.profiles };
-
-  for (const key of PROVIDER_KEYS) {
-    const cloudProfile = cloud.profiles[key];
-    const localProfile = local.profiles[key];
-    const cloudKey = (cloudProfile?.apiKey || '').trim();
-    const localKey = (localProfile?.apiKey || '').trim();
-
-    if (!cloudKey && localKey) {
-      mergedProfiles[key] = { ...cloudProfile, ...localProfile };
-      shouldPushBack = true;
-    }
-  }
-
-  let activeProvider = cloud.activeProvider;
-  if (
-    !mergedProfiles[activeProvider]?.apiKey?.trim() &&
-    mergedProfiles[local.activeProvider]?.apiKey?.trim()
-  ) {
-    activeProvider = local.activeProvider;
-    shouldPushBack = true;
-  }
-
+  queueLegacyAiKeysForServerMigration(local.profiles);
+  queueLegacyAiKeysForServerMigration(cloud.profiles);
   return {
-    merged: {
-      activeProvider,
-      profiles: mergedProfiles,
-    },
-    shouldPushBack,
+    merged: stripSecretsFromAiSettings(cloud),
+    shouldPushBack: false,
   };
 }
 
@@ -184,10 +167,12 @@ export function mergeSkillLibrariesInitial(
 export async function saveAiWriterSettingsToCloud(
   store: AiChatbotSettingsStore
 ): Promise<{ ok: boolean; permissionDenied?: boolean }> {
+  queueLegacyAiKeysForServerMigration(store.profiles);
+  const scrubbed = stripSecretsFromAiSettings(store);
   const ref = doc(db, 'settings', 'aiWriterSettings');
   const payload: Record<string, string> = {
-    activeProvider: store.activeProvider,
-    profilesJson: JSON.stringify(store.profiles),
+    activeProvider: scrubbed.activeProvider,
+    profilesJson: JSON.stringify(scrubbed.profiles),
     updatedAt: new Date().toISOString(),
   };
   if (auth.currentUser?.uid) {
@@ -198,7 +183,6 @@ export async function saveAiWriterSettingsToCloud(
     await setDoc(ref, payload);
     return { ok: true };
   } catch (error) {
-    console.warn('Could not sync AI settings to cloud:', error);
     return { ok: false, permissionDenied: isPermissionDeniedError(error) };
   }
 }
@@ -222,18 +206,23 @@ export function subscribeAiWriterSettings(
           profilesJson?: string;
         };
         const profiles = data.profilesJson ? JSON.parse(data.profilesJson) : {};
-        onData(
-          normalizeAiSettings({
-            activeProvider: data.activeProvider,
-            profiles,
-          })
-        );
+        const hadCloudPlaintextKeys = queueLegacyAiKeysForServerMigration(profiles);
+        const normalized = normalizeAiSettings({
+          activeProvider: data.activeProvider,
+          profiles,
+        });
+        if (hadCloudPlaintextKeys) {
+          // Migrate any legacy plaintext keys to server vault and scrub from Firestore document
+          void syncServerAiKeysStatus().then(() => {
+            void saveAiWriterSettingsToCloud(normalized);
+          });
+        }
+        onData(normalized);
       } catch {
         onData(null);
       }
     },
     (error) => {
-      console.warn('AI settings cloud subscription error:', error);
       onSyncState?.(isPermissionDeniedError(error) ? 'permission_denied' : 'error');
     }
   );

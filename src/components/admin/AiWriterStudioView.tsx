@@ -17,6 +17,7 @@ import {
   saveGlobalSkillLibrary,
   saveWriterSessions,
   stripMarkdownHashesFromText,
+  syncServerAiKeysStatus,
 } from '../../lib/aiWriterClient';
 import {
   CloudSyncState,
@@ -40,6 +41,7 @@ import {
   ACADEMIC_FORMAT_PRESETS,
   AcademicPresetKey,
   AiChatbotSettingsStore,
+  AiProviderType,
   CoverPageConfig,
   DocumentFormatConfig,
   SessionContextFile,
@@ -195,8 +197,15 @@ export function AiWriterStudioView({
   const [exportingAllDocx, setExportingAllDocx] = useState(false);
   const [attachingToOrder, setAttachingToOrder] = useState(false);
   const [cloudSyncState, setCloudSyncState] = useState<CloudSyncState>('connecting');
-  const [serverPerplexityKeyConfigured, setServerPerplexityKeyConfigured] =
-    useState(false);
+  const [serverKeysConfigured, setServerKeysConfigured] = useState<
+    Record<AiProviderType, boolean>
+  >({
+    perplexity: false,
+    gemini: false,
+    openai: false,
+    anthropic: false,
+    custom_openai: false,
+  });
 
   // Refs for background multi-session parallel execution & cloud sync loop protection
   const sessionsRef = useRef<WriterSession[]>(sessions);
@@ -216,16 +225,11 @@ export function AiWriterStudioView({
     saveWriterSessions(sessions);
   }, [sessions]);
 
-  // Probe whether PERPLEXITY_API_KEY is configured in server environment
+  // Probe server vault & migrate any legacy localStorage keys to server vault
   useEffect(() => {
-    fetch('/api/ai/perplexity/models', { method: 'GET' })
-      .then((r) => r.json())
-      .then((d: { serverKeyConfigured?: boolean }) => {
-        if (d?.serverKeyConfigured) {
-          setServerPerplexityKeyConfigured(true);
-        }
-      })
-      .catch(() => undefined);
+    void syncServerAiKeysStatus().then((status) => {
+      setServerKeysConfigured(status);
+    });
   }, []);
 
   // Auto-clean any residual leading markdown hashes (# or ##) from outline content across sessions
@@ -484,7 +488,7 @@ export function AiWriterStudioView({
   const activeProfile = aiSettings.profiles[aiSettings.activeProvider];
   const hasEffectiveApiKey =
     Boolean(activeProfile.apiKey.trim()) ||
-    (activeProfile.provider === 'perplexity' && serverPerplexityKeyConfigured);
+    Boolean(serverKeysConfigured[activeProfile.provider]);
   const enabledSkillsCount = useMemo(
     () => skills.filter((s) => s.enabled).length,
     [skills]
@@ -1569,6 +1573,8 @@ export function AiWriterStudioView({
       <WriterApiSettingsModal
         isOpen={showApiModal}
         settings={aiSettings}
+        serverKeysConfigured={serverKeysConfigured}
+        onUpdateServerKeysConfigured={setServerKeysConfigured}
         onSaveSettings={handleSaveAiSettings}
         onClose={() => setShowApiModal(false)}
         onToast={onToast}

@@ -14,7 +14,6 @@ import {
 } from 'firebase/firestore';
 import { User } from 'firebase/auth';
 import {
-  ADMIN_EMAIL,
   auth,
   db,
   handleFirestoreError,
@@ -28,20 +27,29 @@ import {
   UserProfile,
 } from '../types/domain';
 
-const LEGACY_REMOVED_EMAIL = 'cycloneielts@gmail.com';
-
-async function purgeLegacyRemovedAccount(currentUid: string): Promise<void> {
+async function verifyServerOwnerSession(
+  user: User
+): Promise<{ isOwner: boolean; isRevoked: boolean }> {
   try {
-    const legacySnap = await getDocs(
-      query(collection(db, 'users'), where('email', '==', LEGACY_REMOVED_EMAIL))
-    );
-    await Promise.all(
-      legacySnap.docs
-        .filter((d) => d.id !== currentUid)
-        .map((d) => deleteDoc(doc(db, 'users', d.id)))
-    );
+    const token = await user.getIdToken();
+    const resp = await fetch('/api/auth/session-verify', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+    if (!resp.ok) return { isOwner: false, isRevoked: false };
+    const data = (await resp.json()) as {
+      isOwner?: boolean;
+      isRevoked?: boolean;
+    };
+    return {
+      isOwner: Boolean(data.isOwner),
+      isRevoked: Boolean(data.isRevoked),
+    };
   } catch {
-    // Ignore if non-admin or already purged
+    return { isOwner: false, isRevoked: false };
   }
 }
 
@@ -49,44 +57,32 @@ export async function ensureOwnerOrReadProfile(user: User): Promise<UserProfile 
   const path = `users/${user.uid}`;
   try {
     const email = (user.email || '').trim().toLowerCase();
-    if (email === LEGACY_REMOVED_EMAIL) {
-      return null;
-    }
-
     const snap = await getDoc(doc(db, 'users', user.uid));
     if (snap.exists()) {
       const existing = snap.data() as UserProfile;
-      if (email === ADMIN_EMAIL.toLowerCase() && user.emailVerified) {
-        await purgeLegacyRemovedAccount(user.uid);
-        if (existing.role !== 'owner' || existing.status !== 'active') {
-          const updatedOwner: UserProfile = {
-            ...existing,
-            role: 'owner',
-            status: 'active',
-            updatedAt: new Date().toISOString(),
-          };
-          await setDoc(doc(db, 'users', user.uid), updatedOwner);
-          return updatedOwner;
-        }
-      }
       return existing;
     }
 
-    if (email && email === ADMIN_EMAIL.toLowerCase() && user.emailVerified) {
-      const now = new Date().toISOString();
-      const ownerProfile: UserProfile = {
-        uid: user.uid,
-        email: email.slice(0, FIELD_LIMITS.emailMax),
-        displayName: (user.displayName || 'Chủ hệ thống').trim().slice(0, FIELD_LIMITS.displayNameMax),
-        role: 'owner',
-        status: 'active',
-        specialty: 'Quản trị hệ thống',
-        createdAt: now,
-        updatedAt: now,
-      };
-      await setDoc(doc(db, 'users', user.uid), ownerProfile);
-      await purgeLegacyRemovedAccount(user.uid);
-      return ownerProfile;
+    if (email && user.emailVerified) {
+      const sessionCheck = await verifyServerOwnerSession(user);
+      if (sessionCheck.isRevoked) {
+        return null;
+      }
+      if (sessionCheck.isOwner) {
+        const now = new Date().toISOString();
+        const ownerProfile: UserProfile = {
+          uid: user.uid,
+          email: email.slice(0, FIELD_LIMITS.emailMax),
+          displayName: (user.displayName || 'Chủ hệ thống').trim().slice(0, FIELD_LIMITS.displayNameMax),
+          role: 'owner',
+          status: 'active',
+          specialty: 'Quản trị hệ thống',
+          createdAt: now,
+          updatedAt: now,
+        };
+        await setDoc(doc(db, 'users', user.uid), ownerProfile);
+        return ownerProfile;
+      }
     }
     return null;
   } catch (error) {
@@ -121,7 +117,10 @@ export async function registerClientProfile(
     }
 
     const email = (user.email || '').trim().toLowerCase();
-    const isBootOwner = email === ADMIN_EMAIL.toLowerCase() && user.emailVerified;
+    const sessionCheck = user.emailVerified
+      ? await verifyServerOwnerSession(user)
+      : { isOwner: false, isRevoked: false };
+    const isBootOwner = sessionCheck.isOwner;
     const now = new Date().toISOString();
     const resolvedName =
       (displayName || user.displayName || email.split('@')[0] || 'Khách hàng')
@@ -320,12 +319,6 @@ export function subscribeAllUsersAdmin(onData: (users: UserProfile[]) => void): 
       const validUsers: UserProfile[] = [];
       for (const d of snap.docs) {
         const data = d.data() as UserProfile;
-        if ((data.email || '').trim().toLowerCase() === LEGACY_REMOVED_EMAIL) {
-          if (auth.currentUser?.uid && auth.currentUser.uid !== d.id) {
-            deleteDoc(doc(db, 'users', d.id)).catch(() => undefined);
-          }
-          continue;
-        }
         validUsers.push(data);
       }
       onData(validUsers);

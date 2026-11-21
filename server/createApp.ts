@@ -21,10 +21,13 @@ const UPLOADS_DIR = process.env.VERCEL
   : path.resolve(process.cwd(), 'uploads');
 const META_FILE = path.join(UPLOADS_DIR, '.file-meta.json');
 const NOTIF_PREFS_FILE = path.join(UPLOADS_DIR, '.notification-prefs.json');
-const ADMIN_EMAIL = 'vule160404@gmail.com';
+const AI_KEYS_FILE = path.join(UPLOADS_DIR, '.ai-provider-keys.json');
+const ADMIN_EMAIL = (
+  process.env.ADMIN_OWNER_EMAIL || 'vule160404@gmail.com'
+)
+  .trim()
+  .toLowerCase();
 const REMOVED_LEGACY_EMAIL = 'cycloneielts@gmail.com';
-const OWNER_BOOTSTRAP_DIGEST =
-  'eae81b8cf18b8aa05663d4a179738cada71f736c89fa1578415c5844f3084628';
 const GOOGLE_CERTS_URL =
   'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com';
 
@@ -265,6 +268,120 @@ async function getNotificationPrefs(): Promise<StoredNotificationPrefs> {
   } catch {
     return DEFAULT_STORED_NOTIFICATION_PREFS;
   }
+}
+
+type AiProviderKeyName =
+  | 'perplexity'
+  | 'gemini'
+  | 'openai'
+  | 'anthropic'
+  | 'custom_openai';
+
+type StoredAiProviderSecrets = Partial<Record<AiProviderKeyName, string>>;
+
+function r2AiProviderSecretsKey(): string {
+  return '.secrets/ai-provider-keys.json';
+}
+
+async function getStoredAiProviderSecrets(): Promise<StoredAiProviderSecrets> {
+  if (r2Client && r2Config) {
+    try {
+      const resp = await r2Client.send(
+        new GetObjectCommand({
+          Bucket: r2Config.bucket,
+          Key: r2AiProviderSecretsKey(),
+        })
+      );
+      const buf = await streamToBuffer(resp.Body);
+      const parsed = JSON.parse(buf.toString('utf8')) as StoredAiProviderSecrets;
+      return parsed && typeof parsed === 'object' ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  try {
+    const raw = await fs.promises.readFile(AI_KEYS_FILE, 'utf8');
+    const parsed = JSON.parse(raw) as StoredAiProviderSecrets;
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+async function saveStoredAiProviderSecrets(
+  next: StoredAiProviderSecrets
+): Promise<void> {
+  if (r2Client && r2Config) {
+    await r2Client.send(
+      new PutObjectCommand({
+        Bucket: r2Config.bucket,
+        Key: r2AiProviderSecretsKey(),
+        Body: Buffer.from(JSON.stringify(next, null, 2), 'utf8'),
+        ContentType: 'application/json',
+      })
+    );
+    return;
+  }
+
+  ensureLocalUploadsDir();
+  const tmpPath = `${AI_KEYS_FILE}.${crypto.randomBytes(4).toString('hex')}.tmp`;
+  await fs.promises.writeFile(tmpPath, JSON.stringify(next, null, 2), {
+    encoding: 'utf8',
+    mode: 0o600,
+  });
+  await fs.promises.rename(tmpPath, AI_KEYS_FILE);
+}
+
+function getEnvAiProviderKey(provider: string): string {
+  switch (provider) {
+    case 'perplexity':
+      return (process.env.PERPLEXITY_API_KEY || '').trim();
+    case 'gemini':
+      return (process.env.GEMINI_API_KEY || '').trim();
+    case 'openai':
+      return (process.env.OPENAI_API_KEY || '').trim();
+    case 'anthropic':
+      return (process.env.ANTHROPIC_API_KEY || '').trim();
+    case 'custom_openai':
+      return (
+        process.env.CUSTOM_OPENAI_API_KEY ||
+        process.env.NVIDIA_API_KEY ||
+        ''
+      ).trim();
+    default:
+      return '';
+  }
+}
+
+async function resolveServerAiProviderKey(
+  provider: string,
+  transientKey?: string
+): Promise<string> {
+  const explicit = (transientKey || '').trim();
+  if (explicit) return explicit;
+  const vault = await getStoredAiProviderSecrets();
+  const vaultKey = (vault[provider as AiProviderKeyName] || '').trim();
+  if (vaultKey) return vaultKey;
+  return getEnvAiProviderKey(provider);
+}
+
+async function getConfiguredAiProvidersStatus(): Promise<
+  Record<AiProviderKeyName, boolean>
+> {
+  const vault = await getStoredAiProviderSecrets();
+  const providers: AiProviderKeyName[] = [
+    'perplexity',
+    'gemini',
+    'openai',
+    'anthropic',
+    'custom_openai',
+  ];
+  const result = {} as Record<AiProviderKeyName, boolean>;
+  for (const p of providers) {
+    result[p] = Boolean((vault[p] || '').trim() || getEnvAiProviderKey(p));
+  }
+  return result;
 }
 
 async function getFileMeta(fileId: string): Promise<StoredFileMeta | null> {
@@ -680,57 +797,18 @@ export function createApiApp(): express.Express {
     next();
   });
 
-  // In-memory rate limiter for auth bootstrap endpoint (max 5 failed attempts per 15 min per IP)
-  const bootstrapAttempts = new Map<
-    string,
-    { count: number; resetAt: number }
-  >();
-
-  app.post('/api/auth/verify-owner-bootstrap', (req, res) => {
-    const ip = String(req.ip || req.socket.remoteAddress || 'unknown');
-    const now = Date.now();
-    const record = bootstrapAttempts.get(ip);
-    if (record && now < record.resetAt && record.count >= 5) {
-      res
-        .status(429)
-        .json({ allowed: false, error: 'Too many attempts. Try again later.' });
+  // Authenticated session role verification (avoids exposing ADMIN_EMAIL in frontend bundle)
+  app.post('/api/auth/session-verify', async (req, res) => {
+    const verified = await verifyTeamBearerToken(req.headers.authorization);
+    if (!verified.authorized) {
+      res.json({ ok: true, isOwner: false, isRevoked: false });
       return;
     }
-
-    const email =
-      typeof req.body?.email === 'string'
-        ? req.body.email.trim().toLowerCase()
-        : '';
-    const password =
-      typeof req.body?.password === 'string' ? req.body.password : '';
-    if (!email || !password) {
-      res.status(400).json({ allowed: false });
-      return;
-    }
-
-    const candidateDigest = crypto
-      .createHash('sha256')
-      .update(`${email}:${password}`)
-      .digest('hex');
-
-    const expectedBuf = Buffer.from(OWNER_BOOTSTRAP_DIGEST, 'hex');
-    const candidateBuf = Buffer.from(candidateDigest, 'hex');
-    const matched =
-      expectedBuf.length === candidateBuf.length &&
-      crypto.timingSafeEqual(expectedBuf, candidateBuf);
-
-    if (!matched) {
-      const nextCount = record && now < record.resetAt ? record.count + 1 : 1;
-      bootstrapAttempts.set(ip, {
-        count: nextCount,
-        resetAt: now + 15 * 60 * 1000,
-      });
-      res.status(401).json({ allowed: false });
-      return;
-    }
-
-    bootstrapAttempts.delete(ip);
-    res.json({ allowed: true });
+    res.json({
+      ok: true,
+      isOwner: verified.isAdmin,
+      isRevoked: false,
+    });
   });
 
   function stripOuterQuotes(val: string): string {
@@ -1535,24 +1613,68 @@ export function createApiApp(): express.Express {
     res.json({ ok: true });
   });
 
+  // Server-only AI Secret Key Vault status & update endpoints (Zero secret exposure to frontend)
+  app.get('/api/ai/keys/status', requireTeamAuth, async (_req, res) => {
+    const configured = await getConfiguredAiProvidersStatus();
+    res.json({ ok: true, configured });
+  });
+
+  app.post('/api/ai/keys', requireTeamAuth, async (req, res) => {
+    const allowedProviders: AiProviderKeyName[] = [
+      'perplexity',
+      'gemini',
+      'openai',
+      'anthropic',
+      'custom_openai',
+    ];
+    const current = await getStoredAiProviderSecrets();
+    const next: StoredAiProviderSecrets = { ...current };
+
+    if (
+      typeof req.body?.provider === 'string' &&
+      allowedProviders.includes(req.body.provider as AiProviderKeyName)
+    ) {
+      const p = req.body.provider as AiProviderKeyName;
+      const val =
+        typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+      if (req.body?.clear === true) {
+        delete next[p];
+      } else if (val) {
+        next[p] = val;
+      }
+    }
+
+    if (req.body?.keys && typeof req.body.keys === 'object') {
+      for (const p of allowedProviders) {
+        const val = (req.body.keys as Record<string, unknown>)[p];
+        if (typeof val === 'string' && val.trim()) {
+          next[p] = val.trim();
+        }
+      }
+    }
+
+    await saveStoredAiProviderSecrets(next);
+    const configured = await getConfiguredAiProvidersStatus();
+    res.json({ ok: true, configured });
+  });
+
   // Perplexity Orchestrator API: Tier-Aware Model Catalog & Allowlist (GET /orchestrator/v1/models)
   const handlePerplexityModelsCatalog = async (req: Request, res: Response) => {
     const rawKey =
-      typeof req.body?.apiKey === 'string'
-        ? req.body.apiKey.trim()
-        : typeof req.headers['x-perplexity-key'] === 'string'
-        ? req.headers['x-perplexity-key'].trim()
-        : '';
-    const envKey = (process.env.PERPLEXITY_API_KEY || '').trim();
-    const apiKey = rawKey || envKey;
-    const serverKeyConfigured = Boolean(envKey);
+      typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
+    if (rawKey) {
+      const current = await getStoredAiProviderSecrets();
+      await saveStoredAiProviderSecrets({ ...current, perplexity: rawKey });
+    }
+    const apiKey = await resolveServerAiProviderKey('perplexity', rawKey);
+    const serverKeyConfigured = Boolean(apiKey);
 
     if (!apiKey) {
       res.status(400).json({
         ok: false,
-        serverKeyConfigured,
+        serverKeyConfigured: false,
         error:
-          'Chưa tìm thấy PERPLEXITY_API_KEY. Hãy đặt biến môi trường PERPLEXITY_API_KEY trên server hoặc nhập Perplexity API Key trong Cài đặt AI.',
+          'Chưa cấu hình Perplexity API Key trên máy chủ. Hãy nhập Perplexity API Key trong Cài đặt AI để lưu vào kho bảo mật Server.',
       });
       return;
     }
@@ -1627,22 +1749,23 @@ export function createApiApp(): express.Express {
     }
   };
 
-  app.get('/api/ai/perplexity/models', handlePerplexityModelsCatalog);
-  app.post('/api/ai/perplexity/models', handlePerplexityModelsCatalog);
+  app.get('/api/ai/perplexity/models', requireTeamAuth, handlePerplexityModelsCatalog);
+  app.post('/api/ai/perplexity/models', requireTeamAuth, handlePerplexityModelsCatalog);
 
   // Multi-Provider AI Chatbot Proxy (Perplexity Orchestrator, Gemini, OpenAI, Anthropic Claude, Custom OpenAI-Compatible)
-  app.post('/api/ai/generate', async (req, res) => {
+  app.post('/api/ai/generate', requireTeamAuth, async (req, res) => {
     const provider =
       typeof req.body?.provider === 'string' ? req.body.provider.trim() : 'perplexity';
     const rawApiKey =
       typeof req.body?.apiKey === 'string' ? req.body.apiKey.trim() : '';
-    const apiKey =
-      rawApiKey ||
-      (provider === 'perplexity'
-        ? (process.env.PERPLEXITY_API_KEY || '').trim()
-        : provider === 'gemini'
-        ? (process.env.GEMINI_API_KEY || '').trim()
-        : '');
+    if (rawApiKey) {
+      const current = await getStoredAiProviderSecrets();
+      await saveStoredAiProviderSecrets({
+        ...current,
+        [provider as AiProviderKeyName]: rawApiKey,
+      });
+    }
+    const apiKey = await resolveServerAiProviderKey(provider, rawApiKey);
     const model =
       typeof req.body?.model === 'string' && req.body.model.trim()
         ? req.body.model.trim()

@@ -20,7 +20,7 @@ import {
   Wand2,
   X,
 } from 'lucide-react';
-import { ADMIN_EMAIL, auth } from '../../lib/firebase';
+import { auth, clearAllSensitiveBrowserStorage } from '../../lib/firebase';
 import {
   DEFAULT_BANK_SETTINGS,
   DEFAULT_NOTIFICATION_SETTINGS,
@@ -176,7 +176,7 @@ export function AdminPortalView({
   const syncedNotifKeyRef = useRef('');
 
   const isBootstrappedOwner = Boolean(
-    user && emailVerified && user.email?.toLowerCase() === ADMIN_EMAIL.toLowerCase()
+    user && emailVerified && userProfile?.role === 'owner'
   );
 
   let effectiveRole = userProfile?.role || null;

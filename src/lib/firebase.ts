@@ -9,8 +9,6 @@ const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
-export const ADMIN_EMAIL = 'vule160404@gmail.com';
-
 export enum OperationType {
   CREATE = 'create',
   UPDATE = 'update',
@@ -24,17 +22,6 @@ export interface FirestoreErrorInfo {
   error: string;
   operationType: OperationType;
   path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-    tenantId?: string | null;
-    providerInfo?: {
-      providerId?: string | null;
-      email?: string | null;
-    }[];
-  };
 }
 
 export function handleFirestoreError(
@@ -43,24 +30,38 @@ export function handleFirestoreError(
   path: string | null
 ): never {
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo:
-        auth.currentUser?.providerData?.map((provider) => ({
-          providerId: provider.providerId,
-          email: provider.email,
-        })) || [],
-    },
+    error: error instanceof Error ? error.message : 'Database access error',
     operationType,
     path,
   };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
   throw new Error(JSON.stringify(errInfo));
+}
+
+/**
+ * Purges any sensitive admin, writer, or client workspace caches from browser storage
+ * so nothing remains inspectable via DevTools LocalStorage / SessionStorage.
+ */
+export function clearAllSensitiveBrowserStorage(): void {
+  if (typeof window === 'undefined') return;
+  const sensitiveKeys = [
+    'assigntrack_ai_writer_settings_v1',
+    'assigntrack_ai_skill_library_v1',
+    'assigntrack_ai_writer_sessions_v1',
+    'assigntrack_ai_writer_active_session_v1',
+    'assigntrack_ai_writer_left_tab_v1',
+    'assigntrack_humanizer_checkpoints_v2',
+    'assigntrack_hix_checkpoints_v1',
+    'assigntrack_admin_active_tab_v1',
+    'assigntrack_telegram_deadline_alerts_v1',
+  ];
+  try {
+    for (const k of sensitiveKeys) {
+      window.localStorage.removeItem(k);
+      window.sessionStorage.removeItem(k);
+    }
+  } catch {
+    // ignore storage restrictions
+  }
 }
 
 export async function testConnection(): Promise<boolean> {

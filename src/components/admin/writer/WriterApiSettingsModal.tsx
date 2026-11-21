@@ -9,6 +9,7 @@ import {
   KeyRound,
   Loader2,
   RefreshCw,
+  ShieldCheck,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -16,6 +17,9 @@ import {
   PerplexityOrchestratorModelInfo,
   callAiChatbot,
   fetchPerplexityOrchestratorModels,
+  saveAiProviderKeyToServerVault,
+  stripSecretsFromAiSettings,
+  syncServerAiKeysStatus,
 } from '../../../lib/aiWriterClient';
 import {
   AI_PROVIDER_SUGGESTED_MODELS,
@@ -27,6 +31,8 @@ import {
 interface WriterApiSettingsModalProps {
   isOpen: boolean;
   settings: AiChatbotSettingsStore;
+  serverKeysConfigured: Record<AiProviderType, boolean>;
+  onUpdateServerKeysConfigured: (next: Record<AiProviderType, boolean>) => void;
   onSaveSettings: (next: AiChatbotSettingsStore) => void;
   onClose: () => void;
   onToast: (msg: string) => void;
@@ -48,11 +54,15 @@ const OTHER_PROVIDERS: {
 export function WriterApiSettingsModal({
   isOpen,
   settings,
+  serverKeysConfigured,
+  onUpdateServerKeysConfigured,
   onSaveSettings,
   onClose,
   onToast,
 }: WriterApiSettingsModalProps) {
-  const [draft, setDraft] = useState<AiChatbotSettingsStore>(settings);
+  const [draft, setDraft] = useState<AiChatbotSettingsStore>(() =>
+    stripSecretsFromAiSettings(settings)
+  );
   const [lastOtherProvider, setLastOtherProvider] = useState<
     Exclude<AiProviderType, 'perplexity'>
   >(
@@ -62,6 +72,7 @@ export function WriterApiSettingsModal({
   );
   const [showKey, setShowKey] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [savingVault, setSavingVault] = useState(false);
   const [testResult, setTestResult] = useState<{
     ok: boolean;
     message: string;
@@ -70,21 +81,28 @@ export function WriterApiSettingsModal({
     PerplexityOrchestratorModelInfo[]
   >([]);
   const [loadingCatalog, setLoadingCatalog] = useState(false);
-  const [serverPerplexityKeyPresent, setServerPerplexityKeyPresent] =
-    useState(false);
 
   useEffect(() => {
     if (!isOpen) return;
-    setDraft(settings);
+    setDraft(stripSecretsFromAiSettings(settings));
     setTestResult(null);
-  }, [isOpen, settings]);
+    void syncServerAiKeysStatus().then((status) => {
+      onUpdateServerKeysConfigured(status);
+    });
+  }, [isOpen, settings, onUpdateServerKeysConfigured]);
 
   const activeProvider = draft.activeProvider;
   const isPerplexityMode = activeProvider === 'perplexity';
   const currentProfile: AiProviderProfile = draft.profiles[activeProvider];
+  const isCurrentProviderConfiguredOnServer = Boolean(
+    serverKeysConfigured[activeProvider]
+  );
 
   useEffect(() => {
     if (!isOpen || !isPerplexityMode) return;
+    if (!serverKeysConfigured.perplexity && !draft.profiles.perplexity?.apiKey?.trim()) {
+      return;
+    }
     let cancelled = false;
     const loadCatalog = async () => {
       try {
@@ -92,20 +110,31 @@ export function WriterApiSettingsModal({
           draft.profiles.perplexity?.apiKey
         );
         if (!cancelled) {
-          setServerPerplexityKeyPresent(res.serverKeyConfigured);
+          if (res.serverKeyConfigured && !serverKeysConfigured.perplexity) {
+            onUpdateServerKeysConfigured({
+              ...serverKeysConfigured,
+              perplexity: true,
+            });
+          }
           if (res.models.length > 0) {
             setCatalogModels(res.models);
           }
         }
       } catch {
-        // Silent on initial probe if no key yet
+        // Silent on initial probe
       }
     };
     void loadCatalog();
     return () => {
       cancelled = true;
     };
-  }, [isOpen, isPerplexityMode, draft.profiles.perplexity?.apiKey]);
+  }, [
+    isOpen,
+    isPerplexityMode,
+    draft.profiles.perplexity?.apiKey,
+    serverKeysConfigured,
+    onUpdateServerKeysConfigured,
+  ]);
 
   if (!isOpen) return null;
 
@@ -116,9 +145,11 @@ export function WriterApiSettingsModal({
 
   const hasPerplexityKey =
     Boolean(draft.profiles.perplexity?.apiKey?.trim()) ||
-    serverPerplexityKeyPresent;
-  const hasOtherKey = OTHER_PROVIDERS.some((p) =>
-    Boolean(draft.profiles[p.key]?.apiKey?.trim())
+    serverKeysConfigured.perplexity;
+  const hasOtherKey = OTHER_PROVIDERS.some(
+    (p) =>
+      Boolean(draft.profiles[p.key]?.apiKey?.trim()) ||
+      serverKeysConfigured[p.key]
   );
 
   const selectMainCategory = (mode: 'perplexity' | 'other') => {
@@ -152,14 +183,41 @@ export function WriterApiSettingsModal({
     }));
   };
 
+  const persistEnteredKeysToVault = async (): Promise<void> => {
+    const providers: AiProviderType[] = [
+      'perplexity',
+      'gemini',
+      'openai',
+      'anthropic',
+      'custom_openai',
+    ];
+    let latestStatus = serverKeysConfigured;
+    let savedAny = false;
+    for (const p of providers) {
+      const entered = (draft.profiles[p]?.apiKey || '').trim();
+      if (entered) {
+        latestStatus = await saveAiProviderKeyToServerVault(p, entered);
+        savedAny = true;
+      }
+    }
+    if (savedAny) {
+      onUpdateServerKeysConfigured(latestStatus);
+      setDraft((prev) => stripSecretsFromAiSettings(prev));
+    }
+  };
+
   const handleFetchOrchestratorCatalog = async () => {
     setLoadingCatalog(true);
     setTestResult(null);
     try {
-      const res = await fetchPerplexityOrchestratorModels(
-        currentProfile.apiKey
-      );
-      setServerPerplexityKeyPresent(res.serverKeyConfigured);
+      await persistEnteredKeysToVault();
+      const res = await fetchPerplexityOrchestratorModels();
+      if (res.serverKeyConfigured) {
+        onUpdateServerKeysConfigured({
+          ...serverKeysConfigured,
+          perplexity: true,
+        });
+      }
       setCatalogModels(res.models);
       if (res.models.length > 0) {
         const exists = res.models.some((m) => m.id === currentProfile.model);
@@ -192,8 +250,9 @@ export function WriterApiSettingsModal({
     setTesting(true);
     setTestResult(null);
     try {
+      await persistEnteredKeysToVault();
       const reply = await callAiChatbot({
-        profile: currentProfile,
+        profile: { ...currentProfile, apiKey: '' },
         systemPrompt: 'You are a helpful academic research assistant.',
         userPrompt:
           'Reply with a short 1-sentence confirmation in Vietnamese that the API connection is working properly.',
@@ -218,12 +277,27 @@ export function WriterApiSettingsModal({
     }
   };
 
-  const handleSave = () => {
-    onSaveSettings(draft);
-    onToast(
-      `Đã lưu cấu hình AI Chatbot: ${currentProfile.label} (${currentProfile.model})`
-    );
-    onClose();
+  const handleSave = async () => {
+    setSavingVault(true);
+    try {
+      await persistEnteredKeysToVault();
+      const scrubbed = stripSecretsFromAiSettings(draft);
+      onSaveSettings(scrubbed);
+      onToast(
+        `Đã lưu bảo mật trên Server Vault & kích hoạt: ${currentProfile.label} (${currentProfile.model})`
+      );
+      onClose();
+    } catch (err) {
+      setTestResult({
+        ok: false,
+        message:
+          err instanceof Error
+            ? err.message
+            : 'Không thể lưu API Key vào kho bảo mật Server.',
+      });
+    } finally {
+      setSavingVault(false);
+    }
   };
 
   return createPortal(
@@ -240,10 +314,10 @@ export function WriterApiSettingsModal({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-900">
-                Cài đặt Mô hình AI Nghiên cứu Học thuật
+                Cài đặt Mô hình AI Nghiên cứu Học thuật (Server Vault)
               </h3>
               <p className="text-xs text-zinc-500">
-                Hỗ trợ Perplexity Orchestrator API (`/orchestrator/v1` — đa mô hình Claude, GPT, Gemini, Kimi bằng 1 Key) &amp; các nền tảng AI khác.
+                Mọi API Key đều được lưu ẩn hoàn toàn trên Server — không lưu ở trình duyệt hay Developer Mode.
               </p>
             </div>
           </div>
@@ -286,7 +360,7 @@ export function WriterApiSettingsModal({
                         : 'bg-blue-100/80 text-[#12489B]'
                     }`}
                   >
-                    {hasPerplexityKey ? 'Đã có Key' : '1 Key Đa Model'}
+                    {hasPerplexityKey ? 'Đã khóa trên Server' : '1 Key Đa Model'}
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-500 leading-relaxed">
@@ -316,7 +390,7 @@ export function WriterApiSettingsModal({
                         : 'bg-zinc-100 text-zinc-500'
                     }`}
                   >
-                    {hasOtherKey ? 'Đã có Key' : 'Đa nền tảng'}
+                    {hasOtherKey ? 'Đã khóa trên Server' : 'Đa nền tảng'}
                   </span>
                 </div>
                 <p className="text-[11px] text-zinc-500 leading-relaxed">
@@ -350,15 +424,16 @@ export function WriterApiSettingsModal({
             </div>
           )}
 
-          {/* API Key Input */}
+          {/* API Key Input (Write-Only to Server Vault) */}
           <div>
-            <div className="flex items-center justify-between gap-2 mb-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
               <label className="block text-xs font-semibold text-slate-800">
                 2. API Key ({currentProfile.label})
               </label>
-              {isPerplexityMode && serverPerplexityKeyPresent && (
-                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                  Server đã có biến môi trường PERPLEXITY_API_KEY
+              {isCurrentProviderConfiguredOnServer && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Đã lưu bảo mật trên Server (Ẩn hoàn toàn khỏi Frontend)</span>
                 </span>
               )}
             </div>
@@ -366,20 +441,21 @@ export function WriterApiSettingsModal({
               <KeyRound className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type={showKey ? 'text' : 'password'}
+                autoComplete="off"
                 value={currentProfile.apiKey}
                 onChange={(e) =>
                   updateCurrentProfile({ apiKey: e.target.value })
                 }
                 placeholder={
-                  activeProvider === 'perplexity'
-                    ? serverPerplexityKeyPresent
-                      ? 'Đang dùng PERPLEXITY_API_KEY trên server (hoặc nhập pplx-... để ghi đè)'
-                      : 'pplx-...'
+                  isCurrentProviderConfiguredOnServer
+                    ? '•••••••••••••••••••••••••••••••• (Nhập key mới nếu muốn thay đổi)'
+                    : activeProvider === 'perplexity'
+                    ? 'Nhập Perplexity API Key (pplx-...) để lưu lên Server'
                     : activeProvider === 'gemini'
-                    ? 'AIzaSy...'
+                    ? 'Nhập Gemini API Key (AIzaSy...) để lưu lên Server'
                     : activeProvider === 'anthropic'
-                    ? 'sk-ant-api03-...'
-                    : 'sk-...'
+                    ? 'Nhập Anthropic Key (sk-ant-...) để lưu lên Server'
+                    : 'Nhập API Key (sk-... / nvapi-...) để lưu lên Server'
                 }
                 className="w-full pl-9 pr-10 py-2 text-sm font-mono border border-zinc-300 rounded-lg focus:outline-none focus:border-[#12489B]"
               />
@@ -397,9 +473,7 @@ export function WriterApiSettingsModal({
               </button>
             </div>
             <p className="text-[11px] text-zinc-500 mt-1">
-              {isPerplexityMode
-                ? 'Tạo Perplexity API Key tại console.perplexity.ai. Bạn có thể export biến môi trường PERPLEXITY_API_KEY trên server hoặc nhập tại đây.'
-                : 'API Key được lưu cục bộ và đồng bộ an toàn qua tài khoản quản trị của bạn.'}
+              Ngay khi bấm Lưu hoặc Kiểm tra, Key sẽ được chuyển thẳng vào kho bảo mật trên Server và xóa trắng khỏi bộ nhớ trình duyệt (F12 / LocalStorage sẽ không bao giờ đọc được Key).
             </p>
           </div>
 
@@ -598,7 +672,7 @@ export function WriterApiSettingsModal({
             disabled={
               testing ||
               (!currentProfile.apiKey.trim() &&
-                !(isPerplexityMode && serverPerplexityKeyPresent))
+                !isCurrentProviderConfiguredOnServer)
             }
             onClick={() => void handleTestConnection()}
             className="btn-press px-3.5 py-2 text-xs font-semibold rounded-lg border border-blue-200 bg-blue-50 text-[#12489B] hover:bg-blue-100 disabled:opacity-40 inline-flex items-center gap-1.5"
@@ -621,10 +695,11 @@ export function WriterApiSettingsModal({
             </button>
             <button
               type="button"
-              onClick={handleSave}
-              className="btn-press px-5 py-2 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] shadow-xs"
+              disabled={savingVault}
+              onClick={() => void handleSave()}
+              className="btn-press px-5 py-2 text-xs font-semibold bg-[#12489B] text-white rounded-lg hover:bg-[#0B2559] shadow-xs disabled:opacity-40"
             >
-              Lưu &amp; Sử dụng Mô hình này
+              {savingVault ? 'Đang khóa bảo mật...' : 'Lưu & Sử dụng Mô hình này'}
             </button>
           </div>
         </div>

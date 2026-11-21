@@ -94,7 +94,7 @@ const SOURCE_BADGE_COLORS = [
 const POLITE_HEADERS: Record<string, string> =
   typeof window === 'undefined'
     ? {
-        'User-Agent': 'AssignTrackAcademicChecker/1.0 (mailto:vule160404@gmail.com)',
+        'User-Agent': 'AssignTrackAcademicChecker/1.0 (mailto:support@assigntrack.app)',
         Accept: 'application/json',
       }
     : {
@@ -245,7 +245,7 @@ async function queryCrossrefForSentence(
   try {
     const url = `https://api.crossref.org/works?query.bibliographic=${encodeURIComponent(
       query
-    )}&rows=2&mailto=vule160404@gmail.com&select=DOI,title,author,published,container-title,abstract,URL`;
+    )}&rows=2&mailto=support@assigntrack.app&select=DOI,title,author,published,container-title,abstract,URL`;
     const resp = await fetch(url, {
       headers: POLITE_HEADERS,
       signal: AbortSignal.timeout(4500),
@@ -301,7 +301,7 @@ async function queryOpenAlexForSentence(
   try {
     const url = `https://api.openalex.org/works?search=${encodeURIComponent(
       query
-    )}&per-page=2&mailto=vule160404@gmail.com&select=id,doi,title,publication_year,primary_location,authorships,abstract_inverted_index`;
+    )}&per-page=2&mailto=support@assigntrack.app&select=id,doi,title,publication_year,primary_location,authorships,abstract_inverted_index`;
     const resp = await fetch(url, {
       headers: POLITE_HEADERS,
       signal: AbortSignal.timeout(4500),

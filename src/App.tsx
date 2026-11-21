@@ -5,7 +5,11 @@ import { AdminPortalView } from './components/admin/AdminPortalView';
 import { ClientPortalView } from './components/client/ClientPortalView';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import { RoleSelectionGate } from './components/shared/RoleSelectionGate';
-import { auth, testConnection } from './lib/firebase';
+import {
+  auth,
+  clearAllSensitiveBrowserStorage,
+  testConnection,
+} from './lib/firebase';
 import { normalizeOrderCode } from './lib/utils';
 import {
   ensureOwnerOrReadProfile,
@@ -13,7 +17,6 @@ import {
 } from './services/firestoreService';
 import { UserProfile } from './types/domain';
 
-const REMOVED_LEGACY_EMAIL = 'cycloneielts@gmail.com';
 const PORTAL_MODE_STORAGE_KEY = 'assigntrack_portal_mode_v1';
 
 function resolveInitialPortalMode(): 'select' | 'admin' | 'client' {
@@ -54,12 +57,8 @@ export default function App() {
   useEffect(() => {
     testConnection();
     const unsub = onAuthStateChanged(auth, (u) => {
-      if (u && (u.email || '').trim().toLowerCase() === REMOVED_LEGACY_EMAIL) {
-        signOut(auth).catch(() => undefined);
-        setUser(null);
-        setEmailVerified(false);
-        setAuthReady(true);
-        return;
+      if (!u) {
+        clearAllSensitiveBrowserStorage();
       }
       setUser(u);
       setEmailVerified(Boolean(u?.emailVerified));
