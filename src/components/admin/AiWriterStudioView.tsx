@@ -396,7 +396,9 @@ export function AiWriterStudioView({
         for (const cs of cloudSessions) {
           seen.add(cs.id);
           const local = localById.get(cs.id);
-          if (local && isWriterSessionBusy(local)) {
+          const localTime = local ? Date.parse(local.updatedAt || '') || 0 : 0;
+          const cloudTime = Date.parse(cs.updatedAt || '') || 0;
+          if (local && (isWriterSessionBusy(local) || localTime > cloudTime)) {
             nextList.push(local);
           } else {
             lastSyncedSessionAtRef.current[cs.id] = cs.updatedAt;
@@ -430,6 +432,7 @@ export function AiWriterStudioView({
     const timer = window.setTimeout(() => {
       for (const s of sessionsRef.current) {
         if (isWriterSessionBusy(s)) continue;
+        const alreadySyncedBefore = Boolean(lastSyncedSessionAtRef.current[s.id]);
         const hasMeaningfulData = Boolean(
           s.topic.trim() ||
             s.subject.trim() ||
@@ -437,7 +440,7 @@ export function AiWriterStudioView({
             s.linkedOrderCode.trim() ||
             s.outline.some((sec) => sec.content.trim().length > 0)
         );
-        if (!hasMeaningfulData) continue;
+        if (!hasMeaningfulData && !alreadySyncedBefore) continue;
 
         if (lastSyncedSessionAtRef.current[s.id] !== s.updatedAt) {
           lastSyncedSessionAtRef.current[s.id] = s.updatedAt;
@@ -1224,75 +1227,90 @@ export function AiWriterStudioView({
     handleUpdateOutlineSection(currentSection.id, { content: nextContent }, true);
   };
 
-  const handleConfirmResetPaper = () => {
+  const handleConfirmResetPaper = async () => {
     if (!activeSession) return;
     pausedSessionIdsRef.current.add(activeSession.id);
 
+    const nowIso = new Date().toISOString();
+    let nextSession: WriterSession;
+    let nextTab: 'brief' | 'outline' = 'brief';
+    let toastMessage = '';
+
     if (resetScope === 'content_only') {
-      mutateActiveSession((s) => ({
-        ...s,
+      nextSession = {
+        ...activeSession,
         batchStatus: 'idle',
         batchErrorMsg: undefined,
         fullPaperOverride: '',
         historyStack: [],
         historyIndex: -1,
-        outline: s.outline.map((sec) => ({
+        outline: activeSession.outline.map((sec) => ({
           ...sec,
           content: '',
           status: 'idle',
           errorMsg: undefined,
         })),
-      }));
-      setLeftTab('outline');
-      setShowResetConfirmModal(false);
-      onToast(
-        'Đã xóa toàn bộ nội dung chữ đã viết (giữ nguyên Đề bài & khung Dàn ý) để viết lại!'
-      );
-      return;
-    }
-
-    if (resetScope === 'everything') {
+        updatedAt: nowIso,
+      };
+      nextTab = 'outline';
+      toastMessage =
+        'Đã xóa toàn bộ nội dung chữ đã viết (giữ nguyên Đề bài & khung Dàn ý) để viết lại!';
+    } else if (resetScope === 'everything') {
       const fresh = createDefaultSession(null);
-      mutateActiveSession((s) => ({
+      nextSession = {
         ...fresh,
-        id: s.id,
+        id: activeSession.id,
         format: {
           ...fresh.format,
-          fontFamily: s.format.fontFamily,
-          fontSizePt: s.format.fontSizePt,
+          fontFamily: activeSession.format.fontFamily,
+          fontSizePt: activeSession.format.fontSizePt,
         },
-      }));
-      setLeftTab('brief');
-      setShowResetConfirmModal(false);
-      onToast(
-        'Đã xóa trắng toàn bộ nội dung, dàn ý & đề bài để bắt đầu bài mới từ đầu!'
-      );
-      return;
-    }
-
-    // Default: 'content_and_outline' — reset written content and outline back to default while keeping brief/rubric/order link
-    mutateActiveSession((s) => {
+        researchedSources: '',
+        researchedSourcesTopic: '',
+        updatedAt: nowIso,
+      };
+      nextTab = 'brief';
+      toastMessage =
+        'Đã xóa trắng toàn bộ nội dung, dàn ý & đề bài để bắt đầu bài mới từ đầu!';
+    } else {
+      // Default: 'content_and_outline' — reset written content and outline back to default while keeping brief/rubric/order link
       const resetOutline = parseAiOutlineJson(
         '',
-        s.targetWordCount,
-        s.citationStyle
+        activeSession.targetWordCount,
+        activeSession.citationStyle
       );
-      return {
-        ...s,
+      nextSession = {
+        ...activeSession,
         outline: resetOutline,
         activeSectionId: resetOutline[0]?.id || '',
         fullPaperOverride: '',
+        researchedSources: '',
+        researchedSourcesTopic: '',
         batchStatus: 'idle',
         batchErrorMsg: undefined,
         historyStack: [],
         historyIndex: -1,
+        updatedAt: nowIso,
       };
-    });
-    setLeftTab('brief');
-    setShowResetConfirmModal(false);
-    onToast(
-      'Đã xóa toàn bộ bài viết & dàn ý đang làm (giữ lại Đề bài & Rubric) để làm lại từ đầu!'
+      nextTab = 'brief';
+      toastMessage =
+        'Đã xóa toàn bộ bài viết & dàn ý đang làm (giữ lại Đề bài & Rubric) để làm lại từ đầu!';
+    }
+
+    // Update local state immediately & record timestamp so debounced sync won't race
+    lastSyncedSessionAtRef.current[nextSession.id] = nextSession.updatedAt;
+    setSessions((prev) =>
+      prev.map((s) => (s.id === nextSession.id ? nextSession : s))
     );
+    setLeftTab(nextTab);
+    setShowResetConfirmModal(false);
+
+    // Push reset immediately to Firestore (no 1.5s debounce, no empty-data skip) so F5 never restores old content
+    if (cloudSyncState !== 'permission_denied') {
+      await saveWriterSessionToCloud(nextSession);
+    }
+
+    onToast(toastMessage);
   };
 
   const handleUndo = () => {
@@ -1904,7 +1922,7 @@ export function AiWriterStudioView({
                 </button>
                 <button
                   type="button"
-                  onClick={handleConfirmResetPaper}
+                  onClick={() => void handleConfirmResetPaper()}
                   className="btn-press px-4 py-2 text-xs font-semibold text-white bg-rose-600 hover:bg-rose-700 rounded-lg inline-flex items-center gap-1.5 shadow-2xs"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
