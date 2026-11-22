@@ -1747,6 +1747,8 @@ export interface PaperAuditIssue {
   fixHint?: string;
   /** Optional DOI string if this issue is about a specific bad/duplicate DOI */
   badDoi?: string;
+  /** Optional list of exact in-text citations missing from References */
+  missingCitations?: string[];
 }
 
 export interface PaperAuditReport {
@@ -1760,8 +1762,16 @@ export interface PaperAuditReport {
   auditedAt: string;
 }
 
+function normalizeExtractedDoi(rawDoi: string): string {
+  return rawDoi
+    .trim()
+    .replace(/[.)\],;]+$/, '')
+    .replace(/\/(?:full|abstract|pdf|html|epub|meta)\/?$/i, '')
+    .replace(/[.)\],;]+$/, '');
+}
+
 function isSuspiciousFakeDoiGlobal(doi: string): boolean {
-  const clean = doi.trim().replace(/[.)\],;]+$/, '');
+  const clean = normalizeExtractedDoi(doi);
   if (/(?:12345|123456|112345|115678|234567|345678|987654|000000|111111)/.test(clean)) {
     return true;
   }
@@ -1970,7 +1980,7 @@ export async function runDeterministicPaperAudit(
 
       const doiMatches = entry.match(/10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+/g) || [];
       for (const rawDoi of doiMatches) {
-        const cleanDoi = rawDoi.replace(/[.)\],;]+$/, '');
+        const cleanDoi = normalizeExtractedDoi(rawDoi);
         const lowerDoi = cleanDoi.toLowerCase();
         const existing = doiToEntries.get(lowerDoi) || [];
         existing.push(entry);
@@ -2134,8 +2144,9 @@ export async function runDeterministicPaperAudit(
         sectionId: refSection.id,
         sectionTitle: refSection.title,
         autoFixable: true,
+        missingCitations,
         fixHint:
-          'Xây dựng lại phần References để đảm bảo khớp 100% họ tác giả đầu tiên và năm của tất cả trích dẫn trong bài.',
+          'Bổ sung đúng các nguồn còn thiếu và giữ nguyên các nguồn hợp lệ hiện có để khớp 100% họ tác giả đầu và năm.',
       });
     }
   } else if (bodySections.some((s) => (s.content || '').trim().length > 100)) {
@@ -2336,5 +2347,182 @@ ${digest}`;
     invalidDoiCount: deterministicResult.invalidDoiCount,
     issues: allIssues,
     auditedAt: new Date().toISOString(),
+  };
+}
+
+function escapeRegExpForDoi(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Surgical, deterministic-first References fixer:
+ * 1) Deterministically strips every verified-bad / 404 / fake / duplicate DOI from existing entries (never breaks valid entries).
+ * 2) Generates ONLY the specific missing in-text citations (if any) with strict no-DOI-hallucination rules.
+ * 3) Verifies any newly generated DOI against Crossref API and auto-strips any invalid one before returning.
+ */
+export async function fixReferencesTargetedWithAi(
+  session: WriterSession,
+  refSectionId: string,
+  badDois: string[],
+  missingCitations: string[],
+  profile: AiProviderProfile,
+  enableWebSearch?: boolean,
+  signal?: AbortSignal
+): Promise<{ content: string; changeSummary: string }> {
+  const refSection = session.outline.find((s) => s.id === refSectionId);
+  if (!refSection) {
+    throw new Error('Không tìm thấy mục Tài liệu tham khảo.');
+  }
+
+  let entries = refSection.content
+    .split(/\r?\n\s*\r?\n+/)
+    .map((e) => e.replace(/\r?\n+/g, ' ').replace(/\s{2,}/g, ' ').trim())
+    .filter(Boolean);
+
+  const normalizedBadSet = new Set(
+    badDois.map((d) => normalizeExtractedDoi(d).toLowerCase()).filter(Boolean)
+  );
+
+  let strippedDoiCount = 0;
+
+  // Step 1: Deterministic scrub of every flagged bad/duplicate/404 DOI & suspicious fake DOI
+  entries = entries.map((entry) => {
+    let cleaned = entry;
+    const foundDois = entry.match(/10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+/g) || [];
+    for (const rawDoi of foundDois) {
+      const norm = normalizeExtractedDoi(rawDoi).toLowerCase();
+      if (normalizedBadSet.has(norm) || isSuspiciousFakeDoiGlobal(rawDoi)) {
+        const escaped = escapeRegExpForDoi(rawDoi);
+        cleaned = cleaned
+          .replace(
+            new RegExp(
+              `(?:Available at:\\s*)?(?:https?:\\/\\/(?:dx\\.)?doi\\.org\\/|https?:\\/\\/[^\\s]*?)?${escaped}(?:\\/(?:full|abstract|pdf|html))?[.)\\],;]*`,
+              'gi'
+            ),
+            ''
+          )
+          .replace(/(?:doi:\s*|Available at:\s*)(?=[.,;\s]*$)/gi, '')
+          .replace(/\s+\./g, '.')
+          .replace(/\.\s*\./g, '.')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+        strippedDoiCount++;
+      }
+    }
+    // Ensure clean ending punctuation
+    if (cleaned.length > 20 && !/[.!?)\]]$|https?:\/\/\S+$|10\.\d{4,9}\/\S+$/.test(cleaned)) {
+      cleaned = `${cleaned}.`;
+    }
+    return cleaned;
+  });
+
+  // Step 2: Generate ONLY the missing citations (targeted, max 5 at a time)
+  let addedCount = 0;
+  const uniqueMissing = Array.from(
+    new Set(missingCitations.map((c) => c.trim()).filter(Boolean))
+  );
+
+  if (uniqueMissing.length > 0) {
+    const researchedSnippet = session.researchedSources?.trim()
+      ? `\nVerified web sources:\n${session.researchedSources.trim().slice(0, 1800)}`
+      : '';
+
+    const systemPrompt = `You are a strict academic bibliographer.
+Generate ONLY the full ${session.citationStyle} reference entries for the exact missing in-text citations listed below.
+CRITICAL RULES:
+- PRESERVE THE EXACT FIRST AUTHOR SURNAME AND YEAR from each listed citation (e.g., if listed "Eren and Rakıcıoğlu-Söylemez (2023)", entry MUST start with "Eren, ... (2023)").
+- DO NOT INVENT, GUESS, OR PASTE ANY DOI OR URL unless it is 100% verbatim in the Verified web sources for THAT EXACT author. If unsure, OMIT the DOI/URL completely!
+- Output ONLY the reference entries (one complete entry per paragraph, separated by a blank line). No markdown '#', no numbering, no intro/outro.`;
+
+    const userPrompt = `Topic: ${session.topic || session.title}
+Citation Style: ${session.citationStyle}
+Writing Language: ${session.writingLanguage}${researchedSnippet}
+
+Generate full ${session.citationStyle} entries for ONLY these ${uniqueMissing.length} missing citations:
+${uniqueMissing.map((c, idx) => `${idx + 1}. ${c}`).join('\n')}`;
+
+    const rawAdded = await callAiChatbot({
+      profile,
+      systemPrompt,
+      userPrompt,
+      enableWebSearch,
+      maxOutputTokens: 1100,
+      reasoningEffort: 'low',
+      signal,
+    });
+
+    const addedBlocks = rawAdded
+      .split(/\r?\n\s*\r?\n+/)
+      .map((blk) =>
+        stripMarkdownHashesFromText(blk)
+          .replace(/\r?\n+/g, ' ')
+          .replace(/^\d+[.)]\s+/, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim()
+      )
+      .filter((blk) => blk.length >= 20);
+
+    // Verify any DOI inside newly generated entries against Crossref immediately — auto-strip if 404 or fake!
+    for (const blk of addedBlocks) {
+      let safeEntry = blk;
+      const newDois = blk.match(/10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+/g) || [];
+      for (const rawDoi of newDois) {
+        const cleanDoi = normalizeExtractedDoi(rawDoi);
+        let isBad = isSuspiciousFakeDoiGlobal(cleanDoi);
+        if (!isBad) {
+          const check = await verifyDoiWithCrossref(cleanDoi, signal);
+          if (!check.networkError && !check.exists) {
+            isBad = true;
+          }
+        }
+        if (isBad) {
+          const escaped = escapeRegExpForDoi(rawDoi);
+          safeEntry = safeEntry
+            .replace(
+              new RegExp(
+                `(?:Available at:\\s*)?(?:https?:\\/\\/(?:dx\\.)?doi\\.org\\/|doi:\\s*)?${escaped}[.)\\],;]*`,
+                'gi'
+              ),
+              ''
+            )
+            .replace(/\s{2,}/g, ' ')
+            .trim();
+        }
+      }
+      if (safeEntry.length > 20 && !/[.!?)\]]$|https?:\/\/\S+$|10\.\d{4,9}\/\S+$/.test(safeEntry)) {
+        safeEntry = `${safeEntry}.`;
+      }
+      entries.push(safeEntry);
+      addedCount++;
+    }
+  }
+
+  // Deduplicate & sort alphabetically
+  const deduped: string[] = [];
+  const seenKeys = new Set<string>();
+  for (const e of entries) {
+    const key = e.toLowerCase().replace(/[^a-z0-9à-ỹ]/gi, '').slice(0, 52);
+    if (!key || seenKeys.has(key)) continue;
+    seenKeys.add(key);
+    deduped.push(e);
+  }
+  if (session.citationStyle !== 'IEEE') {
+    deduped.sort((a, b) => a.localeCompare(b, 'vi', { sensitivity: 'base' }));
+  }
+
+  const parts: string[] = [];
+  if (strippedDoiCount > 0) {
+    parts.push(`gỡ bỏ triệt để ${strippedDoiCount} mã DOI lỗi/404/trùng`);
+  }
+  if (addedCount > 0) {
+    parts.push(`bổ sung ${addedCount} nguồn trích dẫn còn thiếu khớp tác giả đầu`);
+  }
+  if (parts.length === 0) {
+    parts.push('chuẩn hóa dấu câu và sắp xếp lại danh mục Tài liệu tham khảo');
+  }
+
+  return {
+    content: deduped.join('\n\n'),
+    changeSummary: `Đã ${parts.join(' và ')} (giữ nguyên các nguồn hợp lệ).`,
   };
 }

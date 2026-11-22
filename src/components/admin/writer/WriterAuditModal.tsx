@@ -373,7 +373,11 @@ export function WriterAuditModal({
                 ) : (
                   <Wrench className="w-3.5 h-3.5" />
                 )}
-                <span>Tự động sửa {autoFixableCount} lỗi bằng AI</span>
+                <span>
+                  {autoFixableCount > 5
+                    ? `Tự động sửa 5 lỗi đầu tiên (5/${autoFixableCount})`
+                    : `Tự động sửa ${autoFixableCount} lỗi bằng AI`}
+                </span>
               </button>
             )}
           </div>

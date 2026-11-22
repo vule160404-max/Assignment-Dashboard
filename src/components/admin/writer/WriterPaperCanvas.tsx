@@ -1,5 +1,16 @@
 import { RefObject, useMemo } from 'react';
-import { BookMarked, ListTree, Maximize2, Minimize2 } from 'lucide-react';
+import {
+  AlertCircle,
+  BookMarked,
+  CheckCircle2,
+  ListTree,
+  Loader2,
+  Maximize2,
+  Minimize2,
+  ShieldAlert,
+  ShieldCheck,
+  Wrench,
+} from 'lucide-react';
 import { stripMarkdownHashesFromText } from '../../../lib/aiWriterClient';
 import { countWords } from '../../../lib/wordHumanizer';
 import { CoverPageSheetPreview } from './CoverPageSheetPreview';
@@ -19,6 +30,24 @@ interface TocPreviewEntry {
   pageNumber: number;
 }
 
+export interface SectionAuditVisualState {
+  status: 'error' | 'fixing' | 'fixed';
+  issueCount: number;
+  label?: string;
+}
+
+export interface PaperQaBannerState {
+  score: number;
+  remainingErrorCount: number;
+  autoFixableCount: number;
+  isFixing: boolean;
+  currentStepIndex: number;
+  batchTotal: number;
+  currentStepTitle?: string;
+  onOpenAuditModal: () => void;
+  onFixNextBatch?: () => void;
+}
+
 interface WriterPaperCanvasProps {
   session: WriterSession;
   currentSectionId: string;
@@ -26,6 +55,8 @@ interface WriterPaperCanvasProps {
   focusPaperMode: boolean;
   containerClassName?: string;
   activeTextareaRef: RefObject<HTMLTextAreaElement | null>;
+  sectionAuditStates?: Record<string, SectionAuditVisualState>;
+  qaBanner?: PaperQaBannerState | null;
   onSelectSection: (sectionId: string) => void;
   onUpdateTopic: (nextTopic: string) => void;
   onUpdateViewMode: (mode: 'sections' | 'full_paper') => void;
@@ -46,6 +77,8 @@ export function WriterPaperCanvas({
   focusPaperMode,
   containerClassName,
   activeTextareaRef,
+  sectionAuditStates,
+  qaBanner,
   onSelectSection,
   onUpdateTopic,
   onUpdateViewMode,
@@ -137,7 +170,7 @@ export function WriterPaperCanvas({
         (focusPaperMode ? 'lg:col-span-12' : 'lg:col-span-8')
       } bg-zinc-200/65 border border-zinc-300/90 rounded-2xl p-4 sm:p-6 overflow-x-auto`}
     >
-      {/* Paper Top Info Strip */}
+        {/* Paper Top Info Strip */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4 text-xs text-zinc-600">
         <div className="flex items-center gap-2">
           <button
@@ -194,6 +227,90 @@ export function WriterPaperCanvas({
           </button>
         </div>
       </div>
+
+      {/* Live QA Score & Sequential Auto-Fix Walkthrough Banner */}
+      {qaBanner && (
+        <div
+          className={`sticky top-2 z-20 mb-4 px-3.5 py-2.5 rounded-xl border shadow-sm backdrop-blur-md flex flex-wrap items-center justify-between gap-2.5 transition-colors ${
+            qaBanner.isFixing
+              ? 'bg-blue-50/95 border-blue-300 text-[#0B2559]'
+              : qaBanner.remainingErrorCount > 0
+              ? 'bg-rose-50/95 border-rose-300 text-rose-900'
+              : 'bg-emerald-50/95 border-emerald-300 text-emerald-900'
+          }`}
+        >
+          <div className="flex items-center gap-2.5 min-w-0">
+            <span
+              className={`px-2 py-1 rounded-lg font-mono text-xs font-black tabular-nums shrink-0 ${
+                qaBanner.remainingErrorCount === 0
+                  ? 'bg-emerald-600 text-white'
+                  : qaBanner.score < 70
+                  ? 'bg-rose-600 text-white'
+                  : 'bg-amber-600 text-white'
+              }`}
+            >
+              {qaBanner.score}/100
+            </span>
+
+            <div className="min-w-0">
+              <div className="text-xs font-bold flex items-center gap-1.5 truncate">
+                {qaBanner.isFixing ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#12489B] shrink-0" />
+                    <span className="truncate">
+                      Đang sửa tuần tự ({qaBanner.currentStepIndex}/
+                      {qaBanner.batchTotal}):{' '}
+                      {qaBanner.currentStepTitle || 'Đang xử lý...'}
+                    </span>
+                  </>
+                ) : qaBanner.remainingErrorCount > 0 ? (
+                  <>
+                    <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                    <span>
+                      Đang còn {qaBanner.remainingErrorCount} lỗi cần sửa (mục
+                      tô đỏ bên dưới)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>
+                      Đã sửa sạch lỗi · Các mục tô xanh đã hoàn tất chuẩn học
+                      thuật!
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {!qaBanner.isFixing &&
+              qaBanner.autoFixableCount > 0 &&
+              qaBanner.onFixNextBatch && (
+                <button
+                  type="button"
+                  onClick={qaBanner.onFixNextBatch}
+                  className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#12489B] hover:bg-[#0D387A] text-white text-xs font-bold shadow-2xs"
+                >
+                  <Wrench className="w-3.5 h-3.5" />
+                  <span>
+                    {qaBanner.autoFixableCount > 5
+                      ? `Sửa tiếp 5 lỗi (${qaBanner.autoFixableCount} lỗi còn lại)`
+                      : `Tự động sửa ${qaBanner.autoFixableCount} lỗi còn lại`}
+                  </span>
+                </button>
+              )}
+            <button
+              type="button"
+              onClick={qaBanner.onOpenAuditModal}
+              className="btn-press px-2.5 py-1.5 rounded-lg bg-white/90 border border-zinc-200 hover:bg-white text-xs font-semibold text-slate-700"
+            >
+              Xem báo cáo QA
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* A4 Paper Sheet */}
       <div
@@ -356,18 +473,62 @@ export function WriterPaperCanvas({
                 Math.ceil(sec.content.length / 85)
             );
 
+            const auditVisual = sectionAuditStates?.[sec.id];
+            const sectionHighlightClass =
+              auditVisual?.status === 'fixing'
+                ? 'ring-2 ring-[#12489B] bg-blue-50/75 p-3 -mx-3 shadow-sm'
+                : auditVisual?.status === 'error'
+                ? 'ring-2 ring-rose-500/80 bg-rose-50/70 p-3 -mx-3'
+                : auditVisual?.status === 'fixed'
+                ? 'ring-2 ring-emerald-500/80 bg-emerald-50/65 p-3 -mx-3'
+                : session.viewMode === 'sections'
+                ? isCurrent
+                  ? 'ring-1 ring-[#12489B]/35 bg-blue-50/15 p-3 -mx-3'
+                  : 'hover:bg-zinc-50/80 p-3 -mx-3'
+                : 'py-1';
+
             return (
               <div
                 key={sec.id}
+                data-writer-section-id={sec.id}
                 onClick={() => onSelectSection(sec.id)}
-                className={`rounded-lg transition-colors duration-150 ${
-                  session.viewMode === 'sections'
-                    ? isCurrent
-                      ? 'ring-1 ring-[#12489B]/35 bg-blue-50/15 p-3 -mx-3'
-                      : 'hover:bg-zinc-50/80 p-3 -mx-3'
-                    : 'py-1'
-                }`}
+                className={`rounded-lg transition-all duration-300 ${sectionHighlightClass}`}
               >
+                {/* Live Audit Highlight Status Pill (Red Warning / Fixing / Green Fixed) */}
+                {auditVisual && (
+                  <div
+                    className={`mb-2 px-2.5 py-1.5 rounded-lg text-[11px] font-sans font-semibold flex items-center justify-between gap-2 ${
+                      auditVisual.status === 'fixing'
+                        ? 'bg-blue-100/90 text-[#0B2559] border border-blue-300'
+                        : auditVisual.status === 'error'
+                        ? 'bg-rose-100/90 text-rose-800 border border-rose-300'
+                        : 'bg-emerald-100/90 text-emerald-800 border border-emerald-300'
+                    }`}
+                  >
+                    <span className="inline-flex items-center gap-1.5 min-w-0">
+                      {auditVisual.status === 'fixing' ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-[#12489B] shrink-0" />
+                      ) : auditVisual.status === 'error' ? (
+                        <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                      ) : (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      )}
+                      <span className="truncate">
+                        {auditVisual.status === 'fixing'
+                          ? `Đang tự động sửa lỗi mục này... ${
+                              auditVisual.label ? `(${auditVisual.label})` : ''
+                            }`
+                          : auditVisual.status === 'error'
+                          ? `Cảnh báo lỗi (${auditVisual.issueCount} lỗi) · Chờ sửa${
+                              auditVisual.label ? ` — ${auditVisual.label}` : ''
+                            }`
+                          : `Đã chỉnh sửa xong ✓${
+                              auditVisual.label ? ` — ${auditVisual.label}` : ''
+                            }`}
+                      </span>
+                    </span>
+                  </div>
+                )}
                 {/* Section Heading */}
                 <div className="flex items-center justify-between gap-2 mb-1.5">
                   <input

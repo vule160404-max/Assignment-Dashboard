@@ -13,6 +13,7 @@ import {
   ExistingDraftMode,
   PaperAuditReport,
   analyzeAndPlanExistingDraftWithAi,
+  fixReferencesTargetedWithAi,
   generateOutlineWithAi,
   generateSectionWithAi,
   loadAiChatbotSettings,
@@ -76,7 +77,10 @@ import { WriterDeliverModal } from './writer/WriterDeliverModal';
 import { WriterAuditModal } from './writer/WriterAuditModal';
 import { WriterImportDraftModal } from './writer/WriterImportDraftModal';
 import { WriterOutlinePanel } from './writer/WriterOutlinePanel';
-import { WriterPaperCanvas } from './writer/WriterPaperCanvas';
+import {
+  SectionAuditVisualState,
+  WriterPaperCanvas,
+} from './writer/WriterPaperCanvas';
 import { WriterSkillLibraryModal } from './writer/WriterSkillLibraryModal';
 import { WriterWordRibbon } from './writer/WriterWordRibbon';
 import {
@@ -218,9 +222,18 @@ export function AiWriterStudioView({
   const [isAuditingPaper, setIsAuditingPaper] = useState(false);
   const [isAutoFixingAudit, setIsAutoFixingAudit] = useState(false);
   const [auditStatusLabel, setAuditStatusLabel] = useState('');
+  const [sectionAuditStates, setSectionAuditStates] = useState<
+    Record<string, SectionAuditVisualState>
+  >({});
+  const [autoFixProgress, setAutoFixProgress] = useState<{
+    currentStepIndex: number;
+    batchTotal: number;
+    currentStepTitle: string;
+  }>({ currentStepIndex: 0, batchTotal: 0, currentStepTitle: '' });
 
   useEffect(() => {
     setAuditReport(null);
+    setSectionAuditStates({});
   }, [activeSessionId]);
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState<boolean>(() => {
@@ -2232,6 +2245,19 @@ export function AiWriterStudioView({
       }
 
       setAuditReport(report);
+      // Paint all sections that have errors with red warning highlight on the paper canvas
+      const initialErrorStates: Record<string, SectionAuditVisualState> = {};
+      for (const issue of report.issues) {
+        if (!issue.sectionId) continue;
+        const prev = initialErrorStates[issue.sectionId];
+        initialErrorStates[issue.sectionId] = {
+          status: 'error',
+          issueCount: (prev?.issueCount || 0) + 1,
+          label: prev?.label || issue.title,
+        };
+      }
+      setSectionAuditStates(initialErrorStates);
+
       const critCount = report.issues.filter((i) => i.severity === 'critical').length;
       const warnCount = report.issues.filter((i) => i.severity === 'warning').length;
       updateActivityLog(auditLogId, {
@@ -2267,11 +2293,14 @@ export function AiWriterStudioView({
       return;
     }
 
-    const fixableIssues = report.issues.filter((i) => i.autoFixable);
-    if (fixableIssues.length === 0) return;
+    const allFixableIssues = report.issues.filter((i) => i.autoFixable);
+    if (allFixableIssues.length === 0) return;
 
     const targetSessionId = activeSession.id;
     const signal = getFreshAiSignal();
+
+    // 1. Close the Audit modal immediately so the user watches the live red -> green walkthrough on the paper!
+    setShowAuditModal(false);
     setIsAutoFixingAudit(true);
 
     const refSection = activeSession.outline.find((s) =>
@@ -2280,58 +2309,159 @@ export function AiWriterStudioView({
       )
     );
 
-    // Group fixable body section issues by sectionId
-    const bodyIssuesBySec = new Map<string, string[]>();
-    let needsRefRebuild = false;
+    // Order fixable issues top-to-bottom by their section index in the outline, then take up to 5 errors per batch
+    const outlineIndexMap = new Map<string, number>();
+    activeSession.outline.forEach((sec, idx) => outlineIndexMap.set(sec.id, idx));
 
-    for (const issue of fixableIssues) {
+    const resolveIssueSectionId = (issue: PaperAuditReport['issues'][number]): string | undefined => {
       if (
         (refSection && issue.sectionId === refSection.id) ||
         issue.category === 'doi_and_sources' ||
         issue.category === 'citation_sync'
       ) {
-        needsRefRebuild = true;
-      } else if (issue.sectionId) {
-        const list = bodyIssuesBySec.get(issue.sectionId) || [];
-        list.push(
-          `${issue.title}: ${issue.detail}${
-            issue.fixHint ? ` -> ${issue.fixHint}` : ''
-          }`
-        );
-        bodyIssuesBySec.set(issue.sectionId, list);
+        return refSection?.id;
       }
+      return issue.sectionId;
+    };
+
+    const sortedFixable = [...allFixableIssues].sort((a, b) => {
+      const idxA = outlineIndexMap.get(resolveIssueSectionId(a) || '') ?? 999;
+      const idxB = outlineIndexMap.get(resolveIssueSectionId(b) || '') ?? 999;
+      return idxA - idxB;
+    });
+
+    const MAX_ERRORS_PER_BATCH = 5;
+    const batchIssues = sortedFixable.slice(0, MAX_ERRORS_PER_BATCH);
+
+    // Paint ALL sections with issues RED before starting sequential fixes
+    const redMap: Record<string, SectionAuditVisualState> = {};
+    for (const issue of report.issues) {
+      const sid = resolveIssueSectionId(issue);
+      if (!sid) continue;
+      const prev = redMap[sid];
+      redMap[sid] = {
+        status: 'error',
+        issueCount: (prev?.issueCount || 0) + 1,
+        label: prev?.label || issue.title,
+      };
+    }
+    setSectionAuditStates(redMap);
+
+    // Group the selected batch (up to 5 errors) by section in top-to-bottom order
+    type SectionFixTask = {
+      sectionId: string;
+      isReferences: boolean;
+      issues: PaperAuditReport['issues'];
+    };
+    const orderedTasks: SectionFixTask[] = [];
+    const taskBySec = new Map<string, SectionFixTask>();
+
+    for (const issue of batchIssues) {
+      const sid = resolveIssueSectionId(issue);
+      if (!sid) continue;
+      let existing = taskBySec.get(sid);
+      if (!existing) {
+        existing = {
+          sectionId: sid,
+          isReferences: Boolean(refSection && sid === refSection.id),
+          issues: [],
+        };
+        taskBySec.set(sid, existing);
+        orderedTasks.push(existing);
+      }
+      existing.issues.push(issue);
     }
 
-    let fixedCount = 0;
+    const scrollToPaperSection = (secId: string) => {
+      const el = document.querySelector<HTMLElement>(
+        `[data-writer-section-id="${secId}"]`
+      );
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    };
+
+    const waitMs = (ms: number) =>
+      new Promise<void>((resolve) => window.setTimeout(resolve, ms));
+
+    let fixedSectionsCount = 0;
+    const fixedSectionIds = new Set<string>();
+    const fixedSectionSummaries = new Map<string, string>();
+    let processedErrorCount = 0;
 
     try {
-      // 1. Fix flagged body sections first
-      for (const [secId, hints] of bodyIssuesBySec.entries()) {
+      for (const task of orderedTasks) {
         if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
         const latestSess =
           sessionsRef.current.find((s) => s.id === targetSessionId) ||
           activeSession;
-        const targetSec = latestSess.outline.find((s) => s.id === secId);
+        const targetSec = latestSess.outline.find((s) => s.id === task.sectionId);
         if (!targetSec) continue;
 
+        processedErrorCount += task.issues.length;
+        const stepTitle = `${targetSec.title} (${task.issues.length} lỗi)`;
+        setAutoFixProgress({
+          currentStepIndex: Math.min(processedErrorCount, batchIssues.length),
+          batchTotal: batchIssues.length,
+          currentStepTitle: stepTitle,
+        });
+
+        // 1. Focus & smoothly scroll to the RED section on the A4 paper
+        mutateSessionById(targetSessionId, (s) => ({
+          ...s,
+          activeSectionId: targetSec.id,
+        }));
+        scrollToPaperSection(targetSec.id);
+
+        // 2. Switch highlight from RED -> FIXING (blue pulsing)
+        setSectionAuditStates((prev) => ({
+          ...prev,
+          [targetSec.id]: {
+            status: 'fixing',
+            issueCount: task.issues.length,
+            label: task.issues[0]?.title,
+          },
+        }));
+
+        await waitMs(400);
+
         const secStart = Date.now();
-        const label = `Đang tự động sửa mục "${targetSec.title}"...`;
+        const label = `Đang tự động sửa "${targetSec.title}" (${processedErrorCount}/${batchIssues.length} lỗi)...`;
         setAuditStatusLabel(label);
         setCurrentStepLabel(label);
         const logId = pushActivityLog(
           'running',
           `Auto-Fix mục: ${targetSec.title}`,
-          hints[0]?.slice(0, 140)
+          task.issues.map((i) => i.title).join(' · ').slice(0, 180)
         );
 
         const prevWords = countWords(targetSec.content);
         let newContent = '';
         let changeSummary = '';
 
-        if (!targetSec.content.trim()) {
+        if (task.isReferences) {
+          const badDois = task.issues
+            .map((i) => i.badDoi)
+            .filter((d): d is string => Boolean(d));
+          const missingCites = task.issues.flatMap(
+            (i) => i.missingCitations || []
+          );
+
+          const refFixed = await fixReferencesTargetedWithAi(
+            latestSess,
+            targetSec.id,
+            badDois,
+            missingCites,
+            effectiveWriter.profile,
+            effectiveWriter.enableWebSearch,
+            signal
+          );
+          newContent = refFixed.content;
+          changeSummary = refFixed.changeSummary;
+        } else if (!targetSec.content.trim()) {
           newContent = await generateSectionWithAi(
             latestSess,
-            secId,
+            targetSec.id,
             skills,
             effectiveWriter.profile,
             effectiveWriter.enableWebSearch,
@@ -2339,9 +2469,12 @@ export function AiWriterStudioView({
           );
           changeSummary = 'Đã viết đầy đủ nội dung cho mục bị trống.';
         } else {
+          const hints = task.issues.map(
+            (i) => `${i.title}: ${i.detail}${i.fixHint ? ` -> ${i.fixHint}` : ''}`
+          );
           const revised = await reviseOrCompleteSectionWithAi(
             latestSess,
-            secId,
+            targetSec.id,
             'revise',
             `BẮT BUỘC SỬA CÁC LỖI KIỂM DUYỆT SAU:\n${hints.join('\n')}`,
             skills,
@@ -2355,12 +2488,13 @@ export function AiWriterStudioView({
 
         const nextWords = countWords(newContent);
         const delta = nextWords - prevWords;
+
         mutateSessionById(
           targetSessionId,
           (s) => ({
             ...s,
             outline: s.outline.map((sec) =>
-              sec.id === secId
+              sec.id === targetSec.id
                 ? {
                     ...sec,
                     content: newContent,
@@ -2375,93 +2509,43 @@ export function AiWriterStudioView({
 
         updateActivityLog(logId, {
           status: 'success',
-          title: `Đã sửa mục: ${targetSec.title} (${prevWords} → ${nextWords} từ, ${
+          title: `Đã sửa xong: ${targetSec.title} (${prevWords} → ${nextWords} từ, ${
             delta >= 0 ? `+${delta}` : delta
           })`,
           detail: changeSummary,
           durationSec: (Date.now() - secStart) / 1000,
         });
-        fixedCount++;
+
+        // 3. Turn this section GREEN ('fixed') so user sees clear visual confirmation!
+        fixedSectionsCount++;
+        fixedSectionIds.add(targetSec.id);
+        fixedSectionSummaries.set(targetSec.id, changeSummary);
+        setSectionAuditStates((prev) => ({
+          ...prev,
+          [targetSec.id]: {
+            status: 'fixed',
+            issueCount: 0,
+            label: changeSummary,
+          },
+        }));
+
+        // Brief pause so user clearly sees the green highlight before auto-scrolling to next red section
+        await waitMs(750);
       }
 
-      // 2. Rebuild References section cleanly (using updated 3+ author extraction & anti-fake-DOI rules)
-      if (needsRefRebuild && refSection) {
-        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
-        const latestSess =
-          sessionsRef.current.find((s) => s.id === targetSessionId) ||
-          activeSession;
-        const refStart = Date.now();
-        const label = `Đang xây dựng lại chuẩn "${refSection.title}" (khớp 1-1 & loại bỏ DOI giả/trùng)...`;
-        setAuditStatusLabel(label);
-        setCurrentStepLabel(label);
-        const refLogId = pushActivityLog(
-          'running',
-          `Auto-Fix danh mục: ${refSection.title}`,
-          'Loại bỏ DOI giả/trùng lặp, khôi phục đủ tác giả đầu và khớp 1-1 với trích dẫn trong bài.'
-        );
-
-        const rebuiltRefs = await generateSectionWithAi(
-          latestSess,
-          refSection.id,
-          skills,
-          effectiveWriter.profile,
-          effectiveWriter.enableWebSearch,
-          signal,
-          (partialText, progressLabel) => {
-            if (progressLabel) {
-              setAuditStatusLabel(progressLabel);
-              setCurrentStepLabel(progressLabel);
-            }
-            if (partialText) {
-              mutateSessionById(targetSessionId, (s) => ({
-                ...s,
-                outline: s.outline.map((sec) =>
-                  sec.id === refSection.id
-                    ? { ...sec, content: partialText }
-                    : sec
-                ),
-              }));
-            }
-          }
-        );
-
-        mutateSessionById(
-          targetSessionId,
-          (s) => ({
-            ...s,
-            outline: s.outline.map((sec) =>
-              sec.id === refSection.id
-                ? {
-                    ...sec,
-                    content: rebuiltRefs,
-                    status: 'completed',
-                    errorMsg: undefined,
-                  }
-                : sec
-            ),
-          }),
-          true
-        );
-
-        updateActivityLog(refLogId, {
-          status: 'success',
-          title: `Đã sửa & chuẩn hóa: ${refSection.title}`,
-          detail:
-            'Đã gỡ bỏ các DOI giả/trùng lặp, đồng bộ 1-1 tác giả đầu với trích dẫn trong bài và sắp xếp chuẩn học thuật.',
-          durationSec: (Date.now() - refStart) / 1000,
-        });
-        fixedCount++;
-      }
-
-      // 3. Re-run deterministic verification immediately so user sees updated score!
-      if (fixedCount > 0) {
-        setAuditStatusLabel('Đang kiểm chứng lại kết quả sau khi tự động sửa...');
+      // 4. Re-run deterministic verification immediately to refresh the live score (e.g. 58/100 -> 100/100)
+      if (fixedSectionsCount > 0) {
+        setAuditStatusLabel('Đang kiểm chứng lại điểm QA sau khi sửa...');
+        setCurrentStepLabel('Đang kiểm chứng lại điểm QA sau khi sửa...');
         const refreshedSess =
           sessionsRef.current.find((s) => s.id === targetSessionId) ||
           activeSession;
         const recheck = await runDeterministicPaperAudit(
           refreshedSess,
-          (label) => setAuditStatusLabel(label),
+          (label) => {
+            setAuditStatusLabel(label);
+            setCurrentStepLabel(label);
+          },
           signal
         );
         const critCount = recheck.issues.filter(
@@ -2484,15 +2568,41 @@ export function AiWriterStudioView({
               : 'pass',
           summary:
             critCount === 0
-              ? `Đã tự động sửa xong ${fixedCount} khu vực lỗi. Kết quả kiểm chứng lại: ${nextScore}/100 điểm — sẵn sàng xuất file!`
-              : `Đã tự động sửa ${fixedCount} khu vực. Còn lại ${critCount} lỗi nghiêm trọng và ${warnCount} cảnh báo cần rà thêm.`,
+              ? `Đã tự động sửa xong ${batchIssues.length} lỗi. Điểm kiểm duyệt hiện tại: ${nextScore}/100 — sẵn sàng xuất file!`
+              : `Đã sửa xong đợt ${batchIssues.length} lỗi. Điểm tăng lên ${nextScore}/100 — còn lại ${critCount} lỗi nghiêm trọng và ${warnCount} cảnh báo.`,
           checkedDoiCount: recheck.checkedDoiCount,
           verifiedDoiCount: recheck.verifiedDoiCount,
           invalidDoiCount: recheck.invalidDoiCount,
           issues: recheck.issues,
           auditedAt: new Date().toISOString(),
         });
-        onToast(`Đã tự động sửa xong ${fixedCount} khu vực và cập nhật nhật ký!`);
+
+        // Update visual badges: keep cleanly fixed sections GREEN, mark any remaining errored sections RED
+        const nextVisualStates: Record<string, SectionAuditVisualState> = {};
+        fixedSectionIds.forEach((fid) => {
+          nextVisualStates[fid] = {
+            status: 'fixed',
+            issueCount: 0,
+            label: fixedSectionSummaries.get(fid),
+          };
+        });
+        for (const issue of recheck.issues) {
+          const sid = resolveIssueSectionId(issue);
+          if (!sid) continue;
+          const prev = nextVisualStates[sid];
+          nextVisualStates[sid] = {
+            status: 'error',
+            issueCount: prev?.status === 'error' ? prev.issueCount + 1 : 1,
+            label: prev?.status === 'error' ? prev.label : issue.title,
+          };
+        }
+        setSectionAuditStates(nextVisualStates);
+
+        onToast(
+          critCount === 0
+            ? `Hoàn tất! Bài viết đã đạt ${nextScore}/100 điểm — không còn lỗi nghiêm trọng!`
+            : `Đã sửa xong đợt ${batchIssues.length} lỗi (Điểm hiện tại: ${nextScore}/100). Bấm "Sửa tiếp" ở thanh đầu trang nếu còn lỗi.`
+        );
       }
     } catch (err) {
       if (!isAbortError(err)) {
@@ -2502,6 +2612,7 @@ export function AiWriterStudioView({
       }
     } finally {
       setIsAutoFixingAudit(false);
+      setAutoFixProgress({ currentStepIndex: 0, batchTotal: 0, currentStepTitle: '' });
       setAuditStatusLabel('');
       setCurrentStepLabel('');
     }
@@ -2811,6 +2922,25 @@ export function AiWriterStudioView({
               : 'lg:col-span-8'
           }
           activeTextareaRef={activeTextareaRef}
+          sectionAuditStates={sectionAuditStates}
+          qaBanner={
+            auditReport || isAutoFixingAudit
+              ? {
+                  score: auditReport?.score ?? 0,
+                  remainingErrorCount: auditReport?.issues.length ?? 0,
+                  autoFixableCount:
+                    auditReport?.issues.filter((i) => i.autoFixable).length ?? 0,
+                  isFixing: isAutoFixingAudit,
+                  currentStepIndex: autoFixProgress.currentStepIndex,
+                  batchTotal: autoFixProgress.batchTotal,
+                  currentStepTitle: autoFixProgress.currentStepTitle,
+                  onOpenAuditModal: () => setShowAuditModal(true),
+                  onFixNextBatch: auditReport
+                    ? () => void handleAutoFixAuditIssues(auditReport)
+                    : undefined,
+                }
+              : null
+          }
           onSelectSection={(secId) =>
             mutateActiveSession((s) => ({ ...s, activeSectionId: secId }))
           }
