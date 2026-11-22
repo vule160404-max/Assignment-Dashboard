@@ -1,18 +1,23 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
+  ArrowUpRight,
   Bookmark,
   CheckCircle2,
   Download,
   ExternalLink,
   Eye,
+  FileCheck2,
   FileText,
   Home,
   KeyRound,
   Lock,
+  LogIn,
   RefreshCw,
   Search,
   Send,
+  ShieldCheck,
+  Sparkles,
   X,
 } from 'lucide-react';
 import {
@@ -250,11 +255,84 @@ export function ClientPortalView({
   const currentStageMeta = portal ? getStageMeta(portal.stage) : null;
   const displayName = portal ? `Khách đơn #${portal.orderCode}` : 'Khách hàng';
 
+  const tabHeroMeta: Record<
+    ClientPortalTab,
+    {
+      eyebrow: string;
+      titlePrefix: string;
+      titleHighlight: string;
+      subtitle: string;
+      badges: string[];
+    }
+  > = {
+    order: {
+      eyebrow: 'AssignTrack · Đặt bài trực tuyến không cần đăng nhập',
+      titlePrefix: 'ĐĂNG KÝ ĐẶT BÀI &',
+      titleHighlight: 'BÁO GIÁ TRONG 15 PHÚT',
+      subtitle:
+        'Điền nhanh yêu cầu, đính kèm file đề bài / Rubric bảo mật — tư vấn viên báo giá rõ ràng và cấp Mã đơn theo dõi tiến độ 24/7.',
+      badges: [
+        'Báo giá minh bạch trước khi làm',
+        'Tải lên file đề bài bảo mật',
+        'Tặng báo cáo Turnitin & AI 0%',
+      ],
+    },
+    lookup: {
+      eyebrow: 'AssignTrack · Cổng theo dõi thời gian thực 24/7',
+      titlePrefix: 'TRA CỨU TIẾN ĐỘ',
+      titleHighlight: 'BẰNG MÃ ĐƠN HÀNG',
+      subtitle:
+        'Không cần tạo tài khoản — nhập Mã đơn hàng (Passcode) được cấp để theo dõi 6 mốc tiến độ, xem trước bài viết và thanh toán QR.',
+      badges: [
+        'Cập nhật 6 mốc tiến độ trực tiếp',
+        'Xem trước tài liệu & Turnitin',
+        'Nhắn tin trực tiếp với đội ngũ',
+      ],
+    },
+    checker: {
+      eyebrow: 'AssignTrack · Công cụ kiểm định học thuật miễn phí',
+      titlePrefix: 'KIỂM TRA',
+      titleHighlight: 'ĐẠO VĂN & AI SƠ BỘ',
+      subtitle:
+        'Tải lên file Word/PDF hoặc dán văn bản để phân tích từng câu, phát hiện đoạn trùng lặp và dấu vết AI hoàn toàn miễn phí.',
+      badges: [
+        'Miễn phí · Không cần đăng nhập',
+        'Phân tích chi tiết từng câu',
+        'Không lưu trữ bài viết của bạn',
+      ],
+    },
+  };
+
+  const currentHero = tabHeroMeta[homeTab];
+  const showHeroBanner = !portal && !(activeCode && loading);
+
   return (
-    <div className="min-h-screen client-ambient-bg text-[#0F172A]">
-      {/* Frictionless Guest / Passcode Client Header */}
-      <header className="sticky top-0 z-20 sticky-glass border-b border-slate-200/80">
-        <div className="max-w-6xl w-full mx-auto px-4 sm:px-8 h-16 flex items-center justify-between gap-4">
+    <div className="min-h-screen bg-[#F4F7FB] text-[#0F172A] flex flex-col">
+      {/* Top Promo Strip (Synchronized with Landing Page) */}
+      <div className="bg-gradient-to-r from-[#071A42] via-[#0B2559] to-[#12489B] text-white/95 text-[11.5px] font-medium py-2 px-4 text-center">
+        <span className="inline-flex items-center gap-2 flex-wrap justify-center">
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+          <span>
+            Ưu đãi sinh viên mới: Miễn phí báo cáo Turnitin &amp; AI Check khi đặt bài ngay hôm nay
+          </span>
+          {homeTab !== 'order' && (
+            <button
+              type="button"
+              onClick={() => {
+                handleResetLookup();
+                setHomeTab('order');
+              }}
+              className="underline decoration-amber-300/80 underline-offset-2 font-semibold text-amber-300 hover:text-amber-200"
+            >
+              Đặt bài ngay →
+            </button>
+          )}
+        </span>
+      </div>
+
+      {/* Unified Sticky White Header (Synchronized with Landing Page) */}
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-zinc-200/80">
+        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           {/* Left: Clean Brand Logo */}
           <a
             href="/"
@@ -272,13 +350,13 @@ export function ClientPortalView({
             <BrandLogo />
           </a>
 
-          {/* Right: Back Home + Subtle Admin Link */}
+          {/* Right: Back Home + Admin Login + Quick Order CTA */}
           <div className="flex items-center gap-2 shrink-0">
             {onBackToRoleSelect && (
               <button
                 type="button"
                 onClick={onBackToRoleSelect}
-                className="btn-press inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-[#0B2559] bg-white hover:bg-blue-50/70 border border-zinc-200/90 rounded-xl whitespace-nowrap shadow-2xs"
+                className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:text-[#0B2559] bg-white hover:bg-blue-50/70 border border-zinc-200/90 rounded-full whitespace-nowrap transition-colors"
               >
                 <Home className="w-3.5 h-3.5 text-[#12489B]" />
                 <span>Về trang chủ</span>
@@ -288,21 +366,90 @@ export function ClientPortalView({
             <button
               type="button"
               onClick={onSwitchToAdmin}
-              className="btn-press hidden sm:inline-flex items-center px-2.5 py-1.5 text-[11px] font-medium text-zinc-400 hover:text-slate-800 hover:bg-zinc-100 rounded-lg whitespace-nowrap border-l border-zinc-200/80 ml-0.5 pl-3"
+              className="btn-press hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-zinc-200 bg-white hover:border-[#12489B]/50 hover:text-[#12489B] text-xs font-semibold text-slate-700 transition-colors"
               title="Chuyển sang cổng dành cho Admin / Nhân sự"
             >
-              Quản trị
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Đăng nhập</span>
             </button>
+
+            {homeTab !== 'order' && (
+              <button
+                type="button"
+                onClick={() => {
+                  handleResetLookup();
+                  setHomeTab('order');
+                }}
+                className="btn-press group inline-flex items-center gap-2 pl-4 pr-1.5 py-1.5 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-xs font-bold shadow-[0_6px_20px_rgba(234,88,12,0.28)] transition-all"
+              >
+                <span>ORDER NOW</span>
+                <span className="w-6 h-6 rounded-full bg-white/20 group-hover:bg-white group-hover:text-[#EA580C] flex items-center justify-center transition-colors">
+                  <ArrowUpRight className="w-3.5 h-3.5" />
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </header>
 
+      {/* Deep Academic Navy Blueprint Hero Banner (Synchronized with Landing Page & Sample Library) */}
+      {showHeroBanner && (
+        <section className="relative overflow-hidden bg-[#0B2559] text-white pt-10 pb-16 sm:pt-12 sm:pb-20">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-[0.08]"
+            style={{
+              backgroundImage:
+                'linear-gradient(to right, #93C5FD 1px, transparent 1px), linear-gradient(to bottom, #93C5FD 1px, transparent 1px)',
+              backgroundSize: '44px 44px',
+            }}
+          />
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 w-[620px] h-[280px] rounded-full bg-sky-400/15 blur-3xl"
+          />
+
+          <div className="relative max-w-5xl mx-auto px-4 sm:px-6 text-center space-y-4">
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-[11px] font-semibold uppercase tracking-[0.1em] text-sky-200">
+              <span className="w-2 h-2 rounded-full bg-sky-300 shadow-[0_0_8px_#7DD3FC]" />
+              <span>{currentHero.eyebrow}</span>
+            </div>
+
+            <h1 className="text-2xl sm:text-4xl font-black tracking-[-0.03em] leading-tight">
+              {currentHero.titlePrefix}{' '}
+              <span className="text-sky-300">{currentHero.titleHighlight}</span>
+            </h1>
+
+            <p className="text-xs sm:text-sm text-slate-200/85 max-w-2xl mx-auto leading-relaxed">
+              {currentHero.subtitle}
+            </p>
+
+            <div className="pt-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-semibold text-slate-200">
+              <span className="inline-flex items-center gap-1.5">
+                <FileCheck2 className="w-4 h-4 text-sky-300" />
+                <span>{currentHero.badges[0]}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                <span>{currentHero.badges[1]}</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Sparkles className="w-4 h-4 text-amber-300" />
+                <span>{currentHero.badges[2]}</span>
+              </span>
+            </div>
+          </div>
+        </section>
+      )}
+
       <main
-        className={`${
+        className={`flex-1 w-full ${
           !portal && (homeTab === 'order' || homeTab === 'checker' || homeTab === 'lookup')
             ? 'max-w-6xl'
             : 'max-w-5xl'
-        } mx-auto px-4 sm:px-8 py-6 sm:py-8`}
+        } mx-auto px-4 sm:px-6 lg:px-8 ${
+          showHeroBanner ? '-mt-8 relative z-10 pb-14' : 'py-8 sm:py-10'
+        }`}
       >
         {(() => {
           if (activeCode && loading && !portal) {
@@ -340,27 +487,24 @@ export function ClientPortalView({
             return (
               <div className="surface-enter space-y-5">
                 {/* Row 1: 2-Column Hero Split — Tra cứu bằng Mã đơn (Passcode) + Cam kết cốt lõi */}
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
-                  <section className="relative overflow-hidden lg:col-span-7 bg-white/95 backdrop-blur-xs border border-slate-200/85 rounded-2xl p-5 sm:p-6 flex flex-col justify-between shadow-[0_12px_34px_-14px_rgba(11,37,89,0.1)] space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
+                  <section className="relative overflow-hidden lg:col-span-7 bg-white border border-zinc-200/90 rounded-3xl p-6 sm:p-7 flex flex-col justify-between shadow-[0_14px_38px_rgba(15,23,42,0.06)] space-y-5">
                     <span
                       aria-hidden="true"
                       className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#0B2559] via-[#12489B] to-[#F5B700]"
                     />
 
-                    <div className="space-y-3.5">
+                    <div className="space-y-4">
                       <div className="space-y-1.5">
                         <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200/80 text-[#12489B] text-[11px] font-semibold">
                           <KeyRound className="w-3 h-3" />
-                          <span>Đăng nhập nhanh bằng Mã đơn hàng (Passcode)</span>
+                          <span>Mở khóa nhanh bằng Mã đơn hàng (Passcode)</span>
                         </span>
-                        <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                          Tra cứu tiến độ{' '}
-                          <span className="bg-gradient-to-r from-[#0B2559] via-[#12489B] to-[#D97706] bg-clip-text text-transparent">
-                            bài làm của bạn
-                          </span>
-                        </h1>
+                        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                          Nhập mã đơn hàng của bạn
+                        </h2>
                         <p className="text-xs text-zinc-600 leading-relaxed">
-                          Không cần tạo tài khoản — chỉ cần nhập <strong>Mã đơn hàng</strong> được cấp để mở khóa tiến độ 6 mốc, xem trước tài liệu, báo cáo Turnitin và thanh toán QR.
+                          Không cần tài khoản — nhập chính xác <strong>Mã đơn hàng</strong> do AssignTrack cung cấp để xem tiến độ, tài liệu &amp; thanh toán.
                         </p>
                       </div>
 
@@ -841,6 +985,69 @@ export function ClientPortalView({
           );
         })()}
       </main>
+
+      {/* Clean Footer (Synchronized with Landing Page) */}
+      <footer className="bg-white border-t border-zinc-200/90 py-8 px-4 sm:px-6 lg:px-8 mt-auto">
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+          <div className="space-y-1.5">
+            <BrandLogo />
+            <p className="text-xs text-zinc-500 max-w-md">
+              AssignTrack — Nền tảng hỗ trợ học thuật, kiểm định đạo văn &amp; theo dõi tiến độ minh bạch dành cho sinh viên.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-5 text-xs font-semibold text-slate-600">
+            {onBackToRoleSelect && (
+              <button
+                type="button"
+                onClick={onBackToRoleSelect}
+                className="hover:text-[#12489B]"
+              >
+                Trang chủ
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                handleResetLookup();
+                setHomeTab('order');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-[#EA580C]"
+            >
+              Đặt bài mới
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleResetLookup();
+                setHomeTab('lookup');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-[#12489B]"
+            >
+              Tra cứu mã đơn
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleResetLookup();
+                setHomeTab('checker');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-[#12489B]"
+            >
+              Check Đạo văn &amp; AI
+            </button>
+            <button
+              type="button"
+              onClick={onSwitchToAdmin}
+              className="hover:text-[#12489B]"
+            >
+              Đăng nhập Quản trị
+            </button>
+          </div>
+        </div>
+      </footer>
 
       <PdfPreviewModal
         attachment={previewAttachment}

@@ -338,17 +338,21 @@ export function ClientIntegrityCheckerView({
       </div>
 
       {/* Main Input & Upload Studio Card */}
-      <section className="bg-white border border-zinc-200/90 rounded-2xl overflow-hidden shadow-[0_10px_32px_rgb(15,23,42,0.04)]">
+      <section className="relative bg-white border border-zinc-200/90 rounded-3xl overflow-hidden shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
+        <span
+          aria-hidden="true"
+          className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#0B2559] via-[#12489B] to-[#F5B700]"
+        />
         {/* Card Header */}
-        <div className="px-6 py-5 sm:px-8 sm:py-6 border-b border-zinc-100 flex flex-wrap items-end justify-between gap-4 bg-gradient-to-b from-slate-50/80 to-white">
+        <div className="px-6 py-5 sm:px-8 sm:py-6 border-b border-zinc-100 flex flex-wrap items-end justify-between gap-4 bg-gradient-to-b from-[#F4F7FB]/80 to-white">
           <div className="space-y-1.5 max-w-2xl">
             <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#12489B]">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Academic Similarity &amp; AI Forensics</span>
             </div>
-            <h1 className="text-2xl sm:text-[26px] font-bold tracking-tight text-slate-900">
-              Kiểm tra Đạo văn &amp; Nhận diện AI
-            </h1>
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+              Tải bài lên để phân tích từng câu
+            </h2>
             <p className="text-xs sm:text-[13px] text-zinc-600 leading-relaxed">
               Lưu ý đây không phải là check Turnitin. Nếu bạn cần check Turnitin vui lòng liên hệ Admin{' '}
               <a
