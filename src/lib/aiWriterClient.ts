@@ -1756,7 +1756,7 @@ function buildVerifiedCitationWhitelistBlock(session: WriterSession): string {
 
 function isAiRefusalOrDisclaimerLine(line: string): boolean {
   const s = line.trim();
-  if (!s) return true;
+  if (!s) return false;
   if (
     /^(?:no verified|to avoid fabricating|i cannot|i'm unable|unable to verify|cannot find|note:|please note|disclaimer:|sorry,|unfortunately,|the provided sources do not|no bibliographic data|missing bibliographic)/i.test(
       s
@@ -2657,6 +2657,7 @@ export async function runDeterministicPaperAudit(
     // Check for leaked AI refusal / meta-disclaimer messages (e.g., "No verified bibliographic data...", "(no verified journal or DOI available...)")
     const leakedAiLines = trimmed
       .split(/\r?\n/)
+      .filter((line) => line.trim().length > 0)
       .filter(
         (line) =>
           isAiRefusalOrDisclaimerLine(line) ||
