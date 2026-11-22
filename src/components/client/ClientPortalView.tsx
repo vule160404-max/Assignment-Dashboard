@@ -42,6 +42,7 @@ import { DeadlineBadge } from '../shared/DeadlineBadge';
 import { BrandLogo } from '../shared/BrandLogo';
 import { OrderChatPanel } from '../shared/OrderChatPanel';
 import { PdfPreviewModal } from '../shared/PdfPreviewModal';
+import { PolicyModal, PolicyTabKey } from '../shared/PolicyModal';
 import { PublicTopNav } from '../shared/PublicTopNav';
 import { ClientIntegrityCheckerView } from './ClientIntegrityCheckerView';
 import { ClientOrderFormView } from './ClientOrderFormView';
@@ -121,6 +122,9 @@ export function ClientPortalView({
   const [lookupError, setLookupError] = useState('');
   const [previewAttachment, setPreviewAttachment] =
     useState<AttachmentItem | null>(null);
+  const [activePolicyTab, setActivePolicyTab] = useState<PolicyTabKey | null>(
+    null
+  );
 
   const [homeTab, setHomeTabState] = useState<ClientPortalTab>(() => {
     if (initialOrderCode) return 'lookup';
@@ -953,79 +957,113 @@ export function ClientPortalView({
 
       {/* Clean Footer (Synchronized with Landing Page) */}
       <footer className="bg-white border-t border-zinc-200/90 py-8 px-4 sm:px-6 lg:px-8 mt-auto">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
-          <div className="space-y-1.5">
-            <BrandLogo />
-            <p className="text-xs text-zinc-500 max-w-md">
-              AssignTrack — Nền tảng hỗ trợ học thuật, kiểm định đạo văn &amp; theo dõi tiến độ minh bạch dành cho sinh viên.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-5 text-xs font-semibold text-slate-600">
-            {onBackToRoleSelect && (
+        <div className="max-w-7xl mx-auto space-y-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+            <div className="space-y-1.5">
+              <BrandLogo />
+              <p className="text-xs text-zinc-500 max-w-md">
+                AssignTrack — Nền tảng hỗ trợ học thuật, kiểm định đạo văn &amp; theo dõi tiến độ minh bạch dành cho sinh viên.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-5 text-xs font-semibold text-slate-600">
+              {onBackToRoleSelect && (
+                <button
+                  type="button"
+                  onClick={onBackToRoleSelect}
+                  className="hover:text-[#12489B]"
+                >
+                  Trang chủ
+                </button>
+              )}
               <button
                 type="button"
-                onClick={onBackToRoleSelect}
-                className="hover:text-[#12489B]"
+                onClick={() => {
+                  if (onOpenOrderModal) {
+                    onOpenOrderModal();
+                  } else {
+                    handleResetLookup();
+                    setHomeTab('order');
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                  }
+                }}
+                className="hover:text-[#EA580C]"
               >
-                Trang chủ
+                Đặt bài mới
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                if (onOpenOrderModal) {
-                  onOpenOrderModal();
-                } else {
+              {onOpenSamples && (
+                <button
+                  type="button"
+                  onClick={onOpenSamples}
+                  className="hover:text-[#12489B]"
+                >
+                  Sample Library
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
                   handleResetLookup();
-                  setHomeTab('order');
+                  setHomeTab('lookup');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
-                }
-              }}
-              className="hover:text-[#EA580C]"
-            >
-              Đặt bài mới
-            </button>
-            {onOpenSamples && (
-              <button
-                type="button"
-                onClick={onOpenSamples}
+                }}
                 className="hover:text-[#12489B]"
               >
-                Sample Library
+                Tra cứu mã đơn
               </button>
-            )}
-            <button
-              type="button"
-              onClick={() => {
-                handleResetLookup();
-                setHomeTab('lookup');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="hover:text-[#12489B]"
-            >
-              Tra cứu mã đơn
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                handleResetLookup();
-                setHomeTab('checker');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              className="hover:text-[#12489B]"
-            >
-              Check Đạo văn &amp; AI
-            </button>
-            <button
-              type="button"
-              onClick={onSwitchToAdmin}
-              className="hover:text-[#12489B]"
-            >
-              Đăng nhập Quản trị
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleResetLookup();
+                  setHomeTab('checker');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="hover:text-[#12489B]"
+              >
+                Check Đạo văn &amp; AI
+              </button>
+              <button
+                type="button"
+                onClick={onSwitchToAdmin}
+                className="hover:text-[#12489B]"
+              >
+                Đăng nhập Quản trị
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-zinc-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11.5px] text-zinc-500">
+            <span>© {new Date().getFullYear()} AssignTrack Academic Support · Zalo: 0916.045.202</span>
+            <div className="flex flex-wrap items-center gap-4 font-semibold text-slate-600">
+              <button
+                type="button"
+                onClick={() => setActivePolicyTab('refund')}
+                className="hover:text-[#12489B] underline-offset-2 hover:underline"
+              >
+                Chính sách Hoàn tiền
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivePolicyTab('privacy')}
+                className="hover:text-[#12489B] underline-offset-2 hover:underline"
+              >
+                Chính sách Bảo mật
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivePolicyTab('terms')}
+                className="hover:text-[#12489B] underline-offset-2 hover:underline"
+              >
+                Điều khoản Sử dụng
+              </button>
+            </div>
           </div>
         </div>
       </footer>
+
+      <PolicyModal
+        initialTab={activePolicyTab}
+        onClose={() => setActivePolicyTab(null)}
+      />
 
       <PdfPreviewModal
         attachment={previewAttachment}

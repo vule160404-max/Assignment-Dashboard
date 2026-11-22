@@ -18,6 +18,7 @@ import {
   Star,
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
+import { PolicyModal, PolicyTabKey } from './PolicyModal';
 import { PublicTopNav } from './PublicTopNav';
 import { SampleLibraryView } from './SampleLibraryView';
 import { ClientIntentHubView } from '../client/ClientIntentHubView';
@@ -243,6 +244,9 @@ export function RoleSelectionGate({
     return initialPage;
   });
   const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(0);
+  const [activePolicyTab, setActivePolicyTab] = useState<PolicyTabKey | null>(
+    null
+  );
 
   const openSampleLibrary = () => {
     setActivePage('samples');
@@ -820,38 +824,72 @@ export function RoleSelectionGate({
 
       {/* CLEAN FOOTER */}
       <footer className="bg-white border-t border-zinc-200/90 py-10 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="space-y-2">
-            <BrandLogo />
-            <p className="text-xs text-zinc-500 max-w-md">
-              AssignTrack — Nền tảng hỗ trợ học thuật, kiểm định đạo văn &amp; điều phối đơn hàng minh bạch dành cho sinh viên.
-            </p>
+        <div className="max-w-7xl mx-auto space-y-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <BrandLogo />
+              <p className="text-xs text-zinc-500 max-w-md">
+                AssignTrack — Nền tảng hỗ trợ học thuật, kiểm định đạo văn &amp; điều phối đơn hàng minh bạch dành cho sinh viên.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-5 text-xs font-semibold text-slate-600">
+              <button
+                type="button"
+                onClick={openSampleLibrary}
+                className="hover:text-[#12489B]"
+              >
+                Sample Library (Bài mẫu)
+              </button>
+              <button
+                type="button"
+                onClick={handleOrderNow}
+                className="hover:text-[#EA580C]"
+              >
+                Đặt bài mới (Order Now)
+              </button>
+              <button
+                type="button"
+                onClick={onSelectAdmin}
+                className="hover:text-[#12489B]"
+              >
+                Đăng nhập Quản trị viên
+              </button>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-5 text-xs font-semibold text-slate-600">
-            <button
-              type="button"
-              onClick={openSampleLibrary}
-              className="hover:text-[#12489B]"
-            >
-              Sample Library (Bài mẫu)
-            </button>
-            <button
-              type="button"
-              onClick={handleOrderNow}
-              className="hover:text-[#12489B]"
-            >
-              Cổng Khách hàng (Order Now)
-            </button>
-            <button
-              type="button"
-              onClick={onSelectAdmin}
-              className="hover:text-[#12489B]"
-            >
-              Đăng nhập Quản trị viên
-            </button>
+
+          <div className="pt-5 border-t border-zinc-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11.5px] text-zinc-500">
+            <span>© {new Date().getFullYear()} AssignTrack Academic Support · Zalo: 0916.045.202</span>
+            <div className="flex flex-wrap items-center gap-4 font-semibold text-slate-600">
+              <button
+                type="button"
+                onClick={() => setActivePolicyTab('refund')}
+                className="hover:text-[#12489B] underline-offset-2 hover:underline"
+              >
+                Chính sách Hoàn tiền
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivePolicyTab('privacy')}
+                className="hover:text-[#12489B] underline-offset-2 hover:underline"
+              >
+                Chính sách Bảo mật
+              </button>
+              <button
+                type="button"
+                onClick={() => setActivePolicyTab('terms')}
+                className="hover:text-[#12489B] underline-offset-2 hover:underline"
+              >
+                Điều khoản Sử dụng
+              </button>
+            </div>
           </div>
         </div>
       </footer>
+
+      <PolicyModal
+        initialTab={activePolicyTab}
+        onClose={() => setActivePolicyTab(null)}
+      />
     </div>
   );
 }
