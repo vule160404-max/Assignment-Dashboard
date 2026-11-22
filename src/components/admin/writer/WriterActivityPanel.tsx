@@ -12,6 +12,8 @@ import {
   PanelRightClose,
   PanelRightOpen,
   PauseCircle,
+  ShieldAlert,
+  ShieldCheck,
   Sparkles,
   Square,
   Trash2,
@@ -50,6 +52,10 @@ interface WriterActivityPanelProps {
   targetWordCount: number;
   logs: WriterActivityLogEntry[];
   onClearLogs: () => void;
+  onRunAudit?: () => void;
+  lastAuditScore?: number | null;
+  lastAuditCriticalCount?: number;
+  isAuditing?: boolean;
 }
 
 function formatElapsed(sec: number): string {
@@ -74,6 +80,10 @@ export function WriterActivityPanel({
   targetWordCount,
   logs,
   onClearLogs,
+  onRunAudit,
+  lastAuditScore = null,
+  lastAuditCriticalCount = 0,
+  isAuditing = false,
 }: WriterActivityPanelProps) {
   const [elapsedSec, setElapsedSec] = useState(0);
   const [showSourcesPreview, setShowSourcesPreview] = useState(false);
@@ -295,6 +305,48 @@ export function WriterActivityPanel({
           <div className="p-2.5 rounded-xl bg-white border border-emerald-200/90 max-h-44 overflow-y-auto text-[10.5px] text-slate-700 leading-relaxed whitespace-pre-wrap break-words font-mono">
             {researchedSources}
           </div>
+        )}
+
+        {/* Final Academic QA Auditor CTA */}
+        {onRunAudit && (
+          <button
+            type="button"
+            disabled={isBusy || isAuditing || totalDraftedWords === 0}
+            onClick={onRunAudit}
+            className={`btn-press w-full px-2.5 py-2 rounded-xl border text-left transition-colors flex items-center justify-between gap-2 disabled:opacity-50 ${
+              lastAuditScore !== null && lastAuditCriticalCount > 0
+                ? 'bg-rose-50/80 border-rose-200 hover:bg-rose-50 text-rose-800'
+                : lastAuditScore !== null && lastAuditScore >= 85
+                ? 'bg-emerald-50/80 border-emerald-200 hover:bg-emerald-50 text-emerald-800'
+                : 'bg-white border-blue-200/90 hover:bg-blue-50/60 text-[#0B2559]'
+            }`}
+          >
+            <div className="flex items-center gap-1.5 min-w-0">
+              {isAuditing ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-[#12489B] shrink-0" />
+              ) : lastAuditCriticalCount > 0 ? (
+                <ShieldAlert className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+              ) : (
+                <ShieldCheck className="w-3.5 h-3.5 text-[#12489B] shrink-0" />
+              )}
+              <span className="text-[11px] font-bold truncate">
+                {isAuditing ? 'Đang kiểm duyệt bài...' : 'Kiểm duyệt bài (AI QA)'}
+              </span>
+            </div>
+            <span
+              className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold shrink-0 ${
+                lastAuditScore === null
+                  ? 'bg-blue-50 text-[#12489B] border border-blue-200/70'
+                  : lastAuditCriticalCount > 0
+                  ? 'bg-rose-100 text-rose-700'
+                  : 'bg-emerald-100 text-emerald-700'
+              }`}
+            >
+              {lastAuditScore === null
+                ? 'Rà lỗi'
+                : `${lastAuditScore}/100`}
+            </span>
+          </button>
         )}
       </div>
 

@@ -926,21 +926,47 @@ function clipText(text: string, maxChars: number): string {
     : `${sliced.trim()}...`;
 }
 
-function extractInTextCitations(text: string): string[] {
-  const found = new Set<string>();
-  // Matches parenthetical citations like (Smith, 2024), (Smith & Lee, 2023; OECD, 2025)
-  const parenRegex = /\([^()]{2,90}(?:19|20)\d{2}[a-z]?[^()]{0,40}\)/g;
-  // Matches narrative citations like Smith (2024), Smith and Lee (2023), Smith et al. (2025)
-  const narrativeRegex =
-    /\b[A-Z][A-Za-zÀ-ỹ'-]+(?:\s+(?:&|and|et al\.?)\s+[A-Z][A-Za-zÀ-ỹ'-]+|\s+et\s+al\.?)?\s*\((?:19|20)\d{2}[a-z]?\)/g;
+export function extractInTextCitations(text: string): string[] {
+  const found = new Map<string, string>();
+  const addCit = (raw: string) => {
+    const clean = raw.replace(/\s+/g, ' ').trim();
+    if (clean.length < 6) return;
+    const key = clean.toLowerCase().replace(/[^a-z0-9à-ỹ]/gi, '');
+    if (!found.has(key)) found.set(key, clean);
+  };
 
-  for (const m of text.match(parenRegex) || []) {
-    found.add(m.trim());
+  // 1. Parenthetical citations: (Smith, 2024), (Fredricks, Blumenfeld & Paris, 2004; Hiver et al., 2024)
+  const parenRegex = /\(([^()]{2,140}(?:19|20)\d{2}[a-z]?[^()]{0,40})\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = parenRegex.exec(text)) !== null) {
+    // Split multi-citation parentheses by ';' so each citation is handled individually
+    const parts = m[1].split(';').map((p) => p.trim()).filter(Boolean);
+    for (const part of parts) {
+      if (/(?:19|20)\d{2}/.test(part) && /[A-Za-zÀ-ỹ]{2,}/.test(part)) {
+        addCit(`(${part})`);
+      }
+    }
   }
-  for (const m of text.match(narrativeRegex) || []) {
-    found.add(m.trim());
+
+  // 2. Narrative citations supporting 1, 2, 3, or 4+ authors:
+  //    Fredricks, Blumenfeld and Paris (2004) | Xu, Yang and He (2023) | Vardal Ocaklı (2019) | Hiver et al. (2024)
+  const authorToken = "[A-ZÀ-Ỹ][A-Za-zÀ-ỹ'’-]+(?:\\s+[A-ZÀ-Ỹ][A-Za-zÀ-ỹ'’-]+)?";
+  const narrativeRegex = new RegExp(
+    `\\b${authorToken}(?:,\\s*${authorToken})*(?:,?\\s+(?:&|and|và)\\s+${authorToken}|\\s+et\\s+al\\.?)?\\s*\\((?:19|20)\\d{2}[a-z]?\\)`,
+    'g'
+  );
+  for (const match of text.match(narrativeRegex) || []) {
+    // Trim common leading non-author sentence starters like "According to ", "Following ", "In "
+    const cleaned = match
+      .replace(
+        /^(?:According to|Following|As|In|See|By|From|With|For|Like|Unlike|Modelled by|Documented by|Synthesized by|Attributed to)\s+/i,
+        ''
+      )
+      .trim();
+    if (cleaned) addCit(cleaned);
   }
-  return Array.from(found).slice(0, 60);
+
+  return Array.from(found.values()).slice(0, 60);
 }
 
 /**
@@ -1074,15 +1100,18 @@ export async function generateSectionWithAi(
       .join('\n\n');
     const uniqueCitations = extractInTextCitations(priorText);
 
-    const leanRefSystemPrompt = `You are a precision Academic Bibliographer.
+    const leanRefSystemPrompt = `You are a strict Academic Bibliographer.
 Format ONLY complete, authentic ${session.citationStyle} reference entries matching the exact in-text citations provided.
-STRICT RULES:
-- Output ONLY the formatted reference entries (one reference paragraph per line, separated by a blank line).
-- NEVER include the assignment prompt, rubric, syllabus, or skill instructions.
-- NEVER add headings, numbering (unless IEEE), markdown '#', or conversational commentary.`;
+CRITICAL ANTI-HALLUCINATION RULES:
+- Preserve EVERY author name in exact order (NEVER drop the first author of a 3-author citation like "Fredricks, Blumenfeld and Paris" or "Xu, Yang and He").
+- NEVER invent, guess, or fabricate a DOI (especially sequential numbers like 123456, 1123456, 1156789) or URL.
+- NEVER copy or reuse one source's DOI, URL, or paper title onto a different author.
+- ONLY include a DOI or URL if it appears verbatim in the VERIFIED SOURCES list for THAT exact author and work. If you are not 100% certain of the DOI/URL, OMIT the DOI/URL completely.
+- Output each reference entry on a SINGLE line (do not insert line breaks inside one entry), separated from the next entry by a blank line.
+- NEVER include the assignment prompt, rubric, syllabus, or skill instructions. No headings, no markdown '#', no commentary.`;
 
     const researchedSnippet = session.researchedSources?.trim()
-      ? `\n\n=== VERIFIED SOURCES FROM WEB RESEARCH (USE EXACT URLS/DOIS WHERE MATCHING) ===\n${session.researchedSources
+      ? `\n\n=== VERIFIED SOURCES FROM WEB RESEARCH (ONLY COPY A DOI/URL IF THE AUTHOR & TITLE ACTUALLY MATCH!) ===\n${session.researchedSources
           .trim()
           .slice(0, 4500)}`
       : '';
@@ -1090,15 +1119,48 @@ STRICT RULES:
     const BATCH_SIZE = 3;
     const accumulatedEntries: string[] = [];
 
+    const isSuspiciousFakeDoi = (doi: string): boolean => {
+      const lower = doi.toLowerCase();
+      return /(?:12345|23456|34567|45678|56789|00000|99999|11111)/.test(lower);
+    };
+
     const mergeAndSortRefs = (entries: string[]): string => {
       const seen = new Set<string>();
+      const seenDois = new Set<string>();
       const cleaned: string[] = [];
       for (const rawEntry of entries) {
-        const line = stripMarkdownHashesFromText(rawEntry).trim();
-        if (!line || line.length < 15) continue;
-        // Skip accidental heading lines
-        if (/^(references|bibliography|tài liệu tham khảo)/i.test(line) && line.length < 50) {
+        let line = stripMarkdownHashesFromText(rawEntry)
+          .replace(/\s*\n+\s*/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        if (!line || line.length < 18) continue;
+        if (
+          /^(references|bibliography|tài liệu tham khảo)/i.test(line) &&
+          line.length < 50
+        ) {
           continue;
+        }
+        // Strip fake sequential DOIs or duplicate DOIs accidentally reused on another author
+        const doiMatches = line.match(/10\.\d{4,9}\/[^\s,;)]+/g) || [];
+        for (const doi of doiMatches) {
+          const normDoi = doi.replace(/\.+$/, '').toLowerCase();
+          if (isSuspiciousFakeDoi(normDoi) || seenDois.has(normDoi)) {
+            line = line
+              .replace(
+                new RegExp(
+                  `\\s*(?:https?:\\/\\/doi\\.org\\/|doi:\\s*)?${doi.replace(
+                    /[.*+?^${}()|[\]\\]/g,
+                    '\\$&'
+                  )}\\.?`,
+                  'gi'
+                ),
+                ''
+              )
+              .replace(/\s*Available at:\s*https?:\/\/\S+(?:\s*\(Accessed:[^)]+\))?\.?/gi, '')
+              .trim();
+          } else {
+            seenDois.add(normDoi);
+          }
         }
         const key = line.toLowerCase().replace(/[^a-z0-9à-ỹ]/gi, '').slice(0, 48);
         if (seen.has(key)) continue;
@@ -1151,10 +1213,25 @@ Return ONLY the ${batch.length} full reference entries (one per line, blank line
           signal,
         });
 
-        const chunkLines = rawChunk
-          .split(/\n+/)
-          .map((l) => l.trim())
+        // Split by blank lines first so multi-line reference entries are never sliced mid-sentence.
+        // Fall back to single newlines only if every line looks like its own author-year entry.
+        const paragraphBlocks = rawChunk
+          .split(/\r?\n\s*\r?\n+/)
+          .map((blk) => blk.replace(/\r?\n+/g, ' ').replace(/\s{2,}/g, ' ').trim())
           .filter(Boolean);
+        let chunkLines = paragraphBlocks;
+        if (paragraphBlocks.length === 1) {
+          const singleLines = rawChunk
+            .split(/\r?\n+/)
+            .map((l) => l.trim())
+            .filter(Boolean);
+          const allLookLikeEntries =
+            singleLines.length > 1 &&
+            singleLines.every((l) => /\((?:19|20)\d{2}[a-z]?\)|\b(?:19|20)\d{2}\b/.test(l));
+          if (allLookLikeEntries) {
+            chunkLines = singleLines;
+          }
+        }
         accumulatedEntries.push(...chunkLines);
 
         const mergedNow = mergeAndSortRefs(accumulatedEntries);
@@ -1644,4 +1721,620 @@ OUTPUT FORMAT:
     signal,
   });
   return splitChangeLogResponse(raw);
+}
+
+// ---------------------------------------------------------------------------
+// Final Academic QA Auditor Agent (Layer 1: Deterministic + Crossref DOI API,
+// Layer 2: AI Examiner Review)
+// ---------------------------------------------------------------------------
+
+export type PaperAuditSeverity = 'critical' | 'warning' | 'info';
+export type PaperAuditCategory =
+  | 'doi_and_sources'
+  | 'citation_sync'
+  | 'structure_and_content'
+  | 'completeness';
+
+export interface PaperAuditIssue {
+  id: string;
+  severity: PaperAuditSeverity;
+  category: PaperAuditCategory;
+  title: string;
+  detail: string;
+  sectionId?: string;
+  sectionTitle?: string;
+  autoFixable: boolean;
+  fixHint?: string;
+  /** Optional DOI string if this issue is about a specific bad/duplicate DOI */
+  badDoi?: string;
+}
+
+export interface PaperAuditReport {
+  score: number;
+  verdict: 'pass' | 'needs_revision' | 'critical_errors';
+  summary: string;
+  checkedDoiCount: number;
+  verifiedDoiCount: number;
+  invalidDoiCount: number;
+  issues: PaperAuditIssue[];
+  auditedAt: string;
+}
+
+function isSuspiciousFakeDoiGlobal(doi: string): boolean {
+  const clean = doi.trim().replace(/[.)\],;]+$/, '');
+  if (/(?:12345|123456|112345|115678|234567|345678|987654|000000|111111)/.test(clean)) {
+    return true;
+  }
+  return false;
+}
+
+function normalizeSurnameToken(raw: string): string {
+  return raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+interface CrossrefVerifyResult {
+  exists: boolean;
+  networkError?: boolean;
+  title?: string;
+  year?: number;
+  firstAuthorSurname?: string;
+}
+
+async function verifyDoiWithCrossref(
+  doi: string,
+  signal?: AbortSignal
+): Promise<CrossrefVerifyResult> {
+  const cleanDoi = doi.trim().replace(/[.)\],;]+$/, '');
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 6500);
+  const onParentAbort = () => controller.abort();
+  signal?.addEventListener('abort', onParentAbort);
+
+  try {
+    const res = await fetch(
+      `https://api.crossref.org/works/${encodeURIComponent(cleanDoi)}`,
+      {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      }
+    );
+    if (res.status === 404) {
+      return { exists: false };
+    }
+    if (!res.ok) {
+      return { exists: true, networkError: true };
+    }
+    const json = (await res.json()) as {
+      message?: {
+        title?: string[];
+        author?: Array<{ family?: string; name?: string }>;
+        issued?: { 'date-parts'?: number[][] };
+        published?: { 'date-parts'?: number[][] };
+      };
+    };
+    const msg = json?.message;
+    const title = msg?.title?.[0];
+    const firstAuthorSurname =
+      msg?.author?.[0]?.family || msg?.author?.[0]?.name || undefined;
+    const year =
+      msg?.issued?.['date-parts']?.[0]?.[0] ||
+      msg?.published?.['date-parts']?.[0]?.[0] ||
+      undefined;
+    return {
+      exists: true,
+      title,
+      year,
+      firstAuthorSurname,
+    };
+  } catch {
+    return { exists: true, networkError: true };
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', onParentAbort);
+  }
+}
+
+export async function runDeterministicPaperAudit(
+  session: WriterSession,
+  onProgress?: (label: string) => void,
+  signal?: AbortSignal
+): Promise<{
+  issues: PaperAuditIssue[];
+  checkedDoiCount: number;
+  verifiedDoiCount: number;
+  invalidDoiCount: number;
+}> {
+  const issues: PaperAuditIssue[] = [];
+  let issueSeq = 1;
+  const pushIssue = (item: Omit<PaperAuditIssue, 'id'>) => {
+    issues.push({ ...item, id: `det_${issueSeq++}` });
+  };
+
+  const refSection = session.outline.find((s) =>
+    /^(references|bibliography|works cited|tài liệu tham khảo)/i.test(
+      s.title.trim()
+    )
+  );
+  const bodySections = session.outline.filter((s) => s.id !== refSection?.id);
+
+  // 1. Check empty or truncated sections
+  for (const sec of session.outline) {
+    const trimmed = (sec.content || '').trim();
+    if (!trimmed) {
+      pushIssue({
+        severity: 'critical',
+        category: 'completeness',
+        title: `Mục "${sec.title}" đang bị trống`,
+        detail: 'Mục này chưa có nội dung. Cần viết hoàn chỉnh trước khi giao bài.',
+        sectionId: sec.id,
+        sectionTitle: sec.title,
+        autoFixable: true,
+        fixHint: 'Viết đầy đủ nội dung cho mục này theo dàn ý và rubric.',
+      });
+      continue;
+    }
+
+    const words = trimmed.split(/\s+/).filter(Boolean).length;
+    if (sec.id !== refSection?.id && words < 45) {
+      pushIssue({
+        severity: 'warning',
+        category: 'completeness',
+        title: `Mục "${sec.title}" quá ngắn (${words} từ)`,
+        detail: `Mục tiêu đề ra là ~${sec.targetWords} từ nhưng hiện mới có ${words} từ.`,
+        sectionId: sec.id,
+        sectionTitle: sec.title,
+        autoFixable: true,
+        fixHint: `Mở rộng mục "${sec.title}" đạt chuẩn học thuật và tiệm cận ~${sec.targetWords} từ.`,
+      });
+    }
+
+    // Check if the last non-empty line is abruptly truncated mid-sentence
+    const lastLine = trimmed.split(/\r?\n/).filter((l) => l.trim()).pop()?.trim() || '';
+    const endsCleanly = /[.!?…)"'\]»]$|https?:\/\/\S+$|10\.\d{4,9}\/\S+$/.test(lastLine);
+    if (lastLine.length > 25 && !endsCleanly) {
+      pushIssue({
+        severity: 'critical',
+        category: 'completeness',
+        title: `Nội dung cuối mục "${sec.title}" bị cắt cụt giữa câu`,
+        detail: `Đoạn cuối kết thúc dang dở: "...${lastLine.slice(-70)}"`,
+        sectionId: sec.id,
+        sectionTitle: sec.title,
+        autoFixable: true,
+        fixHint: 'Hoàn thiện trọn vẹn câu/đoạn cuối bị cắt cụt, không để dang dở.',
+      });
+    }
+  }
+
+  // 2. Check orphan sub-heading numbering (e.g., 4.1 without 4.2)
+  const subByParent = new Map<string, string[]>();
+  for (const sec of bodySections) {
+    const m = sec.title.trim().match(/^(\d+)\.(\d+)\b/);
+    if (m) {
+      const parent = m[1];
+      const list = subByParent.get(parent) || [];
+      list.push(sec.title.trim());
+      subByParent.set(parent, list);
+    }
+  }
+  for (const [parentNum, subs] of subByParent.entries()) {
+    if (subs.length === 1 && /^(\d+)\.1\b/.test(subs[0])) {
+      const targetSec = bodySections.find((s) => s.title.trim() === subs[0]);
+      pushIssue({
+        severity: 'warning',
+        category: 'structure_and_content',
+        title: `Đánh số tiểu mục lẻ: có ${subs[0]} nhưng thiếu mục ${parentNum}.2`,
+        detail:
+          'Trong học thuật, khi đã chia tiểu mục (ví dụ 4.1) thì nên có ít nhất tiểu mục 4.2 hoặc gộp thẳng vào mục chính.',
+        sectionId: targetSec?.id,
+        sectionTitle: targetSec?.title,
+        autoFixable: false,
+      });
+    }
+  }
+
+  // 3. References & DOI audit
+  let checkedDoiCount = 0;
+  let verifiedDoiCount = 0;
+  let invalidDoiCount = 0;
+
+  if (refSection && refSection.content.trim()) {
+    const refEntries = refSection.content
+      .split(/\r?\n\s*\r?\n+/)
+      .map((e) => e.replace(/\r?\n+/g, ' ').trim())
+      .filter(Boolean);
+
+    // 3a. Detect duplicate DOIs & suspicious fake DOIs
+    const doiToEntries = new Map<string, string[]>();
+    const doiEntriesList: Array<{ doi: string; entry: string }> = [];
+
+    for (const entry of refEntries) {
+      // Check truncated reference entry
+      const entryEndsClean = /[.!?)\]]$|https?:\/\/\S+$|10\.\d{4,9}\/\S+$/.test(entry);
+      if (entry.length > 20 && !entryEndsClean) {
+        pushIssue({
+          severity: 'critical',
+          category: 'doi_and_sources',
+          title: 'Một nguồn trong References bị cắt cụt giữa chừng',
+          detail: `Nguồn bị đứt đoạn: "${entry.slice(0, 120)}..."`,
+          sectionId: refSection.id,
+          sectionTitle: refSection.title,
+          autoFixable: true,
+          fixHint: 'Tạo lại danh mục Tài liệu tham khảo đầy đủ, không cắt ngang dòng.',
+        });
+      }
+
+      const doiMatches = entry.match(/10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+/g) || [];
+      for (const rawDoi of doiMatches) {
+        const cleanDoi = rawDoi.replace(/[.)\],;]+$/, '');
+        const lowerDoi = cleanDoi.toLowerCase();
+        const existing = doiToEntries.get(lowerDoi) || [];
+        existing.push(entry);
+        doiToEntries.set(lowerDoi, existing);
+
+        if (isSuspiciousFakeDoiGlobal(cleanDoi)) {
+          invalidDoiCount++;
+          pushIssue({
+            severity: 'critical',
+            category: 'doi_and_sources',
+            title: `Phát hiện DOI giả dạng số thứ tự (${cleanDoi})`,
+            detail: `Nguồn: "${entry.slice(0, 130)}..." chứa đuôi số bịa (123456/112345/...).`,
+            sectionId: refSection.id,
+            sectionTitle: refSection.title,
+            autoFixable: true,
+            badDoi: cleanDoi,
+            fixHint: `Xóa bỏ DOI giả ${cleanDoi} và kiểm chứng lại nguồn tham khảo.`,
+          });
+        } else {
+          doiEntriesList.push({ doi: cleanDoi, entry });
+        }
+      }
+    }
+
+    for (const [lowerDoi, matchedEntries] of doiToEntries.entries()) {
+      if (matchedEntries.length > 1) {
+        invalidDoiCount++;
+        pushIssue({
+          severity: 'critical',
+          category: 'doi_and_sources',
+          title: `Trùng lặp 1 mã DOI cho ${matchedEntries.length} tác giả khác nhau (${lowerDoi})`,
+          detail: `Mã DOI ${lowerDoi} bị gán lặp lại cho nhiều bài báo khác nhau — dấu hiệu rõ của việc AI tự ghép nguồn sai.`,
+          sectionId: refSection.id,
+          sectionTitle: refSection.title,
+          autoFixable: true,
+          badDoi: lowerDoi,
+          fixHint: `Loại bỏ DOI bị trùng ${lowerDoi} khỏi các tác giả không khớp và xây dựng lại danh mục References chuẩn.`,
+        });
+      }
+    }
+
+    // 3b. Live Crossref DOI verification (unique non-suspicious DOIs, max 20, batch of 4)
+    const uniqueDoisToCheck: Array<{ doi: string; entry: string }> = [];
+    const seenCheck = new Set<string>();
+    for (const item of doiEntriesList) {
+      const k = item.doi.toLowerCase();
+      if (seenCheck.has(k)) continue;
+      seenCheck.add(k);
+      uniqueDoisToCheck.push(item);
+      if (uniqueDoisToCheck.length >= 20) break;
+    }
+
+    if (uniqueDoisToCheck.length > 0) {
+      onProgress?.(`Đang kiểm chứng ${uniqueDoisToCheck.length} mã DOI qua Crossref API...`);
+      for (let i = 0; i < uniqueDoisToCheck.length; i += 4) {
+        if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+        const batch = uniqueDoisToCheck.slice(i, i + 4);
+        const results = await Promise.all(
+          batch.map((item) => verifyDoiWithCrossref(item.doi, signal))
+        );
+        results.forEach((res, idx) => {
+          const { doi, entry } = batch[idx];
+          if (res.networkError) return;
+          checkedDoiCount++;
+          if (!res.exists) {
+            invalidDoiCount++;
+            pushIssue({
+              severity: 'critical',
+              category: 'doi_and_sources',
+              title: `DOI không tồn tại trên Crossref (${doi})`,
+              detail: `Tra cứu Crossref trả về 404 (Không tồn tại). Nguồn: "${entry.slice(0, 120)}..."`,
+              sectionId: refSection.id,
+              sectionTitle: refSection.title,
+              autoFixable: true,
+              badDoi: doi,
+              fixHint: `Xóa DOI không tồn tại ${doi} và xác minh lại nguồn.`,
+            });
+          } else {
+            // Check author surname & year mismatch against real Crossref metadata
+            const entryYearMatch = entry.match(/\(((?:19|20)\d{2})[a-z]?\)/);
+            const entryYear = entryYearMatch ? Number(entryYearMatch[1]) : undefined;
+            const firstSurnameToken = normalizeSurnameToken(
+              entry.split(/[,(\s]/)[0] || ''
+            );
+            const crossrefSurnameToken = normalizeSurnameToken(
+              res.firstAuthorSurname || ''
+            );
+
+            const surnameMismatch =
+              Boolean(firstSurnameToken.length >= 3 && crossrefSurnameToken.length >= 3) &&
+              !normalizeSurnameToken(entry.slice(0, 80)).includes(crossrefSurnameToken);
+            const yearMismatch =
+              Boolean(entryYear && res.year) &&
+              Math.abs((entryYear || 0) - (res.year || 0)) >= 2;
+
+            if (surnameMismatch || yearMismatch) {
+              invalidDoiCount++;
+              pushIssue({
+                severity: 'critical',
+                category: 'doi_and_sources',
+                title: `DOI lệch tác giả/năm so với bài thật trên Crossref (${doi})`,
+                detail: `Bài viết ghi "${entry.slice(0, 75)}...", nhưng Crossref xác nhận DOI này thuộc về tác giả "${res.firstAuthorSurname || 'N/A'}" (${res.year || 'N/A'}) — "${res.title || ''}".`,
+                sectionId: refSection.id,
+                sectionTitle: refSection.title,
+                autoFixable: true,
+                badDoi: doi,
+                fixHint: `Gỡ bỏ DOI bị gán nhầm ${doi} và sửa lại nguồn khớp với trích dẫn trong bài.`,
+              });
+            } else {
+              verifiedDoiCount++;
+            }
+          }
+        });
+      }
+    }
+
+    // 3c. In-Text <-> References 1-to-1 check
+    const allBodyText = bodySections.map((s) => s.content || '').join('\n\n');
+    const inTextCitations = extractInTextCitations(allBodyText);
+    const normalizedRefText = refSection.content
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+
+    const missingCitations: string[] = [];
+    for (const cite of inTextCitations) {
+      const yearMatch = cite.match(/(19|20)\d{2}/);
+      const year = yearMatch ? yearMatch[0] : '';
+      const firstAuthor = cite.split(/[,&\s(]/)[0] || '';
+      const normAuthor = normalizeSurnameToken(firstAuthor);
+      if (normAuthor.length < 2 || !year) continue;
+
+      const hasEntry = refEntries.some((entry) => {
+        const normEntry = entry
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .toLowerCase();
+        // Check that first author appears near the start of the reference entry (within first 60 chars)
+        return (
+          normEntry.slice(0, 70).replace(/[^a-z0-9]/g, '').includes(normAuthor) &&
+          normEntry.includes(year)
+        );
+      });
+
+      if (!hasEntry && !normalizedRefText.includes(`${normAuthor}`)) {
+        missingCitations.push(cite);
+      } else if (!hasEntry) {
+        // Author exists in ref list or year mismatch / dropped first author
+        missingCitations.push(cite);
+      }
+    }
+
+    if (missingCitations.length > 0) {
+      pushIssue({
+        severity: 'critical',
+        category: 'citation_sync',
+        title: `Thiếu hoặc lệch tác giả đầu cho ${missingCitations.length} trích dẫn trong bài`,
+        detail: `Các trích dẫn trong bài chưa khớp 1-1 với đầu mục References: ${missingCitations
+          .slice(0, 8)
+          .join('; ')}${missingCitations.length > 8 ? ` (+${missingCitations.length - 8} nguồn khác)` : ''}.`,
+        sectionId: refSection.id,
+        sectionTitle: refSection.title,
+        autoFixable: true,
+        fixHint:
+          'Xây dựng lại phần References để đảm bảo khớp 100% họ tác giả đầu tiên và năm của tất cả trích dẫn trong bài.',
+      });
+    }
+  } else if (bodySections.some((s) => (s.content || '').trim().length > 100)) {
+    pushIssue({
+      severity: 'warning',
+      category: 'citation_sync',
+      title: 'Bài viết chưa có mục References / Tài liệu tham khảo',
+      detail: 'Không tìm thấy mục References hoặc mục References đang trống.',
+      autoFixable: false,
+    });
+  }
+
+  return {
+    issues,
+    checkedDoiCount,
+    verifiedDoiCount,
+    invalidDoiCount,
+  };
+}
+
+export async function runAiPaperAudit(
+  session: WriterSession,
+  deterministicResult: {
+    issues: PaperAuditIssue[];
+    checkedDoiCount: number;
+    verifiedDoiCount: number;
+    invalidDoiCount: number;
+  },
+  skills: SkillDocument[],
+  profile: AiProviderProfile,
+  enableWebSearch?: boolean,
+  signal?: AbortSignal
+): Promise<PaperAuditReport> {
+  const digest = session.outline
+    .map((sec, idx) => {
+      const text = (sec.content || '').trim();
+      const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+      const isRef = /^(references|bibliography|works cited|tài liệu tham khảo)/i.test(
+        sec.title.trim()
+      );
+      const preview = isRef
+        ? text.slice(0, 2600)
+        : text.length > 900
+        ? `${text.slice(0, 480)}\n[...]\n${text.slice(-360)}`
+        : text;
+      return `--- SECTION ${idx + 1} (id: ${sec.id}) | TITLE: "${sec.title}" | WORDS: ${words}/${sec.targetWords} ---\n${preview || '[EMPTY]'}`;
+    })
+    .join('\n\n');
+
+  const detSummary =
+    deterministicResult.issues.length > 0
+      ? deterministicResult.issues
+          .map((i) => `- [${i.severity.toUpperCase()}] ${i.title}: ${i.detail}`)
+          .join('\n')
+      : 'None found by deterministic verifier.';
+
+  const systemPrompt = `You are a strict Senior University Academic Examiner & Quality Auditor (Người kiểm duyệt bài nghiên cứu trước khi giao khách).
+Your job is to inspect the drafted paper below and catch EVERY serious academic/structural/factual defect that would cause a student to lose marks or fail QA:
+1. Heading vs. Content Mismatch (e.g., heading says "Personal Facilitators" while body discusses "Social Facilitators").
+2. Factual Self-Contradictions across sections (e.g., Section 2 calls a study a "doctoral thesis" while References calls it a "Master's thesis", or conflicting sample sizes/years).
+3. Wrongly pasted paper title onto unrelated authors in References.
+4. Off-topic drift or failure to address key assignment brief/rubric requirements.
+
+Do NOT repeat issues already caught by the deterministic checker unless adding new context.
+Output ONLY a valid JSON object (no markdown fences, no commentary) with this exact schema:
+{
+  "summary": "2-3 concise Vietnamese sentences summarizing overall paper readiness and top risks.",
+  "aiIssues": [
+    {
+      "severity": "critical" | "warning" | "info",
+      "category": "structure_and_content" | "doi_and_sources" | "citation_sync" | "completeness",
+      "title": "Short Vietnamese issue title",
+      "detail": "Specific Vietnamese explanation citing exact section/evidence",
+      "sectionId": "exact section id from digest if applicable, else empty string",
+      "autoFixable": true | false,
+      "fixHint": "Exact instruction for AI to fix this section"
+    }
+  ]
+}`;
+
+  const userPrompt = `Assignment Topic: ${session.topic || session.title}
+Subject: ${session.subject || 'N/A'}
+Citation Style: ${session.citationStyle}
+Writing Language: ${session.writingLanguage}
+Brief / Instructions: ${(session.instructions || '').slice(0, 1200)}
+Rubric: ${(session.rubricNotes || '').slice(0, 800)}
+
+=== ALREADY CAUGHT BY DETERMINISTIC VERIFIER ===
+${detSummary}
+
+=== PAPER DIGEST TO AUDIT ===
+${digest}`;
+
+  let aiSummary = '';
+  const aiIssues: PaperAuditIssue[] = [];
+
+  try {
+    const raw = await callAiChatbot({
+      profile,
+      systemPrompt,
+      userPrompt,
+      enableWebSearch: Boolean(enableWebSearch && false), // Fast pure reasoning audit
+      maxOutputTokens: 1400,
+      reasoningEffort: 'low',
+      signal,
+    });
+    const cleaned = raw
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+    const jsonStart = cleaned.indexOf('{');
+    const jsonEnd = cleaned.lastIndexOf('}');
+    if (jsonStart !== -1 && jsonEnd > jsonStart) {
+      const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1)) as {
+        summary?: string;
+        aiIssues?: Array<{
+          severity?: string;
+          category?: string;
+          title?: string;
+          detail?: string;
+          sectionId?: string;
+          autoFixable?: boolean;
+          fixHint?: string;
+        }>;
+      };
+      aiSummary = (parsed.summary || '').trim();
+      if (Array.isArray(parsed.aiIssues)) {
+        parsed.aiIssues.forEach((item, idx) => {
+          if (!item.title) return;
+          const matchedSec = session.outline.find(
+            (s) => s.id === item.sectionId
+          );
+          aiIssues.push({
+            id: `ai_${idx + 1}`,
+            severity:
+              item.severity === 'critical' ||
+              item.severity === 'warning' ||
+              item.severity === 'info'
+                ? item.severity
+                : 'warning',
+            category:
+              item.category === 'doi_and_sources' ||
+              item.category === 'citation_sync' ||
+              item.category === 'structure_and_content' ||
+              item.category === 'completeness'
+                ? item.category
+                : 'structure_and_content',
+            title: item.title.trim(),
+            detail: (item.detail || '').trim(),
+            sectionId: matchedSec?.id,
+            sectionTitle: matchedSec?.title,
+            autoFixable: Boolean(item.autoFixable && matchedSec),
+            fixHint: (item.fixHint || '').trim() || undefined,
+          });
+        });
+      }
+    }
+  } catch (err) {
+    if (
+      err &&
+      typeof err === 'object' &&
+      (err as { name?: string }).name === 'AbortError'
+    ) {
+      throw err;
+    }
+    // Keep deterministic results even if AI JSON parsing fails
+  }
+
+  // Keep reference to skills so callers can pass it consistently
+  void skills;
+
+  const allIssues = [...deterministicResult.issues, ...aiIssues];
+  const criticalCount = allIssues.filter((i) => i.severity === 'critical').length;
+  const warningCount = allIssues.filter((i) => i.severity === 'warning').length;
+
+  const score = Math.max(
+    15,
+    Math.min(100, 100 - criticalCount * 14 - warningCount * 5)
+  );
+  const verdict: PaperAuditReport['verdict'] =
+    criticalCount > 0
+      ? 'critical_errors'
+      : warningCount > 0 || score < 85
+      ? 'needs_revision'
+      : 'pass';
+
+  const fallbackSummary =
+    verdict === 'pass'
+      ? 'Bài viết vượt qua lớp kiểm duyệt học thuật: trích dẫn khớp 1-1, DOI hợp lệ và bố cục logic.'
+      : `Phát hiện ${criticalCount} lỗi nghiêm trọng và ${warningCount} cảnh báo cần xử lý trước khi giao khách.`;
+
+  return {
+    score,
+    verdict,
+    summary: aiSummary || fallbackSummary,
+    checkedDoiCount: deterministicResult.checkedDoiCount,
+    verifiedDoiCount: deterministicResult.verifiedDoiCount,
+    invalidDoiCount: deterministicResult.invalidDoiCount,
+    issues: allIssues,
+    auditedAt: new Date().toISOString(),
+  };
 }

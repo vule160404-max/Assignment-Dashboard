@@ -11,6 +11,7 @@ import {
 import {
   AiRefineAction,
   ExistingDraftMode,
+  PaperAuditReport,
   analyzeAndPlanExistingDraftWithAi,
   generateOutlineWithAi,
   generateSectionWithAi,
@@ -23,6 +24,8 @@ import {
   researchSourcesWithPerplexity,
   resolveEffectiveWriterConfig,
   reviseOrCompleteSectionWithAi,
+  runAiPaperAudit,
+  runDeterministicPaperAudit,
   sanitizeWriterSession,
   saveAiChatbotSettings,
   saveGlobalSkillLibrary,
@@ -70,6 +73,7 @@ import {
 import { WriterBriefPanel } from './writer/WriterBriefPanel';
 import { WriterCoverPageModal } from './writer/WriterCoverPageModal';
 import { WriterDeliverModal } from './writer/WriterDeliverModal';
+import { WriterAuditModal } from './writer/WriterAuditModal';
 import { WriterImportDraftModal } from './writer/WriterImportDraftModal';
 import { WriterOutlinePanel } from './writer/WriterOutlinePanel';
 import { WriterPaperCanvas } from './writer/WriterPaperCanvas';
@@ -209,6 +213,15 @@ export function AiWriterStudioView({
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [showDeliverModal, setShowDeliverModal] = useState(false);
   const [showImportDraftModal, setShowImportDraftModal] = useState(false);
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [auditReport, setAuditReport] = useState<PaperAuditReport | null>(null);
+  const [isAuditingPaper, setIsAuditingPaper] = useState(false);
+  const [isAutoFixingAudit, setIsAutoFixingAudit] = useState(false);
+  const [auditStatusLabel, setAuditStatusLabel] = useState('');
+
+  useEffect(() => {
+    setAuditReport(null);
+  }, [activeSessionId]);
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState<boolean>(() => {
     try {
@@ -2139,6 +2152,361 @@ export function AiWriterStudioView({
     }
   };
 
+  // --- Final Academic QA Auditor Agent (Layer 1: Deterministic + Crossref, Layer 2: AI Examiner) ---
+  const handleRunPaperAudit = async () => {
+    if (!activeSession) return;
+    if (totalDraftedWords === 0) {
+      onToast('Bài viết chưa có nội dung để kiểm duyệt.');
+      return;
+    }
+
+    setShowAuditModal(true);
+    setIsAuditingPaper(true);
+    setAuditStatusLabel('Lớp 1: Đang kiểm tra cấu trúc, trích dẫn 1-1 và xác thực DOI trên Crossref...');
+    const targetSessionId = activeSession.id;
+    const signal = getFreshAiSignal();
+    const startTs = Date.now();
+    const auditLogId = pushActivityLog(
+      'running',
+      'Kiểm duyệt bài cuối cùng (AI Academic QA)',
+      'Lớp 1: Kiểm tra Crossref DOI thật, khớp trích dẫn 1-1 và độ hoàn chỉnh từng mục.'
+    );
+    setCurrentStepLabel('Đang kiểm duyệt bài viết (Crossref DOI + AI Giám khảo)...');
+
+    try {
+      const latestSess =
+        sessionsRef.current.find((s) => s.id === targetSessionId) || activeSession;
+
+      const detResult = await runDeterministicPaperAudit(
+        latestSess,
+        (label) => {
+          setAuditStatusLabel(label);
+          setCurrentStepLabel(label);
+        },
+        signal
+      );
+
+      let report: PaperAuditReport;
+      if (hasEffectiveApiKey) {
+        setAuditStatusLabel(
+          'Lớp 2: AI Giám khảo đang rà soát mâu thuẫn nội dung, lệch tiêu đề và Rubric...'
+        );
+        setCurrentStepLabel('Lớp 2: AI Giám khảo đang đọc duyệt toàn bài...');
+        report = await runAiPaperAudit(
+          latestSess,
+          detResult,
+          skills,
+          effectiveWriter.profile,
+          effectiveWriter.enableWebSearch,
+          signal
+        );
+      } else {
+        const criticalCount = detResult.issues.filter(
+          (i) => i.severity === 'critical'
+        ).length;
+        const warningCount = detResult.issues.filter(
+          (i) => i.severity === 'warning'
+        ).length;
+        const score = Math.max(
+          15,
+          Math.min(100, 100 - criticalCount * 14 - warningCount * 5)
+        );
+        report = {
+          score,
+          verdict:
+            criticalCount > 0
+              ? 'critical_errors'
+              : warningCount > 0 || score < 85
+              ? 'needs_revision'
+              : 'pass',
+          summary:
+            criticalCount === 0
+              ? 'Đã hoàn tất kiểm tra Lớp 1 (Crossref DOI + Khớp trích dẫn). Cấu hình API Key để bật thêm Lớp 2 (AI Giám khảo).'
+              : `Lớp 1 phát hiện ${criticalCount} lỗi nghiêm trọng và ${warningCount} cảnh báo cần xử lý.`,
+          checkedDoiCount: detResult.checkedDoiCount,
+          verifiedDoiCount: detResult.verifiedDoiCount,
+          invalidDoiCount: detResult.invalidDoiCount,
+          issues: detResult.issues,
+          auditedAt: new Date().toISOString(),
+        };
+      }
+
+      setAuditReport(report);
+      const critCount = report.issues.filter((i) => i.severity === 'critical').length;
+      const warnCount = report.issues.filter((i) => i.severity === 'warning').length;
+      updateActivityLog(auditLogId, {
+        status: critCount > 0 ? 'warning' : 'success',
+        title: `Kết quả Kiểm duyệt: ${report.score}/100 điểm`,
+        detail: `${critCount} lỗi nghiêm trọng · ${warnCount} cảnh báo · Crossref DOI hợp lệ: ${report.verifiedDoiCount}/${report.checkedDoiCount}.`,
+        durationSec: (Date.now() - startTs) / 1000,
+      });
+    } catch (err) {
+      if (!isAbortError(err)) {
+        const msg =
+          err instanceof Error ? err.message : 'Kiểm duyệt bài gặp lỗi.';
+        updateActivityLog(auditLogId, {
+          status: 'error',
+          title: 'Kiểm duyệt bài bị gián đoạn',
+          detail: msg,
+          durationSec: (Date.now() - startTs) / 1000,
+        });
+        onToast(msg);
+      }
+    } finally {
+      setIsAuditingPaper(false);
+      setAuditStatusLabel('');
+      setCurrentStepLabel('');
+    }
+  };
+
+  const handleAutoFixAuditIssues = async (report: PaperAuditReport) => {
+    if (!activeSession) return;
+    if (!hasEffectiveApiKey) {
+      setShowApiModal(true);
+      onToast('Vui lòng cấu hình API Key AI để tự động sửa lỗi.');
+      return;
+    }
+
+    const fixableIssues = report.issues.filter((i) => i.autoFixable);
+    if (fixableIssues.length === 0) return;
+
+    const targetSessionId = activeSession.id;
+    const signal = getFreshAiSignal();
+    setIsAutoFixingAudit(true);
+
+    const refSection = activeSession.outline.find((s) =>
+      /^(references|bibliography|works cited|tài liệu tham khảo)/i.test(
+        s.title.trim()
+      )
+    );
+
+    // Group fixable body section issues by sectionId
+    const bodyIssuesBySec = new Map<string, string[]>();
+    let needsRefRebuild = false;
+
+    for (const issue of fixableIssues) {
+      if (
+        (refSection && issue.sectionId === refSection.id) ||
+        issue.category === 'doi_and_sources' ||
+        issue.category === 'citation_sync'
+      ) {
+        needsRefRebuild = true;
+      } else if (issue.sectionId) {
+        const list = bodyIssuesBySec.get(issue.sectionId) || [];
+        list.push(
+          `${issue.title}: ${issue.detail}${
+            issue.fixHint ? ` -> ${issue.fixHint}` : ''
+          }`
+        );
+        bodyIssuesBySec.set(issue.sectionId, list);
+      }
+    }
+
+    let fixedCount = 0;
+
+    try {
+      // 1. Fix flagged body sections first
+      for (const [secId, hints] of bodyIssuesBySec.entries()) {
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        const latestSess =
+          sessionsRef.current.find((s) => s.id === targetSessionId) ||
+          activeSession;
+        const targetSec = latestSess.outline.find((s) => s.id === secId);
+        if (!targetSec) continue;
+
+        const secStart = Date.now();
+        const label = `Đang tự động sửa mục "${targetSec.title}"...`;
+        setAuditStatusLabel(label);
+        setCurrentStepLabel(label);
+        const logId = pushActivityLog(
+          'running',
+          `Auto-Fix mục: ${targetSec.title}`,
+          hints[0]?.slice(0, 140)
+        );
+
+        const prevWords = countWords(targetSec.content);
+        let newContent = '';
+        let changeSummary = '';
+
+        if (!targetSec.content.trim()) {
+          newContent = await generateSectionWithAi(
+            latestSess,
+            secId,
+            skills,
+            effectiveWriter.profile,
+            effectiveWriter.enableWebSearch,
+            signal
+          );
+          changeSummary = 'Đã viết đầy đủ nội dung cho mục bị trống.';
+        } else {
+          const revised = await reviseOrCompleteSectionWithAi(
+            latestSess,
+            secId,
+            'revise',
+            `BẮT BUỘC SỬA CÁC LỖI KIỂM DUYỆT SAU:\n${hints.join('\n')}`,
+            skills,
+            effectiveWriter.profile,
+            effectiveWriter.enableWebSearch,
+            signal
+          );
+          newContent = revised.content;
+          changeSummary = revised.changeSummary;
+        }
+
+        const nextWords = countWords(newContent);
+        const delta = nextWords - prevWords;
+        mutateSessionById(
+          targetSessionId,
+          (s) => ({
+            ...s,
+            outline: s.outline.map((sec) =>
+              sec.id === secId
+                ? {
+                    ...sec,
+                    content: newContent,
+                    status: 'completed',
+                    errorMsg: undefined,
+                  }
+                : sec
+            ),
+          }),
+          true
+        );
+
+        updateActivityLog(logId, {
+          status: 'success',
+          title: `Đã sửa mục: ${targetSec.title} (${prevWords} → ${nextWords} từ, ${
+            delta >= 0 ? `+${delta}` : delta
+          })`,
+          detail: changeSummary,
+          durationSec: (Date.now() - secStart) / 1000,
+        });
+        fixedCount++;
+      }
+
+      // 2. Rebuild References section cleanly (using updated 3+ author extraction & anti-fake-DOI rules)
+      if (needsRefRebuild && refSection) {
+        if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
+        const latestSess =
+          sessionsRef.current.find((s) => s.id === targetSessionId) ||
+          activeSession;
+        const refStart = Date.now();
+        const label = `Đang xây dựng lại chuẩn "${refSection.title}" (khớp 1-1 & loại bỏ DOI giả/trùng)...`;
+        setAuditStatusLabel(label);
+        setCurrentStepLabel(label);
+        const refLogId = pushActivityLog(
+          'running',
+          `Auto-Fix danh mục: ${refSection.title}`,
+          'Loại bỏ DOI giả/trùng lặp, khôi phục đủ tác giả đầu và khớp 1-1 với trích dẫn trong bài.'
+        );
+
+        const rebuiltRefs = await generateSectionWithAi(
+          latestSess,
+          refSection.id,
+          skills,
+          effectiveWriter.profile,
+          effectiveWriter.enableWebSearch,
+          signal,
+          (partialText, progressLabel) => {
+            if (progressLabel) {
+              setAuditStatusLabel(progressLabel);
+              setCurrentStepLabel(progressLabel);
+            }
+            if (partialText) {
+              mutateSessionById(targetSessionId, (s) => ({
+                ...s,
+                outline: s.outline.map((sec) =>
+                  sec.id === refSection.id
+                    ? { ...sec, content: partialText }
+                    : sec
+                ),
+              }));
+            }
+          }
+        );
+
+        mutateSessionById(
+          targetSessionId,
+          (s) => ({
+            ...s,
+            outline: s.outline.map((sec) =>
+              sec.id === refSection.id
+                ? {
+                    ...sec,
+                    content: rebuiltRefs,
+                    status: 'completed',
+                    errorMsg: undefined,
+                  }
+                : sec
+            ),
+          }),
+          true
+        );
+
+        updateActivityLog(refLogId, {
+          status: 'success',
+          title: `Đã sửa & chuẩn hóa: ${refSection.title}`,
+          detail:
+            'Đã gỡ bỏ các DOI giả/trùng lặp, đồng bộ 1-1 tác giả đầu với trích dẫn trong bài và sắp xếp chuẩn học thuật.',
+          durationSec: (Date.now() - refStart) / 1000,
+        });
+        fixedCount++;
+      }
+
+      // 3. Re-run deterministic verification immediately so user sees updated score!
+      if (fixedCount > 0) {
+        setAuditStatusLabel('Đang kiểm chứng lại kết quả sau khi tự động sửa...');
+        const refreshedSess =
+          sessionsRef.current.find((s) => s.id === targetSessionId) ||
+          activeSession;
+        const recheck = await runDeterministicPaperAudit(
+          refreshedSess,
+          (label) => setAuditStatusLabel(label),
+          signal
+        );
+        const critCount = recheck.issues.filter(
+          (i) => i.severity === 'critical'
+        ).length;
+        const warnCount = recheck.issues.filter(
+          (i) => i.severity === 'warning'
+        ).length;
+        const nextScore = Math.max(
+          15,
+          Math.min(100, 100 - critCount * 14 - warnCount * 5)
+        );
+        setAuditReport({
+          score: nextScore,
+          verdict:
+            critCount > 0
+              ? 'critical_errors'
+              : warnCount > 0 || nextScore < 85
+              ? 'needs_revision'
+              : 'pass',
+          summary:
+            critCount === 0
+              ? `Đã tự động sửa xong ${fixedCount} khu vực lỗi. Kết quả kiểm chứng lại: ${nextScore}/100 điểm — sẵn sàng xuất file!`
+              : `Đã tự động sửa ${fixedCount} khu vực. Còn lại ${critCount} lỗi nghiêm trọng và ${warnCount} cảnh báo cần rà thêm.`,
+          checkedDoiCount: recheck.checkedDoiCount,
+          verifiedDoiCount: recheck.verifiedDoiCount,
+          invalidDoiCount: recheck.invalidDoiCount,
+          issues: recheck.issues,
+          auditedAt: new Date().toISOString(),
+        });
+        onToast(`Đã tự động sửa xong ${fixedCount} khu vực và cập nhật nhật ký!`);
+      }
+    } catch (err) {
+      if (!isAbortError(err)) {
+        const msg =
+          err instanceof Error ? err.message : 'Tự động sửa lỗi bị gián đoạn.';
+        onToast(msg);
+      }
+    } finally {
+      setIsAutoFixingAudit(false);
+      setAuditStatusLabel('');
+      setCurrentStepLabel('');
+    }
+  };
+
   // --- Export & Order Integration ---
   const totalDraftedWords = useMemo(() => {
     if (!activeSession) return 0;
@@ -2491,10 +2859,38 @@ export function AiWriterStudioView({
           targetWordCount={activeSession.targetWordCount}
           logs={activityLogs}
           onClearLogs={() => setActivityLogs([])}
+          onRunAudit={() => {
+            if (auditReport) {
+              setShowAuditModal(true);
+            } else {
+              void handleRunPaperAudit();
+            }
+          }}
+          lastAuditScore={auditReport?.score ?? null}
+          lastAuditCriticalCount={
+            auditReport?.issues.filter((i) => i.severity === 'critical').length ||
+            0
+          }
+          isAuditing={isAuditingPaper || isAutoFixingAudit}
         />
       </div>
 
       {/* Modals */}
+      <WriterAuditModal
+        isOpen={showAuditModal}
+        report={auditReport}
+        isAuditing={isAuditingPaper}
+        isAutoFixing={isAutoFixingAudit}
+        auditStatusLabel={auditStatusLabel}
+        onRunAudit={() => void handleRunPaperAudit()}
+        onAutoFixAll={(rep) => void handleAutoFixAuditIssues(rep)}
+        onJumpToSection={(secId) => {
+          setLeftTab('outline');
+          mutateActiveSession((s) => ({ ...s, activeSectionId: secId }));
+        }}
+        onClose={() => setShowAuditModal(false)}
+      />
+
       <WriterImportDraftModal
         isOpen={showImportDraftModal}
         onClose={() => setShowImportDraftModal(false)}

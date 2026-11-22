@@ -58,6 +58,7 @@ function createBlankPageCanvas(): {
   }
   ctx.fillStyle = '#FFFFFF';
   ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+  ctx.fillStyle = '#0F172A';
   ctx.textBaseline = 'top';
   return { canvas, ctx };
 }
@@ -304,6 +305,11 @@ export async function exportWriterSessionToPdf(
     const hLines = wrapTextLines(current.ctx, cleanSecTitle, contentW);
     ensureSpace(hLines.length * headingLineH + lineHeightPx * 2);
 
+    // Re-apply font & color after potential page break in ensureSpace
+    current.ctx.font = `700 ${headingFontPx}px ${fontStack}`;
+    current.ctx.fillStyle = '#0F172A';
+    current.ctx.textAlign = 'left';
+
     tocEntries.push({
       title: cleanSecTitle,
       level: sec.headingLevel === 'h1' ? 1 : 2,
@@ -340,6 +346,11 @@ export async function exportWriterSessionToPdf(
         const subLines = wrapTextLines(current.ctx, para, contentW);
         ensureSpace(subLines.length * subLineH + lineHeightPx);
 
+        // Re-apply font & color after potential page break
+        current.ctx.font = `700 ${subFontPx}px ${fontStack}`;
+        current.ctx.fillStyle = '#0F172A';
+        current.ctx.textAlign = 'left';
+
         tocEntries.push({
           title: para,
           level: 2,
@@ -370,6 +381,10 @@ export async function exportWriterSessionToPdf(
 
       for (let li = 0; li < pLines.length; li++) {
         ensureSpace(lineHeightPx);
+        // Re-apply font & color after potential page break
+        current.ctx.font = `400 ${baseFontPx}px ${fontStack}`;
+        current.ctx.fillStyle = '#0F172A';
+        current.ctx.textAlign = 'left';
         const line = pLines[li];
         const x =
           marginPx + (li === 0 ? indent0 : isRefSec ? hangIndent : 0);
