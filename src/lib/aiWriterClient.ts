@@ -842,32 +842,6 @@ function compactResearchedSourcesForPrompt(
   return `${crossrefPart}\n\n${perplexityPart}`.trim();
 }
 
-function compactContextFilesForPrompt(
-  files: WriterSession['contextFiles'],
-  maxTotalChars: number
-): string {
-  if (!files || files.length === 0) return '';
-  const perFileBudget = Math.max(
-    1800,
-    Math.floor(maxTotalChars / files.length)
-  );
-  return (
-    '\n\n=== UPLOADED ASSIGNMENT & RESEARCH CONTEXT FILES ===\n' +
-    files
-      .map((cf, idx) => {
-        const raw = cf.content.trim();
-        let body = raw;
-        if (raw.length > perFileBudget) {
-          const headLen = Math.round(perFileBudget * 0.72);
-          const tailLen = Math.max(300, perFileBudget - headLen - 40);
-          body = `${raw.slice(0, headLen)}\n[... middle excerpt omitted for token efficiency ...]\n${raw.slice(-tailLen)}`;
-        }
-        return `--- [CONTEXT FILE #${idx + 1}: ${cf.name}] ---\n${body}`;
-      })
-      .join('\n\n')
-  );
-}
-
 export function buildSkillsAndContextSystemPrompt(
   session: WriterSession,
   skills: SkillDocument[],
@@ -884,10 +858,17 @@ export function buildSkillsAndContextSystemPrompt(
           .join('\n\n')
       : 'Use high-distinction academic writing standards.';
 
-  const contextBlock = compactContextFilesForPrompt(
-    session.contextFiles,
-    mode === 'outline' ? 6000 : 14000
-  );
+  // Pass ALL attached client documents & drafts 100% verbatim with NO character limit
+  const contextBlock =
+    session.contextFiles.length > 0
+      ? '\n\n=== UPLOADED ASSIGNMENT & RESEARCH CONTEXT FILES ===\n' +
+        session.contextFiles
+          .map(
+            (cf, idx) =>
+              `--- [CONTEXT FILE #${idx + 1}: ${cf.name}] ---\n${cf.content.trim()}`
+          )
+          .join('\n\n')
+      : '';
 
   const compactSources = compactResearchedSourcesForPrompt(
     session.researchedSources || '',

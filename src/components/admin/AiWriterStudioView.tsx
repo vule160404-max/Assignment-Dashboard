@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertTriangle,
+  BellRing,
+  CheckCircle2,
   FileText,
   Layers,
   RotateCcw,
+  ShieldCheck,
   Trash2,
   X,
 } from 'lucide-react';
@@ -130,6 +133,50 @@ function markSessionIdDeleted(id: string): void {
   }
 }
 
+function playCompletionChime(): void {
+  try {
+    const AudioCtx =
+      window.AudioContext ||
+      (window as unknown as { webkitAudioContext?: typeof AudioContext })
+        .webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const notes = [523.25, 659.25, 783.99]; // C5 -> E5 -> G5 pleasant triad chime
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      const start = ctx.currentTime + idx * 0.11;
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.09, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.36);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(start);
+      osc.stop(start + 0.38);
+    });
+    window.setTimeout(() => {
+      void ctx.close().catch(() => {});
+    }, 900);
+  } catch {
+    // Ignore if browser autoplay policy blocks Web Audio
+  }
+}
+
+function requestDesktopNotificationPermission(): void {
+  try {
+    if (
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'default'
+    ) {
+      void Notification.requestPermission().catch(() => {});
+    }
+  } catch {
+    // ignore
+  }
+}
+
 function formatDefaultRunningHeader(topic?: string): string {
   if (!topic) return '';
   const text = topic.trim().toUpperCase();
@@ -247,6 +294,17 @@ export function AiWriterStudioView({
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [showDeliverModal, setShowDeliverModal] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
+  const [completionNotices, setCompletionNotices] = useState<
+    Array<{
+      id: string;
+      sessionId: string;
+      title: string;
+      orderCode?: string;
+      wordCount: number;
+      sectionsCount: number;
+      finishedAt: string;
+    }>
+  >([]);
   const [auditReport, setAuditReport] = useState<PaperAuditReport | null>(null);
   const [isAuditingPaper, setIsAuditingPaper] = useState(false);
   const [isAutoFixingAudit, setIsAutoFixingAudit] = useState(false);
@@ -1568,12 +1626,59 @@ export function AiWriterStudioView({
         batchStatus: 'completed',
       }));
       setCurrentStepLabel('');
+      const finishedSnap =
+        sessionsRef.current.find((s) => s.id === targetSessionId) || initialSnap;
+      const finishedWords = finishedSnap.outline.reduce(
+        (sum, sec) => sum + countWords(sec.content),
+        0
+      );
+      const finishedLabel = finishedSnap.linkedOrderCode
+        ? `#${finishedSnap.linkedOrderCode} · ${finishedSnap.topic || finishedSnap.title}`
+        : finishedSnap.topic || finishedSnap.title || 'Bài nghiên cứu';
+
       pushActivityLog(
         'success',
         'Hoàn tất viết toàn bộ bài!',
-        `Đã hoàn thành ${sectionIds.length} mục cho "${initialSnap.title}".`,
-        activeProfile.model.replace(/^perplexity\//, '')
+        `Đã hoàn thành ${sectionIds.length} mục (${finishedWords.toLocaleString('vi-VN')} từ) cho "${finishedSnap.title}".`,
+        activeProfile.model.replace(/^perplexity\//, ''),
+        undefined,
+        targetSessionId
       );
+
+      // Multi-channel completion notification: pleasant chime + persistent in-app banner + Desktop Notification
+      playCompletionChime();
+      setCompletionNotices((prev) => [
+        {
+          id: `done_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          sessionId: targetSessionId,
+          title: finishedSnap.topic || finishedSnap.title || 'Bài nghiên cứu',
+          orderCode: finishedSnap.linkedOrderCode || undefined,
+          wordCount: finishedWords,
+          sectionsCount: sectionIds.length,
+          finishedAt: formatNowTime().slice(0, 5),
+        },
+        ...prev.filter((n) => n.sessionId !== targetSessionId),
+      ].slice(0, 4));
+      onToast(
+        `Đã viết xong toàn bộ bài "${finishedLabel.slice(0, 48)}" (${finishedWords.toLocaleString('vi-VN')} từ)!`
+      );
+      try {
+        if (
+          typeof Notification !== 'undefined' &&
+          Notification.permission === 'granted'
+        ) {
+          const desktopNotif = new Notification('AI Writer: Đã viết xong bài!', {
+            body: `${finishedLabel.slice(0, 80)} — ${finishedWords.toLocaleString('vi-VN')} từ (${sectionIds.length} mục). Bấm để mở & kiểm duyệt QA.`,
+          });
+          desktopNotif.onclick = () => {
+            window.focus();
+            setActiveSessionId(targetSessionId);
+            desktopNotif.close();
+          };
+        }
+      } catch {
+        // ignore desktop notification errors
+      }
     } catch (err) {
       if (isAbortError(err)) {
         setCurrentStepLabel('');
@@ -2023,6 +2128,8 @@ export function AiWriterStudioView({
       onToast('Vui lòng nhập API Key Chatbot trước.');
       return;
     }
+
+    requestDesktopNotificationPermission();
 
     setRefiningSection(true);
     const t0 = Date.now();
@@ -3123,6 +3230,87 @@ export function AiWriterStudioView({
         onClose={() => setShowDeliverModal(false)}
         onToast={onToast}
       />
+
+      {completionNotices.length > 0 &&
+        createPortal(
+          <div className="fixed right-4 top-20 z-50 flex flex-col gap-2.5 w-[350px] max-w-[calc(100vw-2rem)]">
+            {completionNotices.map((notice) => (
+              <div
+                key={notice.id}
+                className="popover-enter bg-white border-2 border-emerald-400/90 rounded-2xl shadow-xl p-3.5 space-y-2.5"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-100 border border-emerald-200 flex items-center justify-center text-emerald-700 shrink-0">
+                      <BellRing className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-800">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                        <span>Đã viết xong bài tự động!</span>
+                        <span className="text-[10px] font-mono text-zinc-400 font-normal">
+                          {notice.finishedAt}
+                        </span>
+                      </div>
+                      <p className="text-xs font-semibold text-slate-900 mt-0.5 line-clamp-2 leading-snug">
+                        {notice.orderCode ? `#${notice.orderCode} · ` : ''}
+                        {notice.title}
+                      </p>
+                      <p className="text-[11px] font-mono text-zinc-500 mt-0.5">
+                        {notice.wordCount.toLocaleString('vi-VN')} từ ·{' '}
+                        {notice.sectionsCount} mục hoàn tất
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setCompletionNotices((prev) =>
+                        prev.filter((n) => n.id !== notice.id)
+                      )
+                    }
+                    className="p-1 rounded-lg text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 shrink-0"
+                    title="Đóng thông báo"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1 border-t border-zinc-100">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveSessionId(notice.sessionId);
+                      setCompletionNotices((prev) =>
+                        prev.filter((n) => n.id !== notice.id)
+                      );
+                    }}
+                    className="btn-press px-2.5 py-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-slate-700 text-[11px] font-semibold"
+                  >
+                    Xem bài
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveSessionId(notice.sessionId);
+                      setCompletionNotices((prev) =>
+                        prev.filter((n) => n.id !== notice.id)
+                      );
+                      window.setTimeout(() => {
+                        void handleRunPaperAudit();
+                      }, 80);
+                    }}
+                    className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-2xs"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>Mở &amp; Kiểm duyệt QA</span>
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>,
+          document.body
+        )}
 
       {showResetConfirmModal &&
         createPortal(
