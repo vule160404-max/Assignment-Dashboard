@@ -1,10 +1,6 @@
 import {
   ArrowUpRight,
-  BookOpen,
-  FilePlus2,
-  KeyRound,
   LogIn,
-  ShieldCheck,
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 
@@ -29,6 +25,28 @@ export function PublicTopNav({
   onOpenSamples,
   onSelectAdmin,
 }: PublicTopNavProps) {
+  const scrollToHomeSection = (sectionId: string) => {
+    if (activeNav !== 'home') {
+      onGoHome();
+      window.setTimeout(() => {
+        document
+          .getElementById(sectionId)
+          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 120);
+      return;
+    }
+    document
+      .getElementById(sectionId)
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  const navLinkClass = (isActive: boolean) =>
+    `relative py-5 text-[13px] font-semibold transition-colors whitespace-nowrap ${
+      isActive
+        ? 'text-[#0B2559] font-bold after:content-[""] after:absolute after:inset-x-0 after:bottom-0 after:h-[2.5px] after:rounded-full after:bg-[#12489B]'
+        : 'text-slate-600 hover:text-[#12489B]'
+    }`;
+
   return (
     <>
       {/* Top Promo Strip */}
@@ -48,9 +66,9 @@ export function PublicTopNav({
         </span>
       </div>
 
-      {/* Unified Sticky White Single-Row Header */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-zinc-200/80">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      {/* Unified Editorial Sticky White Header */}
+      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-zinc-200/85">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-6">
           <button
             type="button"
             onClick={onGoHome}
@@ -59,78 +77,68 @@ export function PublicTopNav({
             <BrandLogo />
           </button>
 
-          {/* Unified 5-Tab Navigation Bar (Always Visible on Desktop) */}
+          {/* Clean Editorial Navigation Links (Synchronized with Landing Page Sections + Core Services) */}
           <nav
             aria-label="Điều hướng chính"
-            className="hidden lg:inline-flex items-center bg-slate-100/90 border border-slate-200/80 p-1 rounded-xl gap-0.5 text-xs font-semibold"
+            className="hidden lg:flex items-center gap-6 xl:gap-7"
           >
             <button
               type="button"
               onClick={onGoHome}
-              className={`btn-press px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
-                activeNav === 'home'
-                  ? 'bg-white text-[#0B2559] font-bold shadow-xs ring-1 ring-slate-900/5'
-                  : 'text-slate-600 hover:bg-white/70 hover:text-[#12489B]'
-              }`}
+              className={navLinkClass(activeNav === 'home')}
             >
               Trang chủ
             </button>
             <button
               type="button"
-              onClick={onOpenOrder}
-              className={`btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
-                activeNav === 'order'
-                  ? 'bg-white text-[#EA580C] font-bold shadow-xs ring-1 ring-orange-500/20'
-                  : 'text-slate-600 hover:bg-white hover:text-[#EA580C]'
-              }`}
+              onClick={() => scrollToHomeSection('quy-trinh')}
+              className={navLinkClass(false)}
             >
-              <FilePlus2 className="w-3.5 h-3.5 text-[#EA580C]" />
-              <span>Đặt bài mới</span>
+              Quy trình
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToHomeSection('cam-ket')}
+              className={navLinkClass(false)}
+            >
+              Gói cam kết
             </button>
             <button
               type="button"
               onClick={onOpenLookup}
-              className={`btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
-                activeNav === 'lookup'
-                  ? 'bg-white text-[#12489B] font-bold shadow-xs ring-1 ring-slate-900/5'
-                  : 'text-slate-600 hover:bg-white hover:text-[#12489B]'
-              }`}
+              className={navLinkClass(activeNav === 'lookup')}
             >
-              <KeyRound className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>Tra cứu mã đơn</span>
+              Tra cứu đơn
             </button>
             <button
               type="button"
               onClick={onOpenChecker}
-              className={`btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
-                activeNav === 'checker'
-                  ? 'bg-white text-[#12489B] font-bold shadow-xs ring-1 ring-slate-900/5'
-                  : 'text-slate-600 hover:bg-white hover:text-[#12489B]'
-              }`}
+              className={navLinkClass(activeNav === 'checker')}
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>Check Đạo văn &amp; AI</span>
+              Check AI Free
             </button>
             <button
               type="button"
               onClick={onOpenSamples}
-              className={`btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
-                activeNav === 'samples'
-                  ? 'bg-white text-[#12489B] font-bold shadow-xs ring-1 ring-slate-900/5'
-                  : 'text-slate-600 hover:bg-white hover:text-[#12489B]'
-              }`}
+              className={navLinkClass(activeNav === 'samples')}
             >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span>Sample Library</span>
+              Bài mẫu
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToHomeSection('faq')}
+              className={navLinkClass(false)}
+            >
+              FAQ
             </button>
           </nav>
 
           {/* Right Action Controls */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             <button
               type="button"
               onClick={onSelectAdmin}
-              className="btn-press inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-zinc-200 bg-white hover:border-[#12489B]/50 hover:text-[#12489B] text-xs font-semibold text-slate-700 transition-colors whitespace-nowrap"
+              className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-zinc-200 bg-white hover:border-[#12489B]/50 hover:text-[#12489B] text-xs font-semibold text-slate-700 transition-colors whitespace-nowrap"
               title="Chuyển sang cổng dành cho Admin / Nhân sự"
             >
               <LogIn className="w-3.5 h-3.5" />
@@ -150,56 +158,70 @@ export function PublicTopNav({
           </div>
         </div>
 
-        {/* Tablet & Mobile Quick Service Tabs Bar */}
-        <div className="lg:hidden border-t border-zinc-100 px-3 py-2 bg-white/95">
-          <div className="max-w-7xl mx-auto grid grid-cols-4 gap-1 bg-slate-100/90 border border-slate-200/70 p-1 rounded-xl text-[11px] font-semibold">
+        {/* Tablet & Mobile Clean Quick Nav Bar */}
+        <div className="lg:hidden border-t border-zinc-100 px-3 py-2 bg-white/95 overflow-x-auto">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 min-w-max text-xs font-semibold">
+            <button
+              type="button"
+              onClick={onGoHome}
+              className={`px-3 py-1.5 rounded-full transition-colors ${
+                activeNav === 'home'
+                  ? 'bg-[#0B2559] text-white'
+                  : 'text-slate-600 hover:bg-zinc-100'
+              }`}
+            >
+              Trang chủ
+            </button>
             <button
               type="button"
               onClick={onOpenOrder}
-              className={`btn-press py-1.5 px-1.5 rounded-lg inline-flex items-center justify-center gap-1 transition-colors ${
+              className={`px-3 py-1.5 rounded-full transition-colors ${
                 activeNav === 'order'
-                  ? 'bg-white text-[#EA580C] font-bold shadow-2xs'
-                  : 'text-slate-700 hover:bg-white hover:text-[#EA580C]'
+                  ? 'bg-[#EA580C] text-white'
+                  : 'text-slate-600 hover:bg-zinc-100'
               }`}
             >
-              <FilePlus2 className="w-3.5 h-3.5 text-[#EA580C] shrink-0" />
-              <span className="truncate">Đặt bài</span>
+              Đặt bài
             </button>
             <button
               type="button"
               onClick={onOpenLookup}
-              className={`btn-press py-1.5 px-1.5 rounded-lg inline-flex items-center justify-center gap-1 transition-colors ${
+              className={`px-3 py-1.5 rounded-full transition-colors ${
                 activeNav === 'lookup'
-                  ? 'bg-white text-[#12489B] font-bold shadow-2xs'
-                  : 'text-slate-700 hover:bg-white hover:text-[#12489B]'
+                  ? 'bg-[#0B2559] text-white'
+                  : 'text-slate-600 hover:bg-zinc-100'
               }`}
             >
-              <KeyRound className="w-3.5 h-3.5 text-[#12489B] shrink-0" />
-              <span className="truncate">Tra cứu</span>
+              Tra cứu đơn
             </button>
             <button
               type="button"
               onClick={onOpenChecker}
-              className={`btn-press py-1.5 px-1.5 rounded-lg inline-flex items-center justify-center gap-1 transition-colors ${
+              className={`px-3 py-1.5 rounded-full transition-colors ${
                 activeNav === 'checker'
-                  ? 'bg-white text-[#12489B] font-bold shadow-2xs'
-                  : 'text-slate-700 hover:bg-white hover:text-[#12489B]'
+                  ? 'bg-[#0B2559] text-white'
+                  : 'text-slate-600 hover:bg-zinc-100'
               }`}
             >
-              <ShieldCheck className="w-3.5 h-3.5 text-[#12489B] shrink-0" />
-              <span className="truncate">Check AI</span>
+              Check AI
             </button>
             <button
               type="button"
               onClick={onOpenSamples}
-              className={`btn-press py-1.5 px-1.5 rounded-lg inline-flex items-center justify-center gap-1 transition-colors ${
+              className={`px-3 py-1.5 rounded-full transition-colors ${
                 activeNav === 'samples'
-                  ? 'bg-white text-[#12489B] font-bold shadow-2xs'
-                  : 'text-slate-700 hover:bg-white hover:text-[#12489B]'
+                  ? 'bg-[#0B2559] text-white'
+                  : 'text-slate-600 hover:bg-zinc-100'
               }`}
             >
-              <BookOpen className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">Bài mẫu</span>
+              Bài mẫu
+            </button>
+            <button
+              type="button"
+              onClick={() => scrollToHomeSection('cam-ket')}
+              className="px-3 py-1.5 rounded-full text-slate-600 hover:bg-zinc-100 transition-colors"
+            >
+              Gói cam kết
             </button>
           </div>
         </div>
