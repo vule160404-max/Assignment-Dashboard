@@ -2523,6 +2523,8 @@ export interface PaperAuditIssue {
   badDoi?: string;
   /** Optional list of exact in-text citations missing from References */
   missingCitations?: string[];
+  /** Exact offending sentence/excerpt inside the section for inline red highlight & exact scroll */
+  matchSnippet?: string;
 }
 
 export interface PaperAuditReport {
@@ -2683,6 +2685,7 @@ export async function runDeterministicPaperAudit(
         sectionId: sec.id,
         sectionTitle: sec.title,
         autoFixable: true,
+        matchSnippet: leakedAiLines[0].trim(),
         fixHint:
           'Xóa toàn bộ câu thông báo lỗi/ghi chú ngoặc đơn của AI; bỏ qua âm thầm các yếu tố không bắt buộc (DOI/URL/Issue/Trang) nếu nguồn không có.',
       });
@@ -2714,6 +2717,7 @@ export async function runDeterministicPaperAudit(
         sectionId: sec.id,
         sectionTitle: sec.title,
         autoFixable: true,
+        matchSnippet: lastLine.slice(-110),
         fixHint: 'Hoàn thiện trọn vẹn câu/đoạn cuối bị cắt cụt, không để dang dở.',
       });
     }
@@ -2752,6 +2756,7 @@ export async function runDeterministicPaperAudit(
         sectionId: targetSec?.id,
         sectionTitle: targetSec?.title,
         autoFixable: Boolean(targetSec),
+        matchSnippet: subs[0],
         fixHint: `Kiểm tra tiêu đề "${subs[0]}" có khớp nội dung bên dưới không; tách phần còn lại thành tiểu mục ${parentNum}.2 với tiêu đề đúng nội dung (ví dụ phân biệt Personal vs Social facilitators).`,
       });
     }
@@ -2784,6 +2789,7 @@ export async function runDeterministicPaperAudit(
           sectionId: refSection.id,
           sectionTitle: refSection.title,
           autoFixable: true,
+          matchSnippet: entry.slice(0, 140),
           fixHint: 'Tạo lại danh mục Tài liệu tham khảo đầy đủ, không cắt ngang dòng.',
         });
       }
@@ -2807,6 +2813,7 @@ export async function runDeterministicPaperAudit(
             sectionTitle: refSection.title,
             autoFixable: true,
             badDoi: cleanDoi,
+            matchSnippet: entry.slice(0, 140),
             fixHint: `Xóa bỏ DOI giả ${cleanDoi} và kiểm chứng lại nguồn tham khảo.`,
           });
         } else {
@@ -2827,6 +2834,7 @@ export async function runDeterministicPaperAudit(
           sectionTitle: refSection.title,
           autoFixable: true,
           badDoi: lowerDoi,
+          matchSnippet: matchedEntries[0]?.slice(0, 140) || lowerDoi,
           fixHint: `Loại bỏ DOI bị trùng ${lowerDoi} khỏi các tác giả không khớp và xây dựng lại danh mục References chuẩn.`,
         });
       }
@@ -2855,6 +2863,7 @@ export async function runDeterministicPaperAudit(
           sectionId: refSection.id,
           sectionTitle: refSection.title,
           autoFixable: true,
+          matchSnippet: list[0]?.slice(0, 140),
           fixHint: 'Dựng lại từng nguồn từ metadata thật trên Crossref (tên bài, tạp chí, số trang, DOI).',
         });
       }
@@ -2876,6 +2885,7 @@ export async function runDeterministicPaperAudit(
         sectionId: refSection.id,
         sectionTitle: refSection.title,
         autoFixable: true,
+        matchSnippet: topicPasted[0]?.slice(0, 140),
         fixHint: 'Thay bằng tên bài thật của từng tác giả lấy từ Crossref.',
       });
     }
@@ -2892,6 +2902,7 @@ export async function runDeterministicPaperAudit(
         sectionId: refSection.id,
         sectionTitle: refSection.title,
         autoFixable: true,
+        matchSnippet: stubEntries[0]?.slice(0, 140),
         fixHint: 'Bổ sung đầy đủ tên bài, tạp chí, tập/số, trang từ metadata Crossref.',
       });
     }
@@ -2917,6 +2928,7 @@ export async function runDeterministicPaperAudit(
           sectionId: refSection.id,
           sectionTitle: refSection.title,
           autoFixable: true,
+          matchSnippet: list[0]?.slice(0, 140),
           fixHint: 'Gộp về đúng 1 nguồn thật, khớp 1-1 với trích dẫn trong bài.',
         });
       }
@@ -2977,6 +2989,7 @@ export async function runDeterministicPaperAudit(
               sectionTitle: refSection.title,
               autoFixable: true,
               badDoi: doi,
+              matchSnippet: entry.slice(0, 140),
               fixHint: `Xóa DOI không tồn tại ${doi} và xác minh lại nguồn.`,
             });
           } else {
@@ -3008,6 +3021,7 @@ export async function runDeterministicPaperAudit(
                 sectionTitle: refSection.title,
                 autoFixable: true,
                 badDoi: doi,
+                matchSnippet: entry.slice(0, 140),
                 fixHint: `Gỡ bỏ DOI bị gán nhầm ${doi} và sửa lại nguồn khớp với trích dẫn trong bài.`,
               });
             } else {
@@ -3160,6 +3174,7 @@ Output ONLY a valid JSON object (no markdown fences, no commentary) with this ex
       "title": "Short Vietnamese issue title",
       "detail": "Specific Vietnamese explanation citing exact section/evidence",
       "sectionId": "exact section id from digest if applicable, else empty string",
+      "excerpt": "exact verbatim 6-15 word phrase copied from the offending sentence/sub-heading in that section so the UI can highlight & scroll to it",
       "autoFixable": true | false,
       "fixHint": "Exact instruction for AI to fix this section"
     }
@@ -3207,6 +3222,7 @@ ${digest}`;
           title?: string;
           detail?: string;
           sectionId?: string;
+          excerpt?: string;
           autoFixable?: boolean;
           fixHint?: string;
         }>;
@@ -3238,6 +3254,7 @@ ${digest}`;
             sectionId: matchedSec?.id,
             sectionTitle: matchedSec?.title,
             autoFixable: Boolean(item.autoFixable && matchedSec),
+            matchSnippet: (item.excerpt || '').trim() || undefined,
             fixHint: (item.fixHint || '').trim() || undefined,
           });
         });

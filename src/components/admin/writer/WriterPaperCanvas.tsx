@@ -1,4 +1,4 @@
-import { RefObject, useMemo } from 'react';
+import { ReactNode, RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertCircle,
   BookMarked,
@@ -7,11 +7,13 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
+  PencilLine,
   ShieldAlert,
   ShieldCheck,
   Wrench,
 } from 'lucide-react';
 import {
+  PaperAuditIssue,
   isReferencesSectionTitle,
   stripMarkdownHashesFromText,
 } from '../../../lib/aiWriterClient';
@@ -59,6 +61,9 @@ interface WriterPaperCanvasProps {
   containerClassName?: string;
   activeTextareaRef: RefObject<HTMLTextAreaElement | null>;
   sectionAuditStates?: Record<string, SectionAuditVisualState>;
+  auditIssues?: PaperAuditIssue[];
+  focusedAuditIssueId?: string | null;
+  onFixSingleIssue?: (issue: PaperAuditIssue) => void;
   qaBanner?: PaperQaBannerState | null;
   onSelectSection: (sectionId: string) => void;
   onUpdateTopic: (nextTopic: string) => void;
@@ -81,6 +86,9 @@ export function WriterPaperCanvas({
   containerClassName,
   activeTextareaRef,
   sectionAuditStates,
+  auditIssues = [],
+  focusedAuditIssueId = null,
+  onFixSingleIssue,
   qaBanner,
   onSelectSection,
   onUpdateTopic,
@@ -92,6 +100,288 @@ export function WriterPaperCanvas({
 }: WriterPaperCanvasProps) {
   const { format } = session;
   const pagePaddingPx = Math.round(format.marginInch * 64);
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [activeBubbleIssueId, setActiveBubbleIssueId] = useState<string | null>(
+    null
+  );
+  const hideBubbleTimerRef = useRef<number | null>(null);
+
+  const openBubble = (issueId: string) => {
+    if (hideBubbleTimerRef.current !== null) {
+      window.clearTimeout(hideBubbleTimerRef.current);
+      hideBubbleTimerRef.current = null;
+    }
+    setActiveBubbleIssueId(issueId);
+  };
+
+  const scheduleHideBubble = () => {
+    if (hideBubbleTimerRef.current !== null) {
+      window.clearTimeout(hideBubbleTimerRef.current);
+    }
+    hideBubbleTimerRef.current = window.setTimeout(() => {
+      setActiveBubbleIssueId(null);
+      hideBubbleTimerRef.current = null;
+    }, 220);
+  };
+
+  // When user clicks "Mở mục" / "Đến câu lỗi" on a specific audit issue, exit textarea mode and scroll directly to that exact red sentence!
+  useEffect(() => {
+    if (!focusedAuditIssueId) return;
+    setEditingSectionId(null);
+    setActiveBubbleIssueId(focusedAuditIssueId);
+    const rafId = window.requestAnimationFrame(() => {
+      const targetMark = document.querySelector<HTMLElement>(
+        `[data-audit-issue-id="${focusedAuditIssueId}"]`
+      );
+      if (targetMark) {
+        targetMark.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        const matchedIssue = auditIssues.find(
+          (i) => i.id === focusedAuditIssueId
+        );
+        if (matchedIssue?.sectionId) {
+          const secEl = document.querySelector<HTMLElement>(
+            `[data-writer-section-id="${matchedIssue.sectionId}"]`
+          );
+          secEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [focusedAuditIssueId, auditIssues]);
+
+  /** Finds exact sentence/line character ranges for each issue inside a section's text */
+  const buildHighlightedContentNodes = (
+    sec: WriterOutlineSection,
+    secIssues: PaperAuditIssue[]
+  ): ReactNode => {
+    const text = sec.content || '';
+    if (!text.trim() || secIssues.length === 0) return text;
+
+    const lowerText = text.toLowerCase();
+    const isRef = isReferencesSectionTitle(sec.title);
+
+    const expandToSentenceBounds = (
+      matchStart: number,
+      matchEnd: number
+    ): { start: number; end: number } => {
+      if (isRef) {
+        // For References, highlight the entire bibliographic entry (bounded by newlines)
+        const prevNl = text.lastIndexOf('\n', matchStart - 1);
+        const nextNl = text.indexOf('\n', matchEnd);
+        return {
+          start: prevNl === -1 ? 0 : prevNl + 1,
+          end: nextNl === -1 ? text.length : nextNl,
+        };
+      }
+      // For body prose, expand to the exact sentence boundaries (., !, ?, or newline)
+      let s = matchStart;
+      while (s > 0 && !/[\n.!?]/.test(text[s - 1])) {
+        s--;
+      }
+      while (s < matchStart && /\s/.test(text[s])) s++;
+
+      let e = matchEnd;
+      while (e < text.length && !/[\n.!?]/.test(text[e])) {
+        e++;
+      }
+      if (e < text.length && /[.!?]/.test(text[e])) e++;
+      return { start: s, end: Math.max(e, matchEnd) };
+    };
+
+    const ranges: Array<{ start: number; end: number; issue: PaperAuditIssue }> =
+      [];
+
+    for (const issue of secIssues) {
+      const candidates: string[] = [];
+      if (issue.matchSnippet?.trim()) candidates.push(issue.matchSnippet.trim());
+      if (issue.badDoi?.trim()) candidates.push(issue.badDoi.trim());
+      const quotedInDetail = issue.detail.match(/"([^"]{8,120})"/);
+      if (quotedInDetail?.[1]) {
+        candidates.push(quotedInDetail[1].replace(/^\.\.\.|\.\.\.$/g, '').trim());
+      }
+
+      let foundIdx = -1;
+      let foundLen = 0;
+      for (const cand of candidates) {
+        if (!cand || cand.length < 4) continue;
+        const idx = lowerText.indexOf(cand.toLowerCase());
+        if (idx !== -1) {
+          foundIdx = idx;
+          foundLen = cand.length;
+          break;
+        }
+        // Try first 40 chars if the full snippet was slightly clipped
+        if (cand.length > 42) {
+          const shortCand = cand.slice(0, 42).toLowerCase();
+          const shortIdx = lowerText.indexOf(shortCand);
+          if (shortIdx !== -1) {
+            foundIdx = shortIdx;
+            foundLen = shortCand.length;
+            break;
+          }
+        }
+      }
+
+      if (foundIdx !== -1) {
+        const bounds = expandToSentenceBounds(foundIdx, foundIdx + foundLen);
+        ranges.push({ ...bounds, issue });
+      } else {
+        // Fallback: highlight last sentence for truncation/completeness, or first sentence otherwise
+        const fallbackAnchor =
+          issue.category === 'completeness' ? Math.max(0, text.length - 10) : 0;
+        const bounds = expandToSentenceBounds(
+          fallbackAnchor,
+          Math.min(text.length, fallbackAnchor + 1)
+        );
+        ranges.push({ ...bounds, issue });
+      }
+    }
+
+    // Sort ranges and avoid overlapping DOM nests
+    ranges.sort((a, b) => a.start - b.start || b.end - a.end);
+    const nonOverlapping: Array<{
+      start: number;
+      end: number;
+      issues: PaperAuditIssue[];
+    }> = [];
+    for (const r of ranges) {
+      const last = nonOverlapping[nonOverlapping.length - 1];
+      if (last && r.start < last.end) {
+        last.end = Math.max(last.end, r.end);
+        last.issues.push(r.issue);
+      } else {
+        nonOverlapping.push({ start: r.start, end: r.end, issues: [r.issue] });
+      }
+    }
+
+    const nodes: ReactNode[] = [];
+    let cursor = 0;
+    nonOverlapping.forEach((seg, idx) => {
+      if (seg.start > cursor) {
+        nodes.push(
+          <span key={`plain_${idx}`}>{text.slice(cursor, seg.start)}</span>
+        );
+      }
+      const primaryIssue = seg.issues[0];
+      const isBubbleOpen = seg.issues.some((i) => i.id === activeBubbleIssueId);
+      const isFocused = seg.issues.some((i) => i.id === focusedAuditIssueId);
+      const isCritical = seg.issues.some((i) => i.severity === 'critical');
+
+      nodes.push(
+        <span
+          key={`hl_${primaryIssue.id}_${idx}`}
+          data-audit-issue-id={primaryIssue.id}
+          onMouseEnter={() => openBubble(primaryIssue.id)}
+          onMouseLeave={scheduleHideBubble}
+          onClick={(e) => {
+            e.stopPropagation();
+            openBubble(primaryIssue.id);
+          }}
+          className={`relative inline rounded px-0.5 cursor-pointer transition-colors ${
+            isCritical
+              ? 'bg-rose-200/80 hover:bg-rose-300/85 text-rose-950 underline decoration-wavy decoration-rose-600 underline-offset-2'
+              : 'bg-amber-200/80 hover:bg-amber-300/85 text-amber-950 underline decoration-wavy decoration-amber-600 underline-offset-2'
+          } ${isFocused ? 'ring-2 ring-rose-500 ring-offset-1' : ''}`}
+        >
+          {text.slice(seg.start, seg.end)}
+
+          {/* Floating Chat Bubble Tooltip on Hover / Click */}
+          {isBubbleOpen && (
+            <span
+              role="tooltip"
+              onMouseEnter={() => openBubble(primaryIssue.id)}
+              onMouseLeave={scheduleHideBubble}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                fontFamily: 'system-ui, -apple-system, sans-serif',
+                textIndent: 0,
+                textAlign: 'left',
+                lineHeight: 1.4,
+              }}
+              className="popover-enter absolute left-0 bottom-full mb-2.5 z-40 w-[320px] sm:w-[370px] max-w-[85vw] rounded-2xl bg-white border border-rose-200 shadow-xl p-3 text-slate-800 block select-text"
+            >
+              <span className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-rose-700">
+                  <AlertCircle className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                  <span>
+                    {seg.issues.length > 1
+                      ? `${seg.issues.length} lỗi tại câu này`
+                      : isCritical
+                      ? 'Lỗi nghiêm trọng'
+                      : 'Cảnh báo học thuật'}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveBubbleIssueId(null)}
+                  className="text-[11px] text-zinc-400 hover:text-zinc-700 font-bold px-1"
+                >
+                  ✕
+                </button>
+              </span>
+
+              <span className="block space-y-2 max-h-44 overflow-y-auto pr-0.5">
+                {seg.issues.map((iss) => (
+                  <span key={iss.id} className="block space-y-0.5">
+                    <span className="block text-xs font-bold text-slate-900">
+                      {iss.title}
+                    </span>
+                    <span className="block text-[11px] text-slate-600 break-words">
+                      {iss.detail}
+                    </span>
+                    {iss.fixHint && (
+                      <span className="block text-[10.5px] text-[#12489B] font-medium">
+                        Gợi ý: {iss.fixHint}
+                      </span>
+                    )}
+                  </span>
+                ))}
+              </span>
+
+              <span className="mt-2.5 pt-2 border-t border-zinc-100 flex items-center justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveBubbleIssueId(null);
+                    setEditingSectionId(sec.id);
+                    onSelectSection(sec.id);
+                  }}
+                  className="btn-press inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-slate-700 text-[11px] font-semibold"
+                >
+                  <PencilLine className="w-3 h-3" />
+                  <span>Sửa tay</span>
+                </button>
+
+                {primaryIssue.autoFixable && onFixSingleIssue && (
+                  <button
+                    type="button"
+                    disabled={qaBanner?.isFixing}
+                    onClick={() => {
+                      setActiveBubbleIssueId(null);
+                      onFixSingleIssue(primaryIssue);
+                    }}
+                    className="btn-press inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#12489B] hover:bg-[#0D387A] text-white text-[11px] font-bold shadow-2xs disabled:opacity-50"
+                  >
+                    <Wrench className="w-3 h-3" />
+                    <span>Sửa lỗi này</span>
+                  </button>
+                )}
+              </span>
+
+              {/* Little speech-bubble arrow */}
+              <span className="absolute left-5 top-full w-3 h-3 bg-white border-r border-b border-rose-200 rotate-45 -mt-1.5 block" />
+            </span>
+          )}
+        </span>
+      );
+      cursor = seg.end;
+    });
+    if (cursor < text.length) {
+      nodes.push(<span key="plain_tail">{text.slice(cursor)}</span>);
+    }
+    return nodes;
+  };
   const hasCoverPage = Boolean(format.coverPage?.enabled);
   const includeToc = format.includeTableOfContents ?? true;
   const tocHeadingTitle =
@@ -477,6 +767,21 @@ export function WriterPaperCanvas({
             );
 
             const auditVisual = sectionAuditStates?.[sec.id];
+            const secAuditIssues = auditIssues.filter((iss) => {
+              if (iss.sectionId === sec.id) return true;
+              if (
+                isReferencesSectionTitle(sec.title) &&
+                (iss.category === 'doi_and_sources' ||
+                  iss.category === 'citation_sync')
+              ) {
+                return true;
+              }
+              return false;
+            });
+            const showInlineHighlightMode =
+              secAuditIssues.length > 0 &&
+              Boolean(sec.content.trim()) &&
+              editingSectionId !== sec.id;
             const sectionHighlightClass =
               auditVisual?.status === 'fixing'
                 ? 'ring-2 ring-[#12489B] bg-blue-50/75 p-3 -mx-3 shadow-sm'
@@ -530,6 +835,25 @@ export function WriterPaperCanvas({
                             }`}
                       </span>
                     </span>
+                    {secAuditIssues.length > 0 && sec.content.trim() && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingSectionId((prev) =>
+                            prev === sec.id ? null : sec.id
+                          );
+                        }}
+                        className="btn-press shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded bg-white/90 border border-rose-200 hover:border-[#12489B] text-[10.5px] font-semibold text-slate-700 hover:text-[#12489B]"
+                      >
+                        <PencilLine className="w-3 h-3" />
+                        <span>
+                          {editingSectionId === sec.id
+                            ? 'Xem câu tô đỏ'
+                            : 'Sửa tay'}
+                        </span>
+                      </button>
+                    )}
                   </div>
                 )}
                 {/* Section Heading */}
@@ -562,30 +886,53 @@ export function WriterPaperCanvas({
                   )}
                 </div>
 
-                {/* Editable Section Prose */}
-                <textarea
-                  ref={isCurrent ? activeTextareaRef : undefined}
-                  rows={lineCount}
-                  value={sec.content}
-                  onChange={(e) =>
-                    onUpdateSection(
-                      sec.id,
-                      { content: stripMarkdownHashesFromText(e.target.value) },
-                      true
-                    )
-                  }
-                  placeholder={`Bấm "Viết" ở mục "${sec.title}" hoặc gõ nội dung trực tiếp tại đây...`}
-                  className="w-full bg-transparent text-slate-900 focus:outline-none resize-y border border-transparent focus:border-blue-200/80 rounded p-1"
-                  style={{
-                    fontFamily: `"${format.fontFamily}", serif`,
-                    fontSize: `${Math.round(
-                      (format.fontSizePt * zoomPercent) / 100
-                    )}pt`,
-                    lineHeight: format.lineSpacing,
-                    textAlign: format.textAlign,
-                    textIndent: format.firstLineIndent ? '0.5in' : '0',
-                  }}
-                />
+                {/* Editable Section Prose OR Interactive Inline Red-Highlighted Sentences */}
+                {showInlineHighlightMode ? (
+                  <div
+                    onDoubleClick={() => setEditingSectionId(sec.id)}
+                    className="w-full text-slate-900 rounded p-1 whitespace-pre-wrap break-words"
+                    style={{
+                      fontFamily: `"${format.fontFamily}", serif`,
+                      fontSize: `${Math.round(
+                        (format.fontSizePt * zoomPercent) / 100
+                      )}pt`,
+                      lineHeight: format.lineSpacing,
+                      textAlign: format.textAlign,
+                      textIndent: format.firstLineIndent ? '0.5in' : '0',
+                    }}
+                  >
+                    {buildHighlightedContentNodes(sec, secAuditIssues)}
+                  </div>
+                ) : (
+                  <textarea
+                    ref={isCurrent ? activeTextareaRef : undefined}
+                    rows={lineCount}
+                    value={sec.content}
+                    onBlur={() => {
+                      if (editingSectionId === sec.id) {
+                        setEditingSectionId(null);
+                      }
+                    }}
+                    onChange={(e) =>
+                      onUpdateSection(
+                        sec.id,
+                        { content: stripMarkdownHashesFromText(e.target.value) },
+                        true
+                      )
+                    }
+                    placeholder={`Bấm "Viết" ở mục "${sec.title}" hoặc gõ nội dung trực tiếp tại đây...`}
+                    className="w-full bg-transparent text-slate-900 focus:outline-none resize-y border border-transparent focus:border-blue-200/80 rounded p-1"
+                    style={{
+                      fontFamily: `"${format.fontFamily}", serif`,
+                      fontSize: `${Math.round(
+                        (format.fontSizePt * zoomPercent) / 100
+                      )}pt`,
+                      lineHeight: format.lineSpacing,
+                      textAlign: format.textAlign,
+                      textIndent: format.firstLineIndent ? '0.5in' : '0',
+                    }}
+                  />
+                )}
               </div>
             );
           })}

@@ -224,6 +224,9 @@ export function AiWriterStudioView({
   const [sectionAuditStates, setSectionAuditStates] = useState<
     Record<string, SectionAuditVisualState>
   >({});
+  const [focusedAuditIssueId, setFocusedAuditIssueId] = useState<string | null>(
+    null
+  );
   const [autoFixProgress, setAutoFixProgress] = useState<{
     currentStepIndex: number;
     batchTotal: number;
@@ -233,6 +236,7 @@ export function AiWriterStudioView({
   useEffect(() => {
     setAuditReport(null);
     setSectionAuditStates({});
+    setFocusedAuditIssueId(null);
   }, [activeSessionId]);
   const [showResetConfirmModal, setShowResetConfirmModal] = useState(false);
   const [showActivityPanel, setShowActivityPanel] = useState<boolean>(() => {
@@ -2831,6 +2835,12 @@ export function AiWriterStudioView({
           }
           activeTextareaRef={activeTextareaRef}
           sectionAuditStates={sectionAuditStates}
+          auditIssues={auditReport?.issues || []}
+          focusedAuditIssueId={focusedAuditIssueId}
+          onFixSingleIssue={(issue) => {
+            if (!auditReport) return;
+            void handleAutoFixAuditIssues(auditReport, [issue.id]);
+          }}
           qaBanner={
             auditReport || isAutoFixingAudit
               ? {
@@ -2943,9 +2953,15 @@ export function AiWriterStudioView({
         onAutoFixAll={(rep, selectedIds) =>
           void handleAutoFixAuditIssues(rep, selectedIds)
         }
-        onJumpToSection={(secId) => {
+        onJumpToSection={(secId, issueId) => {
           setLeftTab('outline');
           mutateActiveSession((s) => ({ ...s, activeSectionId: secId }));
+          setFocusedAuditIssueId(null);
+          if (issueId) {
+            window.requestAnimationFrame(() => {
+              setFocusedAuditIssueId(issueId);
+            });
+          }
         }}
         onClose={() => setShowAuditModal(false)}
       />

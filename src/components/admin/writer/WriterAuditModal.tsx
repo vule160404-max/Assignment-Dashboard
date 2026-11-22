@@ -30,7 +30,7 @@ interface WriterAuditModalProps {
   auditStatusLabel: string;
   onRunAudit: () => void;
   onAutoFixAll: (report: PaperAuditReport, selectedIssueIds?: string[]) => void;
-  onJumpToSection: (sectionId: string) => void;
+  onJumpToSection: (sectionId: string, issueId?: string) => void;
   onClose: () => void;
 }
 
@@ -394,12 +394,15 @@ export function WriterAuditModal({
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          onJumpToSection(issue.sectionId!);
+                                          onJumpToSection(
+                                            issue.sectionId!,
+                                            issue.id
+                                          );
                                           onClose();
                                         }}
                                         className="btn-press inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-zinc-200 hover:border-[#12489B] text-[10.5px] font-semibold text-slate-700 hover:text-[#12489B]"
                                       >
-                                        <span>Mở mục</span>
+                                        <span>Đến câu lỗi</span>
                                         <ArrowUpRight className="w-3 h-3" />
                                       </button>
                                     )}
