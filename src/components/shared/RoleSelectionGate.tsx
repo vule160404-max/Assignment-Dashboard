@@ -807,14 +807,6 @@ export function RoleSelectionGate({
                   <ArrowUpRight className="w-4 h-4" />
                 </span>
               </button>
-              <button
-                type="button"
-                onClick={onSelectAdmin}
-                className="btn-press inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-white text-xs font-semibold"
-              >
-                <ShieldCheck className="w-4 h-4 text-sky-300" />
-                <span>Đăng nhập Quản trị viên</span>
-              </button>
             </div>
           </div>
         </section>
