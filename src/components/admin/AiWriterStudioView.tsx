@@ -999,6 +999,25 @@ export function AiWriterStudioView({
   const handleDeleteSession = (id: string) => {
     pausedSessionIdsRef.current.add(id);
     delete lastSyncedSessionAtRef.current[id];
+    const targetSess = sessions.find((s) => s.id === id);
+    if (targetSess) {
+      const logKey = getActivityLogKeyForSession(targetSess);
+      setActivityLogsByKey((prev) => {
+        const next = { ...prev };
+        delete next[logKey];
+        return next;
+      });
+    }
+    if (activeSessionId === id || sessions.length <= 1) {
+      setAuditReport(null);
+      setSectionAuditStates({});
+      setAutoFixProgress({
+        currentStepIndex: 0,
+        batchTotal: 0,
+        currentStepTitle: '',
+      });
+      setShowAuditModal(false);
+    }
     void deleteWriterSessionFromCloud(id);
     if (sessions.length <= 1) {
       const reset = createDefaultSession(null);
@@ -1773,6 +1792,17 @@ export function AiWriterStudioView({
     setLeftTab(nextTab);
     setShowResetConfirmModal(false);
 
+    // Clear QA error report, red/green section highlights, and per-order activity log on paper reset
+    setAuditReport(null);
+    setSectionAuditStates({});
+    setAutoFixProgress({
+      currentStepIndex: 0,
+      batchTotal: 0,
+      currentStepTitle: '',
+    });
+    setShowAuditModal(false);
+    handleClearActiveOrderLogs();
+
     // Push reset immediately to Firestore (no 1.5s debounce, no empty-data skip) so F5 never restores old content
     if (cloudSyncState !== 'permission_denied') {
       await saveWriterSessionToCloud(nextSession);
@@ -2478,6 +2508,15 @@ export function AiWriterStudioView({
       0
     );
   }, [activeSession]);
+
+  useEffect(() => {
+    if (totalDraftedWords === 0) {
+      setAuditReport((prev) => (prev ? null : prev));
+      setSectionAuditStates((prev) =>
+        Object.keys(prev).length > 0 ? {} : prev
+      );
+    }
+  }, [totalDraftedWords]);
 
   const totalOutlineTargetWords = useMemo(() => {
     if (!activeSession) return 0;
