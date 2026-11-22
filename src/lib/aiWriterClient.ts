@@ -1096,12 +1096,19 @@ export function extractInTextCitations(text: string): string[] {
   };
 
   // 1. Parenthetical citations: (Smith, 2024), (Fredricks, Blumenfeld & Paris, 2004; Hiver et al., 2024)
-  const parenRegex = /\(([^()]{2,140}(?:19|20)\d{2}[a-z]?[^()]{0,40})\)/g;
+  //    For secondary citations like (Creswell, 2013, as cited in Kusumawati & Arifin, 2024),
+  //    APA/Harvard rules require ONLY the primary read source (right of "cited in") in References.
+  const parenRegex = /\(([^()]{2,160}(?:19|20)\d{2}[a-z]?[^()]{0,60})\)/g;
   let m: RegExpExecArray | null;
   while ((m = parenRegex.exec(text)) !== null) {
     // Split multi-citation parentheses by ';' so each citation is handled individually
     const parts = m[1].split(';').map((p) => p.trim()).filter(Boolean);
-    for (const part of parts) {
+    for (const rawPart of parts) {
+      const secondarySplit = rawPart.split(/\b(?:as\s+)?cited\s+in\b/i);
+      const part =
+        secondarySplit.length > 1
+          ? secondarySplit[secondarySplit.length - 1].trim()
+          : rawPart;
       if (/(?:19|20)\d{2}/.test(part) && /[A-Za-zÀ-ỹ]{2,}/.test(part)) {
         addCit(`(${part})`);
       }
@@ -1237,6 +1244,8 @@ export interface ParsedCitationKey {
   surnames: string[];
   firstSurname: string;
   year: string;
+  hasEtAl: boolean;
+  expectedAuthorCount: 'exact1' | 'exact2' | '3plus';
 }
 
 function normName(raw: string): string {
@@ -1248,13 +1257,62 @@ function normName(raw: string): string {
     .replace(/[^a-z0-9]/g, '');
 }
 
+const CONTEXT_STOP_WORDS = new Set([
+  'that', 'this', 'with', 'from', 'they', 'them', 'their', 'there', 'these', 'those',
+  'have', 'been', 'were', 'being', 'which', 'what', 'when', 'where', 'while', 'about',
+  'into', 'over', 'after', 'before', 'between', 'under', 'through', 'during', 'without',
+  'within', 'against', 'among', 'study', 'studies', 'research', 'article', 'paper',
+  'review', 'analysis', 'findings', 'results', 'using', 'based', 'approach', 'method',
+  'methods', 'journal', 'international', 'university', 'press', 'also', 'more', 'most',
+  'such', 'than', 'only', 'other', 'some', 'many', 'much', 'very', 'however', 'therefore',
+  'của', 'trong', 'những', 'được', 'không', 'nghiên', 'cứu', 'bài', 'viết', 'phương', 'pháp',
+]);
+
+function extractMeaningfulTokens(text: string): Set<string> {
+  const words = (text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length >= 4 && !/^\d+$/.test(w) && !CONTEXT_STOP_WORDS.has(w));
+  return new Set(words);
+}
+
+function countTokenOverlap(a: Set<string>, b: Set<string>): number {
+  let count = 0;
+  a.forEach((tok) => {
+    if (b.has(tok)) count++;
+  });
+  return count;
+}
+
+function extractCitationSentenceContext(
+  bodyText: string,
+  key: ParsedCitationKey
+): string {
+  if (!bodyText) return '';
+  const sentences = bodyText.split(/(?<=[.!?])\s+|\r?\n+/);
+  const normFirst = normName(key.firstSurname);
+  const matched: string[] = [];
+  for (const sent of sentences) {
+    if (!sent.includes(key.year)) continue;
+    const normSent = normName(sent);
+    if (normFirst.length >= 2 && normSent.includes(normFirst)) {
+      matched.push(sent.trim());
+      if (matched.length >= 2) break;
+    }
+  }
+  return matched.join(' ').slice(0, 320);
+}
+
 export function parseCitationKey(cite: string): ParsedCitationKey | null {
   const inner = cite.replace(/^\(|\)$/g, '').trim();
   const yearMatch = inner.match(/(?:19|20)\d{2}[a-z]?/);
   if (!yearMatch) return null;
   const year = yearMatch[0].slice(0, 4);
-  const authorPart = inner
-    .slice(0, yearMatch.index)
+  const beforeYear = inner.slice(0, yearMatch.index);
+  const hasEtAl = /\bet\s+al\.?/i.test(beforeYear);
+  const authorPart = beforeYear
     .replace(/\(/g, ' ')
     .replace(/\bet\s+al\.?/gi, ' ')
     .replace(/[,\s]+$/g, '')
@@ -1264,7 +1322,20 @@ export function parseCitationKey(cite: string): ParsedCitationKey | null {
     .map((s) => s.trim())
     .filter((s) => /^[A-ZÀ-Ỹ]/.test(s) && s.length >= 2);
   if (surnames.length === 0) return null;
-  return { raw: cite, surnames, firstSurname: surnames[0], year };
+  const expectedAuthorCount: ParsedCitationKey['expectedAuthorCount'] =
+    hasEtAl || surnames.length >= 3
+      ? '3plus'
+      : surnames.length === 2
+      ? 'exact2'
+      : 'exact1';
+  return {
+    raw: cite,
+    surnames,
+    firstSurname: surnames[0],
+    year,
+    hasEtAl,
+    expectedAuthorCount,
+  };
 }
 
 interface CrossrefAuthor {
@@ -1307,6 +1378,8 @@ function surnameMatches(citedSurname: string, family: string): boolean {
 async function searchCrossrefWorkForCitation(
   key: ParsedCitationKey,
   bibliographicHint: string,
+  contextTokens: Set<string>,
+  draftTitleTokens: Set<string>,
   signal?: AbortSignal
 ): Promise<CrossrefWorkMeta | null> {
   const y = Number(key.year);
@@ -1364,6 +1437,12 @@ async function searchCrossrefWorkForCitation(
       const firstFamily = authors[0]?.family || authors[0]?.name || '';
       if (!surnameMatches(key.firstSurname, firstFamily)) continue;
 
+      // Pillar 1: Author-Count Lock (domain-agnostic) — prevents 1-author citations like (Creswell, 2013)
+      // from matching a 4-author homonym paper by J. D. Creswell et al. (2013)
+      if (key.expectedAuthorCount === 'exact1' && authors.length !== 1) continue;
+      if (key.expectedAuthorCount === 'exact2' && authors.length !== 2) continue;
+      if (key.expectedAuthorCount === '3plus' && authors.length < 3) continue;
+
       // If the in-text citation names 2+ authors, every named co-author must exist in Crossref's author list
       const coAuthorsOk = key.surnames
         .slice(1)
@@ -1373,20 +1452,40 @@ async function searchCrossrefWorkForCitation(
       const yearDiff = Math.abs(itemYear - y);
       if (yearDiff > 1) continue;
 
+      const containerTitle = cleanCrossrefText(it['container-title']?.[0]);
+
+      // Pillar 2: Dynamic Context-Overlap Gate (domain-agnostic) — candidate title/journal MUST share
+      // meaningful keywords with the paper's citation sentence / topic or the clean draft title.
+      const candidateTokens = extractMeaningfulTokens(
+        `${title} ${containerTitle}`
+      );
+      const draftOverlap = countTokenOverlap(draftTitleTokens, candidateTokens);
+      const contextOverlap = countTokenOverlap(contextTokens, candidateTokens);
+
+      const minContextNeeded = contextTokens.size >= 4 ? 2 : 1;
+      const passesSemanticGate =
+        draftTitleTokens.size >= 2
+          ? draftOverlap >= 1 || contextOverlap >= minContextNeeded
+          : contextOverlap >= minContextNeeded;
+      if (!passesSemanticGate) continue;
+
       candidates.push({
         meta: {
           doi: it.DOI,
           title,
           authors,
           year: itemYear,
-          containerTitle: cleanCrossrefText(it['container-title']?.[0]),
+          containerTitle,
           volume: it.volume,
           issue: it.issue,
           page: it.page,
           type: it.type,
           publisher: it.publisher,
         },
-        score: (yearDiff === 0 ? 10 : 0) + (it.type === 'journal-article' ? 2 : 0),
+        score:
+          (yearDiff === 0 ? 10 : 0) +
+          draftOverlap * 5 +
+          contextOverlap * 3,
       });
     }
 
@@ -1622,13 +1721,32 @@ export async function buildCrossrefVerifiedReferences(
               e.includes(`(${key.year}`)
           );
         const cleanHintEntry = matchingIdx.find(({ e }) => !isPoisonedTitle(e) && !isStubEntry(e));
-        const hint = cleanHintEntry
-          ? `${extractReferenceTitle(cleanHintEntry.e)} ${topicHint}`
-          : topicHint;
+        const draftTitle = cleanHintEntry ? extractReferenceTitle(cleanHintEntry.e) : '';
+        const sentenceCtx = extractCitationSentenceContext(bodyText, key);
+        const contextTokens = extractMeaningfulTokens(
+          `${sentenceCtx} ${session.subject || ''} ${topicHint}`
+        );
+        const draftTitleTokens = extractMeaningfulTokens(draftTitle);
 
-        let work = await searchCrossrefWorkForCitation(key, hint, signal);
+        const hint = draftTitle
+          ? `${draftTitle} ${sentenceCtx.slice(0, 100)}`
+          : `${sentenceCtx.slice(0, 120)} ${topicHint}`;
+
+        let work = await searchCrossrefWorkForCitation(
+          key,
+          hint,
+          contextTokens,
+          draftTitleTokens,
+          signal
+        );
         if (!work && hint !== topicHint) {
-          work = await searchCrossrefWorkForCitation(key, topicHint, signal);
+          work = await searchCrossrefWorkForCitation(
+            key,
+            topicHint,
+            contextTokens,
+            draftTitleTokens,
+            signal
+          );
         }
         return { key, work, matchingIdx, cleanHintEntry };
       })
@@ -3159,6 +3277,7 @@ export async function runAiPaperAudit(
 Your job is to inspect the drafted paper below and catch EVERY serious academic/structural/factual defect that would cause a student to lose marks or fail QA:
 1. Heading vs. Content Mismatch (e.g., heading says "Personal Facilitators" while body discusses "Social Facilitators"). Check EVERY ">> SUB-HEADING" line against its "body starts" text.
 5. Inconsistent page ranges/volume numbers for the same cited work across the paper.
+6. Homonym Author / Wrong Work Mismatch (CRITICAL): Compare EVERY Reference entry's title and journal against the actual claim/field where that author is cited in the body. Flag any case where the Reference points to a different author with the same surname or a different work by the same author whose topic does NOT match the body's claim (e.g., body cites a methodology textbook or qualitative sampling while Reference lists an unrelated medical/psychology article; or body cites contextual language exposure while Reference lists a vocabulary-size measurement study). Set severity: "critical", autoFixable: true, and copy the exact Reference entry into "excerpt".
 2. Factual Self-Contradictions across sections (e.g., Section 2 calls a study a "doctoral thesis" while References calls it a "Master's thesis", or conflicting sample sizes/years).
 3. Wrongly pasted paper title onto unrelated authors in References.
 4. Off-topic drift or failure to address key assignment brief/rubric requirements.
