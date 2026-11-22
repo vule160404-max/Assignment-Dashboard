@@ -1725,6 +1725,35 @@ export async function buildCrossrefVerifiedReferences(
   };
 }
 
+function getCitationStyleGrammarRule(style: string): string {
+  if (style === 'APA') {
+    return 'APA 7th In-Text Rules: 1 author = (Smith, 2024) or Smith (2024); 2 authors = (Smith & Lee, 2024) in parentheses / Smith and Lee (2024) in narrative; 3+ authors = (Smith et al., 2024) or Smith et al. (2024).';
+  }
+  if (style === 'Harvard') {
+    return 'Harvard (Cite Them Right) In-Text Rules: 1 author = (Smith, 2024) or Smith (2024); 2 authors = (Smith and Lee, 2024) or Smith and Lee (2024); 3+ authors = (Smith et al., 2024) or Smith et al. (2024). NEVER use "&" in Harvard.';
+  }
+  if (style === 'MLA') {
+    return 'MLA 9th In-Text Rules: (Smith) or (Smith 45); 2 authors = (Smith and Lee); 3+ authors = (Smith et al.).';
+  }
+  if (style === 'IEEE') {
+    return 'IEEE In-Text Rules: Use consistent author-year or numbered citations [1], [2] matching the verified source list.';
+  }
+  return `Follow strict ${style} in-text citation grammar consistently throughout every paragraph.`;
+}
+
+function buildVerifiedCitationWhitelistBlock(session: WriterSession): string {
+  const verifiedLines: string[] = [];
+  const rawSources = session.researchedSources || '';
+  const sMatches = rawSources.match(/^\[S\d+\]\s+In-Text:.*$/gm) || [];
+  if (sMatches.length > 0) {
+    verifiedLines.push(...sMatches.slice(0, 14));
+  }
+  if (verifiedLines.length === 0) return '';
+  return `\n=== VERIFIED IN-TEXT CITATION WHITELIST (USE THESE EXACT AUTHOR-YEAR CITATIONS) ===\n${verifiedLines.join(
+    '\n'
+  )}\n`;
+}
+
 export async function generateSectionWithAi(
   session: WriterSession,
   targetSectionId: string,
@@ -1955,6 +1984,9 @@ Provide 6 to 8 authoritative, strictly formatted ${session.citationStyle} schola
     isConclusionSection ? 'conclusion' : 'body'
   );
 
+  const verifiedWhitelistBlock = buildVerifiedCitationWhitelistBlock(session);
+  const citationGrammarRule = getCitationStyleGrammarRule(session.citationStyle);
+
   const userPrompt = `Now write ONLY Section ${sectionIdx + 1} of the paper: "${targetSection.title}".
 
 === FULL PAPER OUTLINE ===
@@ -1964,21 +1996,31 @@ ${
   priorWrittenSections
     ? `=== PREVIOUSLY WRITTEN SECTIONS (FOR CONTINUITY & TO AVOID REPETITION) ===\n${priorWrittenSections}\n`
     : ''
-}
+}${verifiedWhitelistBlock}
 === CURRENT SECTION TO WRITE NOW ===
 - Section Title: ${targetSection.title}
 - Target Word Count for this section: ${targetSection.targetWords} words (write thoroughly to reach approximately ${targetSection.targetWords} words)
 - Specific Guidance & Rubric Notes for this section:
 ${targetSection.guidanceNotes || 'Develop scholarly arguments with peer-reviewed citations.'}
-- Citation Style: ${session.citationStyle}
+- Citation Style: ${session.citationStyle} (${citationGrammarRule})
 - Writing Language: ${session.writingLanguage}
 
-STRICT OUTPUT RULES:
-1. Do NOT repeat the section heading "${targetSection.title}" on the first line (the editor renders the heading automatically).
-2. If this section is a major chapter (${targetSection.targetWords} words >= 350 words and headingLevel is "${targetSection.headingLevel}"), organize the prose with 2 to 4 clear, numbered sub-headings (e.g. "X.1 Sub-section Title", and "X.1.1 ..." if >= 700 words) matching the section number. STRICTLY DO NOT prepend markdown '#' or '##' or '###' symbols to headings or sentences - write clean headings directly as plain text.
-3. Write well-structured, cohesive academic paragraphs in ${session.writingLanguage} with authentic ${session.citationStyle} in-text citations.
-4. Ensure smooth transition from the previous section and strictly fulfill the rubric and active Skill files.
-5. Output ONLY the academic text for this section, with zero meta-commentary or markdown code fences.`;
+STRICT ACADEMIC WRITING & CITATION RULES (MANDATORY):
+1. NO REPEATED HEADING / NO MARKDOWN HASHES: Do NOT repeat "${targetSection.title}" on the first line, and NEVER prepend markdown '#', '##', or '###' symbols.
+2. SUB-HEADING PAIRING & CONTENT ALIGNMENT:
+   - If this section is a major chapter (${targetSection.targetWords} words >= 350 words and headingLevel is "${targetSection.headingLevel}"), structure it with 2 to 4 clear numbered sub-headings matching the chapter number (e.g., "4.1 ...", "4.2 ...").
+   - NEVER create an orphan sub-heading (if you write "X.1", you MUST also write at least "X.2").
+   - Every paragraph under a sub-heading MUST strictly match that sub-heading's exact topic — NEVER place content about another theme under the wrong sub-heading.
+3. CLOSED-BOOK VERIFIED CITATIONS ONLY:
+   - ONLY cite sources that exist in the VERIFIED IN-TEXT CITATION WHITELIST above, the attached Context Files, or complete verified sources in the system prompt (with explicit Author + Year + Title + Venue).
+   - STRICTLY FORBIDDEN: NEVER invent, guess, or recall author-year citations from memory. NEVER drop the first author of a multi-author work, and NEVER alter the publication year.
+   - Integrate citations naturally to support claims (critical synthesis, not a laundry list of summaries), aiming for 2–5 authentic citations per major analytical subsection.
+4. FACTUAL CONSISTENCY ACROSS CHAPTERS:
+   - Keep every factual detail (e.g., Doctoral/PhD thesis vs. Master's thesis, sample size N, instruments, methodology, author spelling) 100% consistent with the attached Context Files and Prior Sections. NEVER contradict earlier chapters.
+5. COMPLETE PROSE & ZERO TRUNCATION:
+   - Write cohesive, high-distinction academic prose in ${session.writingLanguage} with smooth transitions from the prior section.
+   - Ensure the final sentence and paragraph end cleanly with complete punctuation — NEVER stop mid-sentence.
+   - Output ONLY the academic text for this section (zero meta-commentary, zero code fences).`;
 
   const raw = await callAiChatbot({
     profile,
@@ -2045,17 +2087,24 @@ export async function refineTextWithAi(
     taskDirective =
       'Tighten and condense this text by ~20% to remove redundancy while keeping all key arguments and citations intact.';
   } else if (action === 'add_citations') {
-    taskDirective = `Strengthen every unsupported claim in this text with accurate ${session.citationStyle} scholarly in-text citations and empirical backing.`;
+    taskDirective = `Strengthen unsupported claims in this text ONLY with verified ${session.citationStyle} in-text citations drawn strictly from the verified source list or attached context files. NEVER invent or guess new authors or years.`;
   } else if (action === 'rubric_check') {
     taskDirective =
-      'Critically upgrade this text so that it directly satisfies every single criterion in the Grading Rubric at a High Distinction (HD) level.';
+      'Critically upgrade this text so that it directly satisfies every single criterion in the Grading Rubric at a High Distinction (HD) level without inventing unverified citations.';
   }
+
+  const verifiedWhitelistBlock = buildVerifiedCitationWhitelistBlock(session);
+  const citationGrammarRule = getCitationStyleGrammarRule(session.citationStyle);
 
   const userPrompt = `Section: "${sectionTitle}"
 Task: ${taskDirective}
 ${customInstruction.trim() ? `Additional User Instruction: ${customInstruction.trim()}\n` : ''}
-Citation Style: ${session.citationStyle}
+Citation Style: ${session.citationStyle} (${citationGrammarRule})
 Language: ${session.writingLanguage}
+${verifiedWhitelistBlock}
+STRICT CITATION & INTEGRITY RULES:
+- ONLY use citations from the verified whitelist above, the attached context files, or citations already present in the original text. NEVER fabricate new authors, years, DOIs, or statistics.
+- Keep sub-headings accurately aligned with their paragraphs and ensure the text ends cleanly without truncation.
 
 === ORIGINAL TEXT ===
 ${currentText}
