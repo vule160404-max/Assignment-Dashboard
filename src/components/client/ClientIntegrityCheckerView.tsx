@@ -307,7 +307,7 @@ export function ClientIntegrityCheckerView({
 
   const scanStepsMeta = [
     { step: 1, label: 'Tách câu & lọc trích dẫn' },
-    { step: 2, label: 'Đối chiếu Crossref, OpenAlex & Web' },
+    { step: 2, label: 'Đối chiếu nguồn học thuật mở & Web' },
     { step: 3, label: 'Phân tích AI Forensics' },
   ];
 
@@ -331,8 +331,8 @@ export function ClientIntegrityCheckerView({
             </span>
           </div>
           <p className="text-xs text-amber-900/90 leading-relaxed">
-            Hệ thống sử dụng nguồn dữ liệu học thuật mở (<strong>Crossref, OpenAlex, Wikipedia</strong>) kết hợp phân tích thống kê ngôn ngữ học, do đó{' '}
-            <strong>kết quả chắc chắn sẽ có độ sai lệch nhất định</strong> so với báo cáo Turnitin nội bộ của từng trường đại học (do khác biệt kho bài sinh viên và thuật toán độc quyền). Nếu bạn cần báo cáo Turnitin chính thức, vui lòng trao đổi với Admin trong đơn hàng.
+            Hệ thống sử dụng các <strong>nguồn dữ liệu học thuật mở trực tuyến</strong> kết hợp phân tích thống kê ngôn ngữ học, do đó{' '}
+            <strong>kết quả chắc chắn sẽ có độ sai lệch nhất định</strong> so với báo cáo Turnitin nội bộ của từng trường đại học (do khác biệt kho bài sinh viên và thuật toán độc quyền). Nếu bạn cần báo cáo Turnitin chính thức, vui lòng liên hệ Admin qua Zalo để được hỗ trợ.
           </p>
         </div>
       </div>
