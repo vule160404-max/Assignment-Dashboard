@@ -166,11 +166,19 @@ export async function exportWriterSessionToPdf(
     if (f.showTopic) {
       ctx.fillStyle = '#0F172A';
       ctx.font = `700 ${Math.round(17.5 * SCALE)}px ${fontStack}`;
-      const topicText = (session.topic || session.title || 'ACADEMIC PAPER').trim().toUpperCase();
-      const topicLines = wrapTextLines(ctx, topicText, contentW - 60);
-      for (const l of topicLines) {
-        ctx.fillText(l, CANVAS_W / 2, midY);
-        midY += Math.round(25 * SCALE);
+      const topicText = (session.topic || session.title || 'ACADEMIC PAPER').trim();
+      const rawTopicParagraphs = topicText.split(/\r?\n/);
+      for (const para of rawTopicParagraphs) {
+        const trimmedPara = para.trim();
+        if (!trimmedPara) {
+          midY += Math.round(14 * SCALE);
+          continue;
+        }
+        const wrapped = wrapTextLines(ctx, trimmedPara, contentW - 60);
+        for (const l of wrapped) {
+          ctx.fillText(l, CANVAS_W / 2, midY);
+          midY += Math.round(25 * SCALE);
+        }
       }
     }
 

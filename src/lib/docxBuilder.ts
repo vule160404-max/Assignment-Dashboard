@@ -402,7 +402,14 @@ function buildCoverPageXml(session: WriterSession): string {
           <w:sz w:val="${opts.sizeHalfPt}"/>
           <w:szCs w:val="${opts.sizeHalfPt}"/>
         </w:rPr>
-        <w:t xml:space="preserve">${escapeXml(opts.text)}</w:t>
+        ${opts.text
+          .split(/\r?\n/)
+          .map((line, idx) =>
+            idx === 0
+              ? `<w:t xml:space="preserve">${escapeXml(line)}</w:t>`
+              : `<w:br/><w:t xml:space="preserve">${escapeXml(line)}</w:t>`
+          )
+          .join('')}
       </w:r>
     </w:p>`;
   };

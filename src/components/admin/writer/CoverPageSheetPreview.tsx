@@ -161,7 +161,7 @@ export function CoverPageSheetPreview({
               </div>
             )}
             <div
-              className={`font-bold leading-snug text-slate-900 ${
+              className={`font-bold leading-snug text-slate-900 whitespace-pre-line ${
                 compact ? 'text-[13px]' : 'text-[18px]'
               }`}
             >
