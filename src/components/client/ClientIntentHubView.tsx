@@ -54,7 +54,7 @@ export function ClientIntentHubView({
       {/* 3 Equal-Height Architectural Service Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
         {/* Card 01: Viết mới Luận văn & Báo cáo */}
-        <article className="group rounded-3xl bg-white border border-zinc-200/90 hover:border-[#12489B]/45 p-7 flex flex-col justify-between gap-6 shadow-[0_10px_30px_rgba(15,23,42,0.03)] hover:shadow-[0_18px_40px_rgba(18,72,155,0.09)] transition-all">
+        <article className="motion-card-lift group rounded-3xl bg-white border border-zinc-200/90 hover:border-[#12489B]/45 p-7 flex flex-col justify-between gap-6 shadow-[0_10px_30px_rgba(15,23,42,0.03)] hover:shadow-[0_18px_40px_rgba(18,72,155,0.09)]">
           <div className="space-y-5">
             <div className="flex items-center justify-between gap-3">
               <span className="w-11 h-11 rounded-2xl bg-[#F4F7FB] border border-blue-200/80 text-[#12489B] flex items-center justify-center shrink-0">
@@ -105,7 +105,7 @@ export function ClientIntentHubView({
         </article>
 
         {/* Card 02 (Focal Royal Navy Card): Tra cứu tiến độ bằng Mã đơn */}
-        <article className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#071A42] via-[#0B2559] to-[#12489B] text-white border border-[#1E448F] p-7 flex flex-col justify-between gap-6 shadow-[0_20px_48px_-14px_rgba(11,37,89,0.45)]">
+        <article className="motion-card-lift relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#071A42] via-[#0B2559] to-[#12489B] text-white border border-[#1E448F] p-7 flex flex-col justify-between gap-6 shadow-[0_20px_48px_-14px_rgba(11,37,89,0.45)]">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute -top-16 -right-16 w-48 h-48 rounded-full bg-sky-400/20 blur-3xl"
@@ -167,7 +167,7 @@ export function ClientIntentHubView({
         </article>
 
         {/* Card 03: Giảm tỷ lệ Đạo văn & AI */}
-        <article className="group rounded-3xl bg-white border border-zinc-200/90 hover:border-amber-400/60 p-7 flex flex-col justify-between gap-6 shadow-[0_10px_30px_rgba(15,23,42,0.03)] hover:shadow-[0_18px_40px_rgba(217,119,6,0.08)] transition-all">
+        <article className="motion-card-lift group rounded-3xl bg-white border border-zinc-200/90 hover:border-amber-400/60 p-7 flex flex-col justify-between gap-6 shadow-[0_10px_30px_rgba(15,23,42,0.03)] hover:shadow-[0_18px_40px_rgba(217,119,6,0.08)]">
           <div className="space-y-5">
             <div className="flex items-center justify-between gap-3">
               <span className="w-11 h-11 rounded-2xl bg-amber-50 border border-amber-200/90 text-[#D97706] flex items-center justify-center shrink-0">

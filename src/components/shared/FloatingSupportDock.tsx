@@ -40,7 +40,7 @@ export function FloatingSupportDock() {
         </span>
 
         {/* Outer Translucent Halo Ring */}
-        <span className="w-15 h-15 sm:w-16 sm:h-16 rounded-full bg-[#12489B]/18 group-hover:bg-[#12489B]/28 flex items-center justify-center transition-all duration-300 shadow-[0_6px_20px_rgba(11,37,89,0.16)]">
+        <span className="support-halo-pulse w-15 h-15 sm:w-16 sm:h-16 rounded-full bg-[#12489B]/18 group-hover:bg-[#12489B]/28 flex items-center justify-center transition-colors duration-200 shadow-[0_6px_20px_rgba(11,37,89,0.16)]">
           {/* Inner Core Circle */}
           <span className="w-11 h-11 sm:w-11.5 sm:h-11.5 rounded-full bg-gradient-to-b from-[#12489B] to-[#0B2559] group-hover:scale-105 text-white flex items-center justify-center shadow-md border border-white/25 transition-transform duration-200">
             <span className="text-[13px] font-black tracking-tight leading-none font-sans">
@@ -65,7 +65,7 @@ export function FloatingSupportDock() {
         </span>
 
         {/* Outer Translucent Halo Ring */}
-        <span className="w-15 h-15 sm:w-16 sm:h-16 rounded-full bg-[#12489B]/18 group-hover:bg-[#12489B]/28 flex items-center justify-center transition-all duration-300 shadow-[0_6px_20px_rgba(11,37,89,0.16)]">
+        <span className="support-halo-pulse w-15 h-15 sm:w-16 sm:h-16 rounded-full bg-[#12489B]/18 group-hover:bg-[#12489B]/28 flex items-center justify-center transition-colors duration-200 shadow-[0_6px_20px_rgba(11,37,89,0.16)]">
           {/* Inner Core Circle */}
           <span className="w-11 h-11 sm:w-11.5 sm:h-11.5 rounded-full bg-gradient-to-b from-[#12489B] to-[#0B2559] group-hover:scale-105 text-white flex items-center justify-center shadow-md border border-white/25 transition-transform duration-200">
             {/* Messenger Bubble + Lightning SVG */}

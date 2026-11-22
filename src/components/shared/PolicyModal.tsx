@@ -48,12 +48,12 @@ export function PolicyModal({ initialTab, onClose }: PolicyModalProps) {
 
   return (
     <div
-      className="fixed inset-0 z-[110] bg-slate-900/55 backdrop-blur-[2px] flex items-center justify-center p-4"
+      className="modal-backdrop fixed inset-0 z-[110] bg-slate-900/55 backdrop-blur-[2px] flex items-center justify-center p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-3xl bg-white rounded-3xl border border-zinc-200 shadow-2xl overflow-hidden max-h-[88vh] flex flex-col"
+        className="modal-panel w-full max-w-3xl bg-white rounded-3xl border border-zinc-200 shadow-2xl overflow-hidden max-h-[88vh] flex flex-col"
       >
         {/* Header */}
         <div className="px-6 py-4 bg-[#0B2559] text-white flex items-center justify-between gap-3">

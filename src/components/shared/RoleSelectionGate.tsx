@@ -20,6 +20,7 @@ import {
 import { BrandLogo } from './BrandLogo';
 import { PolicyModal, PolicyTabKey } from './PolicyModal';
 import { PublicTopNav } from './PublicTopNav';
+import { RevealOnScroll } from './RevealOnScroll';
 import { SampleLibraryView } from './SampleLibraryView';
 import { ClientIntentHubView } from '../client/ClientIntentHubView';
 
@@ -301,29 +302,29 @@ export function RoleSelectionGate({
 
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-3xl mx-auto text-center space-y-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-sm text-[11px] font-semibold uppercase tracking-[0.1em] text-sky-200">
+              <div className="hero-reveal inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-sm text-[11px] font-semibold uppercase tracking-[0.1em] text-sky-200">
                 <span className="w-2 h-2 rounded-full bg-sky-300 shadow-[0_0_10px_#7DD3FC]" />
                 <span>Hỗ trợ Assignment &amp; Luận văn chuẩn Quốc tế · Đúng hẹn 100%</span>
               </div>
 
-              <h1 className="text-3xl sm:text-5xl lg:text-[54px] font-bold tracking-[-0.03em] leading-[1.1] text-white">
+              <h1 className="hero-reveal hero-delay-1 text-3xl sm:text-5xl lg:text-[54px] font-bold tracking-[-0.03em] leading-[1.1] text-white">
                 Cứu cánh Deadline &amp; Chinh phục{' '}
                 <span className="text-sky-300">điểm High Distinction</span> cho mọi
                 bài luận của bạn
               </h1>
 
-              <p className="text-sm sm:text-base text-slate-200/85 max-w-2xl mx-auto leading-relaxed">
+              <p className="hero-reveal hero-delay-2 text-sm sm:text-base text-slate-200/85 max-w-2xl mx-auto leading-relaxed">
                 Viết bài đúng chuyên ngành, bám sát Rubric từng môn học, cam kết 100% nguồn trích dẫn thật và tặng kèm báo cáo kiểm tra Đạo văn – AI. Theo dõi tiến độ trực tuyến và xem trước bài trước khi thanh toán.
               </p>
 
-              <div className="pt-2 flex flex-wrap items-center justify-center gap-3.5">
+              <div className="hero-reveal hero-delay-3 pt-2 flex flex-wrap items-center justify-center gap-3.5">
                 <button
                   type="button"
                   onClick={handleOrderNow}
-                  className="btn-press group inline-flex items-center gap-3 pl-6 pr-2 py-2 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-sm font-bold shadow-[0_10px_28px_rgba(234,88,12,0.35)] transition-all"
+                  className="btn-press group inline-flex items-center gap-3 pl-6 pr-2 py-2 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-sm font-bold shadow-[0_10px_28px_rgba(234,88,12,0.35)]"
                 >
                   <span>Order Now — Đặt bài ngay</span>
-                  <span className="w-8 h-8 rounded-full bg-white text-[#EA580C] flex items-center justify-center transition-transform group-hover:rotate-12">
+                  <span className="w-8 h-8 rounded-full bg-white text-[#EA580C] flex items-center justify-center transition-transform duration-150 group-hover:rotate-12">
                     <ArrowUpRight className="w-4 h-4" />
                   </span>
                 </button>
@@ -331,24 +332,24 @@ export function RoleSelectionGate({
                 <button
                   type="button"
                   onClick={openSampleLibrary}
-                  className="btn-press group inline-flex items-center gap-2.5 pl-5 pr-2 py-2 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-semibold backdrop-blur-sm transition-colors"
+                  className="btn-press group inline-flex items-center gap-2.5 pl-5 pr-2 py-2 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-semibold backdrop-blur-sm"
                 >
                   <span>Xem Thư viện Bài mẫu (Sample Library)</span>
                   <span className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center">
-                    <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
+                    <ArrowRight className="w-4 h-4 transition-transform duration-150 group-hover:translate-x-0.5" />
                   </span>
                 </button>
               </div>
             </div>
 
             {/* 4 Signature Floating Trust Cards */}
-            <div className="mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="hero-reveal hero-delay-4 mt-14 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {TRUST_CARDS.map((card) => {
                 const Icon = card.icon;
                 return (
                   <div
                     key={card.title}
-                    className="rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/15 backdrop-blur-md p-5 transition-colors"
+                    className="motion-card-lift rounded-2xl bg-white/[0.07] hover:bg-white/[0.11] border border-white/15 backdrop-blur-md p-5"
                   >
                     <div className="flex items-center justify-between gap-2 mb-3">
                       <span className="w-9 h-9 rounded-xl bg-sky-400/15 border border-sky-300/25 flex items-center justify-center text-sky-300">
@@ -388,13 +389,15 @@ export function RoleSelectionGate({
           id="dich-vu-nhanh"
           className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto"
         >
-          <ClientIntentHubView
-            onSelectOrder={(serviceType) =>
-              onSelectClient({ tab: 'order', serviceType })
-            }
-            onSelectLookup={() => onSelectClient({ tab: 'lookup' })}
-            onSelectChecker={() => onSelectClient({ tab: 'checker' })}
-          />
+          <RevealOnScroll>
+            <ClientIntentHubView
+              onSelectOrder={(serviceType) =>
+                onSelectClient({ tab: 'order', serviceType })
+              }
+              onSelectLookup={() => onSelectClient({ tab: 'lookup' })}
+              onSelectChecker={() => onSelectClient({ tab: 'checker' })}
+            />
+          </RevealOnScroll>
         </section>
 
         {/* ACHIEVEMENTS BENTO GRID */}
@@ -536,11 +539,12 @@ export function RoleSelectionGate({
               </p>
             </div>
 
+            <RevealOnScroll>
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
               {PACKAGES.map((pkg) => (
                 <div
                   key={pkg.name}
-                  className={`rounded-3xl p-7 flex flex-col justify-between gap-6 border transition-all ${
+                  className={`motion-card-lift rounded-3xl p-7 flex flex-col justify-between gap-6 border ${
                     pkg.featured
                       ? 'bg-[#0B2559] text-white border-[#1D4ED8]/60 shadow-[0_20px_50px_rgba(11,37,89,0.25)] lg:-translate-y-2'
                       : pkg.warm
@@ -637,6 +641,7 @@ export function RoleSelectionGate({
                 </div>
               ))}
             </div>
+            </RevealOnScroll>
           </div>
         </section>
 
@@ -750,16 +755,17 @@ export function RoleSelectionGate({
                     <button
                       type="button"
                       onClick={() => setOpenFaqIdx(isOpen ? null : idx)}
+                      aria-expanded={isOpen}
                       className="w-full px-6 py-4.5 text-left flex items-center justify-between gap-4 hover:bg-zinc-50/80 transition-colors"
                     >
                       <span className="text-sm font-bold text-slate-900">
                         {item.q}
                       </span>
                       <span
-                        className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                        className={`w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-transform duration-200 ${
                           isOpen
-                            ? 'bg-[#12489B] text-white'
-                            : 'bg-blue-50 text-[#12489B]'
+                            ? 'bg-[#12489B] text-white rotate-180'
+                            : 'bg-blue-50 text-[#12489B] rotate-0'
                         }`}
                       >
                         {isOpen ? (
@@ -769,11 +775,16 @@ export function RoleSelectionGate({
                         )}
                       </span>
                     </button>
-                    {isOpen && (
-                      <div className="px-6 pb-5 text-xs sm:text-sm text-zinc-600 leading-relaxed">
-                        {item.a}
+                    <div
+                      className="faq-collapse"
+                      data-open={isOpen ? 'true' : 'false'}
+                    >
+                      <div className="faq-collapse-inner">
+                        <div className="px-6 pb-5 text-xs sm:text-sm text-zinc-600 leading-relaxed">
+                          {item.a}
+                        </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 );
               })}
@@ -783,6 +794,7 @@ export function RoleSelectionGate({
 
         {/* FINAL DARK CTA BANNER */}
         <section className="px-4 sm:px-6 lg:px-8 pb-16">
+          <RevealOnScroll>
           <div className="max-w-7xl mx-auto rounded-3xl bg-gradient-to-br from-[#071A42] via-[#0B2559] to-[#12489B] text-white p-8 sm:p-14 text-center space-y-6 shadow-xl relative overflow-hidden">
             <div
               aria-hidden="true"
@@ -803,12 +815,13 @@ export function RoleSelectionGate({
                 className="btn-press group inline-flex items-center gap-3 pl-6 pr-2 py-2 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-sm font-bold shadow-lg"
               >
                 <span>Order Now — Đặt bài ngay</span>
-                <span className="w-8 h-8 rounded-full bg-white text-[#EA580C] flex items-center justify-center">
+                <span className="w-8 h-8 rounded-full bg-white text-[#EA580C] flex items-center justify-center transition-transform duration-150 group-hover:rotate-12">
                   <ArrowUpRight className="w-4 h-4" />
                 </span>
               </button>
             </div>
           </div>
+          </RevealOnScroll>
         </section>
         </>
         )}
