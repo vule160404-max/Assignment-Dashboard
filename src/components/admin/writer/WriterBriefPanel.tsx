@@ -304,12 +304,17 @@ export function WriterBriefPanel({
         />
       </div>
 
-      {/* Per-session context / reference files */}
+      {/* Per-session context / reference files (including client draft if any) */}
       <div className="pt-2.5 border-t border-zinc-100">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-[11px] font-semibold text-zinc-600">
-            Tài liệu đính kèm riêng cho bài (.md, .txt, .docx, .pdf):
-          </span>
+        <div className="flex items-center justify-between mb-1.5">
+          <div>
+            <span className="block text-[11px] font-semibold text-zinc-700">
+              Tài liệu đính kèm &amp; Bản nháp (Draft) của khách (.docx, .pdf, .txt, .md):
+            </span>
+            <span className="block text-[10px] text-zinc-400">
+              Nếu khách đã có bản nháp (draft) hoặc tài liệu gốc, đính kèm trực tiếp tại đây để AI đọc hiểu và viết tiếp.
+            </span>
+          </div>
           <input
             ref={contextFileInputRef}
             type="file"

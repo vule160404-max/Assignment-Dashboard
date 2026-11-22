@@ -10,10 +10,8 @@ import {
 } from 'lucide-react';
 import {
   AiRefineAction,
-  ExistingDraftMode,
   PaperAuditReport,
   alignThesisTypeWording,
-  analyzeAndPlanExistingDraftWithAi,
   buildCrossrefVerifiedReferences,
   fixReferencesTargetedWithAi,
   generateOutlineWithAi,
@@ -22,7 +20,6 @@ import {
   loadGlobalSkillLibrary,
   loadWriterSessions,
   parseAiOutlineJson,
-  parseExistingDraftIntoSections,
   refineTextWithAi,
   researchSourcesWithPerplexity,
   resolveEffectiveWriterConfig,
@@ -78,7 +75,6 @@ import { WriterBriefPanel } from './writer/WriterBriefPanel';
 import { WriterCoverPageModal } from './writer/WriterCoverPageModal';
 import { WriterDeliverModal } from './writer/WriterDeliverModal';
 import { WriterAuditModal } from './writer/WriterAuditModal';
-import { WriterImportDraftModal } from './writer/WriterImportDraftModal';
 import { WriterOutlinePanel } from './writer/WriterOutlinePanel';
 import {
   SectionAuditVisualState,
@@ -219,7 +215,6 @@ export function AiWriterStudioView({
   const [showSkillModal, setShowSkillModal] = useState(false);
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [showDeliverModal, setShowDeliverModal] = useState(false);
-  const [showImportDraftModal, setShowImportDraftModal] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [auditReport, setAuditReport] = useState<PaperAuditReport | null>(null);
   const [isAuditingPaper, setIsAuditingPaper] = useState(false);
@@ -1948,319 +1943,6 @@ export function AiWriterStudioView({
     }
   };
 
-  /**
-   * Imports an existing draft (uploaded file or pasted text), optionally analyzes it with AI,
-   * and revises / expands / completes sections while logging EXACT edit locations in the Activity Panel.
-   */
-  const handleProcessExistingDraft = async ({
-    rawDraftText,
-    fileName,
-    mode,
-    userEditNotes,
-  }: {
-    rawDraftText: string;
-    fileName?: string;
-    mode: ExistingDraftMode;
-    userEditNotes: string;
-  }) => {
-    if (!activeSession) return;
-    const targetSessionId = activeSession.id;
-    const draftWords = countWords(rawDraftText);
-
-    // Ensure Activity Panel is visible so user sees live edit changelog
-    if (!showActivityPanel) {
-      setShowActivityPanel(true);
-    }
-
-    pushActivityLog(
-      'info',
-      `Nạp bài nháp có sẵn (${draftWords.toLocaleString('vi-VN')} từ)`,
-      fileName ? `Nguồn tệp: ${fileName}` : 'Dán trực tiếp từ văn bản khách gửi.'
-    );
-
-    // Mode 1: Import Only (instant local split into sections, 0 AI calls)
-    if (mode === 'import_only') {
-      const parsedSections = parseExistingDraftIntoSections(
-        rawDraftText,
-        activeSession.targetWordCount,
-        activeSession.citationStyle,
-        activeSession.writingLanguage
-      );
-      mutateSessionById(
-        targetSessionId,
-        (s) => ({
-          ...s,
-          outline: parsedSections,
-          activeSectionId: parsedSections[0]?.id || '',
-          fullPaperOverride: '',
-          batchStatus: 'idle',
-        }),
-        true
-      );
-      setLeftTab('outline');
-      pushActivityLog(
-        'success',
-        `Đã tách bài nháp thành ${parsedSections.length} mục`,
-        parsedSections.map((p) => p.title).slice(0, 4).join(' · ')
-      );
-      onToast(
-        `Đã nạp bài nháp (${draftWords.toLocaleString('vi-VN')} từ) vào ${parsedSections.length} mục dàn ý!`
-      );
-      return;
-    }
-
-    if (!hasEffectiveApiKey) {
-      setShowApiModal(true);
-      onToast('Vui lòng cấu hình API Key AI trước khi sửa bài.');
-      return;
-    }
-
-    pausedSessionIdsRef.current.delete(targetSessionId);
-    const signal = getFreshAiSignal();
-    setLeftTab('outline');
-
-    mutateSessionById(targetSessionId, (s) => ({
-      ...s,
-      batchStatus: 'outlining',
-      batchErrorMsg: undefined,
-    }));
-
-    const planStart = Date.now();
-    const planLogId = pushActivityLog(
-      'running',
-      'Đang đọc bài nháp & lập kế hoạch sửa',
-      mode === 'complete_and_expand'
-        ? 'Rà soát phần đã viết, mở rộng chỗ còn mỏng và bổ sung mục thiếu.'
-        : 'Rà soát lỗi học thuật, Rubric và trích dẫn từng mục.'
-    );
-    setCurrentStepLabel('Đang đọc bài nháp có sẵn & lập kế hoạch chỉnh sửa...');
-
-    try {
-      const preparedSess =
-        (await ensureHybridSourcesForSession(targetSessionId, signal)) ||
-        activeSession;
-
-      const plannedSections = await analyzeAndPlanExistingDraftWithAi(
-        preparedSess,
-        rawDraftText,
-        mode,
-        userEditNotes,
-        skills,
-        activeProfile,
-        effectiveWriter.enableWebSearch,
-        signal
-      );
-
-      const keepCount = plannedSections.filter((p) => p.action === 'keep').length;
-      const editCount = plannedSections.filter(
-        (p) => p.action === 'revise' || p.action === 'expand'
-      ).length;
-      const newCount = plannedSections.filter(
-        (p) => p.action === 'write_new'
-      ).length;
-
-      updateActivityLog(planLogId, {
-        status: 'success',
-        title: `Lập kế hoạch sửa xong (${plannedSections.length} mục)`,
-        detail: `Giữ nguyên: ${keepCount} · Sửa/Mở rộng: ${editCount} · Viết bổ sung: ${newCount}`,
-        durationSec: (Date.now() - planStart) / 1000,
-      });
-
-      // Load the planned outline (with original draft content preserved) onto the A4 canvas
-      const cleanOutline: WriterOutlineSection[] = plannedSections.map(
-        ({ action: _a, changeReason: _r, ...sec }) => sec
-      );
-      mutateSessionById(
-        targetSessionId,
-        (s) => ({
-          ...s,
-          outline: cleanOutline,
-          activeSectionId: cleanOutline[0]?.id || '',
-          fullPaperOverride: '',
-          batchStatus: 'writing_sections',
-        }),
-        true
-      );
-
-      // Process each planned section sequentially and log EXACT edit details
-      for (let i = 0; i < plannedSections.length; i++) {
-        if (pausedSessionIdsRef.current.has(targetSessionId) || signal.aborted) {
-          setCurrentStepLabel('');
-          mutateSessionById(targetSessionId, (s) => ({
-            ...s,
-            batchStatus: 'paused',
-          }));
-          return;
-        }
-
-        const planSec = plannedSections[i];
-        if (planSec.action === 'keep' && planSec.content.trim()) {
-          pushActivityLog(
-            'info',
-            `Giữ nguyên: ${planSec.title}`,
-            planSec.changeReason || 'Nội dung gốc đã đạt yêu cầu.'
-          );
-          continue;
-        }
-
-        mutateSessionById(targetSessionId, (s) => ({
-          ...s,
-          activeSectionId: planSec.id,
-          outline: s.outline.map((sec) =>
-            sec.id === planSec.id
-              ? { ...sec, status: 'generating', errorMsg: undefined }
-              : sec
-          ),
-        }));
-
-        const latestSnap =
-          sessionsRef.current.find((s) => s.id === targetSessionId) ||
-          preparedSess;
-        const secT0 = Date.now();
-        const beforeWords = countWords(planSec.content);
-
-        const isEditExisting =
-          (planSec.action === 'revise' || planSec.action === 'expand') &&
-          planSec.content.trim().length > 0;
-
-        const actionVerb =
-          planSec.action === 'expand'
-            ? 'Mở rộng'
-            : planSec.action === 'revise'
-            ? 'Sửa & Nâng cấp'
-            : 'Viết bổ sung';
-
-        setCurrentStepLabel(
-          `${actionVerb} (${i + 1}/${plannedSections.length}): ${planSec.title}...`
-        );
-        const secLogId = pushActivityLog(
-          'running',
-          `${actionVerb}: ${planSec.title}`,
-          planSec.changeReason
-        );
-
-        let finalContent = '';
-        let changeSummary = '';
-
-        if (isEditExisting) {
-          const res = await reviseOrCompleteSectionWithAi(
-            latestSnap,
-            planSec.id,
-            planSec.action === 'expand' ? 'expand' : 'revise',
-            userEditNotes,
-            skills,
-            activeProfile,
-            effectiveWriter.enableWebSearch,
-            signal
-          );
-          finalContent = res.content;
-          changeSummary = res.changeSummary;
-        } else {
-          finalContent = await generateSectionWithAi(
-            latestSnap,
-            planSec.id,
-            skills,
-            activeProfile,
-            effectiveWriter.enableWebSearch,
-            signal,
-            (partialText, progressLabel) => {
-              setCurrentStepLabel(progressLabel);
-              if (partialText) {
-                mutateSessionById(targetSessionId, (s) => ({
-                  ...s,
-                  outline: s.outline.map((sec) =>
-                    sec.id === planSec.id
-                      ? { ...sec, content: partialText, status: 'generating' }
-                      : sec
-                  ),
-                }));
-              }
-            }
-          );
-          changeSummary = `Viết mới hoàn chỉnh mục còn thiếu theo đề bài (${planSec.changeReason}).`;
-        }
-
-        const afterWords = countWords(finalContent);
-        const delta = afterWords - beforeWords;
-        const deltaBadge = isEditExisting
-          ? `${beforeWords}w → ${afterWords}w (${delta >= 0 ? `+${delta}` : delta}w)`
-          : `+${afterWords}w (Mới)`;
-
-        mutateSessionById(
-          targetSessionId,
-          (s) => ({
-            ...s,
-            outline: s.outline.map((sec) =>
-              sec.id === planSec.id
-                ? {
-                    ...sec,
-                    content: finalContent,
-                    status: 'completed',
-                    errorMsg: undefined,
-                  }
-                : sec
-            ),
-          }),
-          true
-        );
-
-        updateActivityLog(secLogId, {
-          status: 'success',
-          title: `${actionVerb} xong: ${planSec.title}`,
-          detail: `[${deltaBadge}] ${changeSummary || planSec.changeReason}`,
-          durationSec: (Date.now() - secT0) / 1000,
-        });
-      }
-
-      mutateSessionById(targetSessionId, (s) => ({
-        ...s,
-        batchStatus: 'completed',
-      }));
-      setCurrentStepLabel('');
-      pushActivityLog(
-        'success',
-        'Hoàn tất sửa & hoàn thiện bài nháp!',
-        `Đã xử lý toàn bộ ${plannedSections.length} mục. Xem chi tiết từng vị trí đã sửa ngay phía dưới.`
-      );
-      onToast('Đã sửa & hoàn thiện toàn bộ bài nháp thành công!');
-    } catch (err) {
-      setCurrentStepLabel('');
-      if (isAbortError(err)) {
-        mutateSessionById(targetSessionId, (s) => ({
-          ...s,
-          batchStatus: 'paused',
-          outline: s.outline.map((sec) =>
-            sec.status === 'generating'
-              ? { ...sec, status: 'idle', errorMsg: undefined }
-              : sec
-          ),
-        }));
-        return;
-      }
-      const msg =
-        err instanceof Error
-          ? err.message
-          : 'Quá trình sửa bài nháp bị gián đoạn.';
-      updateActivityLog(planLogId, {
-        status: 'error',
-        title: 'Sửa bài nháp bị gián đoạn',
-        detail: msg,
-        durationSec: (Date.now() - planStart) / 1000,
-      });
-      mutateSessionById(targetSessionId, (s) => ({
-        ...s,
-        batchStatus: 'error',
-        batchErrorMsg: msg,
-        outline: s.outline.map((sec) =>
-          sec.status === 'generating'
-            ? { ...sec, status: 'error', errorMsg: msg }
-            : sec
-        ),
-      }));
-      onToast(msg);
-    }
-  };
-
   // --- Final Academic QA Auditor Agent (Layer 1: Deterministic + Crossref, Layer 2: AI Examiner) ---
   const handleRunPaperAudit = async () => {
     if (!activeSession) return;
@@ -2942,7 +2624,6 @@ export function AiWriterStudioView({
         onOpenDeliverModal={
           onDeliverDocxToClient ? () => setShowDeliverModal(true) : undefined
         }
-        onOpenImportDraft={() => setShowImportDraftModal(true)}
         onExportDocx={() => void handleExportDocx()}
         onExportPdf={() => {
           if (!activeSession || totalDraftedWords === 0) {
@@ -3196,13 +2877,6 @@ export function AiWriterStudioView({
           mutateActiveSession((s) => ({ ...s, activeSectionId: secId }));
         }}
         onClose={() => setShowAuditModal(false)}
-      />
-
-      <WriterImportDraftModal
-        isOpen={showImportDraftModal}
-        onClose={() => setShowImportDraftModal(false)}
-        onStartProcess={(params) => void handleProcessExistingDraft(params)}
-        onToast={onToast}
       />
 
       <WriterApiSettingsModal
