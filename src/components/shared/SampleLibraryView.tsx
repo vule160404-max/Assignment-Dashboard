@@ -40,9 +40,12 @@ export function SampleLibraryView({
   const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [disciplineFilter, setDisciplineFilter] = useState('all');
+  const [institutionFilter, setInstitutionFilter] = useState('all');
   const [levelFilter, setLevelFilter] = useState('all');
   const [docTypeFilter, setDocTypeFilter] = useState('all');
   const [countryFilter, setCountryFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 8;
 
   // Reader utility states
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -51,6 +54,10 @@ export function SampleLibraryView({
 
   const disciplines = useMemo(
     () => Array.from(new Set(SAMPLE_LIBRARY_ITEMS.map((i) => i.discipline))),
+    []
+  );
+  const institutions = useMemo(
+    () => Array.from(new Set(SAMPLE_LIBRARY_ITEMS.map((i) => i.institution))),
     []
   );
   const levels = useMemo(
@@ -70,6 +77,12 @@ export function SampleLibraryView({
     const q = searchQuery.trim().toLowerCase();
     return SAMPLE_LIBRARY_ITEMS.filter((item) => {
       if (disciplineFilter !== 'all' && item.discipline !== disciplineFilter) {
+        return false;
+      }
+      if (
+        institutionFilter !== 'all' &&
+        item.institution !== institutionFilter
+      ) {
         return false;
       }
       if (levelFilter !== 'all' && item.level !== levelFilter) {
@@ -94,10 +107,25 @@ export function SampleLibraryView({
   }, [
     searchQuery,
     disciplineFilter,
+    institutionFilter,
     levelFilter,
     docTypeFilter,
     countryFilter,
   ]);
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredSamples.length / ITEMS_PER_PAGE)
+  );
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedSamples = useMemo(
+    () =>
+      filteredSamples.slice(
+        (safePage - 1) * ITEMS_PER_PAGE,
+        safePage * ITEMS_PER_PAGE
+      ),
+    [filteredSamples, safePage]
+  );
 
   const activeSample: SamplePaperItem | null = useMemo(
     () =>
@@ -687,14 +715,20 @@ export function SampleLibraryView({
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => {
+                setSearchQuery(e.target.value);
+                setCurrentPage(1);
+              }}
               placeholder="Tìm theo mã môn (VD: BUSM2570, FINA3012), tên ngành, trường hoặc từ khóa..."
               className="flex-1 px-3 py-2 text-xs sm:text-sm bg-transparent focus:outline-none text-slate-900 placeholder:text-zinc-400"
             />
             {searchQuery && (
               <button
                 type="button"
-                onClick={() => setSearchQuery('')}
+                onClick={() => {
+                  setSearchQuery('');
+                  setCurrentPage(1);
+                }}
                 className="px-2.5 py-1 text-xs font-semibold text-zinc-400 hover:text-slate-700"
               >
                 Xóa
@@ -705,13 +739,16 @@ export function SampleLibraryView({
             </span>
           </div>
 
-          {/* 4-Facet Filter Row */}
+          {/* 5-Facet Filter Row */}
           <div className="flex flex-wrap items-center justify-center gap-2.5 text-xs">
             <span className="font-bold text-slate-600">Lọc theo:</span>
 
             <select
               value={disciplineFilter}
-              onChange={(e) => setDisciplineFilter(e.target.value)}
+              onChange={(e) => {
+                setDisciplineFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-3.5 py-2 rounded-full bg-white border border-zinc-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
             >
               <option value="all">Tất cả Ngành ({disciplines.length})</option>
@@ -723,8 +760,27 @@ export function SampleLibraryView({
             </select>
 
             <select
+              value={institutionFilter}
+              onChange={(e) => {
+                setInstitutionFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              className="px-3.5 py-2 rounded-full bg-white border border-zinc-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
+            >
+              <option value="all">Tất cả Trường ({institutions.length})</option>
+              {institutions.map((inst) => (
+                <option key={inst} value={inst}>
+                  {inst}
+                </option>
+              ))}
+            </select>
+
+            <select
               value={levelFilter}
-              onChange={(e) => setLevelFilter(e.target.value)}
+              onChange={(e) => {
+                setLevelFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-3.5 py-2 rounded-full bg-white border border-zinc-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
             >
               <option value="all">Tất cả Cấp bậc</option>
@@ -737,7 +793,10 @@ export function SampleLibraryView({
 
             <select
               value={docTypeFilter}
-              onChange={(e) => setDocTypeFilter(e.target.value)}
+              onChange={(e) => {
+                setDocTypeFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-3.5 py-2 rounded-full bg-white border border-zinc-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
             >
               <option value="all">Tất cả Thể loại bài</option>
@@ -750,7 +809,10 @@ export function SampleLibraryView({
 
             <select
               value={countryFilter}
-              onChange={(e) => setCountryFilter(e.target.value)}
+              onChange={(e) => {
+                setCountryFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               className="px-3.5 py-2 rounded-full bg-white border border-zinc-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
             >
               <option value="all">Tất cả Quốc gia</option>
@@ -764,18 +826,23 @@ export function SampleLibraryView({
         </div>
 
         {/* Results Meta Bar */}
-        <div className="flex items-center justify-between gap-2 pb-2 border-b border-zinc-200/80 text-xs">
+        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-200/80 text-xs">
           <div className="inline-flex items-center gap-2 font-bold text-slate-800">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
             <span>{filteredSamples.length} bài mẫu phù hợp</span>
           </div>
-          <button
-            type="button"
-            onClick={onBackHome}
-            className="text-xs font-semibold text-[#12489B] hover:underline"
-          >
-            ← Quay lại Trang chủ
-          </button>
+          <div className="flex items-center gap-3">
+            <span className="px-3 py-1 rounded-full bg-white border border-zinc-200 font-semibold text-slate-600">
+              Trang {safePage} / {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={onBackHome}
+              className="text-xs font-semibold text-[#12489B] hover:underline"
+            >
+              ← Quay lại Trang chủ
+            </button>
+          </div>
         </div>
 
         {/* 2-Column Sample Card Grid */}
@@ -790,9 +857,11 @@ export function SampleLibraryView({
               onClick={() => {
                 setSearchQuery('');
                 setDisciplineFilter('all');
+                setInstitutionFilter('all');
                 setLevelFilter('all');
                 setDocTypeFilter('all');
                 setCountryFilter('all');
+                setCurrentPage(1);
               }}
               className="btn-press px-4 py-2 rounded-full bg-[#0B2559] text-white text-xs font-bold"
             >
@@ -800,69 +869,124 @@ export function SampleLibraryView({
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredSamples.map((sample) => (
-              <div
-                key={sample.id}
-                onClick={() => handleOpenSample(sample.id)}
-                className="group cursor-pointer rounded-3xl bg-white border border-zinc-200/90 hover:border-[#12489B]/50 p-6 shadow-[0_8px_28px_rgba(15,23,42,0.03)] hover:shadow-[0_14px_36px_rgba(18,72,155,0.09)] transition-all flex flex-col justify-between gap-5"
-              >
-                <div className="space-y-4">
-                  <div className="flex items-start gap-4">
-                    {/* Left Square Institution Emblem Slot */}
-                    <div className="w-16 h-16 rounded-2xl bg-[#F4F7FB] border border-zinc-200/90 flex flex-col items-center justify-center shrink-0 text-center px-1">
-                      <span className="text-[11px] font-black font-mono text-[#0B2559] leading-tight">
-                        {sample.institutionShort}
-                      </span>
-                      <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md mt-1">
-                        {sample.gradeLabel} · {sample.gradeScore.split('/')[0]}
-                      </span>
-                    </div>
-
-                    <div className="min-w-0 flex-1 space-y-2">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <span className="px-2.5 py-0.5 rounded-full bg-[#0B2559] text-white text-[10.5px] font-bold">
-                          Free Sample
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {paginatedSamples.map((sample) => (
+                <div
+                  key={sample.id}
+                  onClick={() => handleOpenSample(sample.id)}
+                  className="group cursor-pointer rounded-3xl bg-white border border-zinc-200/90 hover:border-[#12489B]/50 p-6 shadow-[0_8px_28px_rgba(15,23,42,0.03)] hover:shadow-[0_14px_36px_rgba(18,72,155,0.09)] transition-all flex flex-col justify-between gap-5"
+                >
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-4">
+                      {/* Left Square Institution Emblem Slot */}
+                      <div className="w-16 h-16 rounded-2xl bg-[#F4F7FB] border border-zinc-200/90 flex flex-col items-center justify-center shrink-0 text-center px-1">
+                        <span className="text-[11px] font-black font-mono text-[#0B2559] leading-tight">
+                          {sample.institutionShort}
                         </span>
-                        <span className="px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200/80 text-[#12489B] text-[10.5px] font-semibold">
-                          {sample.discipline}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[10px] font-mono font-bold">
-                          Turnitin {sample.turnitinPercent}% · 0% AI
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md mt-1">
+                          {sample.gradeLabel} · {sample.gradeScore.split('/')[0]}
                         </span>
                       </div>
 
-                      <h3 className="text-base font-bold text-slate-900 group-hover:text-[#12489B] transition-colors leading-snug line-clamp-2">
-                        {sample.title}
-                      </h3>
+                      <div className="min-w-0 flex-1 space-y-2">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="px-2.5 py-0.5 rounded-full bg-[#0B2559] text-white text-[10.5px] font-bold">
+                            Free Sample
+                          </span>
+                          <span className="px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200/80 text-[#12489B] text-[10.5px] font-semibold">
+                            {sample.discipline}
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[10px] font-mono font-bold">
+                            Turnitin {sample.turnitinPercent}% · 0% AI
+                          </span>
+                        </div>
+
+                        <h3 className="text-base font-bold text-slate-900 group-hover:text-[#12489B] transition-colors leading-snug line-clamp-2">
+                          {sample.title}
+                        </h3>
+                      </div>
                     </div>
+
+                    <p className="text-xs text-zinc-600 leading-relaxed line-clamp-3">
+                      {sample.excerpt}
+                    </p>
                   </div>
 
-                  <p className="text-xs text-zinc-600 leading-relaxed line-clamp-3">
-                    {sample.excerpt}
-                  </p>
-                </div>
+                  {/* Dashed Divider + Footer */}
+                  <div className="pt-4 border-t border-dashed border-zinc-200 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 text-[11px] text-zinc-500 font-mono">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{sample.publishedDate}</span>
+                      </span>
+                      <span>· {sample.wordCount.toLocaleString('vi-VN')} từ</span>
+                      <span>· {sample.citationStyle}</span>
+                    </div>
 
-                {/* Dashed Divider + Footer */}
-                <div className="pt-4 border-t border-dashed border-zinc-200 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-3 text-[11px] text-zinc-500 font-mono">
-                    <span className="inline-flex items-center gap-1">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>{sample.publishedDate}</span>
+                    <span className="inline-flex items-center gap-2 text-xs font-bold text-[#0B2559] group-hover:text-[#12489B]">
+                      <span>Đọc thêm</span>
+                      <span className="w-7 h-7 rounded-full bg-[#0B2559] group-hover:bg-[#12489B] text-white flex items-center justify-center transition-colors">
+                        <ArrowRight className="w-3.5 h-3.5" />
+                      </span>
                     </span>
-                    <span>· {sample.wordCount.toLocaleString('vi-VN')} từ</span>
-                    <span>· {sample.citationStyle}</span>
                   </div>
-
-                  <span className="inline-flex items-center gap-2 text-xs font-bold text-[#0B2559] group-hover:text-[#12489B]">
-                    <span>Đọc thêm</span>
-                    <span className="w-7 h-7 rounded-full bg-[#0B2559] group-hover:bg-[#12489B] text-white flex items-center justify-center transition-colors">
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </span>
-                  </span>
                 </div>
+              ))}
+            </div>
+
+            {/* Circular Pagination Bar */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <button
+                  type="button"
+                  disabled={safePage <= 1}
+                  onClick={() => {
+                    setCurrentPage((p) => Math.max(1, p - 1));
+                    document
+                      .getElementById('sample-catalog')
+                      ?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="btn-press w-10 h-10 rounded-full bg-white border border-zinc-200 text-slate-700 disabled:opacity-40 disabled:pointer-events-none hover:border-[#12489B] flex items-center justify-center text-xs font-bold"
+                >
+                  &lt;
+                </button>
+                {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(
+                  (pageNum) => (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => {
+                        setCurrentPage(pageNum);
+                        document
+                          .getElementById('sample-catalog')
+                          ?.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className={`btn-press w-10 h-10 rounded-full text-xs font-bold flex items-center justify-center transition-colors ${
+                        pageNum === safePage
+                          ? 'bg-[#0B2559] text-white shadow-sm'
+                          : 'bg-white border border-zinc-200 text-slate-700 hover:border-[#12489B]'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  )
+                )}
+                <button
+                  type="button"
+                  disabled={safePage >= totalPages}
+                  onClick={() => {
+                    setCurrentPage((p) => Math.min(totalPages, p + 1));
+                    document
+                      .getElementById('sample-catalog')
+                      ?.scrollIntoView({ behavior: 'smooth' });
+                  }}
+                  className="btn-press w-10 h-10 rounded-full bg-white border border-zinc-200 text-slate-700 disabled:opacity-40 disabled:pointer-events-none hover:border-[#12489B] flex items-center justify-center text-xs font-bold"
+                >
+                  &gt;
+                </button>
               </div>
-            ))}
+            )}
           </div>
         )}
 
