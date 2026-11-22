@@ -731,7 +731,7 @@ export async function researchSourcesWithPerplexity(
       crossrefPromise,
     ]);
 
-    const perplexityBlock = `=== PERPLEXITY REAL-TIME WEB RESEARCH (Format citations strictly in ${session.citationStyle}) ===\n${res.text}`;
+    const perplexityBlock = `=== PERPLEXITY REAL-TIME WEB RESEARCH (BACKGROUND CONTEXT — ONLY CITE AN ENTRY IF IT EXPLICITLY SHOWS AN AUTHOR SURNAME + YEAR; NEVER CITE AN ARTICLE TITLE IN PARENTHESES!) ===\n${res.text}`;
     return [crossrefDossier, perplexityBlock].filter(Boolean).join('\n\n').trim();
   }
 
@@ -834,7 +834,7 @@ STRICT CLOSED-BOOK CITATION LOCK (MANDATORY — ZERO EXCEPTIONS):
    (a) The VERIFIED CROSSREF ACADEMIC SOURCES [S1]..[SN] list below, OR
    (b) The UPLOADED ASSIGNMENT & RESEARCH CONTEXT FILES attached above, OR
    (c) Complete scholarly entries in the PERPLEXITY WEB RESEARCH section below that explicitly state Author + Year + Title + Venue.
-2. STRICTLY FORBIDDEN: NEVER invent, guess, or recall additional author-year citations from your training memory. NEVER cite any web snippet that lacks a clear author surname, year, or title.
+2. STRICTLY FORBIDDEN: NEVER invent, guess, or recall additional author-year citations from your training memory. NEVER cite any web snippet that lacks an explicit author surname and publication year. NEVER put an article title inside parentheses as an in-text citation (e.g., NEVER write "(Enhancing EFL primary school students' vocabulary mastery, 2026)" or "(Beyond single exposure, 2026)").
 3. Preserve the EXACT author surnames and publication year from the verified source list (e.g., use the exact In-Text format shown in [S1]..[SN]) so every in-text citation matches the final References 100% 1-to-1.
 4. NEVER fabricate or guess DOIs, page numbers, or thesis degrees (doctoral vs. master's) not supported by the attached files or verified sources.
 ${session.researchedSources.trim()}`
@@ -1780,8 +1780,13 @@ export async function buildCrossrefVerifiedReferences(
           return false;
         }
         // Reject completely off-topic homonym entries (e.g. Chemical Engineering CFD paper in an Education essay)
+        // while keeping legitimate regional-journal articles that share at least 1 topic/context keyword
         const entryTokens = extractMeaningfulTokens(e);
-        if (contextTokens.size >= 4 && countTokenOverlap(contextTokens, entryTokens) === 0) {
+        if (
+          contextTokens.size >= 5 &&
+          entryTokens.size >= 4 &&
+          countTokenOverlap(contextTokens, entryTokens) === 0
+        ) {
           return false;
         }
         return true;
@@ -2206,7 +2211,7 @@ STRICT ACADEMIC WRITING & CITATION RULES (MANDATORY):
    - Every paragraph under a sub-heading MUST strictly match that sub-heading's exact topic — NEVER place content about another theme under the wrong sub-heading.
 3. CLOSED-BOOK VERIFIED CITATIONS ONLY:
    - ONLY cite sources that exist in the VERIFIED IN-TEXT CITATION WHITELIST above, the attached Context Files, or complete verified sources in the system prompt (with explicit Author + Year + Title + Venue).
-   - STRICTLY FORBIDDEN: NEVER invent, guess, or recall author-year citations from memory. NEVER drop the first author of a multi-author work, and NEVER alter the publication year.
+   - STRICTLY FORBIDDEN: NEVER invent, guess, or recall author-year citations from memory. NEVER put an article title inside parentheses instead of an author surname (e.g., NEVER write "(Teacher challenges and adaptive pedagogical responses, 2026)"). If a Perplexity snippet has no explicit author name, DO NOT cite it. NEVER drop the first author of a multi-author work, and NEVER alter the publication year.
    - Integrate citations naturally to support claims (critical synthesis, not a laundry list of summaries), aiming for 2–5 authentic citations per major analytical subsection.
 4. FACTUAL CONSISTENCY ACROSS CHAPTERS:
    - Keep every factual detail (e.g., Doctoral/PhD thesis vs. Master's thesis, sample size N, instruments, methodology, author spelling) 100% consistent with the attached Context Files and Prior Sections. NEVER contradict earlier chapters.
@@ -2850,6 +2855,48 @@ export async function runDeterministicPaperAudit(
         autoFixable: true,
         fixHint: `Mở rộng mục "${sec.title}" đạt chuẩn học thuật và tiệm cận ~${sec.targetWords} từ.`,
       });
+    }
+
+    // Check for article titles mistakenly placed inside parenthetical citations instead of author surnames
+    // e.g., (Teacher challenges and adaptive pedagogical responses, 2026) or (Beyond single exposure, 2026)
+    if (sec.id !== refSection?.id) {
+      const titleAsAuthorMatches: string[] = [];
+      const parenCiteRx = /\(([A-ZÀ-Ỹ][^()]{12,120}),\s*(?:19|20)\d{2}[a-z]?\)/g;
+      let tm: RegExpExecArray | null;
+      while ((tm = parenCiteRx.exec(trimmed)) !== null) {
+        const leftPart = tm[1].trim();
+        if (/\b(?:as\s+)?cited\s+in\b/i.test(leftPart) || leftPart.includes(';')) {
+          continue;
+        }
+        const words = leftPart.split(/\s+/).filter(Boolean);
+        const lowercaseNonParticleWords = words.filter(
+          (w) =>
+            /^[a-zà-ỹ]{3,}$/.test(w.replace(/[^a-zà-ỹ]/g, '')) &&
+            !/^(?:and|et|al|van|von|der|den|del|de|da|la|le|di|du|el|bin|binti|và|của)$/i.test(
+              w.replace(/[^a-zà-ỹ]/gi, '')
+            )
+        );
+        // An author surname list never has 2+ lowercase common words (whereas an article title in sentence case does)
+        if (words.length >= 3 && lowercaseNonParticleWords.length >= 2) {
+          titleAsAuthorMatches.push(tm[0]);
+        }
+      }
+      if (titleAsAuthorMatches.length > 0) {
+        pushIssue({
+          severity: 'critical',
+          category: 'citation_sync',
+          title: `Trích dẫn sai chuẩn: lấy Tên bài báo thay cho Họ tác giả (${titleAsAuthorMatches.length} chỗ) trong "${sec.title}"`,
+          detail: `Các cụm sai chuẩn: ${titleAsAuthorMatches
+            .slice(0, 4)
+            .join('; ')} — chuẩn ${session.citationStyle} bắt buộc ghi (Họ tác giả, Năm), tuyệt đối không chép tên bài báo vào ngoặc đơn.`,
+          sectionId: sec.id,
+          sectionTitle: sec.title,
+          autoFixable: true,
+          matchSnippet: titleAsAuthorMatches[0],
+          fixHint:
+            'Thay các trích dẫn bằng tiêu đề bài báo sang trích dẫn chuẩn (Họ tác giả, Năm) từ kho nguồn đã xác minh, hoặc bỏ trích dẫn nếu nguồn không có tên tác giả.',
+        });
+      }
     }
 
     // Check if the last non-empty line is abruptly truncated mid-sentence
