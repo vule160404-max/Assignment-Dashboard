@@ -6,7 +6,6 @@ import {
   Download,
   ExternalLink,
   Eye,
-  FilePlus2,
   FileText,
   Home,
   KeyRound,
@@ -14,7 +13,6 @@ import {
   RefreshCw,
   Search,
   Send,
-  ShieldCheck,
   X,
 } from 'lucide-react';
 import {
@@ -274,68 +272,16 @@ export function ClientPortalView({
             <BrandLogo />
           </a>
 
-          {/* Center: Single Clear Pill Switcher for Client Services (Desktop) */}
-          <nav
-            aria-label="Chức năng chính"
-            className="hidden md:inline-flex items-center bg-slate-100/90 border border-slate-200/80 p-1 rounded-xl gap-1"
-          >
-            <button
-              type="button"
-              onClick={() => {
-                handleResetLookup();
-                setHomeTab('order');
-              }}
-              className={`btn-press px-3.5 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap ${
-                homeTab === 'order' && !portal
-                  ? 'bg-white text-[#EA580C] shadow-xs ring-1 ring-amber-500/20'
-                  : 'text-zinc-600 hover:text-slate-900'
-              }`}
-            >
-              <FilePlus2 className="w-3.5 h-3.5" />
-              <span>Đặt bài mới</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                handleResetLookup();
-                setHomeTab('lookup');
-              }}
-              className={`btn-press px-3.5 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap ${
-                (homeTab === 'lookup' || Boolean(portal))
-                  ? 'bg-white text-[#0B2559] shadow-xs ring-1 ring-slate-900/5'
-                  : 'text-zinc-600 hover:text-slate-900'
-              }`}
-            >
-              <KeyRound className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>Tra cứu mã đơn</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                handleResetLookup();
-                setHomeTab('checker');
-              }}
-              className={`btn-press px-3.5 py-1.5 text-xs font-semibold rounded-lg inline-flex items-center gap-1.5 whitespace-nowrap ${
-                homeTab === 'checker' && !portal
-                  ? 'bg-white text-[#12489B] shadow-xs ring-1 ring-[#12489B]/15'
-                  : 'text-zinc-600 hover:text-slate-900'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Check Đạo văn &amp; AI</span>
-            </button>
-          </nav>
-
           {/* Right: Back Home + Subtle Admin Link */}
           <div className="flex items-center gap-2 shrink-0">
             {onBackToRoleSelect && (
               <button
                 type="button"
                 onClick={onBackToRoleSelect}
-                className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-[#0B2559] bg-white hover:bg-blue-50/70 border border-zinc-200/90 rounded-xl whitespace-nowrap shadow-2xs"
+                className="btn-press inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:text-[#0B2559] bg-white hover:bg-blue-50/70 border border-zinc-200/90 rounded-xl whitespace-nowrap shadow-2xs"
               >
                 <Home className="w-3.5 h-3.5 text-[#12489B]" />
-                <span>Trang chủ</span>
+                <span>Về trang chủ</span>
               </button>
             )}
 
@@ -346,57 +292,6 @@ export function ClientPortalView({
               title="Chuyển sang cổng dành cho Admin / Nhân sự"
             >
               Quản trị
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Compact 3-Tab Bar */}
-        <div className="md:hidden px-4 pb-2.5">
-          <div className="bg-zinc-100/90 border border-zinc-200/70 p-1 rounded-xl grid grid-cols-3 gap-1">
-            <button
-              type="button"
-              onClick={() => {
-                handleResetLookup();
-                setHomeTab('order');
-              }}
-              className={`btn-press py-2 px-2 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1 ${
-                homeTab === 'order' && !portal
-                  ? 'bg-white text-[#EA580C] shadow-2xs'
-                  : 'text-zinc-600'
-              }`}
-            >
-              <FilePlus2 className="w-3.5 h-3.5" />
-              <span>Đặt bài</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                handleResetLookup();
-                setHomeTab('lookup');
-              }}
-              className={`btn-press py-2 px-2 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1 ${
-                homeTab === 'lookup' || Boolean(portal)
-                  ? 'bg-white text-[#0B2559] shadow-2xs'
-                  : 'text-zinc-600'
-              }`}
-            >
-              <KeyRound className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>Tra cứu</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                handleResetLookup();
-                setHomeTab('checker');
-              }}
-              className={`btn-press py-2 px-2 text-xs font-semibold rounded-lg inline-flex items-center justify-center gap-1 ${
-                homeTab === 'checker' && !portal
-                  ? 'bg-white text-[#12489B] shadow-2xs'
-                  : 'text-zinc-600'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Check AI</span>
             </button>
           </div>
         </div>
