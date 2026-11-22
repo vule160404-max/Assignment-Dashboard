@@ -333,6 +333,34 @@ service cloud.firestore {
         && (!('updatedByUid' in data) || isValidId(data.updatedByUid));
     }
 
+    function isValidOrderInquiry(data) {
+      return data.keys().hasAll([
+          'inquiryCode', 'customerName', 'contactInfo', 'serviceType',
+          'subject', 'topic', 'wordCount', 'citationStyle',
+          'deadlineAt', 'status', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'inquiryCode', 'customerName', 'contactInfo', 'serviceType',
+          'subject', 'topic', 'wordCount', 'citationStyle',
+          'deadlineAt', 'notes', 'status', 'convertedOrderCode',
+          'createdAt', 'updatedAt'
+        ])
+        && isValidOrderCode(data.inquiryCode)
+        && data.customerName is string && data.customerName.size() >= 1 && data.customerName.size() <= 120
+        && data.contactInfo is string && data.contactInfo.size() >= 3 && data.contactInfo.size() <= 160
+        && data.serviceType is string && data.serviceType.size() >= 1 && data.serviceType.size() <= 100
+        && data.subject is string && data.subject.size() >= 1 && data.subject.size() <= 120
+        && data.topic is string && data.topic.size() >= 1 && data.topic.size() <= 240
+        && data.wordCount is number && data.wordCount >= 0 && data.wordCount <= 500000
+        && data.citationStyle in ['APA', 'Harvard', 'IEEE', 'MLA', 'Chicago', 'Other']
+        && data.deadlineAt is number && data.deadlineAt > 0
+        && (!('notes' in data) || (data.notes is string && data.notes.size() <= 3000))
+        && data.status in ['new', 'converted', 'archived']
+        && (!('convertedOrderCode' in data) || (data.convertedOrderCode is string && data.convertedOrderCode.size() <= 32))
+        && isValidTimestampStr(data.createdAt)
+        && isValidTimestampStr(data.updatedAt);
+    }
+
     // --- Collection Rules ---
     match /admins/{uid} {
       allow get: if isAdmin() && isValidId(uid);
@@ -555,9 +583,9 @@ service cloud.firestore {
       allow get, list: if isAdmin();
     }
 
-    // Authenticated non-PII tracking projection accessed strictly by exact Order Code
+    // Passcode-based non-PII tracking projection accessed strictly by exact Order Code
     match /trackingPortals/{orderCode} {
-      allow get: if isSignedIn() && isValidOrderCode(orderCode);
+      allow get: if isValidOrderCode(orderCode);
       allow list: if false;
       allow create: if isAdmin() && isValidOrderCode(orderCode) && isValidTrackingPortal(incoming(), orderCode);
       allow update: if isValidOrderCode(orderCode) && isValidTrackingPortal(incoming(), orderCode)
@@ -585,10 +613,9 @@ service cloud.firestore {
 
       // 48-hour ephemeral chat messages scoped under trackingPortals/{orderCode}
       match /messages/{msgId} {
-        allow get: if isSignedIn() && (isAdmin() || isAssignedToPortal(orderCode) || isValidOrderCode(orderCode)) && isValidId(msgId);
-        allow list: if isSignedIn() && (isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode));
-        allow create: if isSignedIn()
-          && isValidId(msgId)
+        allow get: if (isAdmin() || isAssignedToPortal(orderCode) || isValidOrderCode(orderCode)) && isValidId(msgId);
+        allow list: if isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode);
+        allow create: if isValidId(msgId)
           && isValidOrderCode(orderCode)
           && isValidOrderMessage(incoming(), orderCode)
           && exists(/databases/$(database)/documents/trackingPortals/$(orderCode))
@@ -602,10 +629,9 @@ service cloud.firestore {
 
       // Revision requests scoped under trackingPortals/{orderCode}
       match /revisions/{reqId} {
-        allow get: if isSignedIn() && (isAdmin() || isAssignedToPortal(orderCode) || isValidOrderCode(orderCode)) && isValidId(reqId);
-        allow list: if isSignedIn() && (isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode));
-        allow create: if isSignedIn()
-          && isValidId(reqId)
+        allow get: if (isAdmin() || isAssignedToPortal(orderCode) || isValidOrderCode(orderCode)) && isValidId(reqId);
+        allow list: if isAdmin() || (isValidOrderCode(orderCode) && resource.data.orderCode == orderCode);
+        allow create: if isValidId(reqId)
           && isValidOrderCode(orderCode)
           && isValidRevisionRequest(incoming(), orderCode)
           && incoming().status == 'open'
@@ -619,6 +645,22 @@ service cloud.firestore {
           && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminReply', 'updatedAt']);
         allow delete: if isAdmin() && isValidId(reqId);
       }
+    }
+
+    // Public client order registration form (write-only for public; full CRUD for Admin)
+    match /orderInquiries/{inquiryId} {
+      allow get, list: if isAdmin();
+      allow create: if isValidId(inquiryId)
+        && isValidOrderInquiry(incoming())
+        && incoming().status == 'new'
+        && (!('convertedOrderCode' in incoming()) || incoming().convertedOrderCode == '');
+      allow update: if isAdmin()
+        && isValidId(inquiryId)
+        && isValidOrderInquiry(incoming())
+        && incoming().createdAt == existing().createdAt
+        && incoming().inquiryCode == existing().inquiryCode
+        && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'convertedOrderCode', 'updatedAt']);
+      allow delete: if isAdmin() && isValidId(inquiryId);
     }
 
     // Connection check document (empty read-only probe)

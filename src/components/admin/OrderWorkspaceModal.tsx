@@ -37,6 +37,7 @@ import {
   ClientTier,
   FIELD_LIMITS,
   ORDER_STAGES,
+  OrderInquiry,
   OrderRecord,
   OrderStage,
   OrderStatus,
@@ -54,6 +55,7 @@ import { OrderRevisionsTab } from './order/OrderRevisionsTab';
 interface OrderWorkspaceModalProps {
   isOpen: boolean;
   editingOrder: OrderRecord | null;
+  prefillInquiry?: OrderInquiry | null;
   clients: ClientRecord[];
   teamMembers?: UserProfile[];
   userRole?: UserRole;
@@ -62,6 +64,7 @@ interface OrderWorkspaceModalProps {
   bankSettings: BankSettings;
   nowMs: number;
   onClose: () => void;
+  onOrderCreatedFromInquiry?: (inquiryId: string, orderCode: string) => void;
   onOpenWordHumanizer?: (orderCode: string) => void;
   onOpenAiWriter?: (orderCode: string) => void;
   onToast: (msg: string) => void;
@@ -78,6 +81,7 @@ function toDatetimeLocal(ms: number): string {
 export function OrderWorkspaceModal({
   isOpen,
   editingOrder,
+  prefillInquiry = null,
   clients,
   teamMembers = [],
   userRole = 'admin',
@@ -86,6 +90,7 @@ export function OrderWorkspaceModal({
   bankSettings,
   nowMs,
   onClose,
+  onOrderCreatedFromInquiry,
   onOpenWordHumanizer,
   onOpenAiWriter,
   onToast,
@@ -168,7 +173,11 @@ export function OrderWorkspaceModal({
       return;
     }
 
-    const sessionKey = editingOrder ? editingOrder.id : '__new__';
+    const sessionKey = editingOrder
+      ? editingOrder.id
+      : prefillInquiry
+      ? `inq_${prefillInquiry.id}`
+      : '__new__';
     if (initializedSessionRef.current === sessionKey) {
       return;
     }
@@ -204,6 +213,64 @@ export function OrderWorkspaceModal({
       setStaffPayoutPaidAt(editingOrder.staffPayoutPaidAt || '');
       setAttachments(editingOrder.attachments || []);
       setShowNewClientInline(false);
+    } else if (prefillInquiry) {
+      const contactLower = prefillInquiry.contactInfo.trim().toLowerCase();
+      const matchedClient = clients.find(
+        (c) =>
+          (c.zaloNumber && c.zaloNumber.trim().toLowerCase() === contactLower) ||
+          (c.socialLink && c.socialLink.trim().toLowerCase() === contactLower)
+      );
+      setOrderCode(generateOrderCode(existingOrderCodes));
+      if (matchedClient) {
+        setClientId(matchedClient.id);
+        setShowNewClientInline(false);
+        setNewClientName('');
+        setNewClientZalo('');
+      } else {
+        setClientId('');
+        setShowNewClientInline(true);
+        setNewClientName(prefillInquiry.customerName);
+        setNewClientZalo(prefillInquiry.contactInfo.slice(0, FIELD_LIMITS.zaloMax));
+      }
+      setAssignedStaffUid('');
+      setAssignedStaffName('');
+      setNewClientSchool('');
+      setNewClientMajor('');
+      setNewClientTier('new');
+      setSubject(prefillInquiry.subject);
+      setTopic(prefillInquiry.topic);
+      setWordCount(prefillInquiry.wordCount || 2000);
+      setCitationStyle(prefillInquiry.citationStyle || 'APA');
+      setDeadlineLocal(
+        toDatetimeLocal(
+          prefillInquiry.deadlineAt > Date.now()
+            ? prefillInquiry.deadlineAt
+            : Date.now() + 3 * 24 * 60 * 60 * 1000
+        )
+      );
+      setOutlineAndInstructions(
+        [
+          `Dịch vụ đăng ký: ${prefillInquiry.serviceType}`,
+          prefillInquiry.notes ? `Ghi chú khách hàng:\n${prefillInquiry.notes}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n\n')
+      );
+      setRubricNotes('');
+      setStage('quoted');
+      setProgressPercent(10);
+      setPublicStatusNote('');
+      setInternalNotes(
+        `Tạo từ phiếu đăng ký #${prefillInquiry.inquiryCode} · Liên hệ: ${prefillInquiry.contactInfo}`
+      );
+      setOrderStatus('active');
+      setTotalAmount(1000000);
+      setDepositAmount(500000);
+      setPaidAmount(0);
+      setStaffPayoutAmount(0);
+      setStaffPayoutStatus('unpaid');
+      setStaffPayoutPaidAt('');
+      setAttachments([]);
     } else {
       setOrderCode(generateOrderCode(existingOrderCodes));
       setClientId(clients[0]?.id || '');
@@ -235,7 +302,7 @@ export function OrderWorkspaceModal({
       setStaffPayoutPaidAt('');
       setAttachments([]);
     }
-  }, [isOpen, editingOrder, clients, existingOrderCodes]);
+  }, [isOpen, editingOrder, prefillInquiry, clients, existingOrderCodes]);
 
   useEffect(() => {
     if (!isOpen || !editingOrder) {
@@ -483,6 +550,10 @@ export function OrderWorkspaceModal({
       }
       setPendingDeleteUrls([]);
       setUnsavedUploadedUrls([]);
+
+      if (!editingOrder && prefillInquiry && onOrderCreatedFromInquiry) {
+        onOrderCreatedFromInquiry(prefillInquiry.id, normCode);
+      }
 
       onToast(
         editingOrder

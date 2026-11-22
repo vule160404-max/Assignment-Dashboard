@@ -308,14 +308,46 @@ export function triggerClientTelegramNotification(params: {
 }): void {
   void (async () => {
     const token = await auth.currentUser?.getIdToken().catch(() => '');
-    if (!token) return;
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    };
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
     await fetch('/api/notifications/telegram/client-event', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
+      headers,
       body: JSON.stringify(params),
     });
   })().catch(() => undefined);
+}
+
+export async function triggerNewOrderInquiryTelegramNotification(params: {
+  inquiryCode: string;
+  customerName: string;
+  contactInfo: string;
+  serviceType: string;
+  subject: string;
+  topic: string;
+  wordCount: number;
+  citationStyle: string;
+  deadlineAt: number;
+  notes?: string;
+}): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  try {
+    const res = await fetch('/api/notifications/telegram/new-inquiry', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(params),
+    });
+    return (await res.json().catch(() => ({ ok: false }))) as {
+      ok: boolean;
+      skipped?: boolean;
+      error?: string;
+    };
+  } catch {
+    return { ok: false };
+  }
 }

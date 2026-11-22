@@ -31,6 +31,7 @@ import {
 import {
   DEFAULT_BANK_SETTINGS,
   DEFAULT_NOTIFICATION_SETTINGS,
+  deleteOrderInquiry,
   saveOrder,
   sendTelegramAdminAlert,
   subscribeAllRevisionsAdmin,
@@ -38,9 +39,11 @@ import {
   subscribeBankSettings,
   subscribeClients,
   subscribeNotificationSettings,
+  subscribeOrderInquiriesAdmin,
   subscribeOrders,
   subscribeTeamInvitesAdmin,
   syncTelegramPreferencesToServer,
+  updateOrderInquiryStatus,
   uploadFileToServer,
 } from '../../services/firestoreService';
 import {
@@ -59,6 +62,7 @@ import {
   ClientRecord,
   FIELD_LIMITS,
   NotificationSettings,
+  OrderInquiry,
   OrderRecord,
   OrderStage,
   OrderStatus,
@@ -73,6 +77,7 @@ import { AiWriterStudioView } from './AiWriterStudioView';
 import { BankSettingsView } from './BankSettingsView';
 import { CalendarView } from './CalendarView';
 import { ClientsCrmView } from './ClientsCrmView';
+import { OrderInquiriesInbox } from './OrderInquiriesInbox';
 import { OrderWorkspaceModal } from './OrderWorkspaceModal';
 import { RevenueDashboardView } from './RevenueDashboardView';
 import { TeamManagementView } from './TeamManagementView';
@@ -185,6 +190,7 @@ export function AdminPortalView({
     DEFAULT_NOTIFICATION_SETTINGS
   );
   const [revisions, setRevisions] = useState<RevisionRequest[]>([]);
+  const [inquiries, setInquiries] = useState<OrderInquiry[]>([]);
   const [teamUsers, setTeamUsers] = useState<UserProfile[]>([]);
   const [teamInvites, setTeamInvites] = useState<TeamInvite[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -200,6 +206,7 @@ export function AdminPortalView({
   // Workspace modal
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
+  const [prefillInquiry, setPrefillInquiry] = useState<OrderInquiry | null>(null);
   const [humanizerOrderCode, setHumanizerOrderCode] = useState('');
   const [writerOrderCode, setWriterOrderCode] = useState('');
   const syncedNotifKeyRef = useRef('');
@@ -266,6 +273,7 @@ export function AdminPortalView({
     if (!isAdmin) {
       setClients([]);
       setRevisions([]);
+      setInquiries([]);
       setTeamUsers([]);
       setTeamInvites([]);
       return () => {
@@ -288,6 +296,7 @@ export function AdminPortalView({
       }
     });
     const unsubRevs = subscribeAllRevisionsAdmin((list) => setRevisions(list));
+    const unsubInquiries = subscribeOrderInquiriesAdmin((list) => setInquiries(list));
     const unsubUsers = subscribeAllUsersAdmin((list) => setTeamUsers(list));
     const unsubInvites = subscribeTeamInvitesAdmin((list) => setTeamInvites(list));
 
@@ -297,6 +306,7 @@ export function AdminPortalView({
       unsubBank();
       unsubNotif();
       unsubRevs();
+      unsubInquiries();
       unsubUsers();
       unsubInvites();
     };
@@ -389,12 +399,28 @@ export function AdminPortalView({
 
   const openNewOrder = () => {
     setEditingOrder(null);
+    setPrefillInquiry(null);
+    setWorkspaceOpen(true);
+  };
+
+  const openNewOrderFromInquiry = (inquiry: OrderInquiry) => {
+    setEditingOrder(null);
+    setPrefillInquiry(inquiry);
     setWorkspaceOpen(true);
   };
 
   const openEditOrder = (order: OrderRecord) => {
     setEditingOrder(order);
+    setPrefillInquiry(null);
     setWorkspaceOpen(true);
+  };
+
+  const handleOrderCreatedFromInquiry = (inquiryId: string, orderCode: string) => {
+    void updateOrderInquiryStatus({
+      inquiryId,
+      status: 'converted',
+      convertedOrderCode: orderCode,
+    }).catch(() => undefined);
   };
 
   const handleOpenHumanizerForOrder = (code: string) => {
@@ -742,6 +768,10 @@ export function AdminPortalView({
     );
   }
 
+  const newInquiriesCount = inquiries.filter((i) => i.status === 'new').length;
+  const ordersTabBadge =
+    (isAdmin ? newInquiriesCount : 0) + metrics.urgentCount;
+
   const allNavItems: {
     key: AdminTab;
     label: string;
@@ -753,7 +783,7 @@ export function AdminPortalView({
       key: 'orders',
       label: isStaff ? 'Đơn được giao' : 'Đơn hàng',
       icon: LayoutList,
-      badge: metrics.urgentCount > 0 ? metrics.urgentCount : undefined,
+      badge: ordersTabBadge > 0 ? ordersTabBadge : undefined,
     },
     { key: 'calendar', label: 'Lịch Deadline', icon: Calendar },
     { key: 'ai_writer', label: 'AI Writer Studio', icon: Wand2 },
@@ -1096,6 +1126,23 @@ export function AdminPortalView({
                 )}
               </div>
 
+              {/* Incoming Client Order Inquiries Inbox (Admin Only) */}
+              {isAdmin && (
+                <OrderInquiriesInbox
+                  inquiries={inquiries}
+                  onCreateOrderFromInquiry={openNewOrderFromInquiry}
+                  onUpdateStatus={async (inquiryId, status, convertedOrderCode) => {
+                    await updateOrderInquiryStatus({
+                      inquiryId,
+                      status,
+                      convertedOrderCode,
+                    });
+                  }}
+                  onDelete={deleteOrderInquiry}
+                  onToast={onToast}
+                />
+              )}
+
               {/* Open Revision Alerts (Admin Only) */}
               {isAdmin && openRevisions.length > 0 && (
                 <div className="bg-white border border-amber-200 rounded-xl p-4 space-y-2.5">
@@ -1426,6 +1473,7 @@ export function AdminPortalView({
       <OrderWorkspaceModal
         isOpen={workspaceOpen}
         editingOrder={editingOrder}
+        prefillInquiry={prefillInquiry}
         clients={clients}
         teamMembers={teamUsers}
         userRole={effectiveRole || 'staff'}
@@ -1433,7 +1481,11 @@ export function AdminPortalView({
         existingOrderCodes={existingOrderCodes}
         bankSettings={bankSettings}
         nowMs={nowMs}
-        onClose={() => setWorkspaceOpen(false)}
+        onClose={() => {
+          setWorkspaceOpen(false);
+          setPrefillInquiry(null);
+        }}
+        onOrderCreatedFromInquiry={handleOrderCreatedFromInquiry}
         onOpenWordHumanizer={handleOpenHumanizerForOrder}
         onOpenAiWriter={handleOpenAiWriterForOrder}
         onToast={onToast}

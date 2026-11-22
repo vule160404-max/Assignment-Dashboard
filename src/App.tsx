@@ -2,10 +2,16 @@ import { useCallback, useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut, User } from 'firebase/auth';
 import { CheckCircle2, X } from 'lucide-react';
 import { AdminPortalView } from './components/admin/AdminPortalView';
-import { ClientPortalView } from './components/client/ClientPortalView';
+import {
+  ClientPortalTab,
+  ClientPortalView,
+} from './components/client/ClientPortalView';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import { FloatingSupportDock } from './components/shared/FloatingSupportDock';
-import { RoleSelectionGate } from './components/shared/RoleSelectionGate';
+import {
+  ClientPortalLaunchOptions,
+  RoleSelectionGate,
+} from './components/shared/RoleSelectionGate';
 import {
   auth,
   clearAllSensitiveBrowserStorage,
@@ -54,6 +60,8 @@ export default function App() {
   const [clientInitialCode, setClientInitialCode] = useState(() =>
     normalizeOrderCode(initialCodeParam)
   );
+  const [clientInitialTab, setClientInitialTab] = useState<ClientPortalTab>('order');
+  const [clientInitialServiceType, setClientInitialServiceType] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     testConnection();
@@ -167,16 +175,34 @@ export default function App() {
     window.history.replaceState({}, '', url.toString());
   }, []);
 
-  const handleSwitchToClient = (orderCode?: string) => {
+  const handleSwitchToClient = (
+    orderCode?: string,
+    options?: ClientPortalLaunchOptions
+  ) => {
     const normalized = orderCode ? normalizeOrderCode(orderCode) : '';
     setClientInitialCode(normalized);
+    if (normalized) {
+      setClientInitialTab('lookup');
+      setClientInitialServiceType(undefined);
+    } else if (options) {
+      setClientInitialTab(options.tab || 'order');
+      setClientInitialServiceType(options.serviceType);
+    } else {
+      setClientInitialTab('order');
+      setClientInitialServiceType(undefined);
+    }
     setMode('client');
     persistPortalMode('client');
     if (normalized) {
       const url = new URL(window.location.href);
       url.searchParams.set('code', normalized);
       window.history.replaceState({}, '', url.toString());
+    } else if (options?.tab) {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', options.tab);
+      window.history.replaceState({}, '', url.toString());
     }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSwitchToAdmin = () => {
@@ -192,7 +218,7 @@ export default function App() {
 
   let activeContent = (
     <RoleSelectionGate
-      onSelectClient={() => handleSwitchToClient()}
+      onSelectClient={(options) => handleSwitchToClient(undefined, options)}
       onSelectAdmin={handleSwitchToAdmin}
     />
   );
@@ -200,10 +226,9 @@ export default function App() {
   if (mode === 'client') {
     activeContent = (
       <ClientPortalView
-        user={user}
-        userProfile={userProfile}
-        authReady={authReady}
         initialOrderCode={clientInitialCode}
+        initialTab={clientInitialTab}
+        initialServiceType={clientInitialServiceType}
         nowMs={nowMs}
         onSwitchToAdmin={handleSwitchToAdmin}
         onBackToRoleSelect={handleBackToRoleSelect}
@@ -219,7 +244,7 @@ export default function App() {
         profileLoading={profileLoading}
         authReady={authReady}
         nowMs={nowMs}
-        onSwitchToClientPortal={handleSwitchToClient}
+        onSwitchToClientPortal={(code) => handleSwitchToClient(code)}
         onBackToRoleSelect={handleBackToRoleSelect}
         onRefreshProfile={refreshProfile}
         onToast={showToast}

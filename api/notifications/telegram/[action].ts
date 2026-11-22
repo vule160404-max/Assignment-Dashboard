@@ -205,7 +205,10 @@ export default async function handler(
       ? req.headers.authorization.trim()
       : '';
 
-  if (!authHeader) {
+  const isPublicClientAction =
+    action === 'new-inquiry' || action === 'client-event';
+
+  if (!authHeader && !isPublicClientAction) {
     sendJson(res, 401, {
       ok: false,
       error: 'Yêu cầu đăng nhập hợp lệ để thao tác với Telegram Bot.',
@@ -408,6 +411,103 @@ export default async function handler(
     ].join('\n');
 
     const result = await dispatchTelegramHtml(html);
+    if (!result.ok) {
+      sendJson(res, 502, { ok: false, error: result.error });
+      return;
+    }
+    sendJson(res, 200, { ok: true });
+    return;
+  }
+
+  // 6. POST /api/notifications/telegram/new-inquiry (public guest order form submission)
+  if (action === 'new-inquiry') {
+    const env = inspectTelegramEnv();
+    if (!env.hasToken || !env.hasChatId) {
+      sendJson(res, 200, { ok: false, skipped: true });
+      return;
+    }
+
+    const inquiryCode =
+      typeof body.inquiryCode === 'string'
+        ? body.inquiryCode.trim().toUpperCase().slice(0, 32)
+        : '';
+    const customerName =
+      typeof body.customerName === 'string'
+        ? body.customerName.trim().slice(0, 120)
+        : '';
+    const contactInfo =
+      typeof body.contactInfo === 'string'
+        ? body.contactInfo.trim().slice(0, 160)
+        : '';
+    const serviceType =
+      typeof body.serviceType === 'string'
+        ? body.serviceType.trim().slice(0, 100)
+        : '';
+    const subject =
+      typeof body.subject === 'string' ? body.subject.trim().slice(0, 120) : '';
+    const topic =
+      typeof body.topic === 'string' ? body.topic.trim().slice(0, 240) : '';
+    const wordCount =
+      typeof body.wordCount === 'number' && Number.isFinite(body.wordCount)
+        ? Math.max(0, Math.round(body.wordCount))
+        : 0;
+    const citationStyle =
+      typeof body.citationStyle === 'string'
+        ? body.citationStyle.trim().slice(0, 30)
+        : 'APA';
+    const deadlineAt =
+      typeof body.deadlineAt === 'number' && Number.isFinite(body.deadlineAt)
+        ? body.deadlineAt
+        : 0;
+    const notes =
+      typeof body.notes === 'string' ? body.notes.trim().slice(0, 600) : '';
+
+    if (
+      !inquiryCode ||
+      !/^[A-Z0-9-]{4,32}$/.test(inquiryCode) ||
+      !customerName ||
+      !contactInfo ||
+      !subject ||
+      !topic
+    ) {
+      sendJson(res, 400, {
+        ok: false,
+        error: 'Thiếu thông tin bắt buộc của phiếu đăng ký.',
+      });
+      return;
+    }
+
+    const deadlineStr =
+      deadlineAt > 0
+        ? new Date(deadlineAt).toLocaleString('vi-VN', {
+            timeZone: 'Asia/Ho_Chi_Minh',
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+          })
+        : 'Chưa xác định';
+
+    const lines = [
+      `🆕 <b>AssignTrack · ĐƠN ĐĂNG KÝ MỚI (#${escapeTelegramHtml(inquiryCode)})</b>`,
+      `👤 <b>Khách hàng:</b> ${escapeTelegramHtml(customerName)}`,
+      `📱 <b>Liên hệ (Zalo/FB):</b> <code>${escapeTelegramHtml(contactInfo)}</code>`,
+      `📌 <b>Dịch vụ:</b> ${escapeTelegramHtml(serviceType || 'Hỗ trợ học thuật')}`,
+      `📚 <b>Môn học:</b> ${escapeTelegramHtml(subject)}`,
+      `📝 <b>Đề tài:</b> ${escapeTelegramHtml(topic)}`,
+      `📏 <b>Độ dài & Chuẩn:</b> ${wordCount > 0 ? `${wordCount.toLocaleString('vi-VN')} từ` : 'Chưa rõ'} · ${escapeTelegramHtml(citationStyle)}`,
+      `⏰ <b>Deadline:</b> ${escapeTelegramHtml(deadlineStr)}`,
+    ];
+    if (notes) {
+      lines.push(`💬 <b>Ghi chú:</b> ${escapeTelegramHtml(notes)}`);
+    }
+    lines.push(
+      '',
+      '👉 Mở <b>Cổng Admin → Tab Đơn hàng → Đơn đăng ký mới</b> để duyệt và tạo đơn trực tiếp.'
+    );
+
+    const result = await dispatchTelegramHtml(lines.join('\n'));
     if (!result.ok) {
       sendJson(res, 502, { ok: false, error: result.error });
       return;

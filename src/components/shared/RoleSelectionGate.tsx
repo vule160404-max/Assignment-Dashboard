@@ -20,9 +20,15 @@ import {
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { SampleLibraryView } from './SampleLibraryView';
+import { ClientIntentHubView } from '../client/ClientIntentHubView';
+
+export interface ClientPortalLaunchOptions {
+  tab?: 'order' | 'lookup' | 'checker';
+  serviceType?: string;
+}
 
 interface RoleSelectionGateProps {
-  onSelectClient: () => void;
+  onSelectClient: (options?: ClientPortalLaunchOptions) => void;
   onSelectAdmin: () => void;
 }
 
@@ -239,6 +245,8 @@ export function RoleSelectionGate({
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const handleOrderNow = () => onSelectClient({ tab: 'order' });
+
   return (
     <div className="min-h-screen bg-[#F4F7FB] text-[#0F172A] flex flex-col">
       {/* Top Promo Strip */}
@@ -250,7 +258,7 @@ export function RoleSelectionGate({
           </span>
           <button
             type="button"
-            onClick={onSelectClient}
+            onClick={handleOrderNow}
             className="underline decoration-amber-300/80 underline-offset-2 font-semibold text-amber-300 hover:text-amber-200"
           >
             Nhận ưu đãi &amp; Đặt bài →
@@ -321,7 +329,7 @@ export function RoleSelectionGate({
 
             <button
               type="button"
-              onClick={onSelectClient}
+              onClick={handleOrderNow}
               className="btn-press group inline-flex items-center gap-2 pl-4 pr-1.5 py-1.5 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-xs font-bold shadow-[0_6px_20px_rgba(234,88,12,0.28)] transition-all"
             >
               <span>ORDER NOW</span>
@@ -336,7 +344,7 @@ export function RoleSelectionGate({
       <main className="flex-1">
         {activePage === 'samples' ? (
           <SampleLibraryView
-            onOrderNow={onSelectClient}
+            onOrderNow={handleOrderNow}
             onBackHome={openHomePage}
           />
         ) : (
@@ -378,7 +386,7 @@ export function RoleSelectionGate({
               <div className="pt-2 flex flex-wrap items-center justify-center gap-3.5">
                 <button
                   type="button"
-                  onClick={onSelectClient}
+                  onClick={handleOrderNow}
                   className="btn-press group inline-flex items-center gap-3 pl-6 pr-2 py-2 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-sm font-bold shadow-[0_10px_28px_rgba(234,88,12,0.35)] transition-all"
                 >
                   <span>Order Now — Đặt bài ngay</span>
@@ -441,6 +449,20 @@ export function RoleSelectionGate({
             ))}
           </div>
         </div>
+
+        {/* PUBLIC QUICK-SERVICE HUB (NO LOGIN REQUIRED) */}
+        <section
+          id="dich-vu-nhanh"
+          className="py-12 sm:py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto"
+        >
+          <ClientIntentHubView
+            onSelectOrder={(serviceType) =>
+              onSelectClient({ tab: 'order', serviceType })
+            }
+            onSelectLookup={() => onSelectClient({ tab: 'lookup' })}
+            onSelectChecker={() => onSelectClient({ tab: 'checker' })}
+          />
+        </section>
 
         {/* ACHIEVEMENTS BENTO GRID */}
         <section className="py-16 sm:py-20">
@@ -551,7 +573,7 @@ export function RoleSelectionGate({
 
                 <button
                   type="button"
-                  onClick={onSelectClient}
+                  onClick={handleOrderNow}
                   className="btn-press group w-full flex items-center justify-between pl-6 pr-2 py-2.5 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-sm font-bold shadow-[0_8px_24px_rgba(234,88,12,0.35)] transition-all"
                 >
                   <span>ORDER NOW · Vào Cổng Khách hàng</span>
@@ -667,7 +689,7 @@ export function RoleSelectionGate({
 
                   <button
                     type="button"
-                    onClick={onSelectClient}
+                    onClick={handleOrderNow}
                     className={`btn-press w-full py-2.5 px-4 rounded-full text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors ${
                       pkg.featured
                         ? 'bg-sky-300 hover:bg-sky-200 text-[#0B2559]'
@@ -701,7 +723,7 @@ export function RoleSelectionGate({
               </div>
               <button
                 type="button"
-                onClick={onSelectClient}
+                onClick={handleOrderNow}
                 className="btn-press self-start md:self-auto inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 hover:bg-blue-100 text-[#12489B] text-xs font-bold transition-colors"
               >
                 <span>Gửi yêu cầu tư vấn</span>
@@ -750,7 +772,7 @@ export function RoleSelectionGate({
 
                     <button
                       type="button"
-                      onClick={onSelectClient}
+                      onClick={handleOrderNow}
                       className="inline-flex items-center gap-1.5 text-xs font-bold text-[#12489B] group-hover:gap-2.5 transition-all self-start"
                     >
                       <span>Đặt dịch vụ này ngay</span>
@@ -779,7 +801,7 @@ export function RoleSelectionGate({
               </p>
               <button
                 type="button"
-                onClick={onSelectClient}
+                onClick={handleOrderNow}
                 className="btn-press inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#0B2559] hover:bg-[#12489B] text-white text-xs font-bold shadow-sm transition-colors"
               >
                 <span>Order Now</span>
@@ -844,7 +866,7 @@ export function RoleSelectionGate({
             <div className="relative flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"
-                onClick={onSelectClient}
+                onClick={handleOrderNow}
                 className="btn-press group inline-flex items-center gap-3 pl-6 pr-2 py-2 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-sm font-bold shadow-lg"
               >
                 <span>Order Now — Đặt bài ngay</span>
@@ -886,7 +908,7 @@ export function RoleSelectionGate({
             </button>
             <button
               type="button"
-              onClick={onSelectClient}
+              onClick={handleOrderNow}
               className="hover:text-[#12489B]"
             >
               Cổng Khách hàng (Order Now)

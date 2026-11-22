@@ -279,3 +279,31 @@ export const CLIENT_TIERS: { key: ClientTier; label: string }[] = [
   { key: 'vip', label: 'Khách quen / VIP' },
   { key: 'watchlist', label: 'Cần lưu ý / Hay nợ' },
 ];
+
+export type OrderInquiryStatus = 'new' | 'converted' | 'archived';
+
+export interface OrderInquiry {
+  id: string;
+  inquiryCode: string;
+  customerName: string;
+  contactInfo: string;
+  serviceType: string;
+  subject: string;
+  topic: string;
+  wordCount: number;
+  citationStyle: CitationStyle;
+  deadlineAt: number;
+  notes?: string;
+  status: OrderInquiryStatus;
+  convertedOrderCode?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const ORDER_INQUIRY_SERVICES: string[] = [
+  'Viết mới Assignment / Essay / Report',
+  'Luận văn / Dissertation / Khóa luận',
+  'Giảm tỷ lệ đạo văn & AI (Humanize)',
+  'Chỉnh sửa / Proofreading / Format trích dẫn',
+  'Dịch vụ học thuật khác',
+];

@@ -19,7 +19,10 @@ import { sanitizeOrderForTracking } from '../lib/utils';
 import {
   BankSettings,
   CHAT_TTL_MS,
+  CitationStyle,
   FIELD_LIMITS,
+  OrderInquiry,
+  OrderInquiryStatus,
   OrderMessage,
   OrderRecord,
   RevisionRequest,
@@ -30,6 +33,7 @@ import {
   deleteServerFile,
   syncServerFileLock,
   triggerClientTelegramNotification,
+  triggerNewOrderInquiryTelegramNotification,
 } from './apiClient';
 
 async function commitDeletesInChunks(refs: DocumentReference[]): Promise<void> {
@@ -435,5 +439,113 @@ export async function updateRevisionStatus(params: {
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function createOrderInquiry(input: {
+  customerName: string;
+  contactInfo: string;
+  serviceType: string;
+  subject: string;
+  topic: string;
+  wordCount: number;
+  citationStyle: CitationStyle;
+  deadlineAt: number;
+  notes?: string;
+}): Promise<OrderInquiry> {
+  const inquiryId = `inq_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const year = new Date().getFullYear();
+  const suffix = String(Math.floor(1000 + Math.random() * 9000));
+  const inquiryCode = `REQ-${year}-${suffix}`;
+  const now = new Date().toISOString();
+  const path = `orderInquiries/${inquiryId}`;
+
+  const payload: Omit<OrderInquiry, 'id'> = {
+    inquiryCode,
+    customerName: input.customerName.trim().slice(0, 120),
+    contactInfo: input.contactInfo.trim().slice(0, 160),
+    serviceType: input.serviceType.trim().slice(0, 100) || 'Viết mới Assignment / Essay / Report',
+    subject: input.subject.trim().slice(0, 120),
+    topic: input.topic.trim().slice(0, 240),
+    wordCount: Math.max(0, Math.min(500000, Math.round(Number(input.wordCount) || 0))),
+    citationStyle: input.citationStyle || 'APA',
+    deadlineAt: input.deadlineAt,
+    notes: (input.notes || '').trim().slice(0, 3000),
+    status: 'new',
+    convertedOrderCode: '',
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  try {
+    await setDoc(doc(db, 'orderInquiries', inquiryId), payload);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, path);
+  }
+
+  // Fire-and-forget Telegram notification to Admin
+  void triggerNewOrderInquiryTelegramNotification({
+    inquiryCode: payload.inquiryCode,
+    customerName: payload.customerName,
+    contactInfo: payload.contactInfo,
+    serviceType: payload.serviceType,
+    subject: payload.subject,
+    topic: payload.topic,
+    wordCount: payload.wordCount,
+    citationStyle: payload.citationStyle,
+    deadlineAt: payload.deadlineAt,
+    notes: payload.notes,
+  });
+
+  return {
+    id: inquiryId,
+    ...payload,
+  };
+}
+
+export function subscribeOrderInquiriesAdmin(
+  onData: (inquiries: OrderInquiry[]) => void
+): () => void {
+  const q = query(collection(db, 'orderInquiries'), orderBy('createdAt', 'desc'));
+  return onSnapshot(
+    q,
+    (snap) => {
+      onData(
+        snap.docs.map((d) => ({
+          id: d.id,
+          ...(d.data() as Omit<OrderInquiry, 'id'>),
+        }))
+      );
+    },
+    (error) => {
+      console.warn('Could not subscribe orderInquiries:', error);
+      onData([]);
+    }
+  );
+}
+
+export async function updateOrderInquiryStatus(params: {
+  inquiryId: string;
+  status: OrderInquiryStatus;
+  convertedOrderCode?: string;
+}): Promise<void> {
+  const path = `orderInquiries/${params.inquiryId}`;
+  try {
+    await updateDoc(doc(db, 'orderInquiries', params.inquiryId), {
+      status: params.status,
+      convertedOrderCode: (params.convertedOrderCode || '').trim().slice(0, 32),
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, path);
+  }
+}
+
+export async function deleteOrderInquiry(inquiryId: string): Promise<void> {
+  const path = `orderInquiries/${inquiryId}`;
+  try {
+    await deleteDoc(doc(db, 'orderInquiries', inquiryId));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
   }
 }

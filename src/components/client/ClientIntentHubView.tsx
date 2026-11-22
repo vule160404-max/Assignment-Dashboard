@@ -15,8 +15,9 @@ import {
 const ZALO_CONSULT_URL = 'https://zalo.me/0916045202';
 
 interface ClientIntentHubViewProps {
-  displayName: string;
-  savedOrderCount: number;
+  displayName?: string;
+  savedOrderCount?: number;
+  onSelectOrder: (serviceType?: string) => void;
   onSelectLookup: () => void;
   onSelectChecker: () => void;
 }
@@ -54,7 +55,8 @@ const TRUST_STATS = [
 
 export function ClientIntentHubView({
   displayName,
-  savedOrderCount,
+  savedOrderCount = 0,
+  onSelectOrder,
   onSelectLookup,
   onSelectChecker,
 }: ClientIntentHubViewProps) {
@@ -65,16 +67,18 @@ export function ClientIntentHubView({
         <div className="space-y-1.5">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200/80 text-[#0B2559] text-[11px] font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-[#F5B700]" />
-            Chào mừng, {displayName}
+            {displayName
+              ? `Chào mừng, ${displayName}`
+              : 'Không cần đăng nhập · Sử dụng dịch vụ trực tiếp'}
           </span>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
             Bạn muốn{' '}
             <span className="bg-gradient-to-r from-[#0B2559] via-[#12489B] to-[#D97706] bg-clip-text text-transparent">
               làm gì?
             </span>
-          </h1>
+          </h2>
           <p className="text-xs sm:text-sm text-zinc-600 leading-relaxed">
-            Chọn nhu cầu của bạn bên dưới để được đội ngũ AssignTrack hỗ trợ nhanh hoặc theo dõi tiến độ bài làm.
+            Chọn nhu cầu của bạn bên dưới để gửi phiếu đặt bài, tra cứu tiến độ bằng mã đơn hoặc kiểm tra đạo văn miễn phí.
           </p>
         </div>
       </div>
@@ -98,24 +102,34 @@ export function ClientIntentHubView({
               </span>
             </div>
 
-            <h2 className="mt-4 text-base font-bold text-slate-900 leading-snug">
+            <h3 className="mt-4 text-base font-bold text-slate-900 leading-snug">
               Nhận tư vấn hỗ trợ làm luận văn - báo cáo
-            </h2>
+            </h3>
 
             <p className="mt-2.5 text-xs text-zinc-600 leading-relaxed">
               Hỗ trợ trọn gói Tiểu luận, Báo cáo thực tập, Khóa luận tốt nghiệp. Chuẩn học thuật, đúng deadline, kèm báo cáo Turnitin minh bạch.
             </p>
           </div>
 
-          <div className="mt-5 pt-3.5 border-t border-slate-100">
+          <div className="mt-5 pt-3.5 border-t border-slate-100 space-y-2">
+            <button
+              type="button"
+              onClick={() =>
+                onSelectOrder('Viết mới Assignment / Essay / Report')
+              }
+              className="btn-press w-full py-2.5 px-4 text-xs sm:text-sm font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 bg-blue-50 text-[#0B2559] border border-blue-200/90 hover:bg-[#0B2559] hover:text-white hover:border-[#0B2559]"
+            >
+              <span>Điền phiếu đặt bài ngay</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
             <a
               href={ZALO_CONSULT_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-press w-full py-2.5 px-4 text-xs sm:text-sm font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 bg-blue-50 text-[#0B2559] border border-blue-200/90 hover:bg-[#0B2559] hover:text-white hover:border-[#0B2559]"
+              className="w-full py-1 text-[11px] font-semibold text-zinc-500 hover:text-[#12489B] inline-flex items-center justify-center gap-1"
             >
-              <span>Nhận tư vấn qua Zalo</span>
-              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Hoặc nhắn tư vấn nhanh qua Zalo</span>
+              <ExternalLink className="w-3 h-3" />
             </a>
           </div>
         </article>
@@ -195,15 +209,25 @@ export function ClientIntentHubView({
             </p>
           </div>
 
-          <div className="mt-5 pt-3.5 border-t border-slate-100">
+          <div className="mt-5 pt-3.5 border-t border-slate-100 space-y-2">
+            <button
+              type="button"
+              onClick={() =>
+                onSelectOrder('Giảm tỷ lệ đạo văn & AI (Humanize)')
+              }
+              className="btn-press w-full py-2.5 px-4 text-xs sm:text-sm font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 bg-amber-50/90 text-[#92400E] border border-amber-200/90 hover:bg-[#D97706] hover:text-white hover:border-[#D97706]"
+            >
+              <span>Đăng ký giảm đạo văn &amp; AI</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
             <a
               href={ZALO_CONSULT_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="btn-press w-full py-2.5 px-4 text-xs sm:text-sm font-semibold rounded-xl inline-flex items-center justify-center gap-1.5 bg-amber-50/90 text-[#92400E] border border-amber-200/90 hover:bg-[#D97706] hover:text-white hover:border-[#D97706]"
+              className="w-full py-1 text-[11px] font-semibold text-zinc-500 hover:text-[#B45309] inline-flex items-center justify-center gap-1"
             >
-              <span>Nhận tư vấn qua Zalo</span>
-              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Hoặc gửi file qua Zalo báo giá</span>
+              <ExternalLink className="w-3 h-3" />
             </a>
           </div>
         </article>
