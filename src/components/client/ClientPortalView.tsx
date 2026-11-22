@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   ArrowLeft,
-  ArrowUpRight,
   Bookmark,
   CheckCircle2,
   Download,
@@ -9,10 +8,8 @@ import {
   Eye,
   FileCheck2,
   FileText,
-  Home,
   KeyRound,
   Lock,
-  LogIn,
   RefreshCw,
   Search,
   Send,
@@ -45,7 +42,7 @@ import { DeadlineBadge } from '../shared/DeadlineBadge';
 import { BrandLogo } from '../shared/BrandLogo';
 import { OrderChatPanel } from '../shared/OrderChatPanel';
 import { PdfPreviewModal } from '../shared/PdfPreviewModal';
-import { PolicyModal, PolicyTabKey } from '../shared/PolicyModal';
+import { PublicTopNav } from '../shared/PublicTopNav';
 import { ClientIntegrityCheckerView } from './ClientIntegrityCheckerView';
 import { ClientOrderFormView } from './ClientOrderFormView';
 import {
@@ -90,6 +87,8 @@ interface ClientPortalViewProps {
   nowMs: number;
   onSwitchToAdmin: () => void;
   onBackToRoleSelect?: () => void;
+  onOpenSamples?: () => void;
+  onOpenOrderModal?: (serviceType?: string) => void;
   onToast: (msg: string) => void;
 }
 
@@ -107,6 +106,8 @@ export function ClientPortalView({
   nowMs,
   onSwitchToAdmin,
   onBackToRoleSelect,
+  onOpenSamples,
+  onOpenOrderModal,
   onToast,
 }: ClientPortalViewProps) {
   const [codeInput, setCodeInput] = useState(initialOrderCode);
@@ -120,9 +121,6 @@ export function ClientPortalView({
   const [lookupError, setLookupError] = useState('');
   const [previewAttachment, setPreviewAttachment] =
     useState<AttachmentItem | null>(null);
-  const [activePolicyTab, setActivePolicyTab] = useState<PolicyTabKey | null>(
-    null
-  );
 
   const [homeTab, setHomeTabState] = useState<ClientPortalTab>(() => {
     if (initialOrderCode) return 'lookup';
@@ -141,10 +139,15 @@ export function ClientPortalView({
   }, [initialTab]);
 
   const setHomeTab = (nextTab: ClientPortalTab) => {
+    const changed = nextTab !== homeTab;
     setHomeTabState(nextTab);
     const url = new URL(window.location.href);
     url.searchParams.set('tab', nextTab);
-    window.history.replaceState({}, '', url.toString());
+    if (changed) {
+      window.history.pushState({}, '', url.toString());
+    } else {
+      window.history.replaceState({}, '', url.toString());
+    }
   };
 
   // Revision form state
@@ -312,89 +315,43 @@ export function ClientPortalView({
 
   return (
     <div className="min-h-screen bg-[#F4F7FB] text-[#0F172A] flex flex-col">
-      {/* Top Promo Strip (Synchronized with Landing Page) */}
-      <div className="bg-gradient-to-r from-[#071A42] via-[#0B2559] to-[#12489B] text-white/95 text-[11.5px] font-medium py-2 px-4 text-center">
-        <span className="inline-flex items-center gap-2 flex-wrap justify-center">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-          <span>
-            Ưu đãi sinh viên mới: Miễn phí báo cáo Turnitin &amp; AI Check khi đặt bài ngay hôm nay
-          </span>
-          {homeTab !== 'order' && (
-            <button
-              type="button"
-              onClick={() => {
-                handleResetLookup();
-                setHomeTab('order');
-              }}
-              className="underline decoration-amber-300/80 underline-offset-2 font-semibold text-amber-300 hover:text-amber-200"
-            >
-              Đặt bài ngay →
-            </button>
-          )}
-        </span>
-      </div>
-
-      {/* Unified Sticky White Header (Synchronized with Landing Page) */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-zinc-200/80">
-        <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          {/* Left: Clean Brand Logo */}
-          <a
-            href="/"
-            onClick={(e) => {
-              e.preventDefault();
-              if (onBackToRoleSelect) {
-                onBackToRoleSelect();
-              } else {
-                handleResetLookup();
-                setHomeTab('order');
-              }
-            }}
-            className="whitespace-nowrap shrink-0"
-          >
-            <BrandLogo />
-          </a>
-
-          {/* Right: Back Home + Admin Login + Quick Order CTA */}
-          <div className="flex items-center gap-2 shrink-0">
-            {onBackToRoleSelect && (
-              <button
-                type="button"
-                onClick={onBackToRoleSelect}
-                className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-slate-700 hover:text-[#0B2559] bg-white hover:bg-blue-50/70 border border-zinc-200/90 rounded-full whitespace-nowrap transition-colors"
-              >
-                <Home className="w-3.5 h-3.5 text-[#12489B]" />
-                <span>Về trang chủ</span>
-              </button>
-            )}
-
-            <button
-              type="button"
-              onClick={onSwitchToAdmin}
-              className="btn-press hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-zinc-200 bg-white hover:border-[#12489B]/50 hover:text-[#12489B] text-xs font-semibold text-slate-700 transition-colors"
-              title="Chuyển sang cổng dành cho Admin / Nhân sự"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Đăng nhập</span>
-            </button>
-
-            {homeTab !== 'order' && (
-              <button
-                type="button"
-                onClick={() => {
-                  handleResetLookup();
-                  setHomeTab('order');
-                }}
-                className="btn-press group inline-flex items-center gap-2 pl-4 pr-1.5 py-1.5 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-xs font-bold shadow-[0_6px_20px_rgba(234,88,12,0.28)] transition-all"
-              >
-                <span>ORDER NOW</span>
-                <span className="w-6 h-6 rounded-full bg-white/20 group-hover:bg-white group-hover:text-[#EA580C] flex items-center justify-center transition-colors">
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </span>
-              </button>
-            )}
-          </div>
-        </div>
-      </header>
+      <PublicTopNav
+        activeNav={portal ? 'lookup' : homeTab}
+        onGoHome={() => {
+          if (onBackToRoleSelect) {
+            onBackToRoleSelect();
+          } else {
+            handleResetLookup();
+            setHomeTab('lookup');
+          }
+        }}
+        onOpenOrder={() => {
+          if (onOpenOrderModal) {
+            onOpenOrderModal();
+          } else {
+            handleResetLookup();
+            setHomeTab('order');
+          }
+        }}
+        onOpenLookup={() => {
+          handleResetLookup();
+          setHomeTab('lookup');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenChecker={() => {
+          handleResetLookup();
+          setHomeTab('checker');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOpenSamples={() => {
+          if (onOpenSamples) {
+            onOpenSamples();
+          } else if (onBackToRoleSelect) {
+            onBackToRoleSelect();
+          }
+        }}
+        onSelectAdmin={onSwitchToAdmin}
+      />
 
       {/* Deep Academic Navy Blueprint Hero Banner (Synchronized with Landing Page & Sample Library) */}
       {showHeroBanner && (
@@ -563,7 +520,11 @@ export function ClientPortalView({
                           </span>
                           <button
                             type="button"
-                            onClick={() => setHomeTab('order')}
+                            onClick={() =>
+                              onOpenOrderModal
+                                ? onOpenOrderModal()
+                                : setHomeTab('order')
+                            }
                             className="font-bold text-[#EA580C] hover:underline"
                           >
                             Chưa có mã đơn? Đăng ký đặt bài mới →
@@ -992,100 +953,79 @@ export function ClientPortalView({
 
       {/* Clean Footer (Synchronized with Landing Page) */}
       <footer className="bg-white border-t border-zinc-200/90 py-8 px-4 sm:px-6 lg:px-8 mt-auto">
-        <div className="max-w-7xl mx-auto space-y-5">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
-            <div className="space-y-1.5">
-              <BrandLogo />
-              <p className="text-xs text-zinc-500 max-w-md">
-                AssignTrack — Nền tảng hỗ trợ học thuật, kiểm định đạo văn &amp; theo dõi tiến độ minh bạch dành cho sinh viên.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-5 text-xs font-semibold text-slate-600">
-              {onBackToRoleSelect && (
-                <button
-                  type="button"
-                  onClick={onBackToRoleSelect}
-                  className="hover:text-[#12489B]"
-                >
-                  Trang chủ
-                </button>
-              )}
+        <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
+          <div className="space-y-1.5">
+            <BrandLogo />
+            <p className="text-xs text-zinc-500 max-w-md">
+              AssignTrack — Nền tảng hỗ trợ học thuật, kiểm định đạo văn &amp; theo dõi tiến độ minh bạch dành cho sinh viên.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-5 text-xs font-semibold text-slate-600">
+            {onBackToRoleSelect && (
               <button
                 type="button"
-                onClick={() => {
+                onClick={onBackToRoleSelect}
+                className="hover:text-[#12489B]"
+              >
+                Trang chủ
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (onOpenOrderModal) {
+                  onOpenOrderModal();
+                } else {
                   handleResetLookup();
                   setHomeTab('order');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="hover:text-[#EA580C]"
-              >
-                Đặt bài mới
-              </button>
+                }
+              }}
+              className="hover:text-[#EA580C]"
+            >
+              Đặt bài mới
+            </button>
+            {onOpenSamples && (
               <button
                 type="button"
-                onClick={() => {
-                  handleResetLookup();
-                  setHomeTab('lookup');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
+                onClick={onOpenSamples}
                 className="hover:text-[#12489B]"
               >
-                Tra cứu mã đơn
+                Sample Library
               </button>
-              <button
-                type="button"
-                onClick={() => {
-                  handleResetLookup();
-                  setHomeTab('checker');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="hover:text-[#12489B]"
-              >
-                Check Đạo văn &amp; AI
-              </button>
-              <button
-                type="button"
-                onClick={onSwitchToAdmin}
-                className="hover:text-[#12489B]"
-              >
-                Đăng nhập Quản trị
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-4 border-t border-zinc-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-[11.5px] text-zinc-500">
-            <span>© {new Date().getFullYear()} AssignTrack Academic Support · Zalo: 0916.045.202</span>
-            <div className="flex flex-wrap items-center gap-4 font-semibold text-slate-600">
-              <button
-                type="button"
-                onClick={() => setActivePolicyTab('refund')}
-                className="hover:text-[#12489B] underline-offset-2 hover:underline"
-              >
-                Chính sách Hoàn tiền
-              </button>
-              <button
-                type="button"
-                onClick={() => setActivePolicyTab('privacy')}
-                className="hover:text-[#12489B] underline-offset-2 hover:underline"
-              >
-                Chính sách Bảo mật
-              </button>
-              <button
-                type="button"
-                onClick={() => setActivePolicyTab('terms')}
-                className="hover:text-[#12489B] underline-offset-2 hover:underline"
-              >
-                Điều khoản Sử dụng
-              </button>
-            </div>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                handleResetLookup();
+                setHomeTab('lookup');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-[#12489B]"
+            >
+              Tra cứu mã đơn
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                handleResetLookup();
+                setHomeTab('checker');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              className="hover:text-[#12489B]"
+            >
+              Check Đạo văn &amp; AI
+            </button>
+            <button
+              type="button"
+              onClick={onSwitchToAdmin}
+              className="hover:text-[#12489B]"
+            >
+              Đăng nhập Quản trị
+            </button>
           </div>
         </div>
       </footer>
-
-      <PolicyModal
-        initialTab={activePolicyTab}
-        onClose={() => setActivePolicyTab(null)}
-      />
 
       <PdfPreviewModal
         attachment={previewAttachment}

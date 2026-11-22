@@ -6,6 +6,7 @@ import {
   ClientPortalTab,
   ClientPortalView,
 } from './components/client/ClientPortalView';
+import { QuickOrderModal } from './components/client/QuickOrderModal';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import { FloatingSupportDock } from './components/shared/FloatingSupportDock';
 import {
@@ -60,8 +61,17 @@ export default function App() {
   const [clientInitialCode, setClientInitialCode] = useState(() =>
     normalizeOrderCode(initialCodeParam)
   );
-  const [clientInitialTab, setClientInitialTab] = useState<ClientPortalTab>('order');
+  const [clientInitialTab, setClientInitialTab] = useState<ClientPortalTab>('lookup');
   const [clientInitialServiceType, setClientInitialServiceType] = useState<string | undefined>(undefined);
+  const [roleGatePage, setRoleGatePage] = useState<'home' | 'samples'>(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('sample') || params.get('page') === 'samples') {
+      return 'samples';
+    }
+    return 'home';
+  });
+  const [quickOrderOpen, setQuickOrderOpen] = useState(false);
+  const [quickOrderServiceType, setQuickOrderServiceType] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     testConnection();
@@ -153,71 +163,149 @@ export default function App() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  const persistPortalMode = useCallback((nextMode: 'select' | 'admin' | 'client') => {
-    try {
-      localStorage.setItem(PORTAL_MODE_STORAGE_KEY, nextMode);
-    } catch {
-      // ignore
-    }
-    const url = new URL(window.location.href);
-    if (nextMode === 'select') {
-      url.searchParams.delete('portal');
-      url.searchParams.delete('tab');
-      url.searchParams.delete('code');
-    } else {
-      url.searchParams.set('portal', nextMode);
-      if (nextMode === 'client') {
-        url.searchParams.delete('tab');
-      } else {
-        url.searchParams.delete('code');
+  // Support native browser Back / Forward button across public & client views
+  useEffect(() => {
+    const handlePopState = () => {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('code') || '';
+      const portalParam = params.get('portal');
+      const tabParam = params.get('tab');
+      const pageParam = params.get('page');
+      const sampleParam = params.get('sample');
+
+      setQuickOrderOpen(false);
+
+      if (code) {
+        setClientInitialCode(normalizeOrderCode(code));
+        setClientInitialTab('lookup');
+        setMode('client');
+        return;
       }
-    }
-    window.history.replaceState({}, '', url.toString());
+
+      if (portalParam === 'admin') {
+        setMode('admin');
+        return;
+      }
+
+      if (portalParam === 'client') {
+        setClientInitialCode('');
+        if (tabParam === 'order' || tabParam === 'lookup' || tabParam === 'checker') {
+          setClientInitialTab(tabParam);
+        }
+        setMode('client');
+        return;
+      }
+
+      setClientInitialCode('');
+      setRoleGatePage(sampleParam || pageParam === 'samples' ? 'samples' : 'home');
+      setMode('select');
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  const persistPortalMode = useCallback(
+    (
+      nextMode: 'select' | 'admin' | 'client',
+      extraParams?: { tab?: ClientPortalTab; code?: string; page?: 'home' | 'samples' }
+    ) => {
+      try {
+        localStorage.setItem(PORTAL_MODE_STORAGE_KEY, nextMode);
+      } catch {
+        // ignore
+      }
+      const url = new URL(window.location.href);
+      if (nextMode === 'select') {
+        url.searchParams.delete('portal');
+        url.searchParams.delete('tab');
+        url.searchParams.delete('code');
+        if (extraParams?.page === 'samples') {
+          url.searchParams.set('page', 'samples');
+        } else {
+          url.searchParams.delete('page');
+          url.searchParams.delete('sample');
+        }
+      } else {
+        url.searchParams.set('portal', nextMode);
+        url.searchParams.delete('page');
+        url.searchParams.delete('sample');
+        if (nextMode === 'client') {
+          if (extraParams?.code) {
+            url.searchParams.set('code', extraParams.code);
+            url.searchParams.delete('tab');
+          } else {
+            url.searchParams.delete('code');
+            if (extraParams?.tab) {
+              url.searchParams.set('tab', extraParams.tab);
+            }
+          }
+        } else {
+          url.searchParams.delete('code');
+          url.searchParams.delete('tab');
+        }
+      }
+      window.history.pushState({}, '', url.toString());
+    },
+    []
+  );
+
+  const openQuickOrderModal = (serviceType?: string) => {
+    setQuickOrderServiceType(serviceType);
+    setQuickOrderOpen(true);
+  };
 
   const handleSwitchToClient = (
     orderCode?: string,
     options?: ClientPortalLaunchOptions
   ) => {
     const normalized = orderCode ? normalizeOrderCode(orderCode) : '';
+
+    // Opening "Đặt bài mới" / "ORDER NOW" opens the lightweight QuickOrderModal
+    // so the user stays right on their current page and closes with 1 click / ESC.
+    if (!normalized && (!options?.tab || options.tab === 'order')) {
+      openQuickOrderModal(options?.serviceType);
+      return;
+    }
+
+    setQuickOrderOpen(false);
     setClientInitialCode(normalized);
-    if (normalized) {
-      setClientInitialTab('lookup');
-      setClientInitialServiceType(undefined);
-    } else if (options) {
-      setClientInitialTab(options.tab || 'order');
-      setClientInitialServiceType(options.serviceType);
-    } else {
-      setClientInitialTab('order');
-      setClientInitialServiceType(undefined);
-    }
+    const nextTab: ClientPortalTab = normalized
+      ? 'lookup'
+      : options?.tab || 'lookup';
+    setClientInitialTab(nextTab);
+    setClientInitialServiceType(options?.serviceType);
     setMode('client');
-    persistPortalMode('client');
-    if (normalized) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('code', normalized);
-      window.history.replaceState({}, '', url.toString());
-    } else if (options?.tab) {
-      const url = new URL(window.location.href);
-      url.searchParams.set('tab', options.tab);
-      window.history.replaceState({}, '', url.toString());
-    }
+    persistPortalMode('client', {
+      code: normalized || undefined,
+      tab: normalized ? undefined : nextTab,
+    });
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSwitchToAdmin = () => {
+    setQuickOrderOpen(false);
     setMode('admin');
     persistPortalMode('admin');
   };
 
-  const handleBackToRoleSelect = () => {
+  const handleBackToRoleSelect = (page: 'home' | 'samples' = 'home') => {
+    setQuickOrderOpen(false);
     setClientInitialCode('');
+    setRoleGatePage(page);
     setMode('select');
-    persistPortalMode('select');
+    persistPortalMode('select', { page });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   let activeContent = (
     <RoleSelectionGate
+      key={`role-gate-${roleGatePage}`}
+      initialPage={roleGatePage}
+      onPageChange={(page) => {
+        setRoleGatePage(page);
+        persistPortalMode('select', { page });
+      }}
       onSelectClient={(options) => handleSwitchToClient(undefined, options)}
       onSelectAdmin={handleSwitchToAdmin}
     />
@@ -231,7 +319,9 @@ export default function App() {
         initialServiceType={clientInitialServiceType}
         nowMs={nowMs}
         onSwitchToAdmin={handleSwitchToAdmin}
-        onBackToRoleSelect={handleBackToRoleSelect}
+        onBackToRoleSelect={() => handleBackToRoleSelect('home')}
+        onOpenSamples={() => handleBackToRoleSelect('samples')}
+        onOpenOrderModal={openQuickOrderModal}
         onToast={showToast}
       />
     );
@@ -245,7 +335,7 @@ export default function App() {
         authReady={authReady}
         nowMs={nowMs}
         onSwitchToClientPortal={(code) => handleSwitchToClient(code)}
-        onBackToRoleSelect={handleBackToRoleSelect}
+        onBackToRoleSelect={() => handleBackToRoleSelect('home')}
         onRefreshProfile={refreshProfile}
         onToast={showToast}
       />
@@ -256,6 +346,15 @@ export default function App() {
     <ErrorBoundary>
       {activeContent}
       {mode !== 'admin' && <FloatingSupportDock />}
+      {mode !== 'admin' && (
+        <QuickOrderModal
+          isOpen={quickOrderOpen}
+          defaultServiceType={quickOrderServiceType}
+          onClose={() => setQuickOrderOpen(false)}
+          onGoToLookup={() => handleSwitchToClient(undefined, { tab: 'lookup' })}
+          onToast={showToast}
+        />
+      )}
 
       {toast && (
         <div

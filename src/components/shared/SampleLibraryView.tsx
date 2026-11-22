@@ -1,646 +1,274 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  ArrowDown,
+  AlertCircle,
   ArrowLeft,
   ArrowRight,
-  ArrowUp,
-  ArrowUpRight,
-  Award,
   BookOpen,
-  Building2,
-  Check,
-  CheckCircle2,
   Clock,
-  Copy,
-  Eye,
   FileCheck2,
+  FileSpreadsheet,
   FileText,
-  Globe,
   GraduationCap,
-  PanelLeftClose,
-  PanelLeftOpen,
+  Image as ImageIcon,
+  Layers,
+  Loader2,
+  RotateCcw,
   Search,
-  ShieldCheck,
-  Sparkles,
+  Table2,
 } from 'lucide-react';
 import {
-  SAMPLE_LIBRARY_ITEMS,
-  SamplePaperItem,
-} from '../../data/sampleLibraryData';
+  fetchSampleCatalog,
+  getShortSchoolName,
+  type SampleCatalogIndex,
+  type SampleCatalogItem,
+} from '../../services/sampleLibraryService';
+import { SampleUniversityBadge } from './SampleUniversityBadge';
+import { SampleReaderView } from './SampleReaderView';
 
 interface SampleLibraryViewProps {
   onOrderNow: () => void;
   onBackHome: () => void;
 }
 
+const ITEMS_PER_PAGE = 10;
+
+type AttachmentFilter = 'all' | 'tables' | 'images' | 'appendix' | 'references';
+type SortMode = 'default' | 'longest' | 'richest';
+
+function buildPaginationWindow(current: number, total: number): Array<number | 'ellipsis'> {
+  if (total <= 7) {
+    return Array.from({ length: total }, (_, i) => i + 1);
+  }
+  const pages: Array<number | 'ellipsis'> = [1];
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+
+  if (start > 2) pages.push('ellipsis');
+  for (let p = start; p <= end; p++) {
+    pages.push(p);
+  }
+  if (end < total - 1) pages.push('ellipsis');
+  pages.push(total);
+  return pages;
+}
+
 export function SampleLibraryView({
   onOrderNow,
   onBackHome,
 }: SampleLibraryViewProps) {
-  const [selectedSampleId, setSelectedSampleId] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<SampleCatalogIndex | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadNonce, setReloadNonce] = useState(0);
+
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return new URLSearchParams(window.location.search).get('sample');
+  });
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [disciplineFilter, setDisciplineFilter] = useState('all');
-  const [institutionFilter, setInstitutionFilter] = useState('all');
-  const [levelFilter, setLevelFilter] = useState('all');
-  const [docTypeFilter, setDocTypeFilter] = useState('all');
-  const [countryFilter, setCountryFilter] = useState('all');
+  const [schoolFilter, setSchoolFilter] = useState<string>('all');
+  const [majorFilter, setMajorFilter] = useState<string>('all');
+  const [countryFilter, setCountryFilter] = useState<string>('all');
+  const [attachmentFilter, setAttachmentFilter] = useState<AttachmentFilter>('all');
+  const [sortMode, setSortMode] = useState<SortMode>('default');
   const [currentPage, setCurrentPage] = useState(1);
-  const ITEMS_PER_PAGE = 8;
 
-  // Reader utility states
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [readerFontScale, setReaderFontScale] = useState(100);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
 
-  const disciplines = useMemo(
-    () => Array.from(new Set(SAMPLE_LIBRARY_ITEMS.map((i) => i.discipline))),
-    []
-  );
-  const institutions = useMemo(
-    () => Array.from(new Set(SAMPLE_LIBRARY_ITEMS.map((i) => i.institution))),
-    []
-  );
-  const levels = useMemo(
-    () => Array.from(new Set(SAMPLE_LIBRARY_ITEMS.map((i) => i.level))),
-    []
-  );
-  const docTypes = useMemo(
-    () => Array.from(new Set(SAMPLE_LIBRARY_ITEMS.map((i) => i.docType))),
-    []
-  );
-  const countries = useMemo(
-    () => Array.from(new Set(SAMPLE_LIBRARY_ITEMS.map((i) => i.country))),
-    []
-  );
+    fetchSampleCatalog(reloadNonce > 0)
+      .then((data) => {
+        if (!cancelled) {
+          setCatalog(data);
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof Error ? err.message : 'Không thể tải thư viện bài mẫu.');
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadNonce]);
+
+  const items = catalog?.items ?? [];
+  const schools = catalog?.schools ?? [];
+
+  const activeItem: SampleCatalogItem | null = useMemo(() => {
+    if (!selectedSlug || items.length === 0) return null;
+    return items.find((item) => item.slug === selectedSlug || item.id === selectedSlug) || null;
+  }, [items, selectedSlug]);
+
+  // Synchronize ?sample=<slug> query parameter cleanly
+  useEffect(() => {
+    if (typeof window === 'undefined' || loading) return;
+    const url = new URL(window.location.href);
+    if (activeItem) {
+      url.searchParams.set('sample', activeItem.slug);
+    } else {
+      url.searchParams.delete('sample');
+    }
+    window.history.replaceState({}, '', url.toString());
+  }, [activeItem, loading]);
+
+  const stats = useMemo(() => {
+    let totalWords = 0;
+    let withTablesOrImages = 0;
+    let withAppendix = 0;
+    for (const item of items) {
+      totalWords += item.wordCount || 0;
+      if (item.tableCount > 0 || item.imageCount > 0) withTablesOrImages++;
+      if (item.hasAppendix) withAppendix++;
+    }
+    return {
+      totalWords,
+      withTablesOrImages,
+      withAppendix,
+    };
+  }, [items]);
+
+  const majors = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      if (item.major) {
+        counts.set(item.major, (counts.get(item.major) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+  }, [items]);
+
+  const countries = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      if (item.country) {
+        counts.set(item.country, (counts.get(item.country) || 0) + 1);
+      }
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, count]) => ({ name, count }));
+  }, [items]);
 
   const filteredSamples = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return SAMPLE_LIBRARY_ITEMS.filter((item) => {
-      if (disciplineFilter !== 'all' && item.discipline !== disciplineFilter) {
-        return false;
-      }
-      if (
-        institutionFilter !== 'all' &&
-        item.institution !== institutionFilter
-      ) {
-        return false;
-      }
-      if (levelFilter !== 'all' && item.level !== levelFilter) {
-        return false;
-      }
-      if (docTypeFilter !== 'all' && item.docType !== docTypeFilter) {
-        return false;
-      }
-      if (countryFilter !== 'all' && item.country !== countryFilter) {
-        return false;
-      }
+    const list = items.filter((item) => {
+      if (schoolFilter !== 'all' && item.school !== schoolFilter) return false;
+      if (majorFilter !== 'all' && item.major !== majorFilter) return false;
+      if (countryFilter !== 'all' && item.country !== countryFilter) return false;
+      if (attachmentFilter === 'tables' && item.tableCount === 0) return false;
+      if (attachmentFilter === 'images' && item.imageCount === 0) return false;
+      if (attachmentFilter === 'appendix' && !item.hasAppendix) return false;
+      if (attachmentFilter === 'references' && !item.hasReferences) return false;
+
       if (!q) return true;
-      return (
-        item.title.toLowerCase().includes(q) ||
-        item.courseCode.toLowerCase().includes(q) ||
-        item.discipline.toLowerCase().includes(q) ||
-        item.institution.toLowerCase().includes(q) ||
-        item.excerpt.toLowerCase().includes(q) ||
-        item.tags.some((t) => t.toLowerCase().includes(q))
-      );
+      const haystack = [
+        item.title,
+        item.courseCode,
+        item.school,
+        item.major,
+        item.country,
+        item.excerpt,
+        ...item.subjects,
+      ]
+        .join(' ')
+        .toLowerCase();
+      return haystack.includes(q);
     });
+
+    if (sortMode === 'longest') {
+      return [...list].sort((a, b) => b.wordCount - a.wordCount);
+    }
+    if (sortMode === 'richest') {
+      return [...list].sort(
+        (a, b) =>
+          b.tableCount * 3 +
+          b.imageCount * 2 +
+          (b.hasAppendix ? 2 : 0) -
+          (a.tableCount * 3 + a.imageCount * 2 + (a.hasAppendix ? 2 : 0))
+      );
+    }
+    return list;
   }, [
+    items,
     searchQuery,
-    disciplineFilter,
-    institutionFilter,
-    levelFilter,
-    docTypeFilter,
+    schoolFilter,
+    majorFilter,
     countryFilter,
+    attachmentFilter,
+    sortMode,
   ]);
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil(filteredSamples.length / ITEMS_PER_PAGE)
-  );
+  const hasActiveFilter =
+    searchQuery.trim() !== '' ||
+    schoolFilter !== 'all' ||
+    majorFilter !== 'all' ||
+    countryFilter !== 'all' ||
+    attachmentFilter !== 'all' ||
+    sortMode !== 'default';
+
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setSchoolFilter('all');
+    setMajorFilter('all');
+    setCountryFilter('all');
+    setAttachmentFilter('all');
+    setSortMode('default');
+    setCurrentPage(1);
+  };
+
+  const totalPages = Math.max(1, Math.ceil(filteredSamples.length / ITEMS_PER_PAGE));
   const safePage = Math.min(currentPage, totalPages);
-  const paginatedSamples = useMemo(
-    () =>
-      filteredSamples.slice(
-        (safePage - 1) * ITEMS_PER_PAGE,
-        safePage * ITEMS_PER_PAGE
-      ),
-    [filteredSamples, safePage]
+  const paginatedSamples = useMemo(() => {
+    const start = (safePage - 1) * ITEMS_PER_PAGE;
+    return filteredSamples.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredSamples, safePage]);
+
+  const paginationItems = useMemo(
+    () => buildPaginationWindow(safePage, totalPages),
+    [safePage, totalPages]
   );
 
-  const activeSample: SamplePaperItem | null = useMemo(
-    () =>
-      selectedSampleId
-        ? SAMPLE_LIBRARY_ITEMS.find((s) => s.id === selectedSampleId) || null
-        : null,
-    [selectedSampleId]
-  );
-
-  const handleOpenSample = (id: string) => {
-    setSelectedSampleId(id);
+  const handleOpenSample = (slug: string) => {
+    setSelectedSlug(slug);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleCopySampleLink = (sample: SamplePaperItem) => {
-    const shareUrl = `${window.location.origin}${window.location.pathname}?sample=${encodeURIComponent(
-      sample.id
-    )}`;
-    void navigator.clipboard?.writeText(shareUrl).catch(() => {});
-    setCopiedId(sample.id);
-    window.setTimeout(() => setCopiedId(null), 1800);
+  const handleChangePage = (page: number) => {
+    setCurrentPage(page);
+    document
+      .getElementById('sample-catalog-results')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // =========================================================================
-  // 3-COLUMN KNOWLEDGE-BASE READER VIEW (SAMPLE DETAIL)
-  // =========================================================================
-  if (activeSample) {
+  // Render full 3-column Scholarly Reader View when a sample is active
+  if (activeItem) {
     return (
-      <div className="py-6 sm:py-8 px-4 sm:px-6 lg:px-8 max-w-[1400px] mx-auto">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <button
-            type="button"
-            onClick={() => setSelectedSampleId(null)}
-            className="btn-press inline-flex items-center gap-1.5 text-xs font-semibold text-slate-600 hover:text-[#12489B]"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Quay lại Thư viện Bài mẫu ({SAMPLE_LIBRARY_ITEMS.length})</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={onBackHome}
-            className="btn-press text-xs font-semibold text-zinc-500 hover:text-slate-900"
-          >
-            Về trang chủ
-          </button>
-        </div>
-
-        {/* Rounded 3-Column Workspace Shell */}
-        <div className="rounded-3xl border border-zinc-200/90 bg-white shadow-[0_14px_45px_rgba(15,23,42,0.06)] overflow-hidden flex flex-col lg:flex-row min-h-[760px]">
-          {/* LEFT SIDEBAR: Dark Navy Sample Navigation */}
-          {sidebarOpen && (
-            <aside className="lg:w-[260px] shrink-0 bg-[#0B2559] text-white p-4 flex flex-col justify-between gap-6 border-b lg:border-b-0 lg:border-r border-[#163B82]">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between gap-2 pb-3 border-b border-white/10">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-8 h-8 rounded-xl bg-sky-400/20 border border-sky-300/30 flex items-center justify-center text-sky-300 shrink-0">
-                      <BookOpen className="w-4 h-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-xs font-bold text-white truncate">
-                        Sample Library
-                      </div>
-                      <div className="text-[10px] text-sky-200/80">
-                        AssignTrack Studio
-                      </div>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSidebarOpen(false)}
-                    title="Thu gọn thanh bên"
-                    className="p-1.5 rounded-lg text-sky-200/70 hover:text-white hover:bg-white/10"
-                  >
-                    <PanelLeftClose className="w-4 h-4" />
-                  </button>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-sky-200/70 px-2">
-                    Bài mẫu nổi bật
-                  </div>
-                  <div className="space-y-1 max-h-[380px] overflow-y-auto pr-0.5">
-                    {SAMPLE_LIBRARY_ITEMS.map((item) => {
-                      const isCurrent = item.id === activeSample.id;
-                      return (
-                        <button
-                          key={item.id}
-                          type="button"
-                          onClick={() => handleOpenSample(item.id)}
-                          className={`w-full text-left px-2.5 py-2 rounded-xl text-xs transition-colors flex items-start gap-2 ${
-                            isCurrent
-                              ? 'bg-white/15 border border-sky-300/35 text-white font-semibold'
-                              : 'text-slate-300 hover:bg-white/8 hover:text-white'
-                          }`}
-                        >
-                          <FileText className="w-3.5 h-3.5 text-sky-300 shrink-0 mt-0.5" />
-                          <span className="line-clamp-2 leading-snug">
-                            {item.courseCode} · {item.discipline}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedSampleId(null)}
-                  className="w-full px-3 py-2 rounded-xl bg-white/8 hover:bg-white/15 text-xs font-semibold text-sky-200 inline-flex items-center justify-between transition-colors"
-                >
-                  <span>Tất cả bài mẫu</span>
-                  <ArrowRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-
-              {/* Sticky Sidebar Conversion Card */}
-              <div className="rounded-2xl bg-white/10 border border-white/15 p-4 space-y-3">
-                <div className="text-xs font-bold text-white leading-snug">
-                  Cần hỗ trợ bài của riêng bạn?
-                </div>
-                <p className="text-[11px] text-slate-300 leading-relaxed">
-                  Gửi đề bài &amp; Rubric để nhận tư vấn và báo giá chi tiết chỉ trong 15 phút.
-                </p>
-                <button
-                  type="button"
-                  onClick={onOrderNow}
-                  className="btn-press w-full py-2 px-3 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-sm"
-                >
-                  <span>Order Now</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </aside>
-          )}
-
-          {/* CENTER DOCUMENT READER */}
-          <main className="flex-1 min-w-0 p-5 sm:p-7 space-y-6 bg-white">
-            {/* Top Utility Row */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-zinc-200/80">
-              <div className="flex items-center gap-2">
-                {!sidebarOpen && (
-                  <button
-                    type="button"
-                    onClick={() => setSidebarOpen(true)}
-                    title="Mở thanh danh sách bài mẫu"
-                    className="btn-press p-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-slate-700"
-                  >
-                    <PanelLeftOpen className="w-4 h-4" />
-                  </button>
-                )}
-                <span className="px-2.5 py-1 rounded-full bg-[#0B2559] text-white text-[11px] font-bold">
-                  Free Sample
-                </span>
-                <span className="px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-[#12489B] text-[11px] font-semibold">
-                  {activeSample.discipline}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setReaderFontScale((s) => Math.max(85, s - 10))
-                  }
-                  className="btn-press px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-xs font-bold text-slate-700"
-                  title="Giảm cỡ chữ"
-                >
-                  A−
-                </button>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setReaderFontScale((s) => Math.min(130, s + 10))
-                  }
-                  className="btn-press px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-xs font-bold text-slate-700"
-                  title="Tăng cỡ chữ"
-                >
-                  A+
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleCopySampleLink(activeSample)}
-                  className="btn-press inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-xs font-semibold text-slate-700"
-                >
-                  {copiedId === activeSample.id ? (
-                    <>
-                      <Check className="w-3.5 h-3.5 text-emerald-600" />
-                      <span className="text-emerald-700">Đã sao chép</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3.5 h-3.5" />
-                      <span>Copy link</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-
-            {/* Document Title & Breadcrumb */}
-            <div className="space-y-2">
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 leading-snug">
-                {activeSample.title}
-              </h1>
-              <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
-                <span>
-                  {activeSample.institution} · {activeSample.country} ·{' '}
-                  {activeSample.level}
-                </span>
-                <span className="inline-flex items-center gap-1 font-mono">
-                  <Clock className="w-3.5 h-3.5" />
-                  <span>{activeSample.publishedDate}</span>
-                </span>
-              </div>
-            </div>
-
-            {/* Visual Grade & Turnitin Proof Attachment Card */}
-            <div className="rounded-2xl border border-blue-200/80 bg-gradient-to-br from-[#F4F7FB] to-white p-4 sm:p-5 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="inline-flex items-center gap-2 text-xs font-bold text-[#0B2559]">
-                  <Award className="w-4 h-4 text-amber-500" />
-                  <span>Kết quả chấm điểm &amp; Báo cáo kiểm định mẫu</span>
-                </div>
-                <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-bold">
-                  Chỉ dùng để tham khảo
-                </span>
-              </div>
-
-              {activeSample.previewImageUrl ? (
-                <img
-                  src={activeSample.previewImageUrl}
-                  alt={activeSample.title}
-                  className="w-full rounded-xl border border-zinc-200 shadow-2xs object-cover max-h-80"
-                />
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="rounded-xl bg-[#0B2559] text-white p-3.5 flex items-center justify-between">
-                    <div>
-                      <div className="text-[10px] uppercase tracking-wider text-sky-200/80 font-semibold">
-                        Điểm đạt được
-                      </div>
-                      <div className="text-2xl font-black font-mono text-sky-300 mt-0.5">
-                        {activeSample.gradeScore}
-                      </div>
-                    </div>
-                    <span className="px-2.5 py-1 rounded-lg bg-sky-400/20 border border-sky-300/30 text-sky-200 text-xs font-black font-mono">
-                      {activeSample.gradeLabel}
-                    </span>
-                  </div>
-
-                  <div className="rounded-xl bg-white border border-zinc-200 p-3.5 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] font-semibold">
-                      <span className="text-zinc-500">Turnitin Similarity</span>
-                      <span className="font-mono font-bold text-emerald-700">
-                        {activeSample.turnitinPercent}%
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
-                      <div
-                        className="h-full rounded-full bg-emerald-500"
-                        style={{
-                          width: `${Math.max(8, activeSample.turnitinPercent * 3)}%`,
-                        }}
-                      />
-                    </div>
-                    <div className="text-[10px] text-zinc-400">
-                      An toàn (&lt; 10% ngưỡng chuẩn)
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl bg-white border border-zinc-200 p-3.5 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] font-semibold">
-                      <span className="text-zinc-500">AI Detection</span>
-                      <span className="font-mono font-bold text-[#12489B]">
-                        {activeSample.aiPercent}% AI
-                      </span>
-                    </div>
-                    <div className="h-2 rounded-full bg-zinc-100 overflow-hidden">
-                      <div className="h-full rounded-full bg-[#12489B] w-[5%]" />
-                    </div>
-                    <div className="text-[10px] text-zinc-400">
-                      Văn phong học thuật tự nhiên
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Rubric Breakdown Strip */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                {activeSample.rubricHighlights.map((r) => (
-                  <div
-                    key={r.criterion}
-                    className="flex items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-white border border-zinc-200/80 text-[11.5px]"
-                  >
-                    <span className="text-slate-700 truncate">{r.criterion}</span>
-                    <span className="font-mono font-bold text-[#12489B] shrink-0">
-                      {r.score}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Formatted Academic Sample Content */}
-            <article
-              style={{ fontSize: `${readerFontScale}%` }}
-              className="rounded-2xl border border-zinc-200/90 bg-white p-5 sm:p-7 space-y-6 leading-relaxed text-slate-800"
-            >
-              {activeSample.sections.map((sec) => (
-                <section key={sec.heading} className="space-y-3">
-                  <h2 className="text-[1.12em] font-bold text-slate-900">
-                    {sec.heading}
-                  </h2>
-                  {sec.paragraphs.map((p, idx) => (
-                    <p
-                      key={idx}
-                      className="text-[0.94em] text-slate-700 leading-[1.75]"
-                    >
-                      {p}
-                    </p>
-                  ))}
-                  {sec.bullets && sec.bullets.length > 0 && (
-                    <ul className="list-disc pl-5 space-y-1.5 text-[0.93em] text-slate-700">
-                      {sec.bullets.map((b, idx) => (
-                        <li key={idx}>{b}</li>
-                      ))}
-                    </ul>
-                  )}
-                  {sec.table && (
-                    <div className="my-4 space-y-1.5">
-                      <div className="text-[0.82em] font-bold text-slate-800">
-                        {sec.table.caption}
-                      </div>
-                      <div className="overflow-x-auto rounded-xl border border-zinc-200">
-                        <table className="w-full text-left border-collapse text-[0.84em]">
-                          <thead className="bg-[#F4F7FB] text-slate-900">
-                            <tr>
-                              {sec.table.headers.map((h) => (
-                                <th
-                                  key={h}
-                                  className="px-3 py-2 font-bold border-b border-zinc-200"
-                                >
-                                  {h}
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-zinc-100">
-                            {sec.table.rows.map((row, rIdx) => (
-                              <tr
-                                key={rIdx}
-                                className={
-                                  rIdx === sec.table!.rows.length - 1
-                                    ? 'bg-blue-50/40 font-semibold'
-                                    : ''
-                                }
-                              >
-                                {row.map((cell, cIdx) => (
-                                  <td
-                                    key={cIdx}
-                                    className="px-3 py-2 text-slate-700"
-                                  >
-                                    {cell}
-                                  </td>
-                                ))}
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                      {sec.table.sourceNote && (
-                        <p className="text-[0.78em] italic text-zinc-500">
-                          {sec.table.sourceNote}
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </section>
-              ))}
-
-              {/* Sample References */}
-              <section className="pt-4 border-t border-zinc-200 space-y-2.5">
-                <h2 className="text-[1.08em] font-bold text-slate-900">
-                  References ({activeSample.citationStyle})
-                </h2>
-                <div className="space-y-2 text-[0.88em] text-slate-700">
-                  {activeSample.references.map((ref, idx) => (
-                    <p key={idx} className="pl-5 -indent-5 leading-relaxed">
-                      {ref}
-                    </p>
-                  ))}
-                </div>
-              </section>
-            </article>
-
-            {/* Hashtags & Bottom Utility Row */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
-              <div className="flex flex-wrap gap-1.5">
-                {activeSample.tags.map((tag) => (
-                  <span
-                    key={tag}
-                    className="px-2.5 py-1 rounded-full bg-[#F4F7FB] border border-zinc-200 text-[11px] font-semibold text-slate-600"
-                  >
-                    # {tag}
-                  </span>
-                ))}
-              </div>
-              <div className="flex items-center gap-3 text-xs text-zinc-500">
-                <button
-                  type="button"
-                  onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                  className="btn-press inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-slate-700 font-semibold"
-                >
-                  <ArrowUp className="w-3 h-3" />
-                  <span>Lên đầu bài</span>
-                </button>
-                <span className="font-mono font-semibold text-slate-700">
-                  {activeSample.wordCount.toLocaleString('vi-VN')} từ
-                </span>
-              </div>
-            </div>
-
-            {/* Bottom Reader Conversion Bar */}
-            <div className="rounded-2xl bg-[#F4F7FB] border border-zinc-200/90 p-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-zinc-600 max-w-md">
-                Bài mẫu chỉ mang tính tham khảo cấu trúc &amp; phong cách học thuật. Cần bài viết mới 100% bám sát đề bài của bạn?
-              </p>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedSampleId(null)}
-                  className="btn-press px-3.5 py-2 rounded-full bg-white border border-zinc-200 hover:bg-zinc-50 text-xs font-semibold text-slate-700"
-                >
-                  Xem thêm bài mẫu
-                </button>
-                <button
-                  type="button"
-                  onClick={onOrderNow}
-                  className="btn-press inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-xs font-bold shadow-sm"
-                >
-                  <span>Order Now · Đặt bài tương tự</span>
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-          </main>
-
-          {/* RIGHT STICKY METADATA PANEL */}
-          <aside className="lg:w-[270px] shrink-0 bg-[#F4F7FB] p-5 border-t lg:border-t-0 lg:border-l border-zinc-200/80 space-y-4">
-            <div className="inline-flex items-center gap-2 text-xs font-bold text-[#0B2559]">
-              <Eye className="w-4 h-4 text-[#12489B]" />
-              <span>Thông tin bài mẫu</span>
-            </div>
-
-            <div className="space-y-2.5">
-              {[
-                {
-                  icon: FileText,
-                  label: 'Thể loại bài',
-                  value: activeSample.docType,
-                },
-                {
-                  icon: Globe,
-                  label: 'Quốc gia',
-                  value: activeSample.country,
-                },
-                {
-                  icon: Building2,
-                  label: 'Trường / Chương trình',
-                  value: activeSample.institution,
-                },
-                {
-                  icon: GraduationCap,
-                  label: 'Độ dài & Chuẩn trích dẫn',
-                  value: `${activeSample.wordCount.toLocaleString('vi-VN')} từ · ${activeSample.citationStyle}`,
-                },
-              ].map((meta) => {
-                const Icon = meta.icon;
-                return (
-                  <div
-                    key={meta.label}
-                    className="rounded-xl bg-white border border-zinc-200/90 p-3.5 space-y-1"
-                  >
-                    <div className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-zinc-500">
-                      <Icon className="w-3.5 h-3.5 text-[#12489B]" />
-                      <span>{meta.label}</span>
-                    </div>
-                    <div className="text-xs font-bold text-slate-900">
-                      {meta.value}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            <div className="rounded-xl bg-blue-50/70 border border-blue-200/70 p-3.5 text-[11px] text-slate-600 leading-relaxed flex items-start gap-2">
-              <ShieldCheck className="w-4 h-4 text-[#12489B] shrink-0 mt-0.5" />
-              <span>
-                Tài liệu mẫu dùng để tham khảo cách lập luận, trình bày bảng biểu và chuẩn trích dẫn. Vui lòng không sao chép trực tiếp để nộp bài.
-              </span>
-            </div>
-          </aside>
-        </div>
-      </div>
+      <SampleReaderView
+        activeItem={activeItem}
+        allItems={items}
+        onSelectSample={handleOpenSample}
+        onBackToList={() => {
+          setSelectedSlug(null);
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onOrderNow={onOrderNow}
+      />
     );
   }
 
-  // =========================================================================
-  // SAMPLE LIBRARY INDEX VIEW
-  // =========================================================================
   return (
-    <div>
-      {/* Dark Navy Compact Hero */}
-      <section className="relative overflow-hidden bg-[#0B2559] text-white py-14 sm:py-16">
+    <div className="bg-[#F4F7FB] min-h-[calc(100vh-4rem)] pb-16">
+      {/* Dark Deep Academic Navy Hero */}
+      <section className="relative overflow-hidden bg-[#0B2559] text-white pt-10 pb-12 sm:pt-12 sm:pb-14">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-[0.08]"
@@ -650,371 +278,461 @@ export function SampleLibraryView({
             backgroundSize: '44px 44px',
           }}
         />
-        <div className="relative max-w-5xl mx-auto px-4 sm:px-6 text-center space-y-5">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-200">
-            <span className="w-2 h-2 rounded-full bg-sky-300" />
-            <span>AssignTrack · Thư viện Bài mẫu Học thuật</span>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+          <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+            <div className="max-w-2xl space-y-2.5">
+              <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">
+                <GraduationCap className="w-4 h-4" />
+                <span>AssignTrack Academic Sample Library</span>
+              </div>
+              <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-white leading-[1.15]">
+                Thư viện Bài mẫu Đại học Quốc tế{' '}
+                <span className="text-sky-300">Toàn văn đầy đủ</span>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-200/85 leading-relaxed">
+                Trọn bộ bài mẫu nguyên văn dài hàng nghìn từ của các trường Đại học Úc, Anh, Mỹ, Canada &amp; Quốc tế — giữ nguyên đầy đủ bảng dữ liệu, hình ảnh biểu đồ, danh mục nguồn trích dẫn (References) và Phụ lục (Appendix).
+              </p>
+            </div>
+
+            {/* Compact Live Library Metrics */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 shrink-0">
+              <div className="rounded-2xl bg-white/10 border border-white/15 px-3.5 py-2.5">
+                <div className="text-lg font-bold font-mono tabular-nums text-white">
+                  {items.length || '122'}
+                </div>
+                <div className="text-[11px] text-sky-200">Bài mẫu toàn văn</div>
+              </div>
+              <div className="rounded-2xl bg-white/10 border border-white/15 px-3.5 py-2.5">
+                <div className="text-lg font-bold font-mono tabular-nums text-amber-300">
+                  {schools.length || '25'}
+                </div>
+                <div className="text-[11px] text-sky-200">Trường Đại học</div>
+              </div>
+              <div className="rounded-2xl bg-white/10 border border-white/15 px-3.5 py-2.5">
+                <div className="text-lg font-bold font-mono tabular-nums text-white">
+                  {stats.totalWords > 0
+                    ? `${Math.round(stats.totalWords / 1000)}K+`
+                    : '245K+'}
+                </div>
+                <div className="text-[11px] text-sky-200">Tổng từ học thuật</div>
+              </div>
+              <div className="rounded-2xl bg-white/10 border border-white/15 px-3.5 py-2.5">
+                <div className="text-lg font-bold font-mono tabular-nums text-emerald-300">
+                  {stats.withTablesOrImages || '65+'}
+                </div>
+                <div className="text-[11px] text-sky-200">Bài có Bảng / Hình</div>
+              </div>
+            </div>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-black tracking-[-0.03em] leading-tight">
-            FREE <span className="text-sky-300">SAMPLE LIBRARY</span>
-          </h1>
-
-          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-semibold text-slate-200">
-            <span className="inline-flex items-center gap-1.5">
-              <FileCheck2 className="w-4 h-4 text-sky-300" />
-              <span>Plagiarism Checked</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <CheckCircle2 className="w-4 h-4 text-sky-300" />
-              <span>Distinction &amp; HD Quality</span>
-            </span>
-            <span className="inline-flex items-center gap-1.5">
-              <Sparkles className="w-4 h-4 text-amber-300" />
-              <span>Peer-Reviewed References</span>
-            </span>
+          {/* Search Input inside Hero */}
+          <div className="max-w-3xl">
+            <div className="relative">
+              <Search className="w-4 h-4 text-slate-400 absolute left-4 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Tìm theo tên môn, mã môn (BUSM2570, MKTG1205, OMGT...), tên trường (RMIT, Northampton, Melbourne...) hoặc chủ đề..."
+                className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm font-medium shadow-lg focus:outline-none focus:ring-2 focus:ring-[#F5B700]"
+              />
+            </div>
           </div>
-
-          <div className="pt-1 flex flex-wrap items-center justify-center gap-3">
-            <a
-              href="#sample-catalog"
-              className="btn-press inline-flex items-center gap-2 pl-5 pr-2 py-2 rounded-full bg-white text-[#0B2559] text-xs font-bold shadow-md"
-            >
-              <span>Xem bài mẫu</span>
-              <span className="w-7 h-7 rounded-full bg-blue-50 text-[#12489B] flex items-center justify-center">
-                <ArrowDown className="w-3.5 h-3.5" />
-              </span>
-            </a>
-            <button
-              type="button"
-              onClick={onOrderNow}
-              className="btn-press inline-flex items-center gap-2 pl-5 pr-2 py-2 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-xs font-bold shadow-md"
-            >
-              <span>Order Now — Đặt bài ngay</span>
-              <span className="w-7 h-7 rounded-full bg-white text-[#EA580C] flex items-center justify-center">
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </span>
-            </button>
-          </div>
-
-          <p className="text-[11.5px] text-slate-300/85 max-w-xl mx-auto">
-            Các bài mẫu dưới đây được biên soạn chuẩn học thuật giúp sinh viên tham khảo bố cục, cách phân tích phản biện và định dạng trích dẫn.
-          </p>
         </div>
       </section>
 
-      {/* Search & Multi-Facet Filter Bar */}
       <section
         id="sample-catalog"
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8"
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-7"
       >
-        <div className="max-w-4xl mx-auto space-y-4">
-          {/* Primary Search Pill */}
-          <div className="relative flex items-center rounded-full bg-white border-2 border-blue-200/80 shadow-[0_8px_28px_rgba(18,72,155,0.08)] p-1.5">
-            <Search className="w-4 h-4 text-[#12489B] ml-3.5 shrink-0" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => {
-                setSearchQuery(e.target.value);
-                setCurrentPage(1);
-              }}
-              placeholder="Tìm theo mã môn (VD: BUSM2570, FINA3012), tên ngành, trường hoặc từ khóa..."
-              className="flex-1 px-3 py-2 text-xs sm:text-sm bg-transparent focus:outline-none text-slate-900 placeholder:text-zinc-400"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery('');
-                  setCurrentPage(1);
-                }}
-                className="px-2.5 py-1 text-xs font-semibold text-zinc-400 hover:text-slate-700"
-              >
-                Xóa
-              </button>
-            )}
-            <span className="w-9 h-9 rounded-full bg-[#0B2559] text-white flex items-center justify-center shrink-0">
-              <Search className="w-4 h-4" />
-            </span>
-          </div>
-
-          {/* 5-Facet Filter Row */}
-          <div className="flex flex-wrap items-center justify-center gap-2.5 text-xs">
-            <span className="font-bold text-slate-600">Lọc theo:</span>
-
-            <select
-              value={disciplineFilter}
-              onChange={(e) => {
-                setDisciplineFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3.5 py-2 rounded-full bg-white border border-zinc-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
-            >
-              <option value="all">Tất cả Ngành ({disciplines.length})</option>
-              {disciplines.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={institutionFilter}
-              onChange={(e) => {
-                setInstitutionFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3.5 py-2 rounded-full bg-white border border-zinc-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
-            >
-              <option value="all">Tất cả Trường ({institutions.length})</option>
-              {institutions.map((inst) => (
-                <option key={inst} value={inst}>
-                  {inst}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={levelFilter}
-              onChange={(e) => {
-                setLevelFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3.5 py-2 rounded-full bg-white border border-zinc-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
-            >
-              <option value="all">Tất cả Cấp bậc</option>
-              {levels.map((l) => (
-                <option key={l} value={l}>
-                  {l}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={docTypeFilter}
-              onChange={(e) => {
-                setDocTypeFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3.5 py-2 rounded-full bg-white border border-zinc-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
-            >
-              <option value="all">Tất cả Thể loại bài</option>
-              {docTypes.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={countryFilter}
-              onChange={(e) => {
-                setCountryFilter(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3.5 py-2 rounded-full bg-white border border-zinc-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
-            >
-              <option value="all">Tất cả Quốc gia</option>
-              {countries.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Results Meta Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-zinc-200/80 text-xs">
-          <div className="inline-flex items-center gap-2 font-bold text-slate-800">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{filteredSamples.length} bài mẫu phù hợp</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-1 rounded-full bg-white border border-zinc-200 font-semibold text-slate-600">
-              Trang {safePage} / {totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={onBackHome}
-              className="text-xs font-semibold text-[#12489B] hover:underline"
-            >
-              ← Quay lại Trang chủ
-            </button>
-          </div>
-        </div>
-
-        {/* 2-Column Sample Card Grid */}
-        {filteredSamples.length === 0 ? (
-          <div className="py-16 text-center bg-white rounded-3xl border border-zinc-200 space-y-3">
-            <BookOpen className="w-10 h-10 text-zinc-300 mx-auto" />
-            <div className="text-sm font-bold text-slate-800">
-              Không tìm thấy bài mẫu khớp bộ lọc hiện tại
+        {loading ? (
+          <div className="py-20 bg-white rounded-3xl border border-slate-200 flex flex-col items-center justify-center gap-3 text-slate-500">
+            <Loader2 className="w-8 h-8 text-[#12489B] animate-spin" />
+            <div className="text-sm font-semibold text-slate-700">
+              Đang tải danh mục bài mẫu &amp; logo các trường đại học...
             </div>
+          </div>
+        ) : error ? (
+          <div className="py-16 px-6 bg-white rounded-3xl border border-red-200 text-center space-y-3">
+            <AlertCircle className="w-9 h-9 text-red-500 mx-auto" />
+            <div className="text-sm font-bold text-slate-900">{error}</div>
             <button
               type="button"
-              onClick={() => {
-                setSearchQuery('');
-                setDisciplineFilter('all');
-                setInstitutionFilter('all');
-                setLevelFilter('all');
-                setDocTypeFilter('all');
-                setCountryFilter('all');
-                setCurrentPage(1);
-              }}
-              className="btn-press px-4 py-2 rounded-full bg-[#0B2559] text-white text-xs font-bold"
+              onClick={() => setReloadNonce((n) => n + 1)}
+              className="btn-press inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#0B2559] text-white text-xs font-bold"
             >
-              Đặt lại bộ lọc
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Thử tải lại</span>
             </button>
           </div>
         ) : (
-          <div className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {paginatedSamples.map((sample) => (
-                <div
-                  key={sample.id}
-                  onClick={() => handleOpenSample(sample.id)}
-                  className="group cursor-pointer rounded-3xl bg-white border border-zinc-200/90 hover:border-[#12489B]/50 p-6 shadow-[0_8px_28px_rgba(15,23,42,0.03)] hover:shadow-[0_14px_36px_rgba(18,72,155,0.09)] transition-all flex flex-col justify-between gap-5"
+          <>
+            {/* OUTSIDE UNIVERSITY LOGO SHOWCASE & QUICK-FILTER GRID (ALL 25 UNIVERSITIES) */}
+            <div className="rounded-3xl bg-white border border-slate-200/90 p-5 sm:p-6 shadow-[0_6px_24px_rgba(11,37,89,0.04)] space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-[#0B2559]">
+                    Logo các Trường Đại học ({schools.length} trường · {items.length} bài mẫu)
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Nhấn trực tiếp vào logo trường bên dưới để lọc nhanh toàn bộ bài mẫu của trường đó
+                  </p>
+                </div>
+                {schoolFilter !== 'all' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSchoolFilter('all');
+                      setCurrentPage(1);
+                    }}
+                    className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 text-[#12489B] text-xs font-bold hover:bg-blue-100 transition-colors"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Xem tất cả {schools.length} trường</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-9 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSchoolFilter('all');
+                    setCurrentPage(1);
+                  }}
+                  className={`btn-press rounded-2xl border p-2.5 flex flex-col items-center justify-center gap-1.5 text-center transition-colors ${
+                    schoolFilter === 'all'
+                      ? 'bg-[#0B2559] border-[#0B2559] text-white shadow-sm'
+                      : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:border-[#12489B]/50 hover:bg-white'
+                  }`}
                 >
-                  <div className="space-y-4">
-                    <div className="flex items-start gap-4">
-                      {/* Left Square Institution Emblem Slot */}
-                      <div className="w-16 h-16 rounded-2xl bg-[#F4F7FB] border border-zinc-200/90 flex flex-col items-center justify-center shrink-0 text-center px-1">
-                        <span className="text-[11px] font-black font-mono text-[#0B2559] leading-tight">
-                          {sample.institutionShort}
-                        </span>
-                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md mt-1">
-                          {sample.gradeLabel} · {sample.gradeScore.split('/')[0]}
-                        </span>
+                  <div
+                    className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                      schoolFilter === 'all'
+                        ? 'bg-white/15 text-amber-300'
+                        : 'bg-white border border-slate-200 text-[#0B2559]'
+                    }`}
+                  >
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div className="text-[11px] font-bold leading-tight">Tất cả</div>
+                  <div
+                    className={`text-[10px] font-mono tabular-nums ${
+                      schoolFilter === 'all' ? 'text-sky-200' : 'text-slate-500'
+                    }`}
+                  >
+                    {items.length} bài
+                  </div>
+                </button>
+
+                {schools.map((uni) => {
+                  const isSelected = schoolFilter === uni.name;
+                  return (
+                    <button
+                      key={uni.name}
+                      type="button"
+                      onClick={() => {
+                        setSchoolFilter(isSelected ? 'all' : uni.name);
+                        setCurrentPage(1);
+                      }}
+                      title={`${uni.name} (${uni.count} bài mẫu)`}
+                      className={`btn-press rounded-2xl border p-2.5 flex flex-col items-center justify-center gap-1.5 text-center transition-colors ${
+                        isSelected
+                          ? 'bg-blue-50/90 border-[#12489B] ring-1 ring-[#12489B] shadow-xs'
+                          : 'bg-slate-50/60 border-slate-200 hover:border-[#12489B]/50 hover:bg-white'
+                      }`}
+                    >
+                      <SampleUniversityBadge
+                        logoUrl={uni.logoUrl}
+                        schoolName={uni.name}
+                        size="sm"
+                      />
+                      <div
+                        className={`text-[11px] font-bold leading-tight line-clamp-1 w-full ${
+                          isSelected ? 'text-[#0B2559]' : 'text-slate-800'
+                        }`}
+                      >
+                        {getShortSchoolName(uni.name)}
+                      </div>
+                      <div className="text-[10px] font-mono tabular-nums text-slate-500">
+                        {uni.count} bài
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Secondary Facet Filter Row + Results Summary */}
+            <div
+              id="sample-catalog-results"
+              className="scroll-mt-24 flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-slate-200/90"
+            >
+              <div className="flex flex-wrap items-center gap-2 text-xs">
+                <select
+                  value={majorFilter}
+                  onChange={(e) => {
+                    setMajorFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="px-3.5 py-2 rounded-full bg-white border border-slate-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
+                >
+                  <option value="all">Tất cả Chuyên ngành ({majors.length})</option>
+                  {majors.map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.name} ({m.count})
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={countryFilter}
+                  onChange={(e) => {
+                    setCountryFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="px-3.5 py-2 rounded-full bg-white border border-slate-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
+                >
+                  <option value="all">Tất cả Quốc gia</option>
+                  {countries.map((c) => (
+                    <option key={c.name} value={c.name}>
+                      {c.name} ({c.count})
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={attachmentFilter}
+                  onChange={(e) => {
+                    setAttachmentFilter(e.target.value as AttachmentFilter);
+                    setCurrentPage(1);
+                  }}
+                  className="px-3.5 py-2 rounded-full bg-white border border-slate-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
+                >
+                  <option value="all">Tất cả thành phần</option>
+                  <option value="tables">Có bảng dữ liệu (Tables)</option>
+                  <option value="images">Có hình ảnh &amp; biểu đồ</option>
+                  <option value="appendix">Có Phụ lục (Appendix)</option>
+                  <option value="references">Có Tài liệu tham khảo</option>
+                </select>
+
+                <select
+                  value={sortMode}
+                  onChange={(e) => {
+                    setSortMode(e.target.value as SortMode);
+                    setCurrentPage(1);
+                  }}
+                  className="px-3.5 py-2 rounded-full bg-white border border-slate-200 font-semibold text-slate-700 focus:outline-none focus:border-[#12489B]"
+                >
+                  <option value="default">Sắp xếp: Mới nhất</option>
+                  <option value="longest">Dài nhất trước (Nhiều từ)</option>
+                  <option value="richest">Nhiều Bảng &amp; Hình nhất</option>
+                </select>
+
+                {hasActiveFilter && (
+                  <button
+                    type="button"
+                    onClick={resetAllFilters}
+                    className="px-3 py-2 rounded-full text-xs font-bold text-[#12489B] hover:bg-blue-50 transition-colors"
+                  >
+                    Xóa bộ lọc
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between lg:justify-end gap-3 text-xs shrink-0">
+                <span className="font-bold text-slate-800 tabular-nums">
+                  {filteredSamples.length} bài mẫu
+                </span>
+                <span className="px-3 py-1 rounded-full bg-white border border-slate-200 font-semibold text-slate-600 tabular-nums">
+                  Trang {safePage} / {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={onBackHome}
+                  className="text-xs font-semibold text-[#12489B] hover:underline whitespace-nowrap"
+                >
+                  ← Trang chủ
+                </button>
+              </div>
+            </div>
+
+            {/* 2-COLUMN SAMPLE CARD GRID (Crisp White University Logo Cards) */}
+            {filteredSamples.length === 0 ? (
+              <div className="py-16 text-center bg-white rounded-3xl border border-slate-200 space-y-3">
+                <BookOpen className="w-10 h-10 text-slate-300 mx-auto" />
+                <div className="text-sm font-bold text-slate-800">
+                  Không tìm thấy bài mẫu khớp bộ lọc hiện tại
+                </div>
+                <button
+                  type="button"
+                  onClick={resetAllFilters}
+                  className="btn-press px-4 py-2 rounded-full bg-[#0B2559] text-white text-xs font-bold"
+                >
+                  Đặt lại toàn bộ bộ lọc
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {paginatedSamples.map((sample) => (
+                    <article
+                      key={sample.slug}
+                      onClick={() => handleOpenSample(sample.slug)}
+                      className="card-interactive group cursor-pointer rounded-3xl bg-white border border-slate-200/90 p-5 sm:p-6 flex flex-col justify-between shadow-[0_6px_24px_rgba(11,37,89,0.04)]"
+                    >
+                      <div className="space-y-4">
+                        {/* Top row: Official University Logo Box + Pills + Title */}
+                        <div className="flex items-start gap-4">
+                          <SampleUniversityBadge
+                            logoUrl={sample.logoUrl}
+                            schoolName={sample.school}
+                            size="md"
+                          />
+
+                          <div className="min-w-0 flex-1 space-y-2">
+                            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                              <span className="px-2.5 py-0.5 rounded-full bg-[#0B2559] text-white font-bold">
+                                Free sample
+                              </span>
+                              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[#12489B] font-semibold">
+                                {sample.major}
+                              </span>
+                              {sample.gradeLabel && (
+                                <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-mono font-bold">
+                                  {sample.gradeLabel}
+                                </span>
+                              )}
+                            </div>
+
+                            <h3 className="text-base sm:text-[17px] font-bold text-slate-900 group-hover:text-[#12489B] transition-colors leading-snug line-clamp-2">
+                              {sample.title}
+                            </h3>
+                          </div>
+                        </div>
+
+                        {/* Excerpt */}
+                        <p className="text-xs sm:text-[13px] text-slate-600 leading-relaxed line-clamp-3">
+                          {sample.excerpt}
+                        </p>
+
+                        {/* Compact Academic Depth Badges */}
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-slate-500 font-medium">
+                          <span className="inline-flex items-center gap-1 font-mono font-semibold text-slate-700 tabular-nums">
+                            <FileText className="w-3.5 h-3.5 text-[#12489B]" />
+                            {sample.wordCount.toLocaleString('vi-VN')} từ
+                          </span>
+                          {sample.tableCount > 0 && (
+                            <span className="inline-flex items-center gap-1">
+                              <Table2 className="w-3.5 h-3.5 text-[#12489B]" />
+                              {sample.tableCount} bảng
+                            </span>
+                          )}
+                          {sample.imageCount > 0 && (
+                            <span className="inline-flex items-center gap-1">
+                              <ImageIcon className="w-3.5 h-3.5 text-[#12489B]" />
+                              {sample.imageCount} hình
+                            </span>
+                          )}
+                          {sample.hasReferences && (
+                            <span className="inline-flex items-center gap-1">
+                              <FileCheck2 className="w-3.5 h-3.5 text-emerald-600" />
+                              References
+                            </span>
+                          )}
+                          {sample.hasAppendix && (
+                            <span className="inline-flex items-center gap-1 text-[#0B2559] font-semibold">
+                              <FileSpreadsheet className="w-3.5 h-3.5 text-[#D97706]" />
+                              Appendix
+                            </span>
+                          )}
+                        </div>
                       </div>
 
-                      <div className="min-w-0 flex-1 space-y-2">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="px-2.5 py-0.5 rounded-full bg-[#0B2559] text-white text-[10.5px] font-bold">
-                            Free Sample
+                      {/* Dashed Footer Row matching reference layout */}
+                      <div className="mt-5 pt-4 border-t border-dashed border-slate-200 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs text-slate-500 min-w-0">
+                          <span className="inline-flex items-center gap-1 font-mono tabular-nums shrink-0">
+                            <Clock className="w-3.5 h-3.5 text-slate-400" />
+                            {sample.publishedDate}
                           </span>
-                          <span className="px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200/80 text-[#12489B] text-[10.5px] font-semibold">
-                            {sample.discipline}
-                          </span>
-                          <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200/80 text-emerald-700 text-[10px] font-mono font-bold">
-                            Turnitin {sample.turnitinPercent}% · 0% AI
+                          <span className="text-slate-300">·</span>
+                          <span className="truncate font-semibold text-slate-600">
+                            {getShortSchoolName(sample.school)}
                           </span>
                         </div>
 
-                        <h3 className="text-base font-bold text-slate-900 group-hover:text-[#12489B] transition-colors leading-snug line-clamp-2">
-                          {sample.title}
-                        </h3>
+                        <div className="inline-flex items-center gap-2.5 shrink-0">
+                          <span className="text-xs font-bold text-slate-900 group-hover:text-[#12489B] transition-colors">
+                            Đọc thêm
+                          </span>
+                          <span className="w-9 h-9 rounded-full bg-[#0B2559] group-hover:bg-[#12489B] text-white flex items-center justify-center transition-colors shadow-xs">
+                            <ArrowRight className="w-4 h-4" />
+                          </span>
+                        </div>
                       </div>
-                    </div>
-
-                    <p className="text-xs text-zinc-600 leading-relaxed line-clamp-3">
-                      {sample.excerpt}
-                    </p>
-                  </div>
-
-                  {/* Dashed Divider + Footer */}
-                  <div className="pt-4 border-t border-dashed border-zinc-200 flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-3 text-[11px] text-zinc-500 font-mono">
-                      <span className="inline-flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{sample.publishedDate}</span>
-                      </span>
-                      <span>· {sample.wordCount.toLocaleString('vi-VN')} từ</span>
-                      <span>· {sample.citationStyle}</span>
-                    </div>
-
-                    <span className="inline-flex items-center gap-2 text-xs font-bold text-[#0B2559] group-hover:text-[#12489B]">
-                      <span>Đọc thêm</span>
-                      <span className="w-7 h-7 rounded-full bg-[#0B2559] group-hover:bg-[#12489B] text-white flex items-center justify-center transition-colors">
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </span>
-                    </span>
-                  </div>
+                    </article>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            {/* Circular Pagination Bar */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-center gap-2 pt-2">
-                <button
-                  type="button"
-                  disabled={safePage <= 1}
-                  onClick={() => {
-                    setCurrentPage((p) => Math.max(1, p - 1));
-                    document
-                      .getElementById('sample-catalog')
-                      ?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="btn-press w-10 h-10 rounded-full bg-white border border-zinc-200 text-slate-700 disabled:opacity-40 disabled:pointer-events-none hover:border-[#12489B] flex items-center justify-center text-xs font-bold"
-                >
-                  &lt;
-                </button>
-                {Array.from({ length: totalPages }, (_, idx) => idx + 1).map(
-                  (pageNum) => (
+                {/* Smart Windowed Pagination */}
+                {totalPages > 1 && (
+                  <nav
+                    aria-label="Phân trang thư viện bài mẫu"
+                    className="flex items-center justify-center gap-1.5 pt-2 flex-wrap"
+                  >
                     <button
-                      key={pageNum}
                       type="button"
-                      onClick={() => {
-                        setCurrentPage(pageNum);
-                        document
-                          .getElementById('sample-catalog')
-                          ?.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                      className={`btn-press w-10 h-10 rounded-full text-xs font-bold flex items-center justify-center transition-colors ${
-                        pageNum === safePage
-                          ? 'bg-[#0B2559] text-white shadow-sm'
-                          : 'bg-white border border-zinc-200 text-slate-700 hover:border-[#12489B]'
-                      }`}
+                      disabled={safePage <= 1}
+                      onClick={() => handleChangePage(safePage - 1)}
+                      className="btn-press inline-flex items-center gap-1 px-3.5 py-2 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:border-[#12489B] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                     >
-                      {pageNum}
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>Trước</span>
                     </button>
-                  )
+
+                    {paginationItems.map((entry, idx) =>
+                      entry === 'ellipsis' ? (
+                        <span
+                          key={`ellipsis-${idx}`}
+                          className="px-2 text-xs font-bold text-slate-400 select-none"
+                        >
+                          ...
+                        </span>
+                      ) : (
+                        <button
+                          key={entry}
+                          type="button"
+                          onClick={() => handleChangePage(entry)}
+                          className={`btn-press w-9 h-9 rounded-full text-xs font-bold font-mono tabular-nums transition-colors ${
+                            entry === safePage
+                              ? 'bg-[#0B2559] text-white shadow-sm'
+                              : 'bg-white border border-slate-200 text-slate-700 hover:border-[#12489B] hover:text-[#12489B]'
+                          }`}
+                        >
+                          {entry}
+                        </button>
+                      )
+                    )}
+
+                    <button
+                      type="button"
+                      disabled={safePage >= totalPages}
+                      onClick={() => handleChangePage(safePage + 1)}
+                      className="btn-press inline-flex items-center gap-1 px-3.5 py-2 rounded-full bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:border-[#12489B] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <span>Sau</span>
+                      <ArrowRight className="w-3.5 h-3.5" />
+                    </button>
+                  </nav>
                 )}
-                <button
-                  type="button"
-                  disabled={safePage >= totalPages}
-                  onClick={() => {
-                    setCurrentPage((p) => Math.min(totalPages, p + 1));
-                    document
-                      .getElementById('sample-catalog')
-                      ?.scrollIntoView({ behavior: 'smooth' });
-                  }}
-                  className="btn-press w-10 h-10 rounded-full bg-white border border-zinc-200 text-slate-700 disabled:opacity-40 disabled:pointer-events-none hover:border-[#12489B] flex items-center justify-center text-xs font-bold"
-                >
-                  &gt;
-                </button>
               </div>
             )}
-          </div>
+          </>
         )}
-
-        {/* Bottom Conversion Banner */}
-        <div className="rounded-3xl bg-gradient-to-r from-[#071A42] via-[#0B2559] to-[#12489B] text-white p-7 sm:p-9 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-lg">
-          <div className="space-y-1.5 max-w-xl">
-            <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-sky-300">
-              AssignTrack Academic Support
-            </div>
-            <h3 className="text-xl sm:text-2xl font-bold tracking-tight">
-              Chưa tìm thấy Sample đúng môn học của bạn?
-            </h3>
-            <p className="text-xs sm:text-sm text-slate-200/85">
-              Gửi ngay đề bài &amp; Rubric của môn bạn đang học để đội ngũ chuyên gia tư vấn cấu trúc và báo giá trong 15 phút.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={onOrderNow}
-            className="btn-press shrink-0 inline-flex items-center gap-2.5 pl-6 pr-2 py-2.5 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-sm font-bold shadow-lg"
-          >
-            <span>Order Now · Nhận hỗ trợ ngay</span>
-            <span className="w-8 h-8 rounded-full bg-white text-[#EA580C] flex items-center justify-center">
-              <ArrowUpRight className="w-4 h-4" />
-            </span>
-          </button>
-        </div>
       </section>
     </div>
   );

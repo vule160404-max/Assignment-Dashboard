@@ -48,13 +48,17 @@ function getDefaultDeadlineInput(): string {
 
 interface ClientOrderFormViewProps {
   defaultServiceType?: string;
+  compactModal?: boolean;
   onGoToLookup?: () => void;
+  onClose?: () => void;
   onToast?: (msg: string) => void;
 }
 
 export function ClientOrderFormView({
   defaultServiceType,
+  compactModal = false,
   onGoToLookup,
+  onClose,
   onToast,
 }: ClientOrderFormViewProps) {
   const [customerName, setCustomerName] = useState('');
@@ -204,7 +208,13 @@ export function ClientOrderFormView({
 
   if (submittedInquiry) {
     return (
-      <div className="max-w-2xl mx-auto bg-white rounded-3xl border border-emerald-200/90 shadow-[0_14px_40px_rgba(15,23,42,0.06)] p-6 sm:p-8 space-y-6">
+      <div
+        className={
+          compactModal
+            ? 'bg-white rounded-2xl border border-emerald-200/90 p-5 sm:p-6 space-y-5'
+            : 'max-w-2xl mx-auto bg-white rounded-3xl border border-emerald-200/90 shadow-[0_14px_40px_rgba(15,23,42,0.06)] p-6 sm:p-8 space-y-6'
+        }
+      >
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 flex items-center justify-center shrink-0">
             <CheckCircle2 className="w-6 h-6" />
@@ -323,24 +333,42 @@ export function ClientOrderFormView({
           >
             + Gửi thêm yêu cầu khác
           </button>
-          {onGoToLookup && (
-            <button
-              type="button"
-              onClick={onGoToLookup}
-              className="btn-press inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-xs font-bold text-[#12489B]"
-            >
-              <span>Đã có mã đơn? Tra cứu tiến độ</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2">
+            {onGoToLookup && (
+              <button
+                type="button"
+                onClick={onGoToLookup}
+                className="btn-press inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 text-xs font-bold text-[#12489B]"
+              >
+                <span>Tra cứu mã đơn</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="btn-press px-4 py-2 rounded-xl bg-[#0B2559] hover:bg-[#12489B] text-white text-xs font-bold"
+              >
+                Quay lại trang đang xem
+              </button>
+            )}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-      {/* Left Info Column */}
+    <div
+      className={
+        compactModal
+          ? 'w-full'
+          : 'max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start'
+      }
+    >
+      {/* Left Info Column (Shown in Full Page Mode only) */}
+      {!compactModal && (
       <div className="lg:col-span-4 space-y-4">
         <div className="rounded-3xl bg-gradient-to-br from-[#071A42] via-[#0B2559] to-[#12489B] text-white p-6 space-y-4 shadow-lg">
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 border border-white/15 text-[11px] font-semibold text-sky-200">
@@ -398,11 +426,16 @@ export function ClientOrderFormView({
           </div>
         </div>
       </div>
+      )}
 
       {/* Right Concise Registration Form */}
       <form
         onSubmit={handleSubmit}
-        className="lg:col-span-8 bg-white rounded-3xl border border-zinc-200/90 shadow-[0_12px_36px_rgba(15,23,42,0.04)] p-6 sm:p-7 space-y-5"
+        className={
+          compactModal
+            ? 'bg-white rounded-2xl border border-zinc-200/90 p-5 sm:p-6 space-y-4'
+            : 'lg:col-span-8 bg-white rounded-3xl border border-zinc-200/90 shadow-[0_12px_36px_rgba(15,23,42,0.04)] p-6 sm:p-7 space-y-5'
+        }
       >
         <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-zinc-100">
           <div>

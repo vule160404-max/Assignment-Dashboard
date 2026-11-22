@@ -141,3 +141,19 @@ Cloudflare R2 lưu các **tệp nhị phân nặng và metadata gắn với file
    - Nếu có thay đổi `firestore.rules`, phải deploy lên project `gen-lang-client-0888688386` (database `ai-studio-39ecaf2f-943a-4559-8128-4524e07fb377`).
 6. **Quy tắc duy trì ngữ cảnh sống (Living Doc Rule):**
    - Bất kỳ khi nào thay đổi bảng giá, link Zalo/liên hệ, schema Firestore, hạ tầng R2/Vercel, hoặc bảng màu/quy tắc UI cốt lõi, **bắt buộc cập nhật lại file `docs/ASSIGNTRACK_CONTEXT.md` ngay trong cùng commit đó**.
+
+---
+
+## 9. Thư viện Bài mẫu Học thuật (`SampleLibraryView`)
+- **Kiến trúc dữ liệu tĩnh (tối ưu bundle Vite & tải tức thì trên CDN):**
+  - `public/samples/index.json`: Mục lục chuẩn hóa cho toàn bộ **122 bài mẫu toàn văn (~245.208 từ)** thuộc **25 trường đại học quốc tế** (RMIT, University of Northampton, Swinburne, La Trobe, Kaplan, Coventry, Deakin, University of Melbourne, Torrens, UniSA, York, ACU, Wollongong, UC Berkeley, Adelaide, UWA, UPenn, v.v.).
+  - `public/samples/articles/<slug>.json`: Từng bài mẫu toàn văn kèm `toc` (mục lục tương tác) và HTML đã chuẩn hóa (giữ nguyên đầy đủ bảng dữ liệu có bọc `.sample-table-scroll`, hình ảnh đính kèm, tài liệu tham khảo `References` và phụ lục `Appendix`).
+  - `public/samples/logos/*` (44 file logo trường đại học chính thức) & `public/samples/media/*` (92 hình ảnh biểu đồ/bảng dữ liệu đính kèm trong bài) được lưu cục bộ 100%, không phụ thuộc máy chủ ngoài.
+- **Kiến trúc UI & bảo mật:**
+  - `src/services/sampleLibraryService.ts`: Loader có bộ nhớ đệm trong phiên (`fetchSampleCatalog`, `fetchSampleArticle`).
+  - `src/components/shared/SampleUniversityBadge.tsx`: Khung vuông nền trắng hiển thị logo trường chính thức (tự động fallback sang chữ viết tắt nếu ảnh lỗi).
+  - `src/components/shared/SampleLibraryView.tsx`: Hero Navy + dải lọc logo toàn bộ 25 trường phía ngoài + bộ lọc chuyên ngành/quốc gia/thành phần đính kèm (Bảng, Hình, Appendix, References) + lưới thẻ 2 cột + phân trang rút gọn thông minh.
+  - `src/components/shared/SampleReaderView.tsx`: Trình đọc 3 cột (Sidebar Navy có ô tìm nhanh 122 bài, bài viết làm sạch bằng `DOMPurify.sanitize(...)` trong `.sample-article-prose`, thanh `A- / A / A+`, `In / PDF`, mục lục nhảy mục tương tác bên phải, và Lightbox phóng to hình ảnh/bảng dữ liệu render qua `createPortal(..., document.body)`).
+  - Hỗ trợ deep-link trực tiếp qua query string `?sample=<slug>`.
+
+

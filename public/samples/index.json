@@ -1,0 +1,4685 @@
+{
+  "generatedAt": "2026-11-22T17:56:49.881Z",
+  "totalCount": 122,
+  "schools": [
+    {
+      "name": "RMIT University",
+      "country": "Úc",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "count": 65
+    },
+    {
+      "name": "University of Northampton",
+      "country": "Anh",
+      "logoUrl": "/samples/logos/cf6f40573978d0.png",
+      "count": 4
+    },
+    {
+      "name": "Swinburne University",
+      "country": "Úc",
+      "logoUrl": "/samples/logos/e804455ef3b6c4.png",
+      "count": 4
+    },
+    {
+      "name": "La Trobe University",
+      "country": "Quốc tế",
+      "logoUrl": "/samples/logos/b4509a8636badf.png",
+      "count": 4
+    },
+    {
+      "name": "Kaplan Business School",
+      "country": "Australia",
+      "logoUrl": "/samples/logos/bf41fb6e6211d6.png",
+      "count": 4
+    },
+    {
+      "name": "Coventry University",
+      "country": "Australia",
+      "logoUrl": "/samples/logos/c31b15753790ae.png",
+      "count": 4
+    },
+    {
+      "name": "Deakin University",
+      "country": "Australia",
+      "logoUrl": "/samples/logos/0ce191583ca471.png",
+      "count": 4
+    },
+    {
+      "name": "University of Melbourne",
+      "country": "Úc",
+      "logoUrl": "/samples/logos/12e6745e9470dc.png",
+      "count": 3
+    },
+    {
+      "name": "International University",
+      "country": "Việt Nam",
+      "logoUrl": "/samples/logos/92b8abe111090d.png",
+      "count": 3
+    },
+    {
+      "name": "Torrens University",
+      "country": "Úc",
+      "logoUrl": "/samples/logos/902f6dab52bd75.png",
+      "count": 3
+    },
+    {
+      "name": "Sydney Metro College",
+      "country": "Úc",
+      "logoUrl": "/samples/logos/5ea7974969b82d.png",
+      "count": 2
+    },
+    {
+      "name": "University of South Australia",
+      "country": "Úc",
+      "logoUrl": "/samples/logos/696d32ea8099d2.png",
+      "count": 2
+    },
+    {
+      "name": "York University",
+      "country": "Canada",
+      "logoUrl": "/samples/logos/58d1373e730b67.png",
+      "count": 2
+    },
+    {
+      "name": "Australian Catholic University",
+      "country": "Australia",
+      "logoUrl": "/samples/logos/80ba4f233bc220.png",
+      "count": 2
+    },
+    {
+      "name": "University of Wollongong",
+      "country": "Australia",
+      "logoUrl": "/samples/logos/5b2ae8faa838ee.png",
+      "count": 2
+    },
+    {
+      "name": "Laureate Australia",
+      "country": "Australia",
+      "logoUrl": "/samples/logos/9d907b931724a0.png",
+      "count": 2
+    },
+    {
+      "name": "Kent University",
+      "country": "Australia",
+      "logoUrl": "/samples/logos/f7469421fa2eb2.png",
+      "count": 2
+    },
+    {
+      "name": "ICMS",
+      "country": "Australia",
+      "logoUrl": "/samples/logos/d14578b0c44584.png",
+      "count": 2
+    },
+    {
+      "name": "University of Tasmania",
+      "country": "Australia",
+      "logoUrl": "/samples/logos/230eca094a2c37.svg",
+      "count": 2
+    },
+    {
+      "name": "UC Berkeley",
+      "country": "Mỹ",
+      "logoUrl": "/samples/logos/1c81698f248d56.png",
+      "count": 1
+    },
+    {
+      "name": "University of Adelaide",
+      "country": "Úc",
+      "logoUrl": "/samples/logos/cac4e94717626f.png",
+      "count": 1
+    },
+    {
+      "name": "University of Newcastle",
+      "country": "Úc",
+      "logoUrl": "/samples/logos/231a9995f9c5c6.png",
+      "count": 1
+    },
+    {
+      "name": "University of Western Australia",
+      "country": "Úc",
+      "logoUrl": "/samples/logos/8bbb3c21d11dd1.png",
+      "count": 1
+    },
+    {
+      "name": "University of Pennsylvania",
+      "country": "Mỹ",
+      "logoUrl": "/samples/logos/d4b21e74f341c9.png",
+      "count": 1
+    },
+    {
+      "name": "William Angliss Institute",
+      "country": "Úc",
+      "logoUrl": "/samples/logos/9d73c8169d6dab.png",
+      "count": 1
+    }
+  ],
+  "items": [
+    {
+      "id": "university-of-northampton-global-marketing-2",
+      "wpId": 5073,
+      "slug": "university-of-northampton-global-marketing-2",
+      "title": "University of Northampton – Global Marketing 2",
+      "courseCode": "",
+      "school": "University of Northampton",
+      "schools": [
+        "University of Northampton"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Anh",
+      "countries": [
+        "Anh"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2762,
+      "publishedDate": "06/06/2026",
+      "excerpt": "Introduction In the world of rapid globalisation, global marketing including market expansion has become when involving consumer preferences and complex technological advancement. When expanding internationally, all businesses should balance global efficien...",
+      "logoUrl": "/samples/logos/cf6f40573978d0.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    },
+    {
+      "id": "university-of-northampton-luxury-brand-management",
+      "wpId": 5072,
+      "slug": "university-of-northampton-luxury-brand-management",
+      "title": "University of Northampton – Luxury Brand Management",
+      "courseCode": "",
+      "school": "University of Northampton",
+      "schools": [
+        "University of Northampton"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Anh",
+      "countries": [
+        "Anh"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 5242,
+      "publishedDate": "06/06/2026",
+      "excerpt": "Portfolio Entry 1: Characteristics of Luxury Brands Part 1: Characteristics that differentiate luxury brands from other types of brands The distinguishing factor about luxury brands as opposed to ordinary brands is that they derive their value from symbolis...",
+      "logoUrl": "/samples/logos/cf6f40573978d0.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    },
+    {
+      "id": "university-of-northampton-marketing-audit-research-project",
+      "wpId": 5071,
+      "slug": "university-of-northampton-marketing-audit-research-project",
+      "title": "University of Northampton – Marketing Audit Research Project",
+      "courseCode": "",
+      "school": "University of Northampton",
+      "schools": [
+        "University of Northampton"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Anh",
+      "countries": [
+        "Anh"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 6263,
+      "publishedDate": "06/06/2026",
+      "excerpt": "A Marketing Audit of VinFast’s Electric Vehicle Strategy in Vietnam: From Rapid Scale-Up to Trust-Based and Disciplined Growth Executive Summary This report engages in a marketing audit of VinFast Auto Ltd., covering its policy and strategy for EV in Vietna...",
+      "logoUrl": "/samples/logos/cf6f40573978d0.png",
+      "tableCount": 4,
+      "imageCount": 0,
+      "hasAppendix": true,
+      "hasReferences": true
+    },
+    {
+      "id": "university-of-northampton-global-marketing",
+      "wpId": 5070,
+      "slug": "university-of-northampton-global-marketing",
+      "title": "University of Northampton – Global Marketing",
+      "courseCode": "",
+      "school": "University of Northampton",
+      "schools": [
+        "University of Northampton"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Anh",
+      "countries": [
+        "Anh"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 3088,
+      "publishedDate": "06/06/2026",
+      "excerpt": "From Premium Consumption to Strategic Production: Apple’s iPhone Strategy in Japan and India Company Background Apple Inc. is a California-based multinational technology corporation and manufacturer of consumer electronics and digital services founded in 19...",
+      "logoUrl": "/samples/logos/cf6f40573978d0.png",
+      "tableCount": 2,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    },
+    {
+      "id": "business-decision-making-busm2570-sample-di",
+      "wpId": 4005,
+      "slug": "business-decision-making-busm2570-sample-di",
+      "title": "Business Decision Making – BUSM2570 – Sample DI",
+      "courseCode": "BUSM2570",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "DI",
+      "wordCount": 1813,
+      "publishedDate": "19/04/2024",
+      "excerpt": "I . Introduction Profile summary Goodman Group (GMG) is a leading integrated property group based in Australia, focusing on the construction and management of industrial sites, distribution centers, and commercial buildings, especially in the warehousing an...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "financial-accounting-university-of-melbourne-sample",
+      "wpId": 4003,
+      "slug": "financial-accounting-university-of-melbourne-sample",
+      "title": "Financial Accounting (University of Melbourne) Sample",
+      "courseCode": "",
+      "school": "University of Melbourne",
+      "schools": [
+        "University of Melbourne"
+      ],
+      "major": "Accounting",
+      "majors": [
+        "Accounting"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2407,
+      "publishedDate": "19/04/2024",
+      "excerpt": "Woolworths Group was founded in 1924 and is headquartered in Sydney (Australia). Beginning as a single store, currently, Woolworths Group is a prominent Australian retail conglomerate with a diverse portfolio of businesses, primarily operating within the re...",
+      "logoUrl": "/samples/logos/12e6745e9470dc.png",
+      "tableCount": 1,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "corporate-finance-bafi2094-sample-hd",
+      "wpId": 4001,
+      "slug": "corporate-finance-bafi2094-sample-hd",
+      "title": "Corporate Finance – BAFI2094 Sample HD",
+      "courseCode": "BAFI2094",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business / Management",
+      "majors": [],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Việt Nam",
+      "countries": [
+        "Việt Nam",
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2616,
+      "publishedDate": "19/04/2024",
+      "excerpt": "I . Introduction Pharmacity, a leading Vietnamese convenient pharmacy chain, has solidified its reputation as a trusted provider of pharmaceutical and wellness products (Mekong Capital 2023). With an extensive network of conveniently located stores, Pharmac...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 5,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4549-management-in-practice",
+      "wpId": 3428,
+      "slug": "busm4549-management-in-practice",
+      "title": "BUSM4549 – Management in Practice",
+      "courseCode": "BUSM4549",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Việt Nam",
+      "countries": [
+        "Việt Nam",
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2100,
+      "publishedDate": "11/03/2023",
+      "excerpt": "Executive Summary The analysis will be used in this piece to look into the challenges that the Emerging Capital Group (ECG) is dealing with. Marketing and branding, as well as human resource management, are two main difficulties that the organization is now...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "profcomm-studio-rmit",
+      "wpId": 3422,
+      "slug": "profcomm-studio-rmit",
+      "title": "ProfComm Studio Rmit",
+      "courseCode": "",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Professional Communication",
+      "majors": [
+        "Professional Communication"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Việt Nam",
+      "countries": [
+        "Việt Nam",
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2255,
+      "publishedDate": "11/03/2023",
+      "excerpt": "Advertising has been significantly developed in the last 20 years due to technological advancement (Taylor & Johnston 2018, p. 549). Traditional advertising conveyed messages through media channels, namely print, broadcast, phone, etc. However, the advance...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 4,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "bafi3184-business-finance",
+      "wpId": 3420,
+      "slug": "bafi3184-business-finance",
+      "title": "BAFI3184 – Business Finance",
+      "courseCode": "BAFI3184",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Việt Nam",
+      "countries": [
+        "Việt Nam",
+        "Anh",
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1382,
+      "publishedDate": "10/03/2023",
+      "excerpt": "Task 1. Pre-retirement budget The expected income covers salary from me and my wife. Assuming that we start with no investments or savings, thus the dividend and interest are zero. Home, daily living and children account for large proportions of total expen...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 4,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm2301-organizational-analysis-2",
+      "wpId": 3419,
+      "slug": "busm2301-organizational-analysis-2",
+      "title": "BUSM2301 – Organizational Analysis",
+      "courseCode": "BUSM2301",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Việt Nam",
+      "countries": [
+        "Việt Nam",
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2431,
+      "publishedDate": "10/03/2023",
+      "excerpt": "Given Paper 1. National cultural values, sustainability beliefs, and organizational initiatives (Tata & Prasad 2015). Question In your lectures, four paradigms / rationales for organisational analysis are described. 1 Critically discuss the argument present...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 4,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "english-writing",
+      "wpId": 3418,
+      "slug": "english-writing",
+      "title": "English Writing",
+      "courseCode": "",
+      "school": "International University",
+      "schools": [],
+      "major": "Business / Management",
+      "majors": [],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Việt Nam",
+      "countries": [
+        "Việt Nam",
+        "Anh"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1454,
+      "publishedDate": "10/03/2023",
+      "excerpt": "Introduction Urbanized areas are often perceived as ‘bundles of service’ for the citizens (Gory et al 1985, Insch & Florek 2010, cited in Bialowolska 2016) since the needs and wants of them are aligned with the operation systems of the cities. There are som...",
+      "logoUrl": "/samples/logos/92b8abe111090d.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "econ1318-work-in-global-society",
+      "wpId": 3417,
+      "slug": "econ1318-work-in-global-society",
+      "title": "ECON1318 – Work in Global Society",
+      "courseCode": "ECON1318",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2620,
+      "publishedDate": "10/03/2023",
+      "excerpt": "Assessment details: Choose Four Media Articles discussed in four different tutorials between week 2-12 and complete the following template for each individual article Media Article One Topic No.: 5 Title of Media Article: Kaine, S. and Josserand, E. (2016)...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "acc80008-managerial-accounting",
+      "wpId": 3403,
+      "slug": "acc80008-managerial-accounting",
+      "title": "ACC80008 – Managerial Accounting",
+      "courseCode": "ACC80008",
+      "school": "Swinburne University",
+      "schools": [
+        "Swinburne University"
+      ],
+      "major": "Accounting",
+      "majors": [
+        "Accounting"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 737,
+      "publishedDate": "09/03/2023",
+      "excerpt": "Research on the implementation of budgeting What is budgeting? – A budget is an important financial plan that incorporates a systematic analysis and interpretation of financial forecasts in terms of products, markets, and the application of resources. – Bud...",
+      "logoUrl": "/samples/logos/e804455ef3b6c4.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "fin80005-corporate-financial-management",
+      "wpId": 3397,
+      "slug": "fin80005-corporate-financial-management",
+      "title": "FIN80005 – Corporate Financial Management",
+      "courseCode": "FIN80005",
+      "school": "Swinburne University",
+      "schools": [
+        "Swinburne University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1516,
+      "publishedDate": "09/03/2023",
+      "excerpt": "Individual Assignment FIN80005 – Corporate Financial Management Executive Summary Candy Crash Limited – a public listed confectionery company – is deciding whether to engage in a cooperation with Costca – a large supermarket chain – by supply its confection...",
+      "logoUrl": "/samples/logos/e804455ef3b6c4.png",
+      "tableCount": 4,
+      "imageCount": 5,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "bsbmgt617-develop-and-implement-a-business-plan",
+      "wpId": 3396,
+      "slug": "bsbmgt617-develop-and-implement-a-business-plan",
+      "title": "BSBMGT617 – Develop and Implement a business plan",
+      "courseCode": "BSBMGT617",
+      "school": "Sydney Metro College",
+      "schools": [
+        "Sydney Metro College"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 3323,
+      "publishedDate": "09/03/2023",
+      "excerpt": "DEVELOP AND IMPLEMENT A BUSINESS PLAN – BSBMGT617 Task 1: Develop business plan Part A – Fast Track Couriers Business Plan Executive summary The Fast Track Couriers are developing the business plan with the goal of the next three years to develop and expand...",
+      "logoUrl": "/samples/logos/5ea7974969b82d.png",
+      "tableCount": 16,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    },
+    {
+      "id": "bsbmkg609-develop-a-marketing-plan",
+      "wpId": 3393,
+      "slug": "bsbmkg609-develop-a-marketing-plan",
+      "title": "BSBMKG609 – Develop a Marketing Plan",
+      "courseCode": "BSBMKG609",
+      "school": "Sydney Metro College",
+      "schools": [
+        "Sydney Metro College"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2387,
+      "publishedDate": "09/03/2023",
+      "excerpt": "Executive Summary We are looking at a company located in the suburbs of Brisbane for the marketing assignment. The company is named Houzit Pty by two business founders, and it is registered with Australia Securities and Investment Commission. The marketing...",
+      "logoUrl": "/samples/logos/5ea7974969b82d.png",
+      "tableCount": 1,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "torren-uni-responsible-tourism-sustainable-tourism-and-sustainable-development",
+      "wpId": 3392,
+      "slug": "torren-uni-responsible-tourism-sustainable-tourism-and-sustainable-development",
+      "title": "Torren Uni – Responsible Tourism, Sustainable Tourism and Sustainable Development",
+      "courseCode": "",
+      "school": "Torrens University",
+      "schools": [
+        "Torrens University"
+      ],
+      "major": "Hospitality",
+      "majors": [
+        "Hospitality"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2422,
+      "publishedDate": "09/03/2023",
+      "excerpt": "Introduction Sustainability has become a common word in our everyday lives. According to Kuhlman & John 2010, the word “sustainability” is defined as the process contributing to growing a vibrant economy while respecting the environment, natural resources,...",
+      "logoUrl": "/samples/logos/902f6dab52bd75.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "uc-berkeley-poem-analysis",
+      "wpId": 3391,
+      "slug": "uc-berkeley-poem-analysis",
+      "title": "UC Berkeley – Poem Analysis",
+      "courseCode": "",
+      "school": "UC Berkeley",
+      "schools": [
+        "UC Berkeley"
+      ],
+      "major": "Business / Management",
+      "majors": [],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Mỹ",
+      "countries": [
+        "Mỹ"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1013,
+      "publishedDate": "09/03/2023",
+      "excerpt": "Title: Tsunami vs. the Fukushima 50 – Tsunami vs. the Fukushima 50 is a set of poem that is influenced by a tragic event in March of 2011, when a 9.1 magnitude earth quake hit Japan and caused tsunami as well as a nuclear disaster at Fukushima. Lee Ann Rori...",
+      "logoUrl": "/samples/logos/1c81698f248d56.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "accting7026-accounting-systems-and-processes",
+      "wpId": 3390,
+      "slug": "accting7026-accounting-systems-and-processes",
+      "title": "ACCTING7026 – Accounting Systems and Processes",
+      "courseCode": "",
+      "school": "University of Adelaide",
+      "schools": [
+        "University of Adelaide"
+      ],
+      "major": "Accounting",
+      "majors": [
+        "Accounting"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 3948,
+      "publishedDate": "09/03/2023",
+      "excerpt": "Selected topic: Consequences of the COVID-19 pandemic on the accounting and audit functions of business, role technology in addressing the consequences, and emerging challenges. Business’s accounting and audit functions in times of COVID-19 pandemic and the...",
+      "logoUrl": "/samples/logos/cac4e94717626f.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "inft2150-business-analysis-essay",
+      "wpId": 3379,
+      "slug": "inft2150-business-analysis-essay",
+      "title": "INFT2150 – Business Analysis Essay",
+      "courseCode": "INFT2150",
+      "school": "University of Newcastle",
+      "schools": [
+        "University of Newcastle"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 3012,
+      "publishedDate": "09/03/2023",
+      "excerpt": "Individual Project Assignment Applying critical thinking to business process modelling – Airbnb case study 1 Introduction Business analysts (BA) have responsibility to bridge the gap between stakeholders, and call forth the solutions to help organisations a...",
+      "logoUrl": "/samples/logos/231a9995f9c5c6.png",
+      "tableCount": 0,
+      "imageCount": 10,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "comm3077-integrated-communication-planning",
+      "wpId": 3378,
+      "slug": "comm3077-integrated-communication-planning",
+      "title": "COMM3077 – Integrated Communication Planning",
+      "courseCode": "COMM3077",
+      "school": "University of South Australia",
+      "schools": [
+        "University of South Australia"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 387,
+      "publishedDate": "09/03/2023",
+      "excerpt": "Ricardo Fernandes Global Software Development 8 King Street London, ON N1B 2C3 February 9, 2018 Re: Software testing service Complaints Department Trilong Testing Inc. 123 Main Street Toronto, ON M1A 2B3 Dear Sir/Madam, I am writing this to bring to your at...",
+      "logoUrl": "/samples/logos/696d32ea8099d2.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "acct3007-financial-accounting-3",
+      "wpId": 3377,
+      "slug": "acct3007-financial-accounting-3",
+      "title": "ACCT3007 – Financial Accounting 3",
+      "courseCode": "ACCT3007",
+      "school": "University of South Australia",
+      "schools": [
+        "University of South Australia"
+      ],
+      "major": "Accounting",
+      "majors": [
+        "Accounting"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1736,
+      "publishedDate": "09/03/2023",
+      "excerpt": "The memo The objective of IAS 16 is to provide instructive guidelines for the accounting practice of property, plant, and equipment so that these assets will be reflected in the most appropriate value in financial statements. This document provides a basic...",
+      "logoUrl": "/samples/logos/696d32ea8099d2.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mktg2305-marketing-research",
+      "wpId": 3371,
+      "slug": "mktg2305-marketing-research",
+      "title": "MKTG2305 – Marketing Research",
+      "courseCode": "MKTG2305",
+      "school": "University of Western Australia",
+      "schools": [
+        "University of Western Australia"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 3871,
+      "publishedDate": "08/03/2023",
+      "excerpt": "1 Introduction Social media provide considerable benefits for social and economic developments. Users optimizes their performance on online platforms with convenient and omnipresent access. However, increasing prevalence of social media application has chal...",
+      "logoUrl": "/samples/logos/8bbb3c21d11dd1.png",
+      "tableCount": 12,
+      "imageCount": 5,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "biol109-intro-to-brain-behav",
+      "wpId": 3370,
+      "slug": "biol109-intro-to-brain-behav",
+      "title": "BIOL109 – Intro To Brain & Behav",
+      "courseCode": "BIOL109",
+      "school": "University of Pennsylvania",
+      "schools": [
+        "University of Pennsylvania"
+      ],
+      "major": "Psychology",
+      "majors": [
+        "Psychology"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Mỹ",
+      "countries": [
+        "Mỹ"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1428,
+      "publishedDate": "08/03/2023",
+      "excerpt": "The movie I am going to share with my friends and my family is the movie Fed Up (2014), directed by Stephanie Soechtig. My 5 questions are: What are the purposes of filing young people in this film? What does it mean to “eat healthier”? Do we have choices i...",
+      "logoUrl": "/samples/logos/d4b21e74f341c9.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "hos602-food-and-beverage-service-management",
+      "wpId": 3365,
+      "slug": "hos602-food-and-beverage-service-management",
+      "title": "HOS602 – Food and Beverage Service Management",
+      "courseCode": "HOS602",
+      "school": "William Angliss Institute",
+      "schools": [
+        "William Angliss Institute"
+      ],
+      "major": "Hospitality",
+      "majors": [
+        "Hospitality"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 597,
+      "publishedDate": "08/03/2023",
+      "excerpt": "JOURNAL 3: Topic of Journal Service Design Name of Venue/ Venue Type Eleven Madison Park Address 11 Madison Ave, New York, United States Date of visit/ Time 10/10/2020 Service Period Monday–Wednesday, 5:30 pm–10:00 pm Thursday–Sunday, 5:30 pm–10:30 pm Menu...",
+      "logoUrl": "/samples/logos/9d73c8169d6dab.png",
+      "tableCount": 2,
+      "imageCount": 2,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "york-uni-discussion-essay",
+      "wpId": 3364,
+      "slug": "york-uni-discussion-essay",
+      "title": "York Uni – Discussion Essay",
+      "courseCode": "",
+      "school": "York University",
+      "schools": [
+        "York University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Canada",
+      "countries": [
+        "Canada"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 826,
+      "publishedDate": "08/03/2023",
+      "excerpt": "“Whether it’s appropriate to consider e-games as a sport ? ” E-games or video games have gained dramatic popularity since the late 1970s, and this fast-growing trend does not seem to stop any time soon with the boom of gen Y and millennials from gen Z . The...",
+      "logoUrl": "/samples/logos/58d1373e730b67.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "ela30-free-sample-canadian-issue-research-essay",
+      "wpId": 3363,
+      "slug": "ela30-free-sample-canadian-issue-research-essay",
+      "title": "ELA30 – Canadian Issue Research Essay",
+      "courseCode": "",
+      "school": "York University",
+      "schools": [
+        "York University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Canada",
+      "countries": [
+        "Canada"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1016,
+      "publishedDate": "08/03/2023",
+      "excerpt": "In recent times, it seems to be an increasingly widespread concern for residential schools in Canada. The residential schools have undoubtedly posed long-lasting and intergenerational impacts on people living at that time. This piece of writing will thoroug...",
+      "logoUrl": "/samples/logos/58d1373e730b67.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "fin2sev-investment-securities",
+      "wpId": 2879,
+      "slug": "fin2sev-investment-securities",
+      "title": "FIN2SEV – Investment Securities",
+      "courseCode": "",
+      "school": "La Trobe University",
+      "schools": [
+        "La Trobe University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Quốc tế",
+      "countries": [],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 0,
+      "publishedDate": "14/10/2022",
+      "excerpt": "",
+      "logoUrl": "/samples/logos/b4509a8636badf.png",
+      "tableCount": 0,
+      "imageCount": 4,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "fin2sev-investment-securities",
+      "wpId": 2874,
+      "slug": "fin2sev-investment-securities",
+      "title": "FIN2SEV – Investment Securities",
+      "courseCode": "",
+      "school": "La Trobe University",
+      "schools": [
+        "La Trobe University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 0,
+      "publishedDate": "14/10/2022",
+      "excerpt": "",
+      "logoUrl": "/samples/logos/fe8e012088bada.png",
+      "tableCount": 0,
+      "imageCount": 4,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mktg1025-marketing-principle-a3",
+      "wpId": 2859,
+      "slug": "mktg1025-marketing-principle-a3",
+      "title": "MKTG1025 – Marketing Principle – A3",
+      "courseCode": "MKTG1025",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2136,
+      "publishedDate": "11/10/2022",
+      "excerpt": "INTRODUCTION Founded in 1965 in the USA, PEPSI is a beverage and food multinational corporation. The brand was first introduced as a nationally distributed diet soda in the USA with over 22 brands under its name ranging from beverage to snacks. The company...",
+      "logoUrl": "/samples/logos/badd6e9c04aa15.png",
+      "tableCount": 1,
+      "imageCount": 1,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "mktg1025-marketing-principle-a3",
+      "wpId": 2857,
+      "slug": "mktg1025-marketing-principle-a3",
+      "title": "MKTG1025 – Marketing Principle – A3",
+      "courseCode": "MKTG1025",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2136,
+      "publishedDate": "11/10/2022",
+      "excerpt": "INTRODUCTION Founded in 1965 in the USA, PEPSI is a beverage and food multinational corporation. The brand was first introduced as a nationally distributed diet soda in the USA with over 22 brands under its name ranging from beverage to snacks. The company...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 1,
+      "imageCount": 1,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "mktg1260-strategic-marketing",
+      "wpId": 2856,
+      "slug": "mktg1260-strategic-marketing",
+      "title": "MKTG1260 – Strategic Marketing",
+      "courseCode": "MKTG1260",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1468,
+      "publishedDate": "11/10/2022",
+      "excerpt": "INTRODUCTION Nowadays, with the development of companies and the competition of people in different fields, there have been more and more requirements for graduates. Especially, for those who have graduated from universities and would like to work in a prof...",
+      "logoUrl": "/samples/logos/ecc3a92c7a1286.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mktg1260-strategic-marketing",
+      "wpId": 2855,
+      "slug": "mktg1260-strategic-marketing",
+      "title": "MKTG1260 – Strategic Marketing",
+      "courseCode": "MKTG1260",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1468,
+      "publishedDate": "11/10/2022",
+      "excerpt": "INTRODUCTION Nowadays, with the development of companies and the competition of people in different fields, there have been more and more requirements for graduates. Especially, for those who have graduated from universities and would like to work in a prof...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm-4403-ethics-and-governance-a2",
+      "wpId": 2854,
+      "slug": "busm-4403-ethics-and-governance-a2",
+      "title": "BUSM 4403 – ETHICS AND GOVERNANCE – A2",
+      "courseCode": "BUSM4403",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2627,
+      "publishedDate": "11/10/2022",
+      "excerpt": "ASSIGNMENT 2: BOARD REPORT BUSM 4403 ETHICS AND GOVERNANCE CASE: GREG MORTIMER CRUISE SHIP 1.0 EXECUTIVE SUMMARY Similar to the notorious Diamond cruise near Japan, the Greg Mortimer cruise ship was under massive public objection due to its ignorance to WHO...",
+      "logoUrl": "/samples/logos/fa426bfdd46f6d.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    },
+    {
+      "id": "busm-4403-ethics-and-governance-a2",
+      "wpId": 2853,
+      "slug": "busm-4403-ethics-and-governance-a2",
+      "title": "BUSM 4403 – ETHICS AND GOVERNANCE – A2",
+      "courseCode": "BUSM4403",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2627,
+      "publishedDate": "11/10/2022",
+      "excerpt": "ASSIGNMENT 2: BOARD REPORT BUSM 4403 ETHICS AND GOVERNANCE CASE: GREG MORTIMER CRUISE SHIP 1.0 EXECUTIVE SUMMARY Similar to the notorious Diamond cruise near Japan, the Greg Mortimer cruise ship was under massive public objection due to its ignorance to WHO...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    },
+    {
+      "id": "uncc300-justice-and-change-in-a-global-world",
+      "wpId": 2816,
+      "slug": "uncc300-justice-and-change-in-a-global-world",
+      "title": "UNCC300 – Justice and change in a global world",
+      "courseCode": "UNCC300",
+      "school": "Australian Catholic University",
+      "schools": [
+        "Australian Catholic University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 705,
+      "publishedDate": "09/10/2022",
+      "excerpt": "UN Development Goal and principle of the common good The sustainable development goal that is selected to be analyzed in this writing is the SDG3: Ensure healthy lives and promote well-being for all of all ages. This goal aims at the development of people a...",
+      "logoUrl": "/samples/logos/80ba4f233bc220.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "uncc300-justice-and-change-in-a-global-world",
+      "wpId": 2814,
+      "slug": "uncc300-justice-and-change-in-a-global-world",
+      "title": "UNCC300 – Justice and change in a global world",
+      "courseCode": "UNCC300",
+      "school": "Australian Catholic University",
+      "schools": [
+        "Australian Catholic University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 705,
+      "publishedDate": "09/10/2022",
+      "excerpt": "UN Development Goal and principle of the common good The sustainable development goal that is selected to be analyzed in this writing is the SDG3: Ensure healthy lives and promote well-being for all of all ages. This goal aims at the development of people a...",
+      "logoUrl": "/samples/logos/00f2d8609f3564.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "law302-laws-of-business-organizations",
+      "wpId": 2809,
+      "slug": "law302-laws-of-business-organizations",
+      "title": "LAW302 – Laws of Business Organizations",
+      "courseCode": "LAW302",
+      "school": "University of Wollongong",
+      "schools": [
+        "University of Wollongong"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1988,
+      "publishedDate": "09/10/2022",
+      "excerpt": "Proposing the question Taking a new approach to study limited liability companies, Ireland (2010) deducted, ‘the corporate legal form was, and is, in large part a political construct developed to accommodate and protect the rentier investor’. It seemed that...",
+      "logoUrl": "/samples/logos/5b2ae8faa838ee.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "law302-laws-of-business-organizations",
+      "wpId": 2808,
+      "slug": "law302-laws-of-business-organizations",
+      "title": "LAW302 – Laws of Business Organizations",
+      "courseCode": "LAW302",
+      "school": "University of Wollongong",
+      "schools": [
+        "University of Wollongong"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1988,
+      "publishedDate": "09/10/2022",
+      "excerpt": "Proposing the question Taking a new approach to study limited liability companies, Ireland (2010) deducted, ‘the corporate legal form was, and is, in large part a political construct developed to accommodate and protect the rentier investor’. It seemed that...",
+      "logoUrl": "/samples/logos/ce6bca86de4073.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm3309-strategic-management-a3",
+      "wpId": 2805,
+      "slug": "busm3309-strategic-management-a3",
+      "title": "BUSM3309 – Strategic Management – A3",
+      "courseCode": "BUSM3309",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 4727,
+      "publishedDate": "09/10/2022",
+      "excerpt": "Executive Summary It is undeniable that business strategy plays an essential role in every organization that decides the competitive advantage of one firm and drives the firm to sustainable success, especially in newly-established firms. Orlar is a newcomer...",
+      "logoUrl": "/samples/logos/942d66841e12d1.png",
+      "tableCount": 1,
+      "imageCount": 3,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm3309-strategic-management-a3",
+      "wpId": 2801,
+      "slug": "busm3309-strategic-management-a3",
+      "title": "BUSM3309 – Strategic Management – A3",
+      "courseCode": "BUSM3309",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 4727,
+      "publishedDate": "09/10/2022",
+      "excerpt": "Executive Summary It is undeniable that business strategy plays an essential role in every organization that decides the competitive advantage of one firm and drives the firm to sustainable success, especially in newly-established firms. Orlar is a newcomer...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 1,
+      "imageCount": 3,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "rmit-principles-of-psychology",
+      "wpId": 2800,
+      "slug": "rmit-principles-of-psychology",
+      "title": "RMIT – Principles of Psychology",
+      "courseCode": "",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Psychology",
+      "majors": [
+        "Psychology"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 988,
+      "publishedDate": "09/10/2022",
+      "excerpt": "PRINCIPLES OF PSYCHOLOGY The Impact of Extraversion, and Social Connectedness on First-year University Student Stress 1. Abstract This research study sheds light on the changing lifestyle of the students that are responsible for increasing the stress level...",
+      "logoUrl": "/samples/logos/c31b15753790ae.png",
+      "tableCount": 1,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "rmit-principles-of-psychology",
+      "wpId": 2799,
+      "slug": "rmit-principles-of-psychology",
+      "title": "RMIT – Principles of Psychology",
+      "courseCode": "",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Psychology",
+      "majors": [
+        "Psychology"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 988,
+      "publishedDate": "09/10/2022",
+      "excerpt": "PRINCIPLES OF PSYCHOLOGY The Impact of Extraversion, and Social Connectedness on First-year University Student Stress 1. Abstract This research study sheds light on the changing lifestyle of the students that are responsible for increasing the stress level...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 1,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4692-global-corporate-responsibility-a3",
+      "wpId": 2798,
+      "slug": "busm4692-global-corporate-responsibility-a3",
+      "title": "BUSM4692 – Global Corporate Responsibility – A3",
+      "courseCode": "BUSM4692",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2537,
+      "publishedDate": "09/10/2022",
+      "excerpt": "I/ Introduction Corporations of all sizes and different sectors have created many significant environmental consequences as a result of their operations, ranging from the emission of harmful chemicals to the use of massive quantities of environmental assets...",
+      "logoUrl": "/samples/logos/53b821239a5548.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4692-global-corporate-responsibility-a3",
+      "wpId": 2797,
+      "slug": "busm4692-global-corporate-responsibility-a3",
+      "title": "BUSM4692 – Global Corporate Responsibility – A3",
+      "courseCode": "BUSM4692",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2537,
+      "publishedDate": "09/10/2022",
+      "excerpt": "I/ Introduction Corporations of all sizes and different sectors have created many significant environmental consequences as a result of their operations, ranging from the emission of harmful chemicals to the use of massive quantities of environmental assets...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4775-negotiation-and-advocacy-a2",
+      "wpId": 2795,
+      "slug": "busm4775-negotiation-and-advocacy-a2",
+      "title": "BUSM4775 – Negotiation and Advocacy – A2",
+      "courseCode": "BUSM4775",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2016,
+      "publishedDate": "09/10/2022",
+      "excerpt": "Introduction When it comes to negotiation, there are numerous dynamic factors that create the final results of each negotiation. Through this paper, the process of negotiation will be carefully examined beside the importance of sufficiently fulfilling every...",
+      "logoUrl": "/samples/logos/fab88318f40486.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4775-negotiation-and-advocacy-a2",
+      "wpId": 2794,
+      "slug": "busm4775-negotiation-and-advocacy-a2",
+      "title": "BUSM4775 – Negotiation and Advocacy – A2",
+      "courseCode": "BUSM4775",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2016,
+      "publishedDate": "09/10/2022",
+      "excerpt": "Introduction When it comes to negotiation, there are numerous dynamic factors that create the final results of each negotiation. Through this paper, the process of negotiation will be carefully examined beside the importance of sufficiently fulfilling every...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mktg1417-global-branding-a2",
+      "wpId": 2770,
+      "slug": "mktg1417-global-branding-a2",
+      "title": "MKTG1417 – Global branding – A2",
+      "courseCode": "MKTG1417",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1474,
+      "publishedDate": "07/10/2022",
+      "excerpt": "I. Introduction Smoothie Factory, founded in 1996 by Olympic athlete James Villasana, is a reputable retail brand of smoothies, fresh fruit juices, and snacks in the USA. The company has franchises in more than 18 countries around the world including Vietna...",
+      "logoUrl": "/samples/logos/badd6e9c04aa15.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mktg1417-global-branding-a2",
+      "wpId": 2769,
+      "slug": "mktg1417-global-branding-a2",
+      "title": "MKTG1417 – Global branding – A2",
+      "courseCode": "MKTG1417",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1474,
+      "publishedDate": "07/10/2022",
+      "excerpt": "I. Introduction Smoothie Factory, founded in 1996 by Olympic athlete James Villasana, is a reputable retail brand of smoothies, fresh fruit juices, and snacks in the USA. The company has franchises in more than 18 countries around the world including Vietna...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4692-global-corporate-responsibility",
+      "wpId": 2768,
+      "slug": "busm4692-global-corporate-responsibility",
+      "title": "BUSM4692 – Global Corporate Responsibility",
+      "courseCode": "BUSM4692",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1093,
+      "publishedDate": "07/10/2022",
+      "excerpt": "Introduction: In its original form, one of the most important applications of stakeholder theory was as a counterbalance to shareholder theory. Accordingly, Freeman (2010) discusses the governance concept of “managing for stakeholders” in contrast to the do...",
+      "logoUrl": "/samples/logos/53b821239a5548.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4692-global-corporate-responsibility",
+      "wpId": 2767,
+      "slug": "busm4692-global-corporate-responsibility",
+      "title": "BUSM4692 – Global Corporate Responsibility",
+      "courseCode": "BUSM4692",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1093,
+      "publishedDate": "07/10/2022",
+      "excerpt": "Introduction: In its original form, one of the most important applications of stakeholder theory was as a counterbalance to shareholder theory. Accordingly, Freeman (2010) discusses the governance concept of “managing for stakeholders” in contrast to the do...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "omgt2277-supply-chain-analysis-and-design",
+      "wpId": 2765,
+      "slug": "omgt2277-supply-chain-analysis-and-design",
+      "title": "OMGT2277 – Supply Chain Analysis and Design",
+      "courseCode": "OMGT2277",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Logistics and Supply Chain Management",
+      "majors": [
+        "Logistics and Supply Chain Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2003,
+      "publishedDate": "07/10/2022",
+      "excerpt": "LITERATURE REVIEW ON APPLICATION OF QUANTITATIVE METHODS IN DESIGN AND ANALYSIS OF ‘COFFEE BEAN SUPPLY CHAIN’ Introduction Coffee beans seem to be one of the major industries in VietNam because VietNam is an agricultural country. The whole system from the p...",
+      "logoUrl": "/samples/logos/942d66841e12d1.png",
+      "tableCount": 0,
+      "imageCount": 3,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "omgt2277-supply-chain-analysis-and-design",
+      "wpId": 2762,
+      "slug": "omgt2277-supply-chain-analysis-and-design",
+      "title": "OMGT2277 – Supply Chain Analysis and Design",
+      "courseCode": "OMGT2277",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Logistics and Supply Chain Management",
+      "majors": [
+        "Logistics and Supply Chain Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2003,
+      "publishedDate": "07/10/2022",
+      "excerpt": "LITERATURE REVIEW ON APPLICATION OF QUANTITATIVE METHODS IN DESIGN AND ANALYSIS OF ‘COFFEE BEAN SUPPLY CHAIN’ Introduction Coffee beans seem to be one of the major industries in VietNam because VietNam is an agricultural country. The whole system from the p...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 3,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "law2485-business-law-a3",
+      "wpId": 2760,
+      "slug": "law2485-business-law-a3",
+      "title": "LAW2485 – Business Law – A3",
+      "courseCode": "LAW2485",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 3095,
+      "publishedDate": "07/10/2022",
+      "excerpt": "Final Assignment Course Code: LAW 2485 Issue 1: The legal issue is whether Rick, an authorized representative of Wealth Pty Ltd and also Morgan’s advisor, had breached his financial advisor’s duty according to Section 961(B)(G)(J) of the Corporation Act 200...",
+      "logoUrl": "/samples/logos/fa426bfdd46f6d.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "law2485-business-law-a3",
+      "wpId": 2759,
+      "slug": "law2485-business-law-a3",
+      "title": "LAW2485 – Business Law – A3",
+      "courseCode": "LAW2485",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 3095,
+      "publishedDate": "07/10/2022",
+      "excerpt": "Final Assignment Course Code: LAW 2485 Issue 1: The legal issue is whether Rick, an authorized representative of Wealth Pty Ltd and also Morgan’s advisor, had breached his financial advisor’s duty according to Section 961(B)(G)(J) of the Corporation Act 200...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mgmt-30011-supply-chain-management",
+      "wpId": 2735,
+      "slug": "mgmt-30011-supply-chain-management",
+      "title": "MGMT 30011 – Supply Chain Management",
+      "courseCode": "MGMT30011",
+      "school": "University of Melbourne",
+      "schools": [
+        "University of Melbourne"
+      ],
+      "major": "Logistics and Supply Chain Management",
+      "majors": [
+        "Logistics and Supply Chain Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2256,
+      "publishedDate": "04/10/2022",
+      "excerpt": "A report of Toyota Group’s Supply Chain Management Executive summary This report will look into the supply chain of one of the most successful automotive manufacturer, Toyota. With the current success of the Toyota Rav4 as the best seller in the Australian...",
+      "logoUrl": "/samples/logos/5b2ae8faa838ee.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "hos302-hospitality-management",
+      "wpId": 2737,
+      "slug": "hos302-hospitality-management",
+      "title": "HOS302 – Hospitality Management",
+      "courseCode": "HOS302",
+      "school": "Laureate Australia",
+      "schools": [
+        "Laureate Australia"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management",
+        "Hospitality"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 949,
+      "publishedDate": "04/10/2022",
+      "excerpt": "HOS302 – Hospitality management Topic: Does the ‘host’ have a right to put pressure on a guest to be a ‘good guest’? The notion of host and guest relationship can easily draw into different implications. It can be host and guest of a free stay on a stormy d...",
+      "logoUrl": "/samples/logos/9d907b931724a0.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mgt1fom-foundations-of-management",
+      "wpId": 2736,
+      "slug": "mgt1fom-foundations-of-management",
+      "title": "MGT1FOM – Foundations Of Management",
+      "courseCode": "",
+      "school": "La Trobe University",
+      "schools": [
+        "La Trobe University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2254,
+      "publishedDate": "04/10/2022",
+      "excerpt": "MGT1FOM – Foundations Of Management INTRODUCTION Nowadays, leadership has become a vital part, becoming a key factor for the success of the organizational performance among different types of stakeholders (Hao & Yazdanifard 2015). With the development of gl...",
+      "logoUrl": "/samples/logos/badd6e9c04aa15.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "pg11217-contemporary-issues-accounting",
+      "wpId": 2738,
+      "slug": "pg11217-contemporary-issues-accounting",
+      "title": "PG11217 – Contemporary Issues Accounting",
+      "courseCode": "PG11217",
+      "school": "Kent University",
+      "schools": [
+        "Kent University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Accounting"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2310,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Accounting for Social-Environmental Issue CHAPTER 1 INTRODUCTION Accounting literature in the 1950s of the 20 th century witnessed a new path of bookkeeping theory. During this period, accounting practice has been developed to cover inclusive elements inste...",
+      "logoUrl": "/samples/logos/f7469421fa2eb2.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "acc302-auditing-and-assurance",
+      "wpId": 2734,
+      "slug": "acc302-auditing-and-assurance",
+      "title": "ACC302 – Auditing and Assurance",
+      "courseCode": "ACC302",
+      "school": "Kaplan Business School",
+      "schools": [
+        "Kaplan Business School"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Accounting"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 946,
+      "publishedDate": "04/10/2022",
+      "excerpt": "ACC302 – Auditing and Assurance Assessment 3: Case study * According to AUS 702 Auditing Standard (paragraph 25-30), there are four main types of audit reports: unqualified opinion report, qualified opinion report, adverse opinion report, disclaimer opinion...",
+      "logoUrl": "/samples/logos/bf41fb6e6211d6.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "acc-305-management-accounting-2",
+      "wpId": 2726,
+      "slug": "acc-305-management-accounting-2",
+      "title": "ACC 305 – Management Accounting 2",
+      "courseCode": "ACC305",
+      "school": "Kaplan Business School",
+      "schools": [
+        "Kaplan Business School"
+      ],
+      "major": "Accounting",
+      "majors": [
+        "Accounting",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1092,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Management accounting Since the first case was officially reported in Wuhan, China, Corona virus quickly spreads and accelerates to one of the most severe pandemic in mankind history. Global economy growth plummets to 3%, and even the most optimistic econom...",
+      "logoUrl": "/samples/logos/bf41fb6e6211d6.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "icms-global-logistics-and-supply-chain-management",
+      "wpId": 2727,
+      "slug": "icms-global-logistics-and-supply-chain-management",
+      "title": "ICMS – Global Logistics and Supply Chain Management",
+      "courseCode": "",
+      "school": "ICMS",
+      "schools": [
+        "ICMS"
+      ],
+      "major": "Logistics and Supply Chain Management",
+      "majors": [
+        "Logistics and Supply Chain Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1141,
+      "publishedDate": "04/10/2022",
+      "excerpt": "This reflective report will answer the following: 1) Four things that I have learned in this participation are about the importance of inventory, supply chain overview, collaboration and sustainable supply chain. First, the importance of inventory is one of...",
+      "logoUrl": "/samples/logos/d14578b0c44584.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    },
+    {
+      "id": "mkt210-marketing-planning",
+      "wpId": 2728,
+      "slug": "mkt210-marketing-planning",
+      "title": "MKT210 – Marketing Planning",
+      "courseCode": "MKT210",
+      "school": "Coventry University",
+      "schools": [
+        "Coventry University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 4947,
+      "publishedDate": "04/10/2022",
+      "excerpt": "INTRODUCTION The coffee and beverage market continues to grow significantly over the last few years although there have been a large number of great changes in the customer’s requirements and company’s strategies, projected to grow at a CAGR of 4.22% from 2...",
+      "logoUrl": "/samples/logos/c31b15753790ae.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mmk325-strategic-marketing",
+      "wpId": 2729,
+      "slug": "mmk325-strategic-marketing",
+      "title": "MMK325 – Strategic Marketing",
+      "courseCode": "MMK325",
+      "school": "Deakin University",
+      "schools": [
+        "Deakin University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing",
+        "Professional Communication"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2703,
+      "publishedDate": "04/10/2022",
+      "excerpt": "CASE STUDY 1 – INTERFACE: PRIZE-WINNING, SUSTAINABLE MODULAR FLOORING Identification and justification of the main issues 1.1 The company’s mission and products need to reflect the core values of the business The mission of the business is about inventing a...",
+      "logoUrl": "/samples/logos/0ce191583ca471.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "279acc-professional-and-academic-competencies",
+      "wpId": 2730,
+      "slug": "279acc-professional-and-academic-competencies",
+      "title": "279ACC – Professional and Academic Competencies",
+      "courseCode": "",
+      "school": "Coventry University",
+      "schools": [
+        "Coventry University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 3080,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Factors affecting the Adoption of Online Banking in Vietnam I. Introduction and background 1.1. Preliminary background information Growing disruption of business through globalization and technological change, combined with increasing competition and the se...",
+      "logoUrl": "/samples/logos/5b2ae8faa838ee.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mgt301a-ethics-and-sustainability",
+      "wpId": 2731,
+      "slug": "mgt301a-ethics-and-sustainability",
+      "title": "MGT301A – Ethics and Sustainability",
+      "courseCode": "MGT301A",
+      "school": "Torrens University",
+      "schools": [
+        "Torrens University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1283,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Executive Summary Starbucks Corporation, found in Seattle, Washington in 1971, is an American coffee production company and coffeehouse chain that houses thousands of locations worldwide. It offers a wide range of products in its menu, including hot and col...",
+      "logoUrl": "/samples/logos/b4509a8636badf.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mmk251-services-marketing",
+      "wpId": 2732,
+      "slug": "mmk251-services-marketing",
+      "title": "MMK251 – Services Marketing",
+      "courseCode": "MMK251",
+      "school": "Deakin University",
+      "schools": [
+        "Deakin University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1158,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Topic: Students are required to source and apply services marketing theory and frameworks to an organisation and its operating environment in order to overcome ‘real-world’ marketing problems Choose a ‘service’ organisation in Australia affected by a macro-...",
+      "logoUrl": "/samples/logos/5b2ae8faa838ee.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    },
+    {
+      "id": "bafi3182-financial-market",
+      "wpId": 2719,
+      "slug": "bafi3182-financial-market",
+      "title": "BAFI3182 – Financial Market",
+      "courseCode": "BAFI3182",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1235,
+      "publishedDate": "04/10/2022",
+      "excerpt": "BAFI3182 – Financial Market Introduction : The rapid advance of financial technology (fintech) in the past decade has played an important role in the financial system, of how products and services are produced, delivered and consumed. By that, fintech recen...",
+      "logoUrl": "/samples/logos/0ce191583ca471.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "acct1046-accounting-in-organisations-society",
+      "wpId": 2720,
+      "slug": "acct1046-accounting-in-organisations-society",
+      "title": "ACCT1046 – Accounting in Organisations & Society",
+      "courseCode": "ACCT1046",
+      "school": "International University",
+      "schools": [],
+      "major": "Accounting",
+      "majors": [
+        "Accounting"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1005,
+      "publishedDate": "04/10/2022",
+      "excerpt": "ACCT1046 – Accounting in Organisations & Society Question 1: Overall, WEN maintained adequate liquidity to meet its short-term obligations over the period of 2015-2019. Despite fluctuations, the current ratio remained above 1.5x, which implied that WEN had...",
+      "logoUrl": "/samples/logos/98c7616309c083.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "besc1121-principles-of-psychology",
+      "wpId": 2718,
+      "slug": "besc1121-principles-of-psychology",
+      "title": "BESC1121 – Principles of Psychology",
+      "courseCode": "BESC1121",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1703,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Influence of Neuroticism and Social Connectedness on Student Stress: A Psychological Approach Abstract Academic stress is a major, multifactorial concern among college students, affecting their academic performance and mental wellbeing. Student stress can b...",
+      "logoUrl": "/samples/logos/53b821239a5548.png",
+      "tableCount": 1,
+      "imageCount": 0,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "busm2301-organizational-analysis",
+      "wpId": 2717,
+      "slug": "busm2301-organizational-analysis",
+      "title": "BUSM2301 – Organizational Analysis",
+      "courseCode": "BUSM2301",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Quốc tế",
+      "countries": [],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1882,
+      "publishedDate": "04/10/2022",
+      "excerpt": "BUSM2301 – Organizational Analysis Case 1: Can Marketing contribute to social enterprise? In this paper, Powell and Osborne (2015) point out that marketing is an important element in strengthening sustainability and evaluates the close connection between ec...",
+      "logoUrl": "/samples/logos/a9007c6ee6a681.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4557-contemporary-management",
+      "wpId": 2716,
+      "slug": "busm4557-contemporary-management",
+      "title": "BUSM4557 – Contemporary Management",
+      "courseCode": "BUSM4557",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2154,
+      "publishedDate": "04/10/2022",
+      "excerpt": "BUSM4557 – Contemporary Management I> Introduction Amazon has been one of the biggest corporations that offer online retail shopping services to customers across the world. The company was established by Jeff Bezos in 1994, initially started as an online bo...",
+      "logoUrl": "/samples/logos/b4509a8636badf.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4688-cross-cultural-management",
+      "wpId": 2715,
+      "slug": "busm4688-cross-cultural-management",
+      "title": "BUSM4688 – Cross-Cultural Management",
+      "courseCode": "BUSM4688",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 970,
+      "publishedDate": "04/10/2022",
+      "excerpt": "BUSM4688 – Cross-Cultural Management Introduction The increase in diversity at schools, working environment and other social settings necessitate awareness of how to interact with people of diversified cultural background. This module allowed students to di...",
+      "logoUrl": "/samples/logos/d3a80ae727bcae.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "comm2381-communication-strategy-and-planning",
+      "wpId": 2714,
+      "slug": "comm2381-communication-strategy-and-planning",
+      "title": "COMM2381 – Communication Strategy and Planning",
+      "courseCode": "COMM2381",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing",
+        "Professional Communication"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2049,
+      "publishedDate": "04/10/2022",
+      "excerpt": "STRATEGIC COMMUNICATION PLAN DON’T REVEAL THE SECRETS ONLINE Executive summary Don’t reveal the secrets online is a social campaign aiming to raise awareness and advocacy from all Vietnamese Internet users, primarily 16 – 24 years old about the online priva...",
+      "logoUrl": "/samples/logos/f7469421fa2eb2.png",
+      "tableCount": 0,
+      "imageCount": 8,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "econ1192-macroeconomics",
+      "wpId": 2713,
+      "slug": "econ1192-macroeconomics",
+      "title": "ECON1192 – Macroeconomics",
+      "courseCode": "ECON1192",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1838,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Mac roeconomics Australian and Chinese Economic performances Australian and Chinese business cycle 1. Economic data The Australian economy: Economic data 2016 – 2019 Indicators 2016 2017 2018 2019 Nominal Gross Domestic Product (A$ billions) 1,703.6 1,808.9...",
+      "logoUrl": "/samples/logos/5b2ae8faa838ee.png",
+      "tableCount": 4,
+      "imageCount": 3,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "econ1193-business-statistics",
+      "wpId": 2712,
+      "slug": "econ1193-business-statistics",
+      "title": "ECON1193 – Business Statistics",
+      "courseCode": "ECON1193",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2455,
+      "publishedDate": "04/10/2022",
+      "excerpt": "ECON1193 – Business Statistics Chapter 1. Comparison of Central Tendency of Region A (Asia) and Region B (Europe) Figure 1: Comparison the Central Tendency between two regions There are three value in the table of Central Tendency including mean, mode and m...",
+      "logoUrl": "/samples/logos/b4509a8636badf.png",
+      "tableCount": 7,
+      "imageCount": 10,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "econ1269-international-trade",
+      "wpId": 2711,
+      "slug": "econ1269-international-trade",
+      "title": "ECON1269 – International Trade",
+      "courseCode": "ECON1269",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1900,
+      "publishedDate": "04/10/2022",
+      "excerpt": "ECON1269 – International Trade: ASSIGNMENT 3 Section A: Answers for Multiple Choice Questions Question A1: The correct answer of this question is D – “The absolute value of autarky prices are negatively correlated with free trade prices.” In general, a coun...",
+      "logoUrl": "/samples/logos/ecc3a92c7a1286.png",
+      "tableCount": 0,
+      "imageCount": 5,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "isys2109-business-information-system",
+      "wpId": 2710,
+      "slug": "isys2109-business-information-system",
+      "title": "ISYS2109 – Business Information System",
+      "courseCode": "ISYS2109",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 3277,
+      "publishedDate": "04/10/2022",
+      "excerpt": "ISYS2109 – Business Information System Introduction Covid-19 disrupted the education system in most countries as schools, and universities were forced to close down for the student’s safety. In Vietnam, most educational institutions have been forced to clos...",
+      "logoUrl": "/samples/logos/b4509a8636badf.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "omgt2321-global-trade-operation",
+      "wpId": 2709,
+      "slug": "omgt2321-global-trade-operation",
+      "title": "OMGT2321 – Global Trade Operation",
+      "courseCode": "OMGT2321",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1895,
+      "publishedDate": "04/10/2022",
+      "excerpt": "OMGT2321 – Global Trade Operation EXECUTIVE SUMMARY COVID-19 has severely disrupted the lives of millions of people, both from a public health crisis perspective and a economic one. As countries close borders and restrict travelling, logistics and transport...",
+      "logoUrl": "/samples/logos/fa426bfdd46f6d.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4403-ethics-and-governance-3",
+      "wpId": 2708,
+      "slug": "busm4403-ethics-and-governance-3",
+      "title": "BUSM4403 – Ethics and Governance",
+      "courseCode": "BUSM4403",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2575,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Assignment 3: Corporate Governance Report BUSM 3115 Ethics & Governance 1.0 INTRODUCTION Corporate governance is tasked with overseeing the decision, the responsibilities and rights of an organization’s board, shareholders, management and various stakeholde...",
+      "logoUrl": "/samples/logos/c31b15753790ae.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4403-ethics-and-governance-asm-1",
+      "wpId": 2707,
+      "slug": "busm4403-ethics-and-governance-asm-1",
+      "title": "BUSM4403 – Ethics and Governance Asm 1",
+      "courseCode": "BUSM4403",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2225,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Ethics and Governance Assignment 1 Christensen, SL. and Kohls J, 2003, ‘Ethical Decision Making in Times of Organizational Crisis A Framework for Analysis, Business & Society’, Vol. 42 No. 3, 328-358. Critical Analysis Column (student’s own analysis) Direct...",
+      "logoUrl": "/samples/logos/f7469421fa2eb2.png",
+      "tableCount": 8,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "law2447-commercial-law-asm-1",
+      "wpId": 2706,
+      "slug": "law2447-commercial-law-asm-1",
+      "title": "LAW2447 – Commercial Law Asm 1",
+      "courseCode": "LAW2447",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 844,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Introduction This case note is an analysis of the “Jenny Korda v Aldi Foods Pty Limited and Brice Australia (NSW} Pty Limited” case. The case was judged by judge Magistrate Theakston at the Magistrates Court of the Australian Capital Territory on the 2nd of...",
+      "logoUrl": "/samples/logos/ecc3a92c7a1286.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "car20001-future-work-skills",
+      "wpId": 2705,
+      "slug": "car20001-future-work-skills",
+      "title": "CAR20001 – Future Work Skills",
+      "courseCode": "CAR20001",
+      "school": "Swinburne University",
+      "schools": [
+        "Swinburne University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2114,
+      "publishedDate": "04/10/2022",
+      "excerpt": "CAR20001 – Future Work Skills About the Occupation Target Occupation To me, becoming an accountant is always my dream job due to the following reasons. Firstly, I was inspired by the way my mother dealt with money in her shop, including receiving payments f...",
+      "logoUrl": "/samples/logos/d3a80ae727bcae.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4403-ethics-and-governance-asm-12",
+      "wpId": 2704,
+      "slug": "busm4403-ethics-and-governance-asm-12",
+      "title": "BUSM4403 – Ethics and Governance Asm 1(2)",
+      "courseCode": "BUSM4403",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1574,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Monahan, S. C., &amp; Quinn, B. A. (2006); ‘Beyond ‘bad apples’ and ‘weak leaders’ Toward a neo-institutional explanation of organizational deviance’, Theoretical Criminology, 10(3), 361-385 Critical Analysis Column (student’s own analysis) Direct Illustrat...",
+      "logoUrl": "/samples/logos/5b2ae8faa838ee.png",
+      "tableCount": 2,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "bma318-human-resource-management",
+      "wpId": 2703,
+      "slug": "bma318-human-resource-management",
+      "title": "BMA318 – Human Resource Management",
+      "courseCode": "BMA318",
+      "school": "University of Tasmania",
+      "schools": [
+        "University of Tasmania"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2918,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Part 1: Training Program Design The Training Program-FabricGuru Training is one of the most effective and constructive strategies for communicating information, expertise and attitudes in a career. In organizations, training should be seen as a technique fo...",
+      "logoUrl": "/samples/logos/230eca094a2c37.svg",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "econ1205-price-market",
+      "wpId": 2702,
+      "slug": "econ1205-price-market",
+      "title": "ECON1205 – Price & Market",
+      "courseCode": "ECON1205",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 447,
+      "publishedDate": "04/10/2022",
+      "excerpt": "Overall Inventors profit from the Schumpeterian rents created by the introduction and dissemination of a new notion. According to John Van Reenen, to put this theory into practice, Ford’s business must acquire new technology through diffusion, which is unli...",
+      "logoUrl": "/samples/logos/3a723b851e10fb.svg",
+      "tableCount": 2,
+      "imageCount": 3,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4403-ethics-and-governance",
+      "wpId": 2701,
+      "slug": "busm4403-ethics-and-governance",
+      "title": "BUSM4403 – ETHICS AND GOVERNANCE",
+      "courseCode": "BUSM4403",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2622,
+      "publishedDate": "04/10/2022",
+      "excerpt": "ASSIGNMENT 2: BOARD REPORT CASE: GREG MORTIMER CRUISE SHIP 1.0 EXECUTIVE SUMMARY Similar to the notorious Diamond cruise near Japan, the Greg Mortimer cruise ship was under massive public objection due to its ignorance to WHO recommendation and the manager’...",
+      "logoUrl": "/samples/logos/3a723b851e10fb.svg",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    },
+    {
+      "id": "grap2413-advertising-media",
+      "wpId": 2700,
+      "slug": "grap2413-advertising-media",
+      "title": "GRAP2413 – Advertising Media",
+      "courseCode": "GRAP2413",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing",
+        "Professional Communication"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1620,
+      "publishedDate": "04/10/2022",
+      "excerpt": "CONSUMER MEDIA INSIGHT Hyundai Kona Background Hyundai Motor Company Hyundai Motor Company, commonly known as Hyundai, is the largest car manufacturer in Korea belonging to the Hyundai Kia Automotive Group (Hyundai 2021a). Established in 1967, until now, Hy...",
+      "logoUrl": "/samples/logos/ecc3a92c7a1286.png",
+      "tableCount": 0,
+      "imageCount": 15,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "grap2413-advertising-media",
+      "wpId": 2683,
+      "slug": "grap2413-advertising-media",
+      "title": "GRAP2413 – Advertising Media",
+      "courseCode": "GRAP2413",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing",
+        "Professional Communication"
+      ],
+      "level": "Bachelor",
+      "levels": [],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1620,
+      "publishedDate": "04/10/2022",
+      "excerpt": "CONSUMER MEDIA INSIGHT Hyundai Kona Background Hyundai Motor Company Hyundai Motor Company, commonly known as Hyundai, is the largest car manufacturer in Korea belonging to the Hyundai Kia Automotive Group (Hyundai 2021a). Established in 1967, until now, Hy...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 15,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4403-ethics-and-governance-2",
+      "wpId": 2574,
+      "slug": "busm4403-ethics-and-governance-2",
+      "title": "BUSM4403 – ETHICS AND GOVERNANCE",
+      "courseCode": "BUSM4403",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Việt Nam",
+      "countries": [
+        "Việt Nam",
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2622,
+      "publishedDate": "11/08/2022",
+      "excerpt": "ASSIGNMENT 2: BOARD REPORT CASE: GREG MORTIMER CRUISE SHIP 1.0 EXECUTIVE SUMMARY Similar to the notorious Diamond cruise near Japan, the Greg Mortimer cruise ship was under massive public objection due to its ignorance to WHO recommendation and the manager’...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    },
+    {
+      "id": "econ1205-price-market",
+      "wpId": 2522,
+      "slug": "econ1205-price-market",
+      "title": "ECON1205 – Price & Market",
+      "courseCode": "ECON1205",
+      "school": "International University",
+      "schools": [],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Việt Nam",
+      "countries": [
+        "Việt Nam",
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 447,
+      "publishedDate": "31/07/2022",
+      "excerpt": "Overall Inventors profit from the Schumpeterian rents created by the introduction and dissemination of a new notion. According to John Van Reenen, to put this theory into practice, Ford’s business must acquire new technology through diffusion, which is unli...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 2,
+      "imageCount": 3,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "bma318-human-resource-management",
+      "wpId": 1577,
+      "slug": "bma318-human-resource-management",
+      "title": "BMA318 – Human Resource Management",
+      "courseCode": "BMA318",
+      "school": "University of Tasmania",
+      "schools": [
+        "University of Tasmania"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2918,
+      "publishedDate": "22/07/2022",
+      "excerpt": "Part 1: Training Program Design The Training Program-FabricGuru Training is one of the most effective and constructive strategies for communicating information, expertise and attitudes in a career. In organizations, training should be seen as a technique fo...",
+      "logoUrl": "/samples/logos/5b9f01f4fd193f.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4403-ethics-and-governance-asm-1-2",
+      "wpId": 1385,
+      "slug": "busm4403-ethics-and-governance-asm-1-2",
+      "title": "BUSM4403 – Ethics and Governance Asm 1(2)",
+      "courseCode": "BUSM4403",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1574,
+      "publishedDate": "18/07/2022",
+      "excerpt": "Monahan, S. C., &amp; Quinn, B. A. (2006); ‘Beyond ‘bad apples’ and ‘weak leaders’ Toward a neo-institutional explanation of organizational deviance’, Theoretical Criminology, 10(3), 361-385 Critical Analysis Column (student’s own analysis) Direct Illustrat...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 2,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "car20001-future-work-skills",
+      "wpId": 1358,
+      "slug": "car20001-future-work-skills",
+      "title": "CAR20001 – Future Work Skills",
+      "courseCode": "CAR20001",
+      "school": "Swinburne University",
+      "schools": [
+        "Swinburne University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2114,
+      "publishedDate": "15/07/2022",
+      "excerpt": "CAR20001 – Future Work Skills About the Occupation Target Occupation To me, becoming an accountant is always my dream job due to the following reasons. Firstly, I was inspired by the way my mother dealt with money in her shop, including receiving payments f...",
+      "logoUrl": "/samples/logos/e804455ef3b6c4.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "law2447-commercial-law-asm-1",
+      "wpId": 1335,
+      "slug": "law2447-commercial-law-asm-1",
+      "title": "LAW2447 – Commercial Law Asm 1",
+      "courseCode": "LAW2447",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 844,
+      "publishedDate": "12/07/2022",
+      "excerpt": "Introduction This case note is an analysis of the “Jenny Korda v Aldi Foods Pty Limited and Brice Australia (NSW} Pty Limited” case. The case was judged by judge Magistrate Theakston at the Magistrates Court of the Australian Capital Territory on the 2nd of...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4403-ethics-and-governance-asm1-sample",
+      "wpId": 1275,
+      "slug": "busm4403-ethics-and-governance-asm1-sample",
+      "title": "BUSM4403 – Ethics and Governance Asm 1",
+      "courseCode": "BUSM4403",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2225,
+      "publishedDate": "11/07/2022",
+      "excerpt": "Ethics and Governance Assignment 1 Christensen, SL. and Kohls J, 2003, ‘Ethical Decision Making in Times of Organizational Crisis A Framework for Analysis, Business & Society’, Vol. 42 No. 3, 328-358. Critical Analysis Column (student’s own analysis) Direct...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 8,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4403-ethics-and-governance-sample",
+      "wpId": 1250,
+      "slug": "busm4403-ethics-and-governance-sample",
+      "title": "BUSM4403 – Ethics and Governance",
+      "courseCode": "BUSM4403",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance",
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2575,
+      "publishedDate": "08/07/2022",
+      "excerpt": "Assignment 3: Corporate Governance Report BUSM 3115 Ethics & Governance 1.0 INTRODUCTION Corporate governance is tasked with overseeing the decision, the responsibilities and rights of an organization’s board, shareholders, management and various stakeholde...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "omgt2321-global-trade-operation",
+      "wpId": 1249,
+      "slug": "omgt2321-global-trade-operation",
+      "title": "OMGT2321 – Global Trade Operation",
+      "courseCode": "OMGT2321",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1895,
+      "publishedDate": "08/07/2022",
+      "excerpt": "OMGT2321 – Global Trade Operation EXECUTIVE SUMMARY COVID-19 has severely disrupted the lives of millions of people, both from a public health crisis perspective and a economic one. As countries close borders and restrict travelling, logistics and transport...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "isys2109-business-information-system",
+      "wpId": 1248,
+      "slug": "isys2109-business-information-system",
+      "title": "ISYS2109 – Business Information System",
+      "courseCode": "ISYS2109",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 3277,
+      "publishedDate": "08/07/2022",
+      "excerpt": "ISYS2109 – Business Information System Introduction Covid-19 disrupted the education system in most countries as schools, and universities were forced to close down for the student’s safety. In Vietnam, most educational institutions have been forced to clos...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "econ1269-international-trade",
+      "wpId": 1241,
+      "slug": "econ1269-international-trade",
+      "title": "ECON1269 – International Trade",
+      "courseCode": "ECON1269",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1900,
+      "publishedDate": "08/07/2022",
+      "excerpt": "ECON1269 – International Trade: ASSIGNMENT 3 Section A: Answers for Multiple Choice Questions Question A1: The correct answer of this question is D – “The absolute value of autarky prices are negatively correlated with free trade prices.” In general, a coun...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 5,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "econ1193-business-statistics",
+      "wpId": 1230,
+      "slug": "econ1193-business-statistics",
+      "title": "ECON1193 – Business Statistics",
+      "courseCode": "ECON1193",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2455,
+      "publishedDate": "08/07/2022",
+      "excerpt": "ECON1193 – Business Statistics Chapter 1. Comparison of Central Tendency of Region A (Asia) and Region B (Europe) Figure 1: Comparison the Central Tendency between two regions There are three value in the table of Central Tendency including mean, mode and m...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 7,
+      "imageCount": 10,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "econ1192-macroeconomics",
+      "wpId": 1226,
+      "slug": "econ1192-macroeconomics",
+      "title": "ECON1192 – Macroeconomics",
+      "courseCode": "ECON1192",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1838,
+      "publishedDate": "08/07/2022",
+      "excerpt": "Mac roeconomics Australian and Chinese Economic performances Australian and Chinese business cycle 1. Economic data The Australian economy: Economic data 2016 – 2019 Indicators 2016 2017 2018 2019 Nominal Gross Domestic Product (A$ billions) 1,703.6 1,808.9...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 4,
+      "imageCount": 3,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "comm2381-communication-strategy-and-planning",
+      "wpId": 1209,
+      "slug": "comm2381-communication-strategy-and-planning",
+      "title": "COMM2381 – Communication Strategy and Planning",
+      "courseCode": "COMM2381",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Professional Communication",
+      "majors": [
+        "Professional Communication"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2049,
+      "publishedDate": "08/07/2022",
+      "excerpt": "STRATEGIC COMMUNICATION PLAN DON’T REVEAL THE SECRETS ONLINE Executive summary Don’t reveal the secrets online is a social campaign aiming to raise awareness and advocacy from all Vietnamese Internet users, primarily 16 – 24 years old about the online priva...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 8,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4688-cross-cultural-management",
+      "wpId": 1206,
+      "slug": "busm4688-cross-cultural-management",
+      "title": "BUSM4688 – Cross-Cultural Management",
+      "courseCode": "BUSM4688",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 970,
+      "publishedDate": "08/07/2022",
+      "excerpt": "BUSM4688 – Cross-Cultural Management Introduction The increase in diversity at schools, working environment and other social settings necessitate awareness of how to interact with people of diversified cultural background. This module allowed students to di...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm4557-contemporary-management",
+      "wpId": 1205,
+      "slug": "busm4557-contemporary-management",
+      "title": "BUSM4557 – Contemporary Management",
+      "courseCode": "BUSM4557",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2154,
+      "publishedDate": "08/07/2022",
+      "excerpt": "BUSM4557 – Contemporary Management I> Introduction Amazon has been one of the biggest corporations that offer online retail shopping services to customers across the world. The company was established by Jeff Bezos in 1994, initially started as an online bo...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "busm2301-organizational-analysis",
+      "wpId": 1204,
+      "slug": "busm2301-organizational-analysis",
+      "title": "BUSM2301 – Organizational Analysis",
+      "courseCode": "BUSM2301",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1882,
+      "publishedDate": "08/07/2022",
+      "excerpt": "BUSM2301 – Organizational Analysis Case 1: Can Marketing contribute to social enterprise? In this paper, Powell and Osborne (2015) point out that marketing is an important element in strengthening sustainability and evaluates the close connection between ec...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "besc1121-principles-of-psychology",
+      "wpId": 1203,
+      "slug": "besc1121-principles-of-psychology",
+      "title": "BESC1121 – Principles of Psychology",
+      "courseCode": "BESC1121",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Science",
+      "majors": [
+        "Science"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1703,
+      "publishedDate": "08/07/2022",
+      "excerpt": "Influence of Neuroticism and Social Connectedness on Student Stress: A Psychological Approach Abstract Academic stress is a major, multifactorial concern among college students, affecting their academic performance and mental wellbeing. Student stress can b...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 1,
+      "imageCount": 0,
+      "hasAppendix": true,
+      "hasReferences": false
+    },
+    {
+      "id": "bafi3182-financial-market",
+      "wpId": 1202,
+      "slug": "bafi3182-financial-market",
+      "title": "BAFI3182 – Financial Market",
+      "courseCode": "BAFI3182",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1235,
+      "publishedDate": "08/07/2022",
+      "excerpt": "BAFI3182 – Financial Market Introduction : The rapid advance of financial technology (fintech) in the past decade has played an important role in the financial system, of how products and services are produced, delivered and consumed. By that, fintech recen...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "acct1046-accounting-in-organisations-society",
+      "wpId": 1201,
+      "slug": "acct1046-accounting-in-organisations-society",
+      "title": "ACCT1046 – Accounting in Organisations & Society",
+      "courseCode": "ACCT1046",
+      "school": "RMIT University",
+      "schools": [
+        "RMIT University"
+      ],
+      "major": "Accounting",
+      "majors": [
+        "Accounting"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1005,
+      "publishedDate": "08/07/2022",
+      "excerpt": "ACCT1046 – Accounting in Organisations & Society Question 1: Overall, WEN maintained adequate liquidity to meet its short-term obligations over the period of 2015-2019. Despite fluctuations, the current ratio remained above 1.5x, which implied that WEN had...",
+      "logoUrl": "/samples/logos/7e93cf874f1abb.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mgmt-30011-supply-chain-management",
+      "wpId": 1025,
+      "slug": "mgmt-30011-supply-chain-management",
+      "title": "MGMT 30011 – Supply Chain Management",
+      "courseCode": "MGMT30011",
+      "school": "University of Melbourne",
+      "schools": [
+        "University of Melbourne"
+      ],
+      "major": "Logistics and Supply Chain Management",
+      "majors": [
+        "Logistics and Supply Chain Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2256,
+      "publishedDate": "06/07/2022",
+      "excerpt": "A report of Toyota Group’s Supply Chain Management Executive summary This report will look into the supply chain of one of the most successful automotive manufacturer, Toyota. With the current success of the Toyota Rav4 as the best seller in the Australian...",
+      "logoUrl": "/samples/logos/12e6745e9470dc.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "hos302-hospitality-management",
+      "wpId": 1024,
+      "slug": "hos302-hospitality-management",
+      "title": "HOS302 – Hospitality Management",
+      "courseCode": "HOS302",
+      "school": "Laureate Australia",
+      "schools": [
+        "Laureate Australia"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management",
+        "Hospitality"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 949,
+      "publishedDate": "06/07/2022",
+      "excerpt": "HOS302 – Hospitality management Topic: Does the ‘host’ have a right to put pressure on a guest to be a ‘good guest’? The notion of host and guest relationship can easily draw into different implications. It can be host and guest of a free stay on a stormy d...",
+      "logoUrl": "/samples/logos/be9036f8dbd93d.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mgt1fom-foundations-of-management",
+      "wpId": 1022,
+      "slug": "mgt1fom-foundations-of-management",
+      "title": "MGT1FOM – Foundations Of Management",
+      "courseCode": "",
+      "school": "La Trobe University",
+      "schools": [
+        "La Trobe University"
+      ],
+      "major": "Management",
+      "majors": [
+        "Management"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2254,
+      "publishedDate": "06/07/2022",
+      "excerpt": "MGT1FOM – Foundations Of Management INTRODUCTION Nowadays, leadership has become a vital part, becoming a key factor for the success of the organizational performance among different types of stakeholders (Hao & Yazdanifard 2015). With the development of gl...",
+      "logoUrl": "/samples/logos/fe8e012088bada.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "pg11217-contemporary-issues-accounting",
+      "wpId": 1020,
+      "slug": "pg11217-contemporary-issues-accounting",
+      "title": "PG11217 – Contemporary Issues Accounting",
+      "courseCode": "PG11217",
+      "school": "Kent University",
+      "schools": [
+        "Kent University"
+      ],
+      "major": "Accounting",
+      "majors": [
+        "Accounting"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2310,
+      "publishedDate": "06/07/2022",
+      "excerpt": "Accounting for Social-Environmental Issue CHAPTER 1 INTRODUCTION Accounting literature in the 1950s of the 20 th century witnessed a new path of bookkeeping theory. During this period, accounting practice has been developed to cover inclusive elements inste...",
+      "logoUrl": "/samples/logos/b1181315848802.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "acc302-auditing-and-assurance",
+      "wpId": 1019,
+      "slug": "acc302-auditing-and-assurance",
+      "title": "ACC302 – Auditing and Assurance",
+      "courseCode": "ACC302",
+      "school": "Kaplan Business School",
+      "schools": [
+        "Kaplan Business School"
+      ],
+      "major": "Accounting",
+      "majors": [
+        "Accounting"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 946,
+      "publishedDate": "06/07/2022",
+      "excerpt": "ACC302 – Auditing and Assurance Assessment 3: Case study * According to AUS 702 Auditing Standard (paragraph 25-30), there are four main types of audit reports: unqualified opinion report, qualified opinion report, adverse opinion report, disclaimer opinion...",
+      "logoUrl": "/samples/logos/4f053d55325e5a.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "acc-305-management-accounting-2",
+      "wpId": 1018,
+      "slug": "acc-305-management-accounting-2",
+      "title": "ACC 305 – Management Accounting 2",
+      "courseCode": "ACC305",
+      "school": "Kaplan Business School",
+      "schools": [
+        "Kaplan Business School"
+      ],
+      "major": "Accounting",
+      "majors": [
+        "Accounting"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1092,
+      "publishedDate": "06/07/2022",
+      "excerpt": "Management accounting Since the first case was officially reported in Wuhan, China, Corona virus quickly spreads and accelerates to one of the most severe pandemic in mankind history. Global economy growth plummets to 3%, and even the most optimistic econom...",
+      "logoUrl": "/samples/logos/4f053d55325e5a.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "icms-global-logistics-and-supply-chain-management",
+      "wpId": 1016,
+      "slug": "icms-global-logistics-and-supply-chain-management",
+      "title": "ICMS – Global Logistics and Supply Chain Management",
+      "courseCode": "",
+      "school": "ICMS",
+      "schools": [
+        "ICMS"
+      ],
+      "major": "Logistics and Supply Chain Management",
+      "majors": [
+        "Logistics and Supply Chain Management"
+      ],
+      "level": "Bachelor",
+      "levels": [],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1141,
+      "publishedDate": "06/07/2022",
+      "excerpt": "This reflective report will answer the following: 1) Four things that I have learned in this participation are about the importance of inventory, supply chain overview, collaboration and sustainable supply chain. First, the importance of inventory is one of...",
+      "logoUrl": "/samples/logos/d14578b0c44584.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    },
+    {
+      "id": "mkt210-marketing-planning",
+      "wpId": 1014,
+      "slug": "mkt210-marketing-planning",
+      "title": "MKT210 – Marketing Planning",
+      "courseCode": "MKT210",
+      "school": "Coventry University",
+      "schools": [
+        "Coventry University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 4947,
+      "publishedDate": "06/07/2022",
+      "excerpt": "INTRODUCTION The coffee and beverage market continues to grow significantly over the last few years although there have been a large number of great changes in the customer’s requirements and company’s strategies, projected to grow at a CAGR of 4.22% from 2...",
+      "logoUrl": "/samples/logos/7fd8829c8b8c09.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mmk325-strategic-marketing",
+      "wpId": 1011,
+      "slug": "mmk325-strategic-marketing",
+      "title": "MMK325 – Strategic Marketing",
+      "courseCode": "MMK325",
+      "school": "Deakin University",
+      "schools": [
+        "Deakin University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 2703,
+      "publishedDate": "06/07/2022",
+      "excerpt": "CASE STUDY 1 – INTERFACE: PRIZE-WINNING, SUSTAINABLE MODULAR FLOORING Identification and justification of the main issues 1.1 The company’s mission and products need to reflect the core values of the business The mission of the business is about inventing a...",
+      "logoUrl": "/samples/logos/f384bbef370542.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "279acc-professional-and-academic-competencies",
+      "wpId": 1009,
+      "slug": "279acc-professional-and-academic-competencies",
+      "title": "279ACC – Professional and Academic Competencies",
+      "courseCode": "",
+      "school": "Coventry University",
+      "schools": [
+        "Coventry University"
+      ],
+      "major": "Business/Eco&Finance",
+      "majors": [
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 3080,
+      "publishedDate": "06/07/2022",
+      "excerpt": "Factors affecting the Adoption of Online Banking in Vietnam I. Introduction and background 1.1. Preliminary background information Growing disruption of business through globalization and technological change, combined with increasing competition and the se...",
+      "logoUrl": "/samples/logos/7fd8829c8b8c09.png",
+      "tableCount": 0,
+      "imageCount": 1,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mgt301a-ethics-and-sustainability",
+      "wpId": 595,
+      "slug": "mgt301a-ethics-and-sustainability",
+      "title": "MGT301A – Ethics and Sustainability",
+      "courseCode": "MGT301A",
+      "school": "Torrens University",
+      "schools": [
+        "Torrens University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing",
+        "Business/Eco&Finance"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1283,
+      "publishedDate": "01/06/2022",
+      "excerpt": "Executive Summary Starbucks Corporation, found in Seattle, Washington in 1971, is an American coffee production company and coffeehouse chain that houses thousands of locations worldwide. It offers a wide range of products in its menu, including hot and col...",
+      "logoUrl": "/samples/logos/902f6dab52bd75.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": false
+    },
+    {
+      "id": "mmk251-services-marketing",
+      "wpId": 593,
+      "slug": "mmk251-services-marketing",
+      "title": "MMK251 – Services Marketing",
+      "courseCode": "MMK251",
+      "school": "Deakin University",
+      "schools": [
+        "Deakin University"
+      ],
+      "major": "Marketing",
+      "majors": [
+        "Marketing"
+      ],
+      "level": "Bachelor",
+      "levels": [
+        "Bachelor"
+      ],
+      "category": "Assignment/Essay/Report",
+      "categories": [
+        "Assignment/Essay/Report"
+      ],
+      "country": "Úc",
+      "countries": [
+        "Úc"
+      ],
+      "subjects": [],
+      "gradeLabel": "HD",
+      "wordCount": 1158,
+      "publishedDate": "01/06/2022",
+      "excerpt": "Topic: Students are required to source and apply services marketing theory and frameworks to an organisation and its operating environment in order to overcome ‘real-world’ marketing problems Choose a ‘service’ organisation in Australia affected by a macro-...",
+      "logoUrl": "/samples/logos/f384bbef370542.png",
+      "tableCount": 0,
+      "imageCount": 0,
+      "hasAppendix": false,
+      "hasReferences": true
+    }
+  ]
+}
