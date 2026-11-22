@@ -244,7 +244,68 @@ export function AiWriterStudioView({
       return true;
     }
   });
-  const [activityLogs, setActivityLogs] = useState<WriterActivityLogEntry[]>([]);
+  const ACTIVITY_LOGS_STORAGE_KEY =
+    'assigntrack_ai_writer_activity_logs_by_order_v1';
+
+  const getActivityLogKeyForSession = (sess?: WriterSession | null): string => {
+    const code = sess?.linkedOrderCode?.trim();
+    if (code) return `order:${code}`;
+    if (sess?.id) return `session:${sess.id}`;
+    return 'default';
+  };
+
+  const [activityLogsByKey, setActivityLogsByKey] = useState<
+    Record<string, WriterActivityLogEntry[]>
+  >(() => {
+    try {
+      const raw = localStorage.getItem(ACTIVITY_LOGS_STORAGE_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw) as Record<
+        string,
+        WriterActivityLogEntry[]
+      >;
+      if (!parsed || typeof parsed !== 'object') return {};
+      const cleaned: Record<string, WriterActivityLogEntry[]> = {};
+      for (const [k, list] of Object.entries(parsed)) {
+        if (!Array.isArray(list)) continue;
+        cleaned[k] = list.slice(0, 60).map((item) =>
+          item.status === 'running'
+            ? {
+                ...item,
+                status: 'warning',
+                detail: item.detail || 'Tác vụ trước đó đã kết thúc khi tải lại trang.',
+              }
+            : item
+        );
+      }
+      return cleaned;
+    } catch {
+      return {};
+    }
+  });
+
+  useEffect(() => {
+    try {
+      const entries = Object.entries(activityLogsByKey).slice(-40);
+      localStorage.setItem(
+        ACTIVITY_LOGS_STORAGE_KEY,
+        JSON.stringify(Object.fromEntries(entries))
+      );
+    } catch {
+      // ignore storage quota errors
+    }
+  }, [activityLogsByKey]);
+
+  const activeSessionIdRef = useRef<string>(activeSessionId);
+  activeSessionIdRef.current = activeSessionId;
+
+  const resolveLogKey = (targetSessionId?: string): string => {
+    const sid = targetSessionId || activeSessionIdRef.current;
+    const matched =
+      sessionsRef.current.find((s) => s.id === sid) || sessionsRef.current[0];
+    return getActivityLogKeyForSession(matched);
+  };
+
   const [currentStepLabel, setCurrentStepLabel] = useState<string>('');
   const activeAbortControllerRef = useRef<AbortController | null>(null);
   const ribbonWrapperRef = useRef<HTMLDivElement | null>(null);
@@ -288,17 +349,22 @@ export function AiWriterStudioView({
     });
     setRefiningSection(false);
     setCurrentStepLabel('');
-    setActivityLogs((prev) =>
-      prev.map((item) =>
-        item.status === 'running'
-          ? {
-              ...item,
-              status: 'warning',
-              detail: 'Đã dừng ngay theo yêu cầu người dùng.',
-            }
-          : item
-      )
-    );
+    const currentKey = resolveLogKey();
+    setActivityLogsByKey((prev) => {
+      const list = prev[currentKey] || [];
+      return {
+        ...prev,
+        [currentKey]: list.map((item) =>
+          item.status === 'running'
+            ? {
+                ...item,
+                status: 'warning',
+                detail: 'Đã dừng ngay theo yêu cầu người dùng.',
+              }
+            : item
+        ),
+      };
+    });
     pushActivityLog(
       'warning',
       'Đã dừng Trợ lý AI',
@@ -355,7 +421,8 @@ export function AiWriterStudioView({
     title: string,
     detail?: string,
     model?: string,
-    durationSec?: number
+    durationSec?: number,
+    targetSessionId?: string
   ): string => {
     const id = `act_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const entry: WriterActivityLogEntry = {
@@ -367,7 +434,11 @@ export function AiWriterStudioView({
       model,
       durationSec,
     };
-    setActivityLogs((prev) => [entry, ...prev].slice(0, 50));
+    const key = resolveLogKey(targetSessionId);
+    setActivityLogsByKey((prev) => ({
+      ...prev,
+      [key]: [entry, ...(prev[key] || [])].slice(0, 60),
+    }));
     return id;
   };
 
@@ -375,9 +446,31 @@ export function AiWriterStudioView({
     id: string,
     patch: Partial<WriterActivityLogEntry>
   ) => {
-    setActivityLogs((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...patch } : item))
-    );
+    setActivityLogsByKey((prev) => {
+      let changed = false;
+      const next: Record<string, WriterActivityLogEntry[]> = {};
+      for (const [k, list] of Object.entries(prev)) {
+        let bucketChanged = false;
+        const updatedList = list.map((item) => {
+          if (item.id === id) {
+            bucketChanged = true;
+            changed = true;
+            return { ...item, ...patch };
+          }
+          return item;
+        });
+        next[k] = bucketChanged ? updatedList : list;
+      }
+      return changed ? next : prev;
+    });
+  };
+
+  const handleClearActiveOrderLogs = () => {
+    const key = resolveLogKey();
+    setActivityLogsByKey((prev) => ({
+      ...prev,
+      [key]: [],
+    }));
   };
   const [resetScope, setResetScope] = useState<
     'content_and_outline' | 'content_only' | 'everything'
@@ -2987,8 +3080,15 @@ export function AiWriterStudioView({
           }}
           totalDraftedWords={totalDraftedWords}
           targetWordCount={activeSession.targetWordCount}
-          logs={activityLogs}
-          onClearLogs={() => setActivityLogs([])}
+          logs={
+            activityLogsByKey[getActivityLogKeyForSession(activeSession)] || []
+          }
+          orderScopeLabel={
+            activeSession.linkedOrderCode?.trim()
+              ? `#${activeSession.linkedOrderCode.trim()}`
+              : 'Phiên riêng'
+          }
+          onClearLogs={handleClearActiveOrderLogs}
           onRunAudit={() => {
             if (auditReport) {
               setShowAuditModal(true);

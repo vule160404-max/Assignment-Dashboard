@@ -51,6 +51,7 @@ interface WriterActivityPanelProps {
   totalDraftedWords: number;
   targetWordCount: number;
   logs: WriterActivityLogEntry[];
+  orderScopeLabel?: string;
   onClearLogs: () => void;
   onRunAudit?: () => void;
   lastAuditScore?: number | null;
@@ -79,6 +80,7 @@ export function WriterActivityPanel({
   totalDraftedWords,
   targetWordCount,
   logs,
+  orderScopeLabel,
   onClearLogs,
   onRunAudit,
   lastAuditScore = null,
@@ -196,7 +198,11 @@ export function WriterActivityPanel({
             <button
               type="button"
               onClick={onClearLogs}
-              title="Xóa nhật ký"
+              title={
+                orderScopeLabel
+                  ? `Xóa nhật ký riêng của ${orderScopeLabel}`
+                  : 'Xóa nhật ký đơn này'
+              }
               className="btn-press p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -352,12 +358,20 @@ export function WriterActivityPanel({
 
       {/* Compact Scannable Activity Log */}
       <div className="xl:flex-1 xl:min-h-0 xl:overflow-y-auto px-3 py-2.5 max-h-72 xl:max-h-none">
-        <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
-          <span className="inline-flex items-center gap-1">
-            <Activity className="w-3 h-3" />
-            <span>Nhật ký</span>
+        <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-2 gap-1.5">
+          <span className="inline-flex items-center gap-1 min-w-0">
+            <Activity className="w-3 h-3 shrink-0" />
+            <span className="shrink-0">Nhật ký</span>
+            {orderScopeLabel && (
+              <span
+                title={`Nhật ký lưu riêng cho ${orderScopeLabel}`}
+                className="px-1.5 py-0.5 rounded bg-zinc-100 border border-zinc-200/80 text-[9.5px] font-mono normal-case tracking-normal text-slate-600 truncate max-w-[115px]"
+              >
+                {orderScopeLabel}
+              </span>
+            )}
           </span>
-          <span className="font-mono">
+          <span className="font-mono shrink-0">
             {targetWordCount > 0
               ? `Mục tiêu ${targetWordCount.toLocaleString('vi-VN')}w`
               : `${visibleLogs.length}`}
