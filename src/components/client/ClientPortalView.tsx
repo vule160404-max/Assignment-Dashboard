@@ -359,7 +359,7 @@ export function ClientPortalView({
 
       {/* Deep Academic Navy Blueprint Hero Banner (Synchronized with Landing Page & Sample Library) */}
       {showHeroBanner && (
-        <section className="relative overflow-hidden bg-[#0B2559] text-white pt-10 pb-16 sm:pt-12 sm:pb-20">
+        <section className="relative overflow-hidden bg-[#0B2559] text-white py-10 sm:py-12">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute inset-0 opacity-[0.08]"
@@ -412,9 +412,7 @@ export function ClientPortalView({
           !portal && (homeTab === 'order' || homeTab === 'checker' || homeTab === 'lookup')
             ? 'max-w-6xl'
             : 'max-w-5xl'
-        } mx-auto px-4 sm:px-6 lg:px-8 ${
-          showHeroBanner ? '-mt-8 relative z-10 pb-14' : 'py-8 sm:py-10'
-        }`}
+        } mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10`}
       >
         {(() => {
           if (activeCode && loading && !portal) {
