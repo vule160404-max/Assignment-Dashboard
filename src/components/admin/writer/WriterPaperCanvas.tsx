@@ -11,7 +11,10 @@ import {
   ShieldCheck,
   Wrench,
 } from 'lucide-react';
-import { stripMarkdownHashesFromText } from '../../../lib/aiWriterClient';
+import {
+  isReferencesSectionTitle,
+  stripMarkdownHashesFromText,
+} from '../../../lib/aiWriterClient';
 import { countWords } from '../../../lib/wordHumanizer';
 import { CoverPageSheetPreview } from './CoverPageSheetPreview';
 import {
@@ -552,7 +555,9 @@ export function WriterPaperCanvas({
 
                   {session.viewMode === 'sections' && (
                     <span className="text-[11px] font-sans font-mono text-zinc-400 shrink-0 select-none tabular-nums">
-                      {countWords(sec.content)}/{sec.targetWords}w
+                      {isReferencesSectionTitle(sec.title) || sec.targetWords === 0
+                        ? `${countWords(sec.content)}w · Không giới hạn`
+                        : `${countWords(sec.content)}/${sec.targetWords}w`}
                     </span>
                   )}
                 </div>

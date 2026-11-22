@@ -8,6 +8,7 @@ import {
   Sparkles,
   Trash2,
 } from 'lucide-react';
+import { isReferencesSectionTitle } from '../../../lib/aiWriterClient';
 import { countWords } from '../../../lib/wordHumanizer';
 import {
   SectionHeadingLevel,
@@ -170,8 +171,17 @@ export function WriterOutlinePanel({
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span className="text-[11px] font-mono text-zinc-500 tabular-nums">
-                    {actualWords}/{sec.targetWords}w
+                  <span
+                    className="text-[11px] font-mono text-zinc-500 tabular-nums"
+                    title={
+                      isReferencesSectionTitle(sec.title) || sec.targetWords === 0
+                        ? 'Mục Tài liệu tham khảo không giới hạn số từ'
+                        : undefined
+                    }
+                  >
+                    {isReferencesSectionTitle(sec.title) || sec.targetWords === 0
+                      ? `${actualWords}w · ∞`
+                      : `${actualWords}/${sec.targetWords}w`}
                   </span>
 
                   <button
@@ -225,26 +235,32 @@ export function WriterOutlinePanel({
                         <option value="h3">Heading 3</option>
                       </select>
 
-                      <label className="inline-flex items-center gap-1 text-[11px] text-zinc-600">
-                        <span>Mục tiêu:</span>
-                        <input
-                          type="number"
-                          min={50}
-                          max={10000}
-                          step={50}
-                          value={sec.targetWords}
-                          onChange={(e) =>
-                            onUpdateSection(sec.id, {
-                              targetWords: Math.max(
-                                50,
-                                Number(e.target.value) || 200
-                              ),
-                            })
-                          }
-                          className="w-16 px-1.5 py-0.5 text-[11px] font-mono text-right bg-white border border-zinc-200 rounded tabular-nums"
-                        />
-                        <span>từ</span>
-                      </label>
+                      {isReferencesSectionTitle(sec.title) || sec.targetWords === 0 ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded">
+                          Không giới hạn từ (∞)
+                        </span>
+                      ) : (
+                        <label className="inline-flex items-center gap-1 text-[11px] text-zinc-600">
+                          <span>Mục tiêu:</span>
+                          <input
+                            type="number"
+                            min={50}
+                            max={10000}
+                            step={50}
+                            value={sec.targetWords}
+                            onChange={(e) =>
+                              onUpdateSection(sec.id, {
+                                targetWords: Math.max(
+                                  50,
+                                  Number(e.target.value) || 200
+                                ),
+                              })
+                            }
+                            className="w-16 px-1.5 py-0.5 text-[11px] font-mono text-right bg-white border border-zinc-200 rounded tabular-nums"
+                          />
+                          <span>từ</span>
+                        </label>
+                      )}
                     </div>
 
                     <div className="inline-flex items-center gap-0.5">

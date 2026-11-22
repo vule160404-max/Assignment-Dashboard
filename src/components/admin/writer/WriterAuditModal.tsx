@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   AlertCircle,
@@ -28,7 +29,7 @@ interface WriterAuditModalProps {
   isAutoFixing: boolean;
   auditStatusLabel: string;
   onRunAudit: () => void;
-  onAutoFixAll: (report: PaperAuditReport) => void;
+  onAutoFixAll: (report: PaperAuditReport, selectedIssueIds?: string[]) => void;
   onJumpToSection: (sectionId: string) => void;
   onClose: () => void;
 }
@@ -51,14 +52,43 @@ export function WriterAuditModal({
   onJumpToSection,
   onClose,
 }: WriterAuditModalProps) {
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!report) {
+      setSelectedIds([]);
+      return;
+    }
+    setSelectedIds(report.issues.filter((i) => i.autoFixable).map((i) => i.id));
+  }, [report]);
+
   if (!isOpen) return null;
 
   const criticalCount =
     report?.issues.filter((i) => i.severity === 'critical').length || 0;
   const warningCount =
     report?.issues.filter((i) => i.severity === 'warning').length || 0;
-  const autoFixableCount =
-    report?.issues.filter((i) => i.autoFixable).length || 0;
+  const autoFixableIssues =
+    report?.issues.filter((i) => i.autoFixable) || [];
+  const autoFixableCount = autoFixableIssues.length;
+  const selectedSet = new Set(selectedIds);
+  const selectedFixableCount = autoFixableIssues.filter((i) =>
+    selectedSet.has(i.id)
+  ).length;
+
+  const toggleIssueSelection = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const toggleSelectAllFixable = () => {
+    if (selectedFixableCount === autoFixableCount) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(autoFixableIssues.map((i) => i.id));
+    }
+  };
 
   const groupedCategories: PaperAuditCategory[] = [
     'doi_and_sources',
@@ -256,6 +286,31 @@ export function WriterAuditModal({
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {/* Quick Select All / Deselect All Bar */}
+                  {autoFixableCount > 0 && (
+                    <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-blue-50/60 border border-blue-200/80 text-xs">
+                      <label className="inline-flex items-center gap-2 cursor-pointer select-none font-semibold text-[#0B2559]">
+                        <input
+                          type="checkbox"
+                          checked={
+                            autoFixableCount > 0 &&
+                            selectedFixableCount === autoFixableCount
+                          }
+                          onChange={toggleSelectAllFixable}
+                          className="w-4 h-4 rounded accent-[#12489B] cursor-pointer"
+                        />
+                        <span>
+                          {selectedFixableCount === autoFixableCount
+                            ? 'Bỏ chọn tất cả lỗi'
+                            : 'Chọn tất cả lỗi có thể tự sửa'}
+                        </span>
+                      </label>
+                      <span className="font-mono text-[11px] font-bold text-[#12489B]">
+                        Đã chọn {selectedFixableCount}/{autoFixableCount} lỗi
+                      </span>
+                    </div>
+                  )}
+
                   {groupedCategories.map((cat) => {
                     const catIssues = report.issues.filter(
                       (i) => i.category === cat
@@ -277,63 +332,88 @@ export function WriterAuditModal({
                         </div>
 
                         <div className="space-y-2">
-                          {catIssues.map((issue: PaperAuditIssue) => (
-                            <div
-                              key={issue.id}
-                              className={`p-3.5 rounded-xl border space-y-1.5 ${
-                                issue.severity === 'critical'
-                                  ? 'bg-rose-50/40 border-rose-200/90'
-                                  : issue.severity === 'warning'
-                                  ? 'bg-amber-50/40 border-amber-200/90'
-                                  : 'bg-zinc-50/60 border-zinc-200/80'
-                              }`}
-                            >
-                              <div className="flex items-start justify-between gap-2">
-                                <div className="flex items-start gap-2 min-w-0">
-                                  {issue.severity === 'critical' ? (
-                                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
-                                  ) : (
-                                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                                  )}
-                                  <div className="min-w-0">
-                                    <div className="text-xs font-bold text-slate-900 leading-snug">
-                                      {issue.title}
+                          {catIssues.map((issue: PaperAuditIssue) => {
+                            const isChecked =
+                              issue.autoFixable && selectedSet.has(issue.id);
+                            return (
+                              <div
+                                key={issue.id}
+                                className={`p-3.5 rounded-xl border space-y-1.5 transition-colors ${
+                                  issue.autoFixable && !isChecked
+                                    ? 'bg-zinc-50/70 border-zinc-200/80 opacity-65'
+                                    : issue.severity === 'critical'
+                                    ? 'bg-rose-50/40 border-rose-200/90'
+                                    : issue.severity === 'warning'
+                                    ? 'bg-amber-50/40 border-amber-200/90'
+                                    : 'bg-zinc-50/60 border-zinc-200/80'
+                                }`}
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex items-start gap-2.5 min-w-0">
+                                    {issue.autoFixable ? (
+                                      <input
+                                        type="checkbox"
+                                        checked={isChecked}
+                                        onChange={() =>
+                                          toggleIssueSelection(issue.id)
+                                        }
+                                        aria-label={`Chọn sửa lỗi: ${issue.title}`}
+                                        className="mt-0.5 w-4 h-4 rounded accent-[#12489B] cursor-pointer shrink-0"
+                                      />
+                                    ) : issue.severity === 'critical' ? (
+                                      <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+                                    ) : (
+                                      <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                                    )}
+                                    <div
+                                      className={`min-w-0 ${
+                                        issue.autoFixable ? 'cursor-pointer' : ''
+                                      }`}
+                                      onClick={() => {
+                                        if (issue.autoFixable) {
+                                          toggleIssueSelection(issue.id);
+                                        }
+                                      }}
+                                    >
+                                      <div className="text-xs font-bold text-slate-900 leading-snug">
+                                        {issue.title}
+                                      </div>
+                                      <p className="text-[11.5px] text-slate-600 mt-0.5 leading-relaxed break-words">
+                                        {issue.detail}
+                                      </p>
                                     </div>
-                                    <p className="text-[11.5px] text-slate-600 mt-0.5 leading-relaxed break-words">
-                                      {issue.detail}
-                                    </p>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {issue.autoFixable && (
+                                      <span className="px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-[#12489B] text-[10px] font-semibold">
+                                        Auto-Fix
+                                      </span>
+                                    )}
+                                    {issue.sectionId && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          onJumpToSection(issue.sectionId!);
+                                          onClose();
+                                        }}
+                                        className="btn-press inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-zinc-200 hover:border-[#12489B] text-[10.5px] font-semibold text-slate-700 hover:text-[#12489B]"
+                                      >
+                                        <span>Mở mục</span>
+                                        <ArrowUpRight className="w-3 h-3" />
+                                      </button>
+                                    )}
                                   </div>
                                 </div>
 
-                                <div className="flex items-center gap-1.5 shrink-0">
-                                  {issue.autoFixable && (
-                                    <span className="px-1.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-[#12489B] text-[10px] font-semibold">
-                                      Auto-Fix
-                                    </span>
-                                  )}
-                                  {issue.sectionId && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        onJumpToSection(issue.sectionId!);
-                                        onClose();
-                                      }}
-                                      className="btn-press inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white border border-zinc-200 hover:border-[#12489B] text-[10.5px] font-semibold text-slate-700 hover:text-[#12489B]"
-                                    >
-                                      <span>Mở mục</span>
-                                      <ArrowUpRight className="w-3 h-3" />
-                                    </button>
-                                  )}
-                                </div>
+                                {issue.fixHint && (
+                                  <div className="pl-6 text-[11px] text-[#12489B] font-medium">
+                                    Hướng xử lý: {issue.fixHint}
+                                  </div>
+                                )}
                               </div>
-
-                              {issue.fixHint && (
-                                <div className="pl-6 text-[11px] text-[#12489B] font-medium">
-                                  Hướng xử lý: {issue.fixHint}
-                                </div>
-                              )}
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     );
@@ -369,8 +449,8 @@ export function WriterAuditModal({
             {report && autoFixableCount > 0 && (
               <button
                 type="button"
-                disabled={isAuditing || isAutoFixing}
-                onClick={() => onAutoFixAll(report)}
+                disabled={isAuditing || isAutoFixing || selectedFixableCount === 0}
+                onClick={() => onAutoFixAll(report, selectedIds)}
                 className="btn-press inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#12489B] hover:bg-[#0D387A] text-white text-xs font-bold shadow-2xs disabled:opacity-50"
               >
                 {isAutoFixing ? (
@@ -379,9 +459,11 @@ export function WriterAuditModal({
                   <Wrench className="w-3.5 h-3.5" />
                 )}
                 <span>
-                  {autoFixableCount > 5
-                    ? `Tự động sửa 5 lỗi đầu tiên (5/${autoFixableCount})`
-                    : `Tự động sửa ${autoFixableCount} lỗi bằng AI`}
+                  {selectedFixableCount === 0
+                    ? 'Hãy tích chọn ít nhất 1 lỗi'
+                    : selectedFixableCount > 5
+                    ? `Tự động sửa 5 lỗi đã chọn (5/${selectedFixableCount})`
+                    : `Tự động sửa ${selectedFixableCount} lỗi đã chọn`}
                 </span>
               </button>
             )}

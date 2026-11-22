@@ -16,6 +16,7 @@ import {
   fixReferencesTargetedWithAi,
   generateOutlineWithAi,
   generateSectionWithAi,
+  isReferencesSectionTitle,
   loadAiChatbotSettings,
   loadGlobalSkillLibrary,
   loadWriterSessions,
@@ -2097,7 +2098,10 @@ export function AiWriterStudioView({
     }
   };
 
-  const handleAutoFixAuditIssues = async (report: PaperAuditReport) => {
+  const handleAutoFixAuditIssues = async (
+    report: PaperAuditReport,
+    selectedIssueIds?: string[]
+  ) => {
     if (!activeSession) return;
     if (!hasEffectiveApiKey) {
       setShowApiModal(true);
@@ -2105,7 +2109,13 @@ export function AiWriterStudioView({
       return;
     }
 
-    const allFixableIssues = report.issues.filter((i) => i.autoFixable);
+    const selectedIdSet =
+      selectedIssueIds && selectedIssueIds.length > 0
+        ? new Set(selectedIssueIds)
+        : null;
+    const allFixableIssues = report.issues.filter(
+      (i) => i.autoFixable && (!selectedIdSet || selectedIdSet.has(i.id))
+    );
     if (allFixableIssues.length === 0) return;
 
     const targetSessionId = activeSession.id;
@@ -2524,7 +2534,11 @@ export function AiWriterStudioView({
 
   const totalOutlineTargetWords = useMemo(() => {
     if (!activeSession) return 0;
-    return activeSession.outline.reduce((sum, sec) => sum + sec.targetWords, 0);
+    return activeSession.outline.reduce(
+      (sum, sec) =>
+        isReferencesSectionTitle(sec.title) ? sum : sum + (sec.targetWords || 0),
+      0
+    );
   }, [activeSession]);
 
   const linkedOrder = useMemo(() => {
@@ -2926,7 +2940,9 @@ export function AiWriterStudioView({
         isAutoFixing={isAutoFixingAudit}
         auditStatusLabel={auditStatusLabel}
         onRunAudit={() => void handleRunPaperAudit()}
-        onAutoFixAll={(rep) => void handleAutoFixAuditIssues(rep)}
+        onAutoFixAll={(rep, selectedIds) =>
+          void handleAutoFixAuditIssues(rep, selectedIds)
+        }
         onJumpToSection={(secId) => {
           setLeftTab('outline');
           mutateActiveSession((s) => ({ ...s, activeSectionId: secId }));

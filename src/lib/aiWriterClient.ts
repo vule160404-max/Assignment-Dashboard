@@ -910,7 +910,7 @@ export async function generateOutlineWithAi(
 
 YÊU CẦU BẮT BUỘC:
 1. Chia bài thành các chương/mục cân đối chuẩn Việt Nam theo cấu trúc: ${vnStructureHint}
-2. Tổng "targetWords" của các mục nội dung (không tính Tài liệu tham khảo) xấp xỉ ${session.targetWordCount} từ (đặt targetWords cho mục Tài liệu tham khảo khoảng 200-300).
+2. Tổng "targetWords" của các mục nội dung thân bài (KHÔNG tính Tài liệu tham khảo) xấp xỉ ${session.targetWordCount} từ. Riêng mục Tài liệu tham khảo đặt "targetWords": 0 (không giới hạn số từ).
 3. Trong "guidanceNotes" của mỗi chương lớn (>= 400 từ), nêu rõ 2-3 tiểu mục con đánh số chuẩn (VD: "Gồm các tiểu mục: 1.1. ..., 1.2. ...") để Word tự tạo Mục lục chuẩn. TUYỆT ĐỐI KHÔNG dùng dấu '#' hay '##' trong tiêu đề.
 4. CHỈ trả về duy nhất một mảng JSON hợp lệ (không giải thích thêm) với mỗi phần tử gồm:
    - "title": string (tiêu đề tiếng Việt chuẩn, VD: "LỜI MỞ ĐẦU", "CHƯƠNG 1. CƠ SỞ LÝ LUẬN", "TÀI LIỆU THAM KHẢO (${session.citationStyle})")
@@ -921,7 +921,7 @@ YÊU CẦU BẮT BUỘC:
 
 REQUIREMENTS:
 1. Divide the paper into well-proportioned sections following a standard university thesis / academic report Table of Contents structure (e.g., numbered H1 chapters such as "1. Introduction", "2. Literature Review & Theoretical Framework", "3. Empirical Analysis & Discussion", "4. Strategic Recommendations", "5. Conclusion", plus H2 sub-sections like "2.1 ...", "2.2 ..." for longer papers, and a final "References (${session.citationStyle})" section).
-2. The sum of "targetWords" across all prose sections should equal approximately ${session.targetWordCount} words (set targetWords for the References section to ~150-300).
+2. The sum of "targetWords" across all body prose sections (EXCLUDING References) should equal approximately ${session.targetWordCount} words. Set "targetWords": 0 for the References section (unlimited words).
 3. In "guidanceNotes" for each major H1 body section (>= 400 words), specify 2-3 numbered H2 sub-headings (e.g. "Include sub-headings: 2.1 ..., 2.2 ...") so the automatic Word Table of Contents captures both H1 and H2 levels cleanly. DO NOT use markdown '#' or '##' hashes in headings.
 4. Return ONLY a valid JSON array (no extra commentary) where each item has:
    - "title": string (exact numbered academic heading, e.g. "1. Introduction", "2. Theoretical Framework & Literature Review", "References (${session.citationStyle})")
@@ -949,6 +949,13 @@ Example JSON schema:
   });
 
   return parseAiOutlineJson(rawText, session.targetWordCount, session.citationStyle);
+}
+
+export function isReferencesSectionTitle(title: string): boolean {
+  const normalized = (title || '').replace(/^\d+(\.\d+)*\.?\s*/, '').trim();
+  return /^(references|bibliography|works cited|tài liệu tham khảo|danh mục tài liệu tham khảo)/i.test(
+    normalized
+  );
 }
 
 export function parseAiOutlineJson(
@@ -983,12 +990,14 @@ export function parseAiOutlineJson(
           item.headingLevel === 'h2' || item.headingLevel === 'h3'
             ? item.headingLevel
             : 'h1';
+        const cleanTitle = (item.title || `Section ${idx + 1}`).trim();
+        const isRef = isReferencesSectionTitle(cleanTitle);
         return {
           id: `sec_${Date.now()}_${idx}`,
           order: idx + 1,
-          title: (item.title || `Section ${idx + 1}`).trim(),
+          title: cleanTitle,
           headingLevel: level,
-          targetWords: Math.max(80, Number(item.targetWords) || 300),
+          targetWords: isRef ? 0 : Math.max(80, Number(item.targetWords) || 300),
           guidanceNotes: stripMarkdownHashesFromText((item.guidanceNotes || '').trim()),
           content: '',
           status: 'idle',
@@ -1055,8 +1064,8 @@ export function parseAiOutlineJson(
       order: 5,
       title: `References (${citationStyle})`,
       headingLevel: 'h1',
-      targetWords: 200,
-      guidanceNotes: `Complete list of all scholarly sources cited across all sections above formatted strictly in ${citationStyle}.`,
+      targetWords: 0,
+      guidanceNotes: `Complete list of all scholarly sources cited across all sections above formatted strictly in ${citationStyle} (unlimited word count).`,
       content: '',
       status: 'idle',
     },
@@ -1933,7 +1942,7 @@ Return ONLY the ${batch.length} full reference entries (one per line, blank line
           systemPrompt: leanRefSystemPrompt,
           userPrompt: batchPrompt,
           enableWebSearch,
-          maxOutputTokens: 900,
+          maxOutputTokens: 1800,
           reasoningEffort: 'low',
           signal,
         });
