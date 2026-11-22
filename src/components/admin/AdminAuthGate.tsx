@@ -476,6 +476,23 @@ export function AdminAuthGate({
                       </p>
                     </div>
 
+                    {/* Clear Admin-Only Notice + 1-click redirect to Client Portal */}
+                    <div className="rounded-xl bg-amber-50/90 border border-amber-200/90 px-3.5 py-2.5 text-xs text-amber-950 leading-relaxed flex items-start gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                      <p>
+                        <span className="font-bold">Lưu ý:</span> Trang đăng nhập này{' '}
+                        <span className="font-semibold">dành cho Quản trị viên</span>. Nếu bạn là khách hàng, vui lòng nhấn{' '}
+                        <button
+                          type="button"
+                          onClick={onSwitchToClientPortal}
+                          className="font-bold text-[#12489B] underline decoration-[#12489B]/60 underline-offset-2 hover:text-[#0B2559]"
+                        >
+                          vào đây
+                        </button>{' '}
+                        để chuyển tới trang của khách hàng.
+                      </p>
+                    </div>
+
                     <form onSubmit={handleEmailLogin} className="space-y-4">
                       <div>
                         <label className="block text-xs font-medium text-zinc-700 mb-1.5">
