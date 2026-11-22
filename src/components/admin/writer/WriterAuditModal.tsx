@@ -167,17 +167,22 @@ export function WriterAuditModal({
                       : 'bg-amber-50/70 border-amber-200'
                   }`}
                 >
-                  <div
-                    className={`text-3xl font-black font-mono tabular-nums ${
-                      report.verdict === 'pass'
-                        ? 'text-emerald-700'
-                        : report.verdict === 'critical_errors'
-                        ? 'text-rose-700'
-                        : 'text-amber-700'
-                    }`}
-                  >
-                    {report.score}
-                    <span className="text-sm font-semibold opacity-70">/100</span>
+                  <div className="shrink-0">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                      Điểm QA
+                    </div>
+                    <div
+                      className={`text-3xl font-black font-mono tabular-nums leading-none mt-0.5 ${
+                        report.verdict === 'pass'
+                          ? 'text-emerald-700'
+                          : report.verdict === 'critical_errors'
+                          ? 'text-rose-700'
+                          : 'text-amber-700'
+                      }`}
+                    >
+                      {report.score}
+                      <span className="text-sm font-semibold opacity-70">/100</span>
+                    </div>
                   </div>
                   <div className="min-w-0">
                     <div
@@ -192,8 +197,8 @@ export function WriterAuditModal({
                       {report.verdict === 'pass'
                         ? 'Đạt chuẩn giao khách'
                         : report.verdict === 'critical_errors'
-                        ? 'Phát hiện lỗi nghiêm trọng'
-                        : 'Cần rà soát nhẹ'}
+                        ? `Phát hiện ${report.issues.length} lỗi cần sửa`
+                        : `Cần rà soát ${report.issues.length} mục`}
                     </div>
                     <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
                       {criticalCount} lỗi nghiêm trọng · {warningCount} cảnh báo

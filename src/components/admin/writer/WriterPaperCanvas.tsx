@@ -249,7 +249,7 @@ export function WriterPaperCanvas({
                   : 'bg-amber-600 text-white'
               }`}
             >
-              {qaBanner.score}/100
+              Điểm QA: {qaBanner.score}/100
             </span>
 
             <div className="min-w-0">

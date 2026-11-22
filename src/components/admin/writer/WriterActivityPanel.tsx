@@ -350,7 +350,9 @@ export function WriterActivityPanel({
             >
               {lastAuditScore === null
                 ? 'Rà lỗi'
-                : `${lastAuditScore}/100`}
+                : lastAuditCriticalCount > 0
+                ? `${lastAuditCriticalCount} lỗi · ${lastAuditScore}đ`
+                : `${lastAuditScore}đ`}
             </span>
           </button>
         )}
