@@ -1066,6 +1066,514 @@ function buildSmartPriorContext(
   return `${blocks.join('\n\n')}${citationFooter}`.trim();
 }
 
+// ---------------------------------------------------------------------------
+// Crossref-Grounded References Engine
+// Builds every reference entry from REAL Crossref metadata (title, journal,
+// volume, pages, DOI) instead of letting the LLM guess them.
+// ---------------------------------------------------------------------------
+
+export interface ParsedCitationKey {
+  raw: string;
+  surnames: string[];
+  firstSurname: string;
+  year: string;
+}
+
+function normName(raw: string): string {
+  return (raw || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ı/g, 'i')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+}
+
+export function parseCitationKey(cite: string): ParsedCitationKey | null {
+  const inner = cite.replace(/^\(|\)$/g, '').trim();
+  const yearMatch = inner.match(/(?:19|20)\d{2}[a-z]?/);
+  if (!yearMatch) return null;
+  const year = yearMatch[0].slice(0, 4);
+  const authorPart = inner
+    .slice(0, yearMatch.index)
+    .replace(/\(/g, ' ')
+    .replace(/\bet\s+al\.?/gi, ' ')
+    .replace(/[,\s]+$/g, '')
+    .trim();
+  const surnames = authorPart
+    .split(/\s*(?:,|&|\band\b|\bvà\b)\s*/i)
+    .map((s) => s.trim())
+    .filter((s) => /^[A-ZÀ-Ỹ]/.test(s) && s.length >= 2);
+  if (surnames.length === 0) return null;
+  return { raw: cite, surnames, firstSurname: surnames[0], year };
+}
+
+interface CrossrefAuthor {
+  family?: string;
+  given?: string;
+  name?: string;
+}
+
+interface CrossrefWorkMeta {
+  doi?: string;
+  title: string;
+  authors: CrossrefAuthor[];
+  year: number;
+  containerTitle?: string;
+  volume?: string;
+  issue?: string;
+  page?: string;
+  type?: string;
+  publisher?: string;
+}
+
+function cleanCrossrefText(raw?: string): string {
+  return (raw || '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function surnameMatches(citedSurname: string, family: string): boolean {
+  const a = normName(citedSurname);
+  const b = normName(family);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  // Handle compound surnames: "Vardal Ocaklı" vs "Ocaklı", "Rakıcıoğlu-Söylemez" vs "Rakıcıoğlu Söylemez"
+  const aParts = citedSurname.split(/[\s-]+/).map(normName).filter((p) => p.length >= 3);
+  const bParts = family.split(/[\s-]+/).map(normName).filter((p) => p.length >= 3);
+  return aParts.some((p) => bParts.includes(p));
+}
+
+async function searchCrossrefWorkForCitation(
+  key: ParsedCitationKey,
+  bibliographicHint: string,
+  signal?: AbortSignal
+): Promise<CrossrefWorkMeta | null> {
+  const y = Number(key.year);
+  const params = new URLSearchParams({
+    'query.author': key.surnames.join(' '),
+    rows: '8',
+    select:
+      'DOI,title,author,issued,published,container-title,volume,issue,page,type,publisher',
+    filter: `from-pub-date:${y - 1},until-pub-date:${y + 1}`,
+  });
+  if (bibliographicHint.trim()) {
+    params.set('query.bibliographic', bibliographicHint.trim().slice(0, 220));
+  }
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 8000);
+  const onParentAbort = () => controller.abort();
+  signal?.addEventListener('abort', onParentAbort);
+
+  try {
+    const res = await fetch(`https://api.crossref.org/works?${params.toString()}`, {
+      headers: { Accept: 'application/json' },
+      signal: controller.signal,
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      message?: {
+        items?: Array<{
+          DOI?: string;
+          title?: string[];
+          author?: CrossrefAuthor[];
+          issued?: { 'date-parts'?: number[][] };
+          published?: { 'date-parts'?: number[][] };
+          'container-title'?: string[];
+          volume?: string;
+          issue?: string;
+          page?: string;
+          type?: string;
+          publisher?: string;
+        }>;
+      };
+    };
+    const items = json?.message?.items || [];
+    const candidates: Array<{ meta: CrossrefWorkMeta; score: number }> = [];
+
+    for (const it of items) {
+      const authors = it.author || [];
+      const title = cleanCrossrefText(it.title?.[0]);
+      const itemYear =
+        it.issued?.['date-parts']?.[0]?.[0] ||
+        it.published?.['date-parts']?.[0]?.[0] ||
+        0;
+      if (!title || authors.length === 0 || !itemYear) continue;
+
+      const firstFamily = authors[0]?.family || authors[0]?.name || '';
+      if (!surnameMatches(key.firstSurname, firstFamily)) continue;
+
+      // If the in-text citation names 2+ authors, every named co-author must exist in Crossref's author list
+      const coAuthorsOk = key.surnames
+        .slice(1)
+        .every((s) => authors.some((a) => surnameMatches(s, a.family || a.name || '')));
+      if (!coAuthorsOk) continue;
+
+      const yearDiff = Math.abs(itemYear - y);
+      if (yearDiff > 1) continue;
+
+      candidates.push({
+        meta: {
+          doi: it.DOI,
+          title,
+          authors,
+          year: itemYear,
+          containerTitle: cleanCrossrefText(it['container-title']?.[0]),
+          volume: it.volume,
+          issue: it.issue,
+          page: it.page,
+          type: it.type,
+          publisher: it.publisher,
+        },
+        score: (yearDiff === 0 ? 10 : 0) + (it.type === 'journal-article' ? 2 : 0),
+      });
+    }
+
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) => b.score - a.score);
+    // Keep the citation year exactly as written in the body so in-text & list stay 1-to-1
+    return { ...candidates[0].meta, year: y };
+  } catch {
+    return null;
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', onParentAbort);
+  }
+}
+
+function initialsOf(given: string | undefined, withSpaces: boolean): string {
+  if (!given) return '';
+  const parts = given
+    .replace(/\./g, ' ')
+    .split(/[\s]+/)
+    .filter(Boolean)
+    .map((p) =>
+      p
+        .split('-')
+        .map((h) => `${h.charAt(0).toUpperCase()}.`)
+        .join('-')
+    );
+  return parts.join(withSpaces ? ' ' : '');
+}
+
+function formatCrossrefReference(
+  work: CrossrefWorkMeta,
+  style: string
+): string {
+  const doiUrl = work.doi ? `https://doi.org/${work.doi}` : '';
+  const authors = work.authors.slice(0, 20);
+  const fam = (a: CrossrefAuthor) => cleanCrossrefText(a.family || a.name || '');
+  const pages = (work.page || '').replace(/-/g, '–');
+  const isBook = work.type === 'book' || work.type === 'monograph';
+  const isChapter = work.type === 'book-chapter';
+
+  if (style === 'APA') {
+    const names = authors.map((a) => {
+      const ini = initialsOf(a.given, true);
+      return ini ? `${fam(a)}, ${ini}` : fam(a);
+    });
+    const authorStr =
+      names.length <= 1
+        ? names[0] || ''
+        : `${names.slice(0, -1).join(', ')}, & ${names[names.length - 1]}`;
+    if (isBook) {
+      return `${authorStr} (${work.year}). ${work.title}. ${work.publisher || ''}.${doiUrl ? ` ${doiUrl}` : ''}`.replace(/\s+\./g, '.');
+    }
+    const volIssue = `${work.volume || ''}${work.issue ? `(${work.issue})` : ''}`;
+    return `${authorStr} (${work.year}). ${work.title}. ${work.containerTitle || work.publisher || ''}${
+      volIssue ? `, ${volIssue}` : ''
+    }${pages ? `, ${pages}` : ''}.${doiUrl ? ` ${doiUrl}` : ''}`;
+  }
+
+  if (style === 'MLA') {
+    const first = authors[0];
+    const firstStr = first
+      ? `${fam(first)}${first.given ? `, ${cleanCrossrefText(first.given)}` : ''}`
+      : '';
+    const authorStr =
+      authors.length >= 3
+        ? `${firstStr}, et al.`
+        : authors.length === 2
+        ? `${firstStr}, and ${cleanCrossrefText(authors[1].given || '')} ${fam(authors[1])}`.replace(/\s+/g, ' ')
+        : firstStr;
+    return `${authorStr}. "${work.title}." ${work.containerTitle || work.publisher || ''}${
+      work.volume ? `, vol. ${work.volume}` : ''
+    }${work.issue ? `, no. ${work.issue}` : ''}, ${work.year}${pages ? `, pp. ${pages}` : ''}.${
+      doiUrl ? ` ${doiUrl}.` : ''
+    }`;
+  }
+
+  if (style === 'IEEE') {
+    const names = authors.map((a) => {
+      const ini = initialsOf(a.given, true);
+      return ini ? `${ini} ${fam(a)}` : fam(a);
+    });
+    const authorStr =
+      names.length <= 2
+        ? names.join(' and ')
+        : `${names.slice(0, -1).join(', ')}, and ${names[names.length - 1]}`;
+    return `${authorStr}, "${work.title}," ${work.containerTitle || work.publisher || ''}${
+      work.volume ? `, vol. ${work.volume}` : ''
+    }${work.issue ? `, no. ${work.issue}` : ''}${pages ? `, pp. ${pages}` : ''}, ${work.year}${
+      work.doi ? `, doi: ${work.doi}` : ''
+    }.`;
+  }
+
+  // Harvard (Cite Them Right) default
+  const names = authors.map((a) => {
+    const ini = initialsOf(a.given, false);
+    return ini ? `${fam(a)}, ${ini}` : fam(a);
+  });
+  const authorStr =
+    names.length <= 1
+      ? names[0] || ''
+      : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  if (isBook) {
+    return `${authorStr} (${work.year}) ${work.title}. ${work.publisher || ''}.${
+      doiUrl ? ` Available at: ${doiUrl}.` : ''
+    }`.replace(/\s+\./g, '.');
+  }
+  if (isChapter) {
+    return `${authorStr} (${work.year}) '${work.title}', in ${work.containerTitle || ''}. ${
+      work.publisher || ''
+    }${pages ? `, pp. ${pages}` : ''}.${doiUrl ? ` Available at: ${doiUrl}.` : ''}`.replace(/\s+\./g, '.');
+  }
+  const volIssue = `${work.volume || ''}${work.issue ? `(${work.issue})` : ''}`;
+  return `${authorStr} (${work.year}) '${work.title}', ${work.containerTitle || work.publisher || ''}${
+    volIssue ? `, ${volIssue}` : ''
+  }${pages ? `, pp. ${pages}` : ''}.${doiUrl ? ` Available at: ${doiUrl}.` : ''}`;
+}
+
+/** Extracts the title-ish portion of a reference entry (text after the year, before the journal). */
+export function extractReferenceTitle(entry: string): string {
+  const afterYear = entry.split(/\((?:19|20)\d{2}[a-z]?\)\.?/)[1] || '';
+  const quoted = afterYear.match(/['‘"“]([^'’"”]{12,})['’"”]/);
+  const raw = quoted ? quoted[1] : afterYear.split(/\.\s|,\s(?=[A-Z])/)[0] || '';
+  return raw.trim();
+}
+
+function normTitleKey(raw: string): string {
+  return normName(raw).slice(0, 60);
+}
+
+function referenceStartsWithSurname(entry: string, surname: string): boolean {
+  const head = entry.slice(0, Math.max(40, surname.length + 25));
+  const firstChunk = head.split(/[,(]/)[0] || '';
+  return surnameMatches(surname, firstChunk);
+}
+
+export interface CrossrefReferencesResult {
+  content: string;
+  verifiedCount: number;
+  keptUnverifiedCount: number;
+  droppedDuplicateCount: number;
+  unverifiedCitations: string[];
+  missingCitations: string[];
+  changeSummary: string;
+}
+
+/**
+ * Rebuilds the full References list 1-to-1 with in-text citations:
+ * - Each cited work is looked up on Crossref; when found, the entry is rebuilt from REAL metadata.
+ * - When not on Crossref (e.g. theses), exactly ONE best existing entry is kept (DOIs stripped unless verified).
+ * - Variant duplicates (same surname, different initials/years), entries with a reused title,
+ *   or entries whose title is the assignment's own topic are dropped.
+ */
+export async function buildCrossrefVerifiedReferences(
+  session: WriterSession,
+  existingRefText: string,
+  onProgress?: (label: string) => void,
+  signal?: AbortSignal
+): Promise<CrossrefReferencesResult> {
+  const refSectionIdx = session.outline.findIndex((s) =>
+    /^(references|bibliography|works cited|tài liệu tham khảo|danh mục tài liệu tham khảo)/i.test(
+      s.title.replace(/^\d+(\.\d+)*\.?\s*/, '').trim()
+    )
+  );
+  const bodyText = session.outline
+    .filter((_, idx) => idx !== refSectionIdx)
+    .map((s) => s.content || '')
+    .join('\n\n');
+
+  const citations = extractInTextCitations(bodyText);
+  const keys: ParsedCitationKey[] = [];
+  const seenKeys = new Set<string>();
+  for (const c of citations) {
+    const k = parseCitationKey(c);
+    if (!k) continue;
+    const id = `${normName(k.firstSurname)}_${k.year}`;
+    if (seenKeys.has(id)) continue;
+    seenKeys.add(id);
+    keys.push(k);
+  }
+
+  const existingEntries = existingRefText
+    .split(/\r?\n\s*\r?\n+/)
+    .map((e) => e.replace(/\r?\n+/g, ' ').replace(/\s{2,}/g, ' ').trim())
+    .filter((e) => e.length >= 15);
+
+  const topicKey = normTitleKey(session.topic || session.title || '');
+  const titleCounts = new Map<string, number>();
+  for (const e of existingEntries) {
+    const t = normTitleKey(extractReferenceTitle(e));
+    if (t.length >= 15) titleCounts.set(t, (titleCounts.get(t) || 0) + 1);
+  }
+  const isPoisonedTitle = (entry: string): boolean => {
+    const t = normTitleKey(extractReferenceTitle(entry));
+    if (t.length < 15) return false;
+    if (topicKey.length >= 15 && (t.startsWith(topicKey.slice(0, 40)) || topicKey.startsWith(t.slice(0, 40)))) {
+      return true;
+    }
+    return (titleCounts.get(t) || 0) > 1;
+  };
+  const isStubEntry = (entry: string): boolean => {
+    const afterYear = entry.split(/\((?:19|20)\d{2}[a-z]?\)\.?/)[1] || '';
+    return afterYear.replace(/[^A-Za-zÀ-ỹ]/g, '').length < 12;
+  };
+
+  const topicHint = (session.topic || session.title || '').slice(0, 120);
+  const finalEntries: string[] = [];
+  const usedExisting = new Set<number>();
+  const unverifiedCitations: string[] = [];
+  const missingCitations: string[] = [];
+  let verifiedCount = 0;
+  let keptUnverifiedCount = 0;
+
+  const CONCURRENCY = 4;
+  for (let i = 0; i < keys.length; i += CONCURRENCY) {
+    if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+    const batch = keys.slice(i, i + CONCURRENCY);
+    onProgress?.(
+      `Đang tra cứu Crossref để lấy metadata thật cho nguồn ${i + 1}–${Math.min(
+        keys.length,
+        i + CONCURRENCY
+      )}/${keys.length}...`
+    );
+
+    const results = await Promise.all(
+      batch.map(async (key) => {
+        // Find existing entries for this exact citation (first surname + year)
+        const matchingIdx = existingEntries
+          .map((e, idx) => ({ e, idx }))
+          .filter(
+            ({ e }) =>
+              referenceStartsWithSurname(e, key.firstSurname) &&
+              e.includes(`(${key.year}`)
+          );
+        const cleanHintEntry = matchingIdx.find(({ e }) => !isPoisonedTitle(e) && !isStubEntry(e));
+        const hint = cleanHintEntry
+          ? `${extractReferenceTitle(cleanHintEntry.e)} ${topicHint}`
+          : topicHint;
+
+        let work = await searchCrossrefWorkForCitation(key, hint, signal);
+        if (!work && hint !== topicHint) {
+          work = await searchCrossrefWorkForCitation(key, topicHint, signal);
+        }
+        return { key, work, matchingIdx, cleanHintEntry };
+      })
+    );
+
+    for (const { key, work, matchingIdx, cleanHintEntry } of results) {
+      matchingIdx.forEach(({ idx }) => usedExisting.add(idx));
+      if (work) {
+        finalEntries.push(formatCrossrefReference(work, session.citationStyle));
+        verifiedCount++;
+        continue;
+      }
+      // Not on Crossref: keep ONE best existing entry (prefer non-stub, non-poisoned), strip unverified DOIs
+      const fallback =
+        cleanHintEntry ||
+        matchingIdx.find(({ e }) => !isStubEntry(e)) ||
+        matchingIdx[0];
+      if (fallback) {
+        let kept = fallback.e;
+        const dois = kept.match(/10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+/g) || [];
+        for (const rawDoi of dois) {
+          const check = await verifyDoiWithCrossref(normalizeExtractedDoi(rawDoi), signal);
+          const ok =
+            check.exists &&
+            !check.networkError &&
+            (!check.firstAuthorSurname ||
+              surnameMatches(key.firstSurname, check.firstAuthorSurname));
+          if (!ok && !check.networkError) {
+            kept = kept
+              .replace(
+                new RegExp(
+                  `(?:Available at:\\s*)?(?:https?:\\/\\/(?:dx\\.)?doi\\.org\\/|doi:\\s*)?${escapeRegExpForDoi(
+                    rawDoi
+                  )}[.)\\],;]*`,
+                  'gi'
+                ),
+                ''
+              )
+              .trim();
+          }
+        }
+        kept = kept
+          .replace(/\s*,\s*\./g, '.')
+          .replace(/\.\s*\./g, '.')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+        if (!/[.!?)\]]$/.test(kept)) kept = `${kept}.`;
+        finalEntries.push(kept);
+        keptUnverifiedCount++;
+        if (isPoisonedTitle(fallback.e) || isStubEntry(fallback.e)) {
+          unverifiedCitations.push(key.raw);
+        }
+      } else {
+        missingCitations.push(key.raw);
+      }
+    }
+  }
+
+  // Keep orphan entries (not matched to any detected citation) only if they are clean & not variant duplicates
+  const citedSurnames = keys.map((k) => k.firstSurname);
+  let droppedDuplicateCount = 0;
+  existingEntries.forEach((e, idx) => {
+    if (usedExisting.has(idx)) {
+      return;
+    }
+    const isVariantOfCited = citedSurnames.some((s) => referenceStartsWithSurname(e, s));
+    if (isVariantOfCited || isPoisonedTitle(e) || isStubEntry(e)) {
+      droppedDuplicateCount++;
+      return;
+    }
+    finalEntries.push(e);
+  });
+  // Count dropped duplicates from multi-matched citations too
+  droppedDuplicateCount += Math.max(0, usedExisting.size - keptUnverifiedCount - verifiedCount);
+
+  const dedup: string[] = [];
+  const seen = new Set<string>();
+  for (const e of finalEntries) {
+    const k = normName(e).slice(0, 70);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    dedup.push(e);
+  }
+  if (session.citationStyle !== 'IEEE') {
+    dedup.sort((a, b) => a.localeCompare(b, 'vi', { sensitivity: 'base' }));
+  }
+
+  const parts: string[] = [`xác minh & dựng lại ${verifiedCount} nguồn từ metadata thật trên Crossref`];
+  if (droppedDuplicateCount > 0) parts.push(`loại ${droppedDuplicateCount} nguồn trùng/biến thể/gán sai tên bài`);
+  if (keptUnverifiedCount > 0) parts.push(`giữ ${keptUnverifiedCount} nguồn không có trên Crossref (luận văn/sách) sau khi gỡ DOI sai`);
+  if (unverifiedCitations.length + missingCitations.length > 0) {
+    parts.push(`${unverifiedCitations.length + missingCitations.length} trích dẫn cần kiểm tra thủ công`);
+  }
+
+  return {
+    content: dedup.join('\n\n'),
+    verifiedCount,
+    keptUnverifiedCount,
+    droppedDuplicateCount,
+    unverifiedCitations,
+    missingCitations,
+    changeSummary: `Đã ${parts.join('; ')}.`,
+  };
+}
+
 export async function generateSectionWithAi(
   session: WriterSession,
   targetSectionId: string,
@@ -1241,7 +1749,25 @@ Return ONLY the ${batch.length} full reference entries (one per line, blank line
         );
       }
 
-      return mergeAndSortRefs(accumulatedEntries);
+      const aiDraftRefs = mergeAndSortRefs(accumulatedEntries);
+      // Ground every entry on REAL Crossref metadata (fixes reused titles, stub entries, fake DOIs, variant duplicates)
+      try {
+        onPartialText?.(aiDraftRefs, 'Đang đối chiếu Crossref để xác minh từng nguồn...');
+        const verified = await buildCrossrefVerifiedReferences(
+          session,
+          aiDraftRefs,
+          (label) => onPartialText?.(aiDraftRefs, label),
+          signal
+        );
+        if (verified.content.trim()) {
+          return verified.content;
+        }
+      } catch (err) {
+        if (err && typeof err === 'object' && (err as { name?: string }).name === 'AbortError') {
+          throw err;
+        }
+      }
+      return aiDraftRefs;
     }
 
     // Fallback when no in-text citations were drafted yet: 1 lean fast call
@@ -1675,7 +2201,8 @@ export async function reviseOrCompleteSectionWithAi(
   skills: SkillDocument[],
   profile: AiProviderProfile,
   enableWebSearch?: boolean,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  auditFixMode?: boolean
 ): Promise<{ content: string; changeSummary: string }> {
   const sectionIdx = session.outline.findIndex((s) => s.id === targetSectionId);
   if (sectionIdx === -1) {
@@ -1688,8 +2215,9 @@ export async function reviseOrCompleteSectionWithAi(
     'body'
   );
 
-  const actionGoal =
-    action === 'expand'
+  const actionGoal = auditFixMode
+    ? `You are fixing defects flagged by the academic QA examiner. FIXING EVERY LISTED DEFECT TAKES PRIORITY over preserving the draft wording: you MAY rename sub-headings, split content into correctly titled sub-sections (e.g. add the missing "x.2"), move paragraphs, and rewrite passages so every sub-heading accurately describes its body. Keep all correct arguments, facts and ${session.citationStyle} citations (do not invent new authors). Keep approximately ${targetSection.targetWords} words.`
+    : action === 'expand'
       ? `PRESERVE the author's core ideas and good passages from the EXISTING DRAFT below, then EXPAND & COMPLETE this section thoroughly to reach approximately ${targetSection.targetWords} words with deeper academic analysis, transitions, and authentic ${session.citationStyle} citations.`
       : `PRESERVE the author's core structure and meaning from the EXISTING DRAFT below, while UPGRADING academic tone, fixing grammar/logic/rubric gaps, and strengthening ${session.citationStyle} citations (target ~${targetSection.targetWords} words).`;
 
@@ -1922,18 +2450,28 @@ export async function runDeterministicPaperAudit(
 
   // 2. Check orphan sub-heading numbering (e.g., 4.1 without 4.2)
   const subByParent = new Map<string, string[]>();
+  const subOwnerSection = new Map<string, WriterOutlineSection>();
   for (const sec of bodySections) {
-    const m = sec.title.trim().match(/^(\d+)\.(\d+)\b/);
-    if (m) {
+    const candidates = [
+      sec.title.trim(),
+      ...(sec.content || '')
+        .split(/\r?\n/)
+        .map((l) => l.replace(/^[ \t]*#{1,6}[ \t]*/, '').trim())
+        .filter((l) => l.length > 3 && l.length < 140 && /^\d+\.\d+\s+[A-Za-zÀ-ỹ]/.test(l)),
+    ];
+    for (const heading of candidates) {
+      const m = heading.match(/^(\d+)\.(\d+)\b/);
+      if (!m) continue;
       const parent = m[1];
       const list = subByParent.get(parent) || [];
-      list.push(sec.title.trim());
+      if (!list.includes(heading)) list.push(heading);
       subByParent.set(parent, list);
+      subOwnerSection.set(heading, sec);
     }
   }
   for (const [parentNum, subs] of subByParent.entries()) {
     if (subs.length === 1 && /^(\d+)\.1\b/.test(subs[0])) {
-      const targetSec = bodySections.find((s) => s.title.trim() === subs[0]);
+      const targetSec = subOwnerSection.get(subs[0]);
       pushIssue({
         severity: 'warning',
         category: 'structure_and_content',
@@ -1942,7 +2480,8 @@ export async function runDeterministicPaperAudit(
           'Trong học thuật, khi đã chia tiểu mục (ví dụ 4.1) thì nên có ít nhất tiểu mục 4.2 hoặc gộp thẳng vào mục chính.',
         sectionId: targetSec?.id,
         sectionTitle: targetSec?.title,
-        autoFixable: false,
+        autoFixable: Boolean(targetSec),
+        fixHint: `Kiểm tra tiêu đề "${subs[0]}" có khớp nội dung bên dưới không; tách phần còn lại thành tiểu mục ${parentNum}.2 với tiêu đề đúng nội dung (ví dụ phân biệt Personal vs Social facilitators).`,
       });
     }
   }
@@ -2020,6 +2559,117 @@ export async function runDeterministicPaperAudit(
           fixHint: `Loại bỏ DOI bị trùng ${lowerDoi} khỏi các tác giả không khớp và xây dựng lại danh mục References chuẩn.`,
         });
       }
+    }
+
+    // 3a-2. Same article title reused for different authors / assignment topic pasted as a title / stub entries
+    const topicKeyAudit = normTitleKey(session.topic || session.title || '');
+    const titleToEntries = new Map<string, string[]>();
+    for (const entry of refEntries) {
+      const t = normTitleKey(extractReferenceTitle(entry));
+      if (t.length < 15) continue;
+      const list = titleToEntries.get(t) || [];
+      list.push(entry);
+      titleToEntries.set(t, list);
+    }
+    for (const [, list] of titleToEntries.entries()) {
+      if (list.length > 1) {
+        pushIssue({
+          severity: 'critical',
+          category: 'doi_and_sources',
+          title: `Cùng 1 tên bài báo bị gán cho ${list.length} tác giả khác nhau`,
+          detail: `Tên bài "${extractReferenceTitle(list[0]).slice(0, 90)}" xuất hiện ở: ${list
+            .map((e) => e.split('(')[0].trim())
+            .slice(0, 6)
+            .join('; ')}.`,
+          sectionId: refSection.id,
+          sectionTitle: refSection.title,
+          autoFixable: true,
+          fixHint: 'Dựng lại từng nguồn từ metadata thật trên Crossref (tên bài, tạp chí, số trang, DOI).',
+        });
+      }
+    }
+    const topicPasted = refEntries.filter((e) => {
+      const t = normTitleKey(extractReferenceTitle(e));
+      return (
+        t.length >= 15 &&
+        topicKeyAudit.length >= 15 &&
+        (t.startsWith(topicKeyAudit.slice(0, 40)) || topicKeyAudit.startsWith(t.slice(0, 40)))
+      );
+    });
+    if (topicPasted.length > 0) {
+      pushIssue({
+        severity: 'critical',
+        category: 'doi_and_sources',
+        title: `${topicPasted.length} nguồn bị lấy nguyên tên đề tài bài làm làm tên bài báo`,
+        detail: `Các nguồn: ${topicPasted.map((e) => e.split('(')[0].trim()).slice(0, 6).join('; ')}.`,
+        sectionId: refSection.id,
+        sectionTitle: refSection.title,
+        autoFixable: true,
+        fixHint: 'Thay bằng tên bài thật của từng tác giả lấy từ Crossref.',
+      });
+    }
+    const stubEntries = refEntries.filter((e) => {
+      const afterYear = e.split(/\((?:19|20)\d{2}[a-z]?\)\.?/)[1];
+      return afterYear !== undefined && afterYear.replace(/[^A-Za-zÀ-ỹ]/g, '').length < 12;
+    });
+    if (stubEntries.length > 0) {
+      pushIssue({
+        severity: 'critical',
+        category: 'doi_and_sources',
+        title: `${stubEntries.length} nguồn cụt lủn (chỉ có tác giả + năm, thiếu tên bài/tạp chí)`,
+        detail: `Ví dụ: ${stubEntries.slice(0, 4).join(' | ')}`,
+        sectionId: refSection.id,
+        sectionTitle: refSection.title,
+        autoFixable: true,
+        fixHint: 'Bổ sung đầy đủ tên bài, tạp chí, tập/số, trang từ metadata Crossref.',
+      });
+    }
+    // Variant duplicates: same first surname listed multiple times with different initials/years
+    const surnameBuckets = new Map<string, string[]>();
+    for (const e of refEntries) {
+      const sur = normName(e.split(/[,(]/)[0] || '');
+      if (sur.length < 3) continue;
+      const list = surnameBuckets.get(sur) || [];
+      list.push(e);
+      surnameBuckets.set(sur, list);
+    }
+    for (const [, list] of surnameBuckets.entries()) {
+      if (list.length < 2) continue;
+      const titles = new Set(list.map((e) => normTitleKey(extractReferenceTitle(e))));
+      const authorsHeads = new Set(list.map((e) => e.split('(')[0].replace(/\s+/g, '')));
+      if (titles.size < list.length || authorsHeads.size > 1) {
+        pushIssue({
+          severity: 'warning',
+          category: 'doi_and_sources',
+          title: `Một tác giả bị tách thành ${list.length} nguồn biến thể khác nhau`,
+          detail: list.map((e) => e.slice(0, 70)).join(' | '),
+          sectionId: refSection.id,
+          sectionTitle: refSection.title,
+          autoFixable: true,
+          fixHint: 'Gộp về đúng 1 nguồn thật, khớp 1-1 với trích dẫn trong bài.',
+        });
+      }
+    }
+
+    // 3a-3. Thesis type contradiction between body and References (doctoral vs master's)
+    const bodyAll = bodySections.map((s) => s.content || '').join('\n');
+    const bodySaysDoctoral = /\b(doctoral (thesis|dissertation)|ph\.?d\.? (thesis|dissertation)|luận án tiến sĩ)\b/i.test(bodyAll);
+    const bodySaysMaster = /\b(master'?s (thesis|dissertation)|ma thesis|luận văn thạc sĩ)\b/i.test(bodyAll);
+    const refSaysDoctoral = /\b(doctoral|ph\.?d\.?)\b[^.]{0,30}\b(thesis|dissertation)\b/i.test(refSection.content);
+    const refSaysMaster = /\b(master'?s?|ma)\b[^.]{0,30}\b(thesis|dissertation)\b/i.test(refSection.content);
+    if ((bodySaysDoctoral && refSaysMaster && !bodySaysMaster) || (bodySaysMaster && refSaysDoctoral && !bodySaysDoctoral)) {
+      pushIssue({
+        severity: 'critical',
+        category: 'structure_and_content',
+        title: 'Mâu thuẫn loại luận văn giữa nội dung bài và References',
+        detail: bodySaysDoctoral
+          ? 'Thân bài gọi nghiên cứu là luận án Tiến sĩ (doctoral thesis) nhưng References lại ghi Master\'s thesis.'
+          : 'Thân bài gọi nghiên cứu là luận văn Thạc sĩ nhưng References lại ghi Doctoral/PhD thesis.',
+        sectionId: refSection.id,
+        sectionTitle: refSection.title,
+        autoFixable: true,
+        fixHint: 'Đối chiếu tài liệu gốc trong đề bài/tài liệu đính kèm rồi thống nhất cả thân bài và References.',
+      });
     }
 
     // 3b. Live Crossref DOI verification (unique non-suspicious DOIs, max 20, batch of 4)
@@ -2192,7 +2842,24 @@ export async function runAiPaperAudit(
         : text.length > 900
         ? `${text.slice(0, 480)}\n[...]\n${text.slice(-360)}`
         : text;
-      return `--- SECTION ${idx + 1} (id: ${sec.id}) | TITLE: "${sec.title}" | WORDS: ${words}/${sec.targetWords} ---\n${preview || '[EMPTY]'}`;
+      const lines = text.split(/\r?\n/);
+      const subHeadingDigest: string[] = [];
+      if (!isRef) {
+        lines.forEach((line, li) => {
+          const clean = line.replace(/^[ \t]*#{1,6}[ \t]*/, '').trim();
+          if (/^\d+\.\d+(\.\d+)?\s+[A-Za-zÀ-ỹ]/.test(clean) && clean.length < 140) {
+            const nextPara = lines
+              .slice(li + 1)
+              .find((l) => l.trim().length > 40)
+              ?.trim()
+              .slice(0, 320);
+            subHeadingDigest.push(`  >> SUB-HEADING "${clean}" → body starts: "${nextPara || '[EMPTY]'}"`);
+          }
+        });
+      }
+      return `--- SECTION ${idx + 1} (id: ${sec.id}) | TITLE: "${sec.title}" | WORDS: ${words}/${sec.targetWords} ---\n${preview || '[EMPTY]'}${
+        subHeadingDigest.length > 0 ? `\n${subHeadingDigest.join('\n')}` : ''
+      }`;
     })
     .join('\n\n');
 
@@ -2205,7 +2872,8 @@ export async function runAiPaperAudit(
 
   const systemPrompt = `You are a strict Senior University Academic Examiner & Quality Auditor (Người kiểm duyệt bài nghiên cứu trước khi giao khách).
 Your job is to inspect the drafted paper below and catch EVERY serious academic/structural/factual defect that would cause a student to lose marks or fail QA:
-1. Heading vs. Content Mismatch (e.g., heading says "Personal Facilitators" while body discusses "Social Facilitators").
+1. Heading vs. Content Mismatch (e.g., heading says "Personal Facilitators" while body discusses "Social Facilitators"). Check EVERY ">> SUB-HEADING" line against its "body starts" text.
+5. Inconsistent page ranges/volume numbers for the same cited work across the paper.
 2. Factual Self-Contradictions across sections (e.g., Section 2 calls a study a "doctoral thesis" while References calls it a "Master's thesis", or conflicting sample sizes/years).
 3. Wrongly pasted paper title onto unrelated authors in References.
 4. Off-topic drift or failure to address key assignment brief/rubric requirements.
@@ -2525,4 +3193,65 @@ ${uniqueMissing.map((c, idx) => `${idx + 1}. ${c}`).join('\n')}`;
     content: deduped.join('\n\n'),
     changeSummary: `Đã ${parts.join(' và ')} (giữ nguyên các nguồn hợp lệ).`,
   };
+}
+
+/**
+ * Resolves a doctoral-vs-master's thesis contradiction using ONLY evidence from the brief,
+ * uploaded context files and researched sources. Returns 'unknown' if no evidence exists
+ * (we never guess facts), so the issue stays flagged for manual verification.
+ */
+export async function resolveThesisTypeFromEvidence(
+  session: WriterSession,
+  profile: AiProviderProfile,
+  signal?: AbortSignal
+): Promise<{ type: 'doctoral' | 'master' | 'unknown'; evidence: string }> {
+  const evidenceText = [
+    session.instructions || '',
+    session.rubricNotes || '',
+    ...(session.contextFiles || []).map((f) => `[${f.name}]\n${(f.content || '').slice(0, 6000)}`),
+    session.researchedSources || '',
+  ]
+    .join('\n\n')
+    .slice(0, 14000);
+
+  // Deterministic first: explicit wording in the evidence
+  const docHits = (evidenceText.match(/\b(doctoral (thesis|dissertation)|ph\.?\s?d\.? (thesis|dissertation)|doctor of philosophy|luận án tiến sĩ)\b/gi) || []).length;
+  const maHits = (evidenceText.match(/\b(master'?s (thesis|dissertation)|ma thesis|master of arts|luận văn thạc sĩ)\b/gi) || []).length;
+  if (docHits > 0 && maHits === 0) return { type: 'doctoral', evidence: 'Tài liệu đề bài/đính kèm ghi rõ là luận án Tiến sĩ.' };
+  if (maHits > 0 && docHits === 0) return { type: 'master', evidence: 'Tài liệu đề bài/đính kèm ghi rõ là luận văn Thạc sĩ.' };
+  if (!evidenceText.trim()) return { type: 'unknown', evidence: 'Không có tài liệu gốc để đối chiếu.' };
+
+  try {
+    const raw = await callAiChatbot({
+      profile,
+      systemPrompt:
+        'You are a fact checker. Answer ONLY from the provided evidence. Reply with exactly one token: DOCTORAL, MASTER, or UNKNOWN.',
+      userPrompt: `Is the main analyzed study in this assignment a doctoral (PhD) thesis or a master's thesis?\n\nEVIDENCE:\n${evidenceText}`,
+      enableWebSearch: false,
+      maxOutputTokens: 20,
+      reasoningEffort: 'low',
+      signal,
+    });
+    const ans = raw.trim().toUpperCase();
+    if (ans.startsWith('DOCTORAL')) return { type: 'doctoral', evidence: 'AI xác nhận từ tài liệu gốc: luận án Tiến sĩ.' };
+    if (ans.startsWith('MASTER')) return { type: 'master', evidence: 'AI xác nhận từ tài liệu gốc: luận văn Thạc sĩ.' };
+  } catch (err) {
+    if (err && typeof err === 'object' && (err as { name?: string }).name === 'AbortError') throw err;
+  }
+  return { type: 'unknown', evidence: 'Tài liệu gốc không nêu rõ loại luận văn.' };
+}
+
+/** Deterministically aligns thesis-type wording in a text block to the resolved type. */
+export function alignThesisTypeWording(text: string, type: 'doctoral' | 'master'): string {
+  if (type === 'doctoral') {
+    return text
+      .replace(/\b[Uu]npublished [Mm]aster'?s (thesis|dissertation)\b/g, 'Unpublished doctoral $1')
+      .replace(/\b[Mm]aster'?s (thesis|dissertation)\b/g, (m, w) => (m[0] === 'M' ? `Doctoral ${w}` : `doctoral ${w}`))
+      .replace(/\bMA thesis\b/g, 'PhD thesis')
+      .replace(/luận văn thạc sĩ/gi, 'luận án tiến sĩ');
+  }
+  return text
+    .replace(/\b[Dd]octoral (thesis|dissertation)\b/g, (m, w) => (m[0] === 'D' ? `Master's ${w}` : `master's ${w}`))
+    .replace(/\bPh\.?\s?D\.? (thesis|dissertation)\b/g, "Master's $1")
+    .replace(/luận án tiến sĩ/gi, 'luận văn thạc sĩ');
 }

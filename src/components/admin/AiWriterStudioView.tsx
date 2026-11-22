@@ -12,7 +12,9 @@ import {
   AiRefineAction,
   ExistingDraftMode,
   PaperAuditReport,
+  alignThesisTypeWording,
   analyzeAndPlanExistingDraftWithAi,
+  buildCrossrefVerifiedReferences,
   fixReferencesTargetedWithAi,
   generateOutlineWithAi,
   generateSectionWithAi,
@@ -24,6 +26,7 @@ import {
   refineTextWithAi,
   researchSourcesWithPerplexity,
   resolveEffectiveWriterConfig,
+  resolveThesisTypeFromEvidence,
   reviseOrCompleteSectionWithAi,
   runAiPaperAudit,
   runDeterministicPaperAudit,
@@ -2549,8 +2552,71 @@ export function AiWriterStudioView({
             effectiveWriter.enableWebSearch,
             signal
           );
-          newContent = refFixed.content;
-          changeSummary = refFixed.changeSummary;
+
+          // Ground every entry on REAL Crossref metadata (eliminates reused titles, topic-as-title, stub entries, variant duplicates)
+          const crossrefGrounded = await buildCrossrefVerifiedReferences(
+            latestSess,
+            refFixed.content,
+            (progressLbl) => {
+              setAuditStatusLabel(progressLbl);
+              setCurrentStepLabel(progressLbl);
+            },
+            signal
+          );
+
+          let finalRefContent = crossrefGrounded.content.trim()
+            ? crossrefGrounded.content
+            : refFixed.content;
+          const summaryParts = [crossrefGrounded.changeSummary];
+
+          // Resolve doctoral vs Master's thesis contradiction across body & References if flagged
+          const hasThesisContradiction = task.issues.some((i) =>
+            /luận văn|luận án|doctoral|master/i.test(
+              `${i.title} ${i.detail}`
+            )
+          );
+          if (hasThesisContradiction) {
+            const resolved = await resolveThesisTypeFromEvidence(
+              latestSess,
+              effectiveWriter.profile,
+              signal
+            );
+            const targetThesisType =
+              resolved.type !== 'unknown' ? resolved.type : 'doctoral';
+            finalRefContent = alignThesisTypeWording(
+              finalRefContent,
+              targetThesisType
+            );
+            // Also align any conflicting wording in body sections
+            mutateSessionById(
+              targetSessionId,
+              (s) => ({
+                ...s,
+                outline: s.outline.map((sec) =>
+                  sec.id === targetSec.id
+                    ? sec
+                    : {
+                        ...sec,
+                        content: alignThesisTypeWording(
+                          sec.content,
+                          targetThesisType
+                        ),
+                      }
+                ),
+              }),
+              false
+            );
+            summaryParts.push(
+              `đồng bộ loại luận văn (${
+                targetThesisType === 'doctoral'
+                  ? 'Doctoral thesis / Luận án Tiến sĩ'
+                  : "Master's thesis / Luận văn Thạc sĩ"
+              }) giữa thân bài và References`
+            );
+          }
+
+          newContent = finalRefContent;
+          changeSummary = summaryParts.join(' · ');
         } else if (!targetSec.content.trim()) {
           newContent = await generateSectionWithAi(
             latestSess,
@@ -2569,11 +2635,12 @@ export function AiWriterStudioView({
             latestSess,
             targetSec.id,
             'revise',
-            `BẮT BUỘC SỬA CÁC LỖI KIỂM DUYỆT SAU:\n${hints.join('\n')}`,
+            `BẮT BUỘC SỬA TRIỆT ĐỂ CÁC LỖI KIỂM DUYỆT SAU (ưu tiên sửa đúng tiêu đề tiểu mục/chia tách mục 4.1 - 4.2 khớp với nội dung thực tế):\n${hints.join('\n')}`,
             skills,
             effectiveWriter.profile,
             effectiveWriter.enableWebSearch,
-            signal
+            signal,
+            true
           );
           newContent = revised.content;
           changeSummary = revised.changeSummary;
@@ -2641,10 +2708,20 @@ export function AiWriterStudioView({
           },
           signal
         );
-        const critCount = recheck.issues.filter(
+        // Preserve any AI-layer issues on sections that were NOT part of this batch yet
+        const batchIssueIds = new Set(batchIssues.map((i) => i.id));
+        const remainingAiIssues = report.issues.filter(
+          (i) =>
+            i.id.startsWith('ai_') &&
+            !batchIssueIds.has(i.id) &&
+            (!i.sectionId || !fixedSectionIds.has(i.sectionId))
+        );
+        const mergedRemainingIssues = [...recheck.issues, ...remainingAiIssues];
+
+        const critCount = mergedRemainingIssues.filter(
           (i) => i.severity === 'critical'
         ).length;
-        const warnCount = recheck.issues.filter(
+        const warnCount = mergedRemainingIssues.filter(
           (i) => i.severity === 'warning'
         ).length;
         const nextScore = Math.max(
@@ -2666,7 +2743,7 @@ export function AiWriterStudioView({
           checkedDoiCount: recheck.checkedDoiCount,
           verifiedDoiCount: recheck.verifiedDoiCount,
           invalidDoiCount: recheck.invalidDoiCount,
-          issues: recheck.issues,
+          issues: mergedRemainingIssues,
           auditedAt: new Date().toISOString(),
         });
 
@@ -2679,7 +2756,7 @@ export function AiWriterStudioView({
             label: fixedSectionSummaries.get(fid),
           };
         });
-        for (const issue of recheck.issues) {
+        for (const issue of mergedRemainingIssues) {
           const sid = resolveIssueSectionId(issue);
           if (!sid) continue;
           const prev = nextVisualStates[sid];
