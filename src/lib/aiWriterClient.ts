@@ -1115,11 +1115,11 @@ export function extractInTextCitations(text: string): string[] {
     }
   }
 
-  // 2. Narrative citations supporting 1, 2, 3, or 4+ authors:
+  // 2. Narrative citations supporting 1, 2, 3, or 4+ authors (horizontal spaces ONLY so headings on the previous line never glue onto author names):
   //    Fredricks, Blumenfeld and Paris (2004) | Xu, Yang and He (2023) | Vardal Ocaklı (2019) | Hiver et al. (2024)
-  const authorToken = "[A-ZÀ-Ỹ][A-Za-zÀ-ỹ'’-]+(?:\\s+[A-ZÀ-Ỹ][A-Za-zÀ-ỹ'’-]+)?";
+  const authorToken = "[A-ZÀ-Ỹ][A-Za-zÀ-ỹ'’-]+(?:[ \\t]+[A-ZÀ-Ỹ][A-Za-zÀ-ỹ'’-]+)?";
   const narrativeRegex = new RegExp(
-    `\\b${authorToken}(?:,\\s*${authorToken})*(?:,?\\s+(?:&|and|và)\\s+${authorToken}|\\s+et\\s+al\\.?)?\\s*\\((?:19|20)\\d{2}[a-z]?\\)`,
+    `\\b${authorToken}(?:,[ \\t]*${authorToken})*(?:,?[ \\t]+(?:&|and|và)[ \\t]+${authorToken}|[ \\t]+et[ \\t]+al\\.?)?[ \\t]*\\((?:19|20)\\d{2}[a-z]?\\)`,
     'g'
   );
   for (const match of text.match(narrativeRegex) || []) {
@@ -1360,6 +1360,12 @@ interface CrossrefWorkMeta {
 function cleanCrossrefText(raw?: string): string {
   return (raw || '')
     .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&nbsp;/gi, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
@@ -1748,24 +1754,41 @@ export async function buildCrossrefVerifiedReferences(
             signal
           );
         }
-        return { key, work, matchingIdx, cleanHintEntry };
+        return { key, work, matchingIdx, cleanHintEntry, contextTokens };
       })
     );
 
-    for (const { key, work, matchingIdx, cleanHintEntry } of results) {
+    for (const { key, work, matchingIdx, cleanHintEntry, contextTokens } of results) {
       matchingIdx.forEach(({ idx }) => usedExisting.add(idx));
       if (work) {
         finalEntries.push(formatCrossrefReference(work, session.citationStyle));
         verifiedCount++;
         continue;
       }
-      // Not on Crossref: keep ONE best existing entry (prefer non-stub, non-poisoned), strip unverified DOIs
-      const fallback =
-        cleanHintEntry ||
-        matchingIdx.find(({ e }) => !isStubEntry(e)) ||
-        matchingIdx[0];
-      if (fallback) {
-        let kept = fallback.e;
+      // Not on Crossref: keep ONE best existing non-stub entry that ALSO passes author-count & semantic checks
+      const candidateFallbacks = [
+        ...(cleanHintEntry ? [cleanHintEntry] : []),
+        ...matchingIdx.filter((m) => m !== cleanHintEntry),
+      ].filter(({ e }) => !isStubEntry(e));
+
+      const validFallback = candidateFallbacks.find(({ e }) => {
+        const authorHead = (e.split(/\((?:19|20)\d{2}/)[0] || '').trim();
+        const looksMultiAuthor =
+          /\s(?:&|and|và)\s/i.test(authorHead) ||
+          (authorHead.match(/,/g) || []).length >= 2;
+        if (key.expectedAuthorCount === 'exact1' && looksMultiAuthor) {
+          return false;
+        }
+        // Reject completely off-topic homonym entries (e.g. Chemical Engineering CFD paper in an Education essay)
+        const entryTokens = extractMeaningfulTokens(e);
+        if (contextTokens.size >= 4 && countTokenOverlap(contextTokens, entryTokens) === 0) {
+          return false;
+        }
+        return true;
+      });
+
+      if (validFallback) {
+        let kept = cleanCrossrefText(validFallback.e);
         const dois = kept.match(/10\.\d{4,9}\/[-._;()/:A-Za-z0-9]+/g) || [];
         for (const rawDoi of dois) {
           const check = await verifyDoiWithCrossref(normalizeExtractedDoi(rawDoi), signal);
@@ -1793,10 +1816,15 @@ export async function buildCrossrefVerifiedReferences(
           .replace(/\.\s*\./g, '.')
           .replace(/\s{2,}/g, ' ')
           .trim();
-        if (!/[.!?)\]]$/.test(kept)) kept = `${kept}.`;
+        // In APA 7, do NOT put a trailing period after a DOI URL
+        if (session.citationStyle === 'APA' && /https?:\/\/doi\.org\/\S+\.$/.test(kept)) {
+          kept = kept.slice(0, -1);
+        } else if (!/[.!?)\]]$/.test(kept) && !/https?:\/\/\S+$/.test(kept)) {
+          kept = `${kept}.`;
+        }
         finalEntries.push(kept);
         keptUnverifiedCount++;
-        if (isPoisonedTitle(fallback.e) || isStubEntry(fallback.e)) {
+        if (isPoisonedTitle(validFallback.e)) {
           unverifiedCitations.push(key.raw);
         }
       } else {
@@ -1957,6 +1985,7 @@ CRITICAL ANTI-HALLUCINATION & ZERO-META RULES:
 - NEVER invent, guess, or fabricate a DOI (especially sequential numbers like 123456, 1123456, 1156789) or URL.
 - NEVER copy or reuse one source's DOI, URL, or paper title onto a different author.
 - ONLY include a DOI or URL if it appears verbatim in the VERIFIED SOURCES list for THAT exact author and work; otherwise silently omit the DOI/URL.
+- NEVER output incomplete author-year stubs without a title and publication venue (e.g., NEVER write "Norman, R. E., & King, J. (2020).").
 - ZERO ERROR MESSAGES / ZERO META-NOTES (STRICTLY FORBIDDEN): NEVER write apologies, refusal sentences, or parenthetical disclaimers into the output (e.g., NEVER write "No verified bibliographic data...", "To avoid fabricating...", "(no verified journal or DOI available...)", "[DOI unavailable]", "Note:").
 - Output each reference entry on a SINGLE line (do not insert line breaks inside one entry), separated from the next entry by a blank line. No headings, no markdown '#', no commentary.`;
 
