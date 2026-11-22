@@ -8,8 +8,10 @@ import {
   CheckCircle2,
   Clock,
   FileCheck2,
+  FilePlus2,
   FileSearch,
   GraduationCap,
+  KeyRound,
   Lock,
   LogIn,
   Minus,
@@ -277,51 +279,64 @@ export function RoleSelectionGate({
             <BrandLogo />
           </button>
 
-          <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-slate-600">
+          <nav
+            aria-label="Điều hướng chính"
+            className="hidden lg:inline-flex items-center bg-slate-100/90 border border-slate-200/80 p-1 rounded-xl gap-0.5 text-xs font-semibold"
+          >
             <button
               type="button"
               onClick={openHomePage}
-              className={`hover:text-[#12489B] transition-colors ${
-                activePage === 'home' ? 'text-[#12489B] font-bold' : ''
+              className={`btn-press px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
+                activePage === 'home'
+                  ? 'bg-white text-[#0B2559] font-bold shadow-xs ring-1 ring-slate-900/5'
+                  : 'text-slate-600 hover:text-[#12489B]'
               }`}
             >
               Trang chủ
             </button>
             <button
               type="button"
+              onClick={() => onSelectClient({ tab: 'order' })}
+              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:bg-white hover:text-[#EA580C] transition-colors whitespace-nowrap"
+            >
+              <FilePlus2 className="w-3.5 h-3.5 text-[#EA580C]" />
+              <span>Đặt bài mới</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectClient({ tab: 'lookup' })}
+              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:bg-white hover:text-[#12489B] transition-colors whitespace-nowrap"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-[#12489B]" />
+              <span>Tra cứu mã đơn</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectClient({ tab: 'checker' })}
+              className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:bg-white hover:text-[#12489B] transition-colors whitespace-nowrap"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-[#12489B]" />
+              <span>Check Đạo văn &amp; AI</span>
+            </button>
+            <button
+              type="button"
               onClick={openSampleLibrary}
-              className={`inline-flex items-center gap-1.5 hover:text-[#12489B] transition-colors ${
+              className={`btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap ${
                 activePage === 'samples'
-                  ? 'text-[#12489B] font-bold bg-blue-50 px-3 py-1.5 rounded-full'
-                  : ''
+                  ? 'bg-white text-[#12489B] font-bold shadow-xs ring-1 ring-slate-900/5'
+                  : 'text-slate-600 hover:bg-white hover:text-[#12489B]'
               }`}
             >
               <BookOpen className="w-3.5 h-3.5" />
               <span>Sample Library</span>
             </button>
-            {activePage === 'home' && (
-              <>
-                <a href="#quy-trinh" className="hover:text-[#12489B] transition-colors">
-                  Quy trình
-                </a>
-                <a href="#cam-ket" className="hover:text-[#12489B] transition-colors">
-                  Gói cam kết
-                </a>
-                <a href="#dich-vu" className="hover:text-[#12489B] transition-colors">
-                  Dịch vụ
-                </a>
-                <a href="#faq" className="hover:text-[#12489B] transition-colors">
-                  FAQ
-                </a>
-              </>
-            )}
           </nav>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={onSelectAdmin}
-              className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-zinc-200 bg-white hover:border-[#12489B]/50 hover:text-[#12489B] text-xs font-semibold text-slate-700 transition-colors"
+              className="btn-press inline-flex items-center gap-1.5 px-3 py-2 rounded-full border border-zinc-200 bg-white hover:border-[#12489B]/50 hover:text-[#12489B] text-xs font-semibold text-slate-700 transition-colors"
             >
               <LogIn className="w-3.5 h-3.5" />
               <span>Đăng nhập</span>
@@ -336,6 +351,48 @@ export function RoleSelectionGate({
               <span className="w-6 h-6 rounded-full bg-white/20 group-hover:bg-white group-hover:text-[#EA580C] flex items-center justify-center transition-colors">
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </span>
+            </button>
+          </div>
+        </div>
+
+        {/* Tablet & Mobile Quick Service Tabs Bar */}
+        <div className="lg:hidden border-t border-zinc-100 px-3 py-2 bg-white/95">
+          <div className="max-w-7xl mx-auto grid grid-cols-4 gap-1 bg-slate-100/90 border border-slate-200/70 p-1 rounded-xl text-[11px] font-semibold">
+            <button
+              type="button"
+              onClick={() => onSelectClient({ tab: 'order' })}
+              className="btn-press py-1.5 px-1.5 rounded-lg inline-flex items-center justify-center gap-1 text-slate-700 hover:bg-white hover:text-[#EA580C]"
+            >
+              <FilePlus2 className="w-3.5 h-3.5 text-[#EA580C] shrink-0" />
+              <span className="truncate">Đặt bài</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectClient({ tab: 'lookup' })}
+              className="btn-press py-1.5 px-1.5 rounded-lg inline-flex items-center justify-center gap-1 text-slate-700 hover:bg-white hover:text-[#12489B]"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-[#12489B] shrink-0" />
+              <span className="truncate">Tra cứu</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectClient({ tab: 'checker' })}
+              className="btn-press py-1.5 px-1.5 rounded-lg inline-flex items-center justify-center gap-1 text-slate-700 hover:bg-white hover:text-[#12489B]"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-[#12489B] shrink-0" />
+              <span className="truncate">Check AI</span>
+            </button>
+            <button
+              type="button"
+              onClick={openSampleLibrary}
+              className={`btn-press py-1.5 px-1.5 rounded-lg inline-flex items-center justify-center gap-1 ${
+                activePage === 'samples'
+                  ? 'bg-white text-[#12489B] font-bold shadow-2xs'
+                  : 'text-slate-700 hover:bg-white hover:text-[#12489B]'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">Bài mẫu</span>
             </button>
           </div>
         </div>
