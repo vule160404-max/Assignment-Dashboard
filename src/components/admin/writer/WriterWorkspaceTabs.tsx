@@ -4,6 +4,7 @@ import {
   Bot,
   Check,
   Download,
+  FileEdit,
   FilePlus2,
   FolderPlus,
   Loader2,
@@ -49,6 +50,7 @@ interface WriterWorkspaceTabsProps {
   onOpenDeliverModal?: () => void;
   onExportDocx: () => void;
   onExportPdf?: () => void;
+  onOpenImportDraft?: () => void;
 }
 
 export function isWriterSessionBusy(session: WriterSession): boolean {
@@ -101,6 +103,7 @@ export function WriterWorkspaceTabs({
   onOpenDeliverModal,
   onExportDocx,
   onExportPdf,
+  onOpenImportDraft,
 }: WriterWorkspaceTabsProps) {
   const [showOrderPicker, setShowOrderPicker] = useState(false);
   const [pickedCodes, setPickedCodes] = useState<string[]>([]);
@@ -259,6 +262,18 @@ export function WriterWorkspaceTabs({
             <FolderPlus className="w-3.5 h-3.5 text-[#12489B]" />
             <span>+ Nạp nhiều đơn</span>
           </button>
+
+          {onOpenImportDraft && (
+            <button
+              type="button"
+              onClick={onOpenImportDraft}
+              title="Nạp bài nháp có sẵn của khách để AI đọc lại, sửa lỗi, mở rộng hoặc viết hoàn thiện nốt"
+              className="btn-press inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-50/90 text-amber-800 border border-amber-200/90 hover:bg-amber-100/80"
+            >
+              <FileEdit className="w-3.5 h-3.5 text-amber-700" />
+              <span>Sửa bài có sẵn</span>
+            </button>
+          )}
 
           {/* Parallel Runner Controls (only prominent when multiple tabs or running) */}
           {sessions.length >= 2 && (

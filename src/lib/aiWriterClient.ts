@@ -1243,6 +1243,30 @@ export type AiRefineAction =
   | 'add_citations'
   | 'rubric_check';
 
+const CHANGE_LOG_MARKER = '<<<CHANGE_LOG>>>';
+
+function splitChangeLogResponse(raw: string): {
+  content: string;
+  changeSummary: string;
+} {
+  const idx = raw.indexOf(CHANGE_LOG_MARKER);
+  if (idx === -1) {
+    return {
+      content: stripMarkdownHashesFromText(raw).trim(),
+      changeSummary: '',
+    };
+  }
+  const bodyPart = raw.slice(0, idx).trim();
+  const logPart = raw
+    .slice(idx + CHANGE_LOG_MARKER.length)
+    .replace(/^[:\-\s]+/, '')
+    .trim();
+  return {
+    content: stripMarkdownHashesFromText(bodyPart).trim(),
+    changeSummary: logPart.slice(0, 320),
+  };
+}
+
 export async function refineTextWithAi(
   session: WriterSession,
   sectionTitle: string,
@@ -1253,7 +1277,7 @@ export async function refineTextWithAi(
   profile: AiProviderProfile,
   enableWebSearch?: boolean,
   signal?: AbortSignal
-): Promise<string> {
+): Promise<{ content: string; changeSummary: string }> {
   const systemPrompt = buildSkillsAndContextSystemPrompt(session, skills);
 
   let taskDirective = '';
@@ -1282,7 +1306,10 @@ Language: ${session.writingLanguage}
 === ORIGINAL TEXT ===
 ${currentText}
 
-Return ONLY the revised academic text for this section (no conversational intro or outro). Do NOT prepend markdown '#' or '##' hashes to headings or sentences.`;
+OUTPUT FORMAT:
+1. Output the revised academic text for this section (no conversational intro, do NOT prepend markdown '#' or '##' hashes).
+2. Immediately after the revised text, on a new line output the exact marker: ${CHANGE_LOG_MARKER}
+3. Right after that marker, write 1-2 concise Vietnamese sentences specifying EXACTLY which paragraphs/parts were modified and what was improved (e.g., "Đoạn 1-2: Nâng cấp văn phong học thuật; Đoạn 3: Mở rộng phân tích phản biện và bổ sung trích dẫn 2024.").`;
 
   const raw = await callAiChatbot({
     profile,
@@ -1291,5 +1318,330 @@ Return ONLY the revised academic text for this section (no conversational intro 
     enableWebSearch,
     signal,
   });
-  return stripMarkdownHashesFromText(raw);
+  return splitChangeLogResponse(raw);
+}
+
+export type ExistingDraftMode =
+  | 'complete_and_expand'
+  | 'upgrade_and_fix'
+  | 'import_only';
+
+export type DraftSectionAction = 'keep' | 'revise' | 'expand' | 'write_new';
+
+export interface PlannedDraftSection extends WriterOutlineSection {
+  action: DraftSectionAction;
+  changeReason: string;
+}
+
+/**
+ * Local zero-token parser: splits an uploaded/pasted existing draft into structured outline sections
+ * by detecting numbered chapters, Vietnamese chapter titles, or common academic headings.
+ */
+export function parseExistingDraftIntoSections(
+  rawDraftText: string,
+  targetWordCount: number,
+  citationStyle: string,
+  writingLanguage: WriterSession['writingLanguage']
+): WriterOutlineSection[] {
+  const cleanLines = rawDraftText.replace(/\r\n/g, '\n').split('\n');
+  const headingRegex =
+    /^(?:(?:CHƯƠNG|PHẦN|MỤC|CHAPTER|PART|SECTION)\s+\d+[\.\:\-]?\s+.*|\d+(?:\.\d+)?\.?\s+[A-ZÀ-Ỹ][^\n]{2,110}|(?:LỜI MỞ ĐẦU|MỞ ĐẦU|ĐẶT VẤN ĐỀ|TÓM TẮT|ABSTRACT|INTRODUCTION|LITERATURE REVIEW|METHODOLOGY|FINDINGS|DISCUSSION|CONCLUSION|KẾT LUẬN|KẾT LUẬN VÀ KIẾN NGHỊ|REFERENCES|BIBLIOGRAPHY|TÀI LIỆU THAM KHẢO|DANH MỤC TÀI LIỆU THAM KHẢO)(?:\s*\([^)]+\))?)$/i;
+
+  const detected: Array<{
+    title: string;
+    headingLevel: 'h1' | 'h2';
+    lines: string[];
+  }> = [];
+
+  let currentBucket: {
+    title: string;
+    headingLevel: 'h1' | 'h2';
+    lines: string[];
+  } | null = null;
+
+  for (const rawLine of cleanLines) {
+    const trimmed = stripMarkdownHashesFromText(rawLine).trim();
+    if (!trimmed) {
+      if (currentBucket) currentBucket.lines.push('');
+      continue;
+    }
+
+    const isLikelyHeading =
+      trimmed.length <= 125 &&
+      !trimmed.endsWith('.') &&
+      headingRegex.test(trimmed);
+
+    if (isLikelyHeading) {
+      if (currentBucket) detected.push(currentBucket);
+      const isSub = /^\d+\.\d+/.test(trimmed);
+      currentBucket = {
+        title: trimmed,
+        headingLevel: isSub ? 'h2' : 'h1',
+        lines: [],
+      };
+    } else {
+      if (!currentBucket) {
+        currentBucket = {
+          title:
+            writingLanguage === 'Vietnamese'
+              ? '1. Nội dung bản nháp hiện có'
+              : '1. Existing Draft Content',
+          headingLevel: 'h1',
+          lines: [],
+        };
+      }
+      currentBucket.lines.push(trimmed);
+    }
+  }
+  if (currentBucket) detected.push(currentBucket);
+
+  const ts = Date.now();
+  if (detected.length === 0) {
+    return parseAiOutlineJson('', targetWordCount, citationStyle);
+  }
+
+  const perSecTarget = Math.max(
+    200,
+    Math.round(targetWordCount / Math.max(1, detected.length))
+  );
+
+  return detected.map((d, idx) => {
+    const body = d.lines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    const wCount = body ? body.split(/\s+/).length : 0;
+    return {
+      id: `sec_draft_${ts}_${idx}`,
+      order: idx + 1,
+      title: d.title,
+      headingLevel: d.headingLevel,
+      targetWords: Math.max(wCount, perSecTarget),
+      guidanceNotes:
+        wCount > 0
+          ? `Đã nạp từ bản nháp có sẵn (${wCount} từ).`
+          : 'Mục còn trống từ bản nháp, cần viết nội dung.',
+      content: body,
+      status: wCount > 0 ? 'completed' : 'idle',
+    };
+  });
+}
+
+/**
+ * AI reads the customer's existing draft + brief/rubric and builds a structured revision/completion plan.
+ */
+export async function analyzeAndPlanExistingDraftWithAi(
+  session: WriterSession,
+  rawDraftText: string,
+  mode: Exclude<ExistingDraftMode, 'import_only'>,
+  userEditNotes: string,
+  skills: SkillDocument[],
+  profile: AiProviderProfile,
+  enableWebSearch?: boolean,
+  signal?: AbortSignal
+): Promise<PlannedDraftSection[]> {
+  // First split draft locally so we never lose a single word of the original text
+  const localSections = parseExistingDraftIntoSections(
+    rawDraftText,
+    session.targetWordCount,
+    session.citationStyle,
+    session.writingLanguage
+  );
+
+  const systemPrompt = buildSkillsAndContextSystemPrompt(session, skills);
+  const isVi = session.writingLanguage === 'Vietnamese';
+  const modeDirective =
+    mode === 'complete_and_expand'
+      ? 'Analyze the existing partial/rough draft. Preserve strong parts, mark thin/incomplete sections as "expand" or "revise", and ADD any missing sections required by the brief/rubric (e.g., remaining body chapters, Conclusion, and References) as "write_new" so the full paper reaches approximately ' +
+        session.targetWordCount +
+        ' words.'
+      : 'Analyze the existing draft section by section. Keep its core structure, mark sections needing academic tone/citation/rubric upgrades as "revise", mark well-written complete sections as "keep", and add a References section as "write_new" only if missing.';
+
+  const draftSummaryForPlan = localSections
+    .map((sec, idx) => {
+      const words = sec.content ? sec.content.split(/\s+/).length : 0;
+      const preview =
+        sec.content.length > 900
+          ? `${sec.content.slice(0, 600)}\n[...]\n${sec.content.slice(-260)}`
+          : sec.content;
+      return `[DRAFT_INDEX ${idx}] Title: "${sec.title}" (${words} words)\n${preview || '(empty)'}`;
+    })
+    .join('\n\n');
+
+  const userPrompt = `You are reviewing an existing customer draft to plan edits & completion.
+Mode: ${modeDirective}
+${userEditNotes.trim() ? `Specific User Revision Instructions:\n${userEditNotes.trim()}\n` : ''}
+Language: ${session.writingLanguage}
+Citation Style: ${session.citationStyle}
+Target Total Word Count: ${session.targetWordCount} words
+
+=== EXISTING DRAFT SECTIONS ===
+${draftSummaryForPlan}
+
+Return ONLY a valid JSON array representing the final complete paper outline. Each object MUST have:
+- "draftIndex": number | null (matching [DRAFT_INDEX X] above if this section corresponds to an existing draft section, or null if this is a brand-new section to add)
+- "title": string (clean academic heading in ${isVi ? 'Vietnamese' : session.writingLanguage}, no '#' symbols)
+- "headingLevel": "h1" | "h2" | "h3"
+- "targetWords": number
+- "action": "keep" | "revise" | "expand" | "write_new"
+- "guidanceNotes": string (exact instructions for revising/expanding/writing this section)
+- "changeReason": string (1 short Vietnamese sentence explaining why this section is kept, revised, expanded, or newly added)`;
+
+  const rawText = await callAiChatbot({
+    profile,
+    systemPrompt,
+    userPrompt,
+    enableWebSearch,
+    reasoningEffort: 'low',
+    signal,
+  });
+
+  const cleaned = rawText
+    .replace(/^```json\s*/i, '')
+    .replace(/^```\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+  const startIdx = cleaned.indexOf('[');
+  const endIdx = cleaned.lastIndexOf(']');
+  const jsonCandidate =
+    startIdx !== -1 && endIdx !== -1 && endIdx > startIdx
+      ? cleaned.slice(startIdx, endIdx + 1)
+      : cleaned;
+
+  try {
+    const parsed = JSON.parse(jsonCandidate) as Array<{
+      draftIndex?: number | null;
+      title?: string;
+      headingLevel?: string;
+      targetWords?: number;
+      action?: string;
+      guidanceNotes?: string;
+      changeReason?: string;
+    }>;
+
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const ts = Date.now();
+      return parsed.map((item, idx) => {
+        const matchedLocal =
+          typeof item.draftIndex === 'number' &&
+          item.draftIndex >= 0 &&
+          item.draftIndex < localSections.length
+            ? localSections[item.draftIndex]
+            : null;
+        const existingContent = matchedLocal?.content || '';
+        const action: DraftSectionAction =
+          item.action === 'keep' ||
+          item.action === 'revise' ||
+          item.action === 'expand' ||
+          item.action === 'write_new'
+            ? item.action
+            : existingContent.trim()
+            ? mode === 'complete_and_expand'
+              ? 'expand'
+              : 'revise'
+            : 'write_new';
+
+        return {
+          id: `sec_plan_${ts}_${idx}`,
+          order: idx + 1,
+          title: stripMarkdownHashesFromText(
+            (item.title || matchedLocal?.title || `Section ${idx + 1}`).trim()
+          ),
+          headingLevel:
+            item.headingLevel === 'h2' || item.headingLevel === 'h3'
+              ? item.headingLevel
+              : 'h1',
+          targetWords: Math.max(100, Number(item.targetWords) || 350),
+          guidanceNotes: stripMarkdownHashesFromText(
+            (item.guidanceNotes || '').trim()
+          ),
+          content: existingContent,
+          status:
+            action === 'keep' && existingContent.trim() ? 'completed' : 'idle',
+          action,
+          changeReason:
+            (item.changeReason || '').trim() ||
+            (action === 'keep'
+              ? 'Giữ nguyên nội dung đã đạt chuẩn.'
+              : action === 'expand'
+              ? 'Mở rộng chiều sâu và bổ sung dẫn chứng.'
+              : action === 'revise'
+              ? 'Nâng cấp văn phong học thuật và trích dẫn.'
+              : 'Viết mới mục còn thiếu để hoàn thiện bài.'),
+        };
+      });
+    }
+  } catch {
+    // Fall back to local parsed sections marked for revise/expand
+  }
+
+  return localSections.map((sec) => ({
+    ...sec,
+    action: sec.content.trim()
+      ? mode === 'complete_and_expand'
+        ? 'expand'
+        : 'revise'
+      : 'write_new',
+    changeReason:
+      mode === 'complete_and_expand'
+        ? 'Mở rộng và hoàn thiện dựa trên bản nháp.'
+        : 'Sửa lỗi và nâng cấp văn phong học thuật.',
+  }));
+}
+
+/**
+ * Revises or expands an existing draft section while preserving core author arguments,
+ * returning both the upgraded prose and an explicit Vietnamese changelog of WHERE/WHAT changed.
+ */
+export async function reviseOrCompleteSectionWithAi(
+  session: WriterSession,
+  targetSectionId: string,
+  action: 'revise' | 'expand',
+  userEditNotes: string,
+  skills: SkillDocument[],
+  profile: AiProviderProfile,
+  enableWebSearch?: boolean,
+  signal?: AbortSignal
+): Promise<{ content: string; changeSummary: string }> {
+  const sectionIdx = session.outline.findIndex((s) => s.id === targetSectionId);
+  if (sectionIdx === -1) {
+    throw new Error('Không tìm thấy mục cần sửa.');
+  }
+  const targetSection = session.outline[sectionIdx];
+  const systemPrompt = buildSkillsAndContextSystemPrompt(session, skills);
+  const priorContext = buildSmartPriorContext(
+    session.outline.slice(0, sectionIdx),
+    'body'
+  );
+
+  const actionGoal =
+    action === 'expand'
+      ? `PRESERVE the author's core ideas and good passages from the EXISTING DRAFT below, then EXPAND & COMPLETE this section thoroughly to reach approximately ${targetSection.targetWords} words with deeper academic analysis, transitions, and authentic ${session.citationStyle} citations.`
+      : `PRESERVE the author's core structure and meaning from the EXISTING DRAFT below, while UPGRADING academic tone, fixing grammar/logic/rubric gaps, and strengthening ${session.citationStyle} citations (target ~${targetSection.targetWords} words).`;
+
+  const userPrompt = `Section ${sectionIdx + 1}: "${targetSection.title}"
+Task: ${actionGoal}
+Section Guidance: ${targetSection.guidanceNotes || 'Ensure high-distinction academic quality.'}
+${userEditNotes.trim() ? `Specific User Edit Instructions: ${userEditNotes.trim()}\n` : ''}
+Writing Language: ${session.writingLanguage}
+Citation Style: ${session.citationStyle}
+
+${
+  priorContext
+    ? `=== PRIOR SECTIONS CONTEXT (FOR CONTINUITY) ===\n${priorContext}\n\n`
+    : ''
+}=== EXISTING DRAFT FOR THIS SECTION (TO REVISE / EXPAND) ===
+${targetSection.content.trim()}
+
+OUTPUT FORMAT:
+1. Do NOT repeat the section heading "${targetSection.title}" on the first line and do NOT prepend markdown '#' or '##' hashes.
+2. Output the complete revised/expanded academic prose for this section.
+3. Immediately after the prose, on a new line output the exact marker: ${CHANGE_LOG_MARKER}
+4. Right after that marker, write 1-2 concise Vietnamese sentences describing EXACTLY WHERE and WHAT was edited/added in this section (e.g., "Giữ nguyên đoạn mở đầu; mở rộng đoạn 2 thêm phân tích số liệu 2024 và bổ sung 2 trích dẫn; viết tiếp đoạn kết chuyển ý sang chương sau.").`;
+
+  const raw = await callAiChatbot({
+    profile,
+    systemPrompt,
+    userPrompt,
+    enableWebSearch,
+    signal,
+  });
+  return splitChangeLogResponse(raw);
 }
