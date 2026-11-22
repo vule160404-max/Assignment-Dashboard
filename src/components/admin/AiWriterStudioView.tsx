@@ -101,6 +101,35 @@ interface AiWriterStudioViewProps {
   onToast: (msg: string) => void;
 }
 
+const DELETED_SESSIONS_STORAGE_KEY =
+  'assigntrack_ai_writer_deleted_session_ids_v1';
+
+function loadDeletedSessionIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_SESSIONS_STORAGE_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      return new Set(parsed.filter((x): x is string => typeof x === 'string'));
+    }
+  } catch {
+    // ignore
+  }
+  return new Set();
+}
+
+function markSessionIdDeleted(id: string): void {
+  if (!id) return;
+  try {
+    const set = loadDeletedSessionIds();
+    set.add(id);
+    const trimmed = Array.from(set).slice(-120);
+    localStorage.setItem(DELETED_SESSIONS_STORAGE_KEY, JSON.stringify(trimmed));
+  } catch {
+    // ignore
+  }
+}
+
 function formatDefaultRunningHeader(topic?: string): string {
   if (!topic) return '';
   const text = topic.trim().toUpperCase();
@@ -167,7 +196,8 @@ export function AiWriterStudioView({
     loadGlobalSkillLibrary()
   );
   const [sessions, setSessions] = useState<WriterSession[]>(() => {
-    const saved = loadWriterSessions();
+    const deletedIds = loadDeletedSessionIds();
+    const saved = loadWriterSessions().filter((s) => !deletedIds.has(s.id));
     if (saved.length > 0) {
       // Reset any stuck generating statuses from previous page reload
       return saved.map((s) => ({
@@ -599,7 +629,18 @@ export function AiWriterStudioView({
       }
     }, updateSyncState);
 
-    const unsubSessions = subscribeWriterSessions((cloudSessions) => {
+    const unsubSessions = subscribeWriterSessions((rawCloudSessions) => {
+      // Never resurrect any tab/session that the user explicitly closed or deleted
+      const deletedIds = loadDeletedSessionIds();
+      const cloudSessions: WriterSession[] = [];
+      for (const cs of rawCloudSessions) {
+        if (deletedIds.has(cs.id)) {
+          void deleteWriterSessionFromCloud(cs.id);
+          continue;
+        }
+        cloudSessions.push(cs);
+      }
+
       const hasMeaningfulData = (s: WriterSession) =>
         Boolean(
           s.topic.trim() ||
@@ -707,8 +748,9 @@ export function AiWriterStudioView({
     }
 
     const timer = window.setTimeout(() => {
+      const deletedIds = loadDeletedSessionIds();
       for (const s of sessionsRef.current) {
-        if (isWriterSessionBusy(s)) continue;
+        if (deletedIds.has(s.id) || isWriterSessionBusy(s)) continue;
         const alreadySyncedBefore = Boolean(lastSyncedSessionAtRef.current[s.id]);
         const hasMeaningfulData = Boolean(
           s.topic.trim() ||
@@ -1006,18 +1048,29 @@ export function AiWriterStudioView({
   const handleDeleteSession = (id: string) => {
     pausedSessionIdsRef.current.add(id);
     delete lastSyncedSessionAtRef.current[id];
+    markSessionIdDeleted(id);
+
     const targetSess = sessions.find((s) => s.id === id);
     if (targetSess) {
       const logKey = getActivityLogKeyForSession(targetSess);
       setActivityLogsByKey((prev) => {
         const next = { ...prev };
         delete next[logKey];
+        try {
+          localStorage.setItem(
+            ACTIVITY_LOGS_STORAGE_KEY,
+            JSON.stringify(next)
+          );
+        } catch {
+          // ignore
+        }
         return next;
       });
     }
     if (activeSessionId === id || sessions.length <= 1) {
       setAuditReport(null);
       setSectionAuditStates({});
+      setFocusedAuditIssueId(null);
       setAutoFixProgress({
         currentStepIndex: 0,
         batchTotal: 0,
@@ -1028,11 +1081,31 @@ export function AiWriterStudioView({
     void deleteWriterSessionFromCloud(id);
     if (sessions.length <= 1) {
       const reset = createDefaultSession(null);
+      saveWriterSessions([reset]);
+      try {
+        localStorage.setItem(
+          'assigntrack_ai_writer_active_session_v1',
+          reset.id
+        );
+      } catch {
+        // ignore
+      }
       setSessions([reset]);
       setActiveSessionId(reset.id);
       return;
     }
     const next = sessions.filter((s) => s.id !== id);
+    const nextActiveId = activeSessionId === id ? next[0].id : activeSessionId;
+    // Persist synchronously so pressing F5 immediately after closing a tab NEVER restores it
+    saveWriterSessions(next);
+    try {
+      localStorage.setItem(
+        'assigntrack_ai_writer_active_session_v1',
+        nextActiveId
+      );
+    } catch {
+      // ignore
+    }
     setSessions(next);
     if (activeSessionId === id) {
       setActiveSessionId(next[0].id);
@@ -1793,17 +1866,45 @@ export function AiWriterStudioView({
         'Đã xóa toàn bộ bài viết & dàn ý đang làm (giữ lại Đề bài & Rubric) để làm lại từ đầu!';
     }
 
-    // Update local state immediately & record timestamp so debounced sync won't race
-    lastSyncedSessionAtRef.current[nextSession.id] = nextSession.updatedAt;
-    setSessions((prev) =>
-      prev.map((s) => (s.id === nextSession.id ? nextSession : s))
+    // Update local state & localStorage synchronously so immediate F5 never restores deleted content
+    const oldSessionId = activeSession.id;
+    let finalNextSession = nextSession;
+    if (resetScope === 'everything') {
+      // Retire old ID completely so neither localStorage nor Firestore can resurrect the deleted paper
+      markSessionIdDeleted(oldSessionId);
+      delete lastSyncedSessionAtRef.current[oldSessionId];
+      void deleteWriterSessionFromCloud(oldSessionId);
+      finalNextSession = {
+        ...nextSession,
+        id: `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      };
+    }
+
+    lastSyncedSessionAtRef.current[finalNextSession.id] =
+      finalNextSession.updatedAt;
+    const updatedSessions = sessionsRef.current.map((s) =>
+      s.id === oldSessionId ? finalNextSession : s
     );
+    saveWriterSessions(updatedSessions);
+    try {
+      localStorage.setItem(
+        'assigntrack_ai_writer_active_session_v1',
+        finalNextSession.id
+      );
+    } catch {
+      // ignore
+    }
+    setSessions(updatedSessions);
+    if (finalNextSession.id !== oldSessionId) {
+      setActiveSessionId(finalNextSession.id);
+    }
     setLeftTab(nextTab);
     setShowResetConfirmModal(false);
 
     // Clear QA error report, red/green section highlights, and per-order activity log on paper reset
     setAuditReport(null);
     setSectionAuditStates({});
+    setFocusedAuditIssueId(null);
     setAutoFixProgress({
       currentStepIndex: 0,
       batchTotal: 0,
@@ -1812,9 +1913,12 @@ export function AiWriterStudioView({
     setShowAuditModal(false);
     handleClearActiveOrderLogs();
 
-    // Push reset immediately to Firestore (no 1.5s debounce, no empty-data skip) so F5 never restores old content
-    if (cloudSyncState !== 'permission_denied') {
-      await saveWriterSessionToCloud(nextSession);
+    // Push reset immediately to Firestore (for partial resets that keep the same session)
+    if (
+      resetScope !== 'everything' &&
+      cloudSyncState !== 'permission_denied'
+    ) {
+      await saveWriterSessionToCloud(finalNextSession);
     }
 
     onToast(toastMessage);
