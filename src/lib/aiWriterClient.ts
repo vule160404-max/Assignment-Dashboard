@@ -560,12 +560,32 @@ export function resolveEffectiveWriterConfig(settings: AiChatbotSettingsStore): 
  * Step 1 of Hybrid Pipeline: Uses Perplexity (Agent Search / Sonar) ONLY to gather
  * up-to-date real-time web/academic sources and properly formatted citations (low output tokens).
  */
+const INSTITUTION_NAME_RX =
+  /\b(?:university|faculty|ministry|department|institute|association|organization|organisation|center|centre|council|board|commission|committee|office|agency|bank|academy|foundation|society|world|united|national|international|who|oecd|unesco|unicef|imf)\b/i;
+
+/**
+ * Splits merged 2-word personal names from Crossref (e.g. { family: "Yunika Upa" } or { name: "Yunika Upa" })
+ * into { given: "Yunika", family: "Upa" } while keeping institutional names intact.
+ */
+function normalizeCrossrefAuthor(a: CrossrefAuthor): { family: string; given?: string } {
+  const rawFamily = cleanCrossrefText(a.family || a.name || '');
+  const rawGiven = cleanCrossrefText(a.given || '');
+  if (rawGiven) {
+    return { family: rawFamily, given: rawGiven };
+  }
+  const parts = rawFamily.split(/\s+/).filter(Boolean);
+  if (parts.length === 2 && !INSTITUTION_NAME_RX.test(rawFamily)) {
+    return { given: parts[0], family: parts[1] };
+  }
+  return { family: rawFamily };
+}
+
 function formatInTextCitationForWork(
   work: CrossrefWorkMeta,
   style: string
 ): string {
   const fams = work.authors
-    .map((a) => cleanCrossrefText(a.family || a.name || ''))
+    .map((a) => normalizeCrossrefAuthor(a).family)
     .filter(Boolean);
   if (fams.length === 0) return `(${work.year})`;
   if (fams.length === 1) return `(${fams[0]}, ${work.year})`;
@@ -801,9 +821,57 @@ STRICT RULES:
   return [crossrefDossier, perplexityBlock].filter(Boolean).join('\n\n').trim();
 }
 
+function compactResearchedSourcesForPrompt(
+  rawSources: string,
+  mode: 'outline' | 'body'
+): string {
+  const trimmed = (rawSources || '').trim();
+  if (!trimmed) return '';
+  const perpMarker = '=== PERPLEXITY REAL-TIME WEB RESEARCH';
+  const splitIdx = trimmed.indexOf(perpMarker);
+  if (splitIdx === -1) {
+    return trimmed.slice(0, mode === 'outline' ? 2400 : 4800);
+  }
+  const crossrefPart = trimmed.slice(0, splitIdx).trim();
+  if (mode === 'outline') {
+    // Outline generation only needs the verified [S1]..[S12] Crossref titles/citations (saves ~3,000 tokens!)
+    return crossrefPart.slice(0, 3200);
+  }
+  // Body writing keeps 100% of verified [S1]..[S12] Crossref pack + compact capped Perplexity web context
+  const perplexityPart = trimmed.slice(splitIdx).trim().slice(0, 2600);
+  return `${crossrefPart}\n\n${perplexityPart}`.trim();
+}
+
+function compactContextFilesForPrompt(
+  files: WriterSession['contextFiles'],
+  maxTotalChars: number
+): string {
+  if (!files || files.length === 0) return '';
+  const perFileBudget = Math.max(
+    1800,
+    Math.floor(maxTotalChars / files.length)
+  );
+  return (
+    '\n\n=== UPLOADED ASSIGNMENT & RESEARCH CONTEXT FILES ===\n' +
+    files
+      .map((cf, idx) => {
+        const raw = cf.content.trim();
+        let body = raw;
+        if (raw.length > perFileBudget) {
+          const headLen = Math.round(perFileBudget * 0.72);
+          const tailLen = Math.max(300, perFileBudget - headLen - 40);
+          body = `${raw.slice(0, headLen)}\n[... middle excerpt omitted for token efficiency ...]\n${raw.slice(-tailLen)}`;
+        }
+        return `--- [CONTEXT FILE #${idx + 1}: ${cf.name}] ---\n${body}`;
+      })
+      .join('\n\n')
+  );
+}
+
 export function buildSkillsAndContextSystemPrompt(
   session: WriterSession,
-  skills: SkillDocument[]
+  skills: SkillDocument[],
+  mode: 'outline' | 'body' = 'body'
 ): string {
   const activeSkills = skills.filter((s) => s.enabled && s.content.trim());
   const skillBlock =
@@ -816,28 +884,24 @@ export function buildSkillsAndContextSystemPrompt(
           .join('\n\n')
       : 'Use high-distinction academic writing standards.';
 
-  const contextBlock =
-    session.contextFiles.length > 0
-      ? '\n\n=== UPLOADED ASSIGNMENT & RESEARCH CONTEXT FILES ===\n' +
-        session.contextFiles
-          .map(
-            (cf, idx) =>
-              `--- [CONTEXT FILE #${idx + 1}: ${cf.name}] ---\n${cf.content.trim()}`
-          )
-          .join('\n\n')
-      : '';
+  const contextBlock = compactContextFilesForPrompt(
+    session.contextFiles,
+    mode === 'outline' ? 6000 : 14000
+  );
 
-  const researchedSourcesBlock = session.researchedSources?.trim()
+  const compactSources = compactResearchedSourcesForPrompt(
+    session.researchedSources || '',
+    mode
+  );
+
+  const researchedSourcesBlock = compactSources
     ? `\n\n=== VERIFIED REAL-TIME ACADEMIC & WEB SOURCES (CROSSREF + PERPLEXITY) ===
-STRICT CLOSED-BOOK CITATION LOCK (MANDATORY — ZERO EXCEPTIONS):
-1. You may ONLY cite sources that have COMPLETE, VERIFIED bibliographic metadata (Author(s), Publication Year, Title, and Journal/Publisher/Venue) explicitly present in:
-   (a) The VERIFIED CROSSREF ACADEMIC SOURCES [S1]..[SN] list below, OR
-   (b) The UPLOADED ASSIGNMENT & RESEARCH CONTEXT FILES attached above, OR
-   (c) Complete scholarly entries in the PERPLEXITY WEB RESEARCH section below that explicitly state Author + Year + Title + Venue.
-2. STRICTLY FORBIDDEN: NEVER invent, guess, or recall additional author-year citations from your training memory. NEVER cite any web snippet that lacks an explicit author surname and publication year. NEVER put an article title inside parentheses as an in-text citation (e.g., NEVER write "(Enhancing EFL primary school students' vocabulary mastery, 2026)" or "(Beyond single exposure, 2026)").
-3. Preserve the EXACT author surnames and publication year from the verified source list (e.g., use the exact In-Text format shown in [S1]..[SN]) so every in-text citation matches the final References 100% 1-to-1.
-4. NEVER fabricate or guess DOIs, page numbers, or thesis degrees (doctoral vs. master's) not supported by the attached files or verified sources.
-${session.researchedSources.trim()}`
+STRICT CLOSED-BOOK CITATION & DATA LOCK (ZERO EXCEPTIONS):
+1. ONLY cite sources with COMPLETE bibliographic metadata (Author(s), Year, Title, Venue) from [S1]..[SN] below, attached Context Files, or complete Perplexity entries with an explicit Author + Year.
+2. NEVER invent/recall citations from memory. NEVER cite an article title in parentheses (e.g., NEVER "(Enhancing EFL..., 2026)"). If a Perplexity snippet lacks an explicit author name, DO NOT cite it AND DO NOT copy specific quantitative numbers/scores (e.g., "72.20 to 85.44") from it.
+3. Copy exact author surname spelling and year from [S1]..[SN] (zero typos like Emyliani vs Emyliana; 100% 1-to-1 with References).
+4. NEVER guess DOIs, page ranges, or thesis degrees not supported by the sources/files.
+${compactSources}`
     : '';
 
   const isVi = session.writingLanguage === 'Vietnamese';
@@ -886,7 +950,11 @@ export async function generateOutlineWithAi(
   enableWebSearch?: boolean,
   signal?: AbortSignal
 ): Promise<WriterOutlineSection[]> {
-  const systemPrompt = buildSkillsAndContextSystemPrompt(session, skills);
+  const systemPrompt = buildSkillsAndContextSystemPrompt(
+    session,
+    skills,
+    'outline'
+  );
   const isVi = session.writingLanguage === 'Vietnamese';
 
   let vnStructureHint =
@@ -990,8 +1058,12 @@ export function parseAiOutlineJson(
           item.headingLevel === 'h2' || item.headingLevel === 'h3'
             ? item.headingLevel
             : 'h1';
-        const cleanTitle = (item.title || `Section ${idx + 1}`).trim();
-        const isRef = isReferencesSectionTitle(cleanTitle);
+        const rawTitle = (item.title || `Section ${idx + 1}`).trim();
+        const isRef = isReferencesSectionTitle(rawTitle);
+        // APA 7 / Harvard standard: heading is simply "References" (strip trailing "(APA)" / "(Harvard)" etc.)
+        const cleanTitle = isRef
+          ? rawTitle.replace(/\s*\((?:APA|Harvard|MLA|IEEE|Chicago)[^)]*\)\s*$/i, '').trim() || 'References'
+          : rawTitle;
         return {
           id: `sec_${Date.now()}_${idx}`,
           order: idx + 1,
@@ -1062,7 +1134,7 @@ export function parseAiOutlineJson(
     {
       id: `sec_${Date.now()}_4`,
       order: 5,
-      title: `References (${citationStyle})`,
+      title: 'References',
       headingLevel: 'h1',
       targetWords: 0,
       guidanceNotes: `Complete list of all scholarly sources cited across all sections above formatted strictly in ${citationStyle} (unlimited word count).`,
@@ -1522,18 +1594,68 @@ function initialsOf(given: string | undefined, withSpaces: boolean): string {
   return parts.join(withSpaces ? ' ' : '');
 }
 
+const PROPER_NOUN_WORDS_APA = new Set([
+  'english', 'indonesian', 'vietnamese', 'japanese', 'chinese', 'korean', 'thai',
+  'german', 'french', 'spanish', 'arabic', 'russian', 'turkish', 'afghan', 'indian',
+  'american', 'british', 'australian', 'canadian', 'european', 'asian', 'african',
+  'indonesia', 'vietnam', 'japan', 'china', 'korea', 'thailand', 'germany', 'france',
+  'spain', 'turkey', 'afghanistan', 'india', 'malaysia', 'singapore', 'philippines',
+  'depok', 'batam', 'jakarta', 'hanoi', 'merdeka', 'cambridge', 'oxford', 'harvard',
+  'bloomsbury', 'sage', 'springer', 'elsevier', 'routledge', 'wiley', 'google',
+]);
+
+/**
+ * Converts Title Case or ALL CAPS article/book titles to strict APA 7th Sentence case:
+ * keeps first word, first word after ':'/'?'/'!', all-caps acronyms (EFL, AI, TED, STEM),
+ * and proper geographical/language nouns capitalized.
+ */
+function toApaSentenceCase(rawTitle: string): string {
+  const clean = cleanCrossrefText(rawTitle);
+  if (!clean) return clean;
+  const words = clean.split(/(\s+)/);
+  let capitalizeNext = true;
+  return words
+    .map((tok) => {
+      if (/^\s+$/.test(tok)) return tok;
+      // Preserve acronyms like EFL, ESL, AI, TED, STEM, COVID-19, L1, L2
+      const stripped = tok.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '');
+      const isAcronym =
+        /^[A-Z]{2,6}(?:-[A-Z0-9]+)?$/.test(stripped) ||
+        /^L[12]$/.test(stripped) ||
+        /^(?:iOS|iPad|e-Learning|ChatGPT|YouTube|WhatsApp|TikTok)$/i.test(stripped);
+
+      let out = tok;
+      if (isAcronym) {
+        out = tok;
+      } else if (capitalizeNext || PROPER_NOUN_WORDS_APA.has(stripped.toLowerCase())) {
+        // Capitalize first letter, keep rest lowercase if it was ALL CAPS
+        const isAllCaps = stripped.length >= 3 && stripped === stripped.toUpperCase();
+        out = isAllCaps
+          ? tok.toLowerCase().replace(/[A-Za-zÀ-ỹ]/, (c) => c.toUpperCase())
+          : tok.replace(/[A-Za-zÀ-ỹ]/, (c) => c.toUpperCase());
+      } else {
+        out = tok.toLowerCase();
+      }
+
+      capitalizeNext = /[:?!—–]$/.test(tok.trim());
+      return out;
+    })
+    .join('');
+}
+
 function formatCrossrefReference(
   work: CrossrefWorkMeta,
   style: string
 ): string {
   const doiUrl = work.doi ? `https://doi.org/${work.doi}` : '';
-  const authors = work.authors.slice(0, 20);
-  const fam = (a: CrossrefAuthor) => cleanCrossrefText(a.family || a.name || '');
+  const authors = work.authors.slice(0, 20).map(normalizeCrossrefAuthor);
+  const fam = (a: { family: string; given?: string }) => a.family;
   const pages = (work.page || '').replace(/-/g, '–');
   const isBook = work.type === 'book' || work.type === 'monograph';
   const isChapter = work.type === 'book-chapter';
 
   if (style === 'APA') {
+    const apaTitle = toApaSentenceCase(work.title);
     const names = authors.map((a) => {
       const ini = initialsOf(a.given, true);
       return ini ? `${fam(a)}, ${ini}` : fam(a);
@@ -1543,10 +1665,10 @@ function formatCrossrefReference(
         ? names[0] || ''
         : `${names.slice(0, -1).join(', ')}, & ${names[names.length - 1]}`;
     if (isBook) {
-      return `${authorStr} (${work.year}). ${work.title}. ${work.publisher || ''}.${doiUrl ? ` ${doiUrl}` : ''}`.replace(/\s+\./g, '.');
+      return `${authorStr} (${work.year}). ${apaTitle}. ${work.publisher || ''}.${doiUrl ? ` ${doiUrl}` : ''}`.replace(/\s+\./g, '.');
     }
     const volIssue = `${work.volume || ''}${work.issue ? `(${work.issue})` : ''}`;
-    return `${authorStr} (${work.year}). ${work.title}. ${work.containerTitle || work.publisher || ''}${
+    return `${authorStr} (${work.year}). ${apaTitle}. ${work.containerTitle || work.publisher || ''}${
       volIssue ? `, ${volIssue}` : ''
     }${pages ? `, ${pages}` : ''}.${doiUrl ? ` ${doiUrl}` : ''}`;
   }
@@ -2171,9 +2293,7 @@ Provide 6 to 8 authoritative, strictly formatted ${session.citationStyle} schola
   const fullOutlineMap = session.outline
     .map(
       (s, i) =>
-        `${i + 1}. [${s.headingLevel.toUpperCase()}] ${s.title} (~${
-          s.targetWords
-        } words) — ${s.guidanceNotes}`
+        `${i + 1}. ${s.title}${s.targetWords > 0 ? ` (~${s.targetWords}w)` : ''}`
     )
     .join('\n');
 
@@ -2185,40 +2305,24 @@ Provide 6 to 8 authoritative, strictly formatted ${session.citationStyle} schola
   const verifiedWhitelistBlock = buildVerifiedCitationWhitelistBlock(session);
   const citationGrammarRule = getCitationStyleGrammarRule(session.citationStyle);
 
-  const userPrompt = `Now write ONLY Section ${sectionIdx + 1} of the paper: "${targetSection.title}".
+  const userPrompt = `Write ONLY Section ${sectionIdx + 1}: "${targetSection.title}".
 
-=== FULL PAPER OUTLINE ===
+=== OUTLINE ===
 ${fullOutlineMap}
-
 ${
   priorWrittenSections
-    ? `=== PREVIOUSLY WRITTEN SECTIONS (FOR CONTINUITY & TO AVOID REPETITION) ===\n${priorWrittenSections}\n`
+    ? `\n=== PRIOR SECTIONS (CONTINUITY) ===\n${priorWrittenSections}\n`
     : ''
 }${verifiedWhitelistBlock}
-=== CURRENT SECTION TO WRITE NOW ===
-- Section Title: ${targetSection.title}
-- Target Word Count for this section: ${targetSection.targetWords} words (write thoroughly to reach approximately ${targetSection.targetWords} words)
-- Specific Guidance & Rubric Notes for this section:
-${targetSection.guidanceNotes || 'Develop scholarly arguments with peer-reviewed citations.'}
-- Citation Style: ${session.citationStyle} (${citationGrammarRule})
-- Writing Language: ${session.writingLanguage}
+=== CURRENT SECTION ===
+- Title: ${targetSection.title} | Target: ~${targetSection.targetWords} words | Style: ${session.citationStyle} (${citationGrammarRule}) | Language: ${session.writingLanguage}
+- Guidance: ${targetSection.guidanceNotes || 'Develop scholarly arguments with peer-reviewed citations.'}
 
-STRICT ACADEMIC WRITING & CITATION RULES (MANDATORY):
-1. NO REPEATED HEADING / NO MARKDOWN HASHES: Do NOT repeat "${targetSection.title}" on the first line, and NEVER prepend markdown '#', '##', or '###' symbols.
-2. SUB-HEADING PAIRING & CONTENT ALIGNMENT:
-   - If this section is a major chapter (${targetSection.targetWords} words >= 350 words and headingLevel is "${targetSection.headingLevel}"), structure it with 2 to 4 clear numbered sub-headings matching the chapter number (e.g., "4.1 ...", "4.2 ...").
-   - NEVER create an orphan sub-heading (if you write "X.1", you MUST also write at least "X.2").
-   - Every paragraph under a sub-heading MUST strictly match that sub-heading's exact topic — NEVER place content about another theme under the wrong sub-heading.
-3. CLOSED-BOOK VERIFIED CITATIONS ONLY:
-   - ONLY cite sources that exist in the VERIFIED IN-TEXT CITATION WHITELIST above, the attached Context Files, or complete verified sources in the system prompt (with explicit Author + Year + Title + Venue).
-   - STRICTLY FORBIDDEN: NEVER invent, guess, or recall author-year citations from memory. NEVER put an article title inside parentheses instead of an author surname (e.g., NEVER write "(Teacher challenges and adaptive pedagogical responses, 2026)"). If a Perplexity snippet has no explicit author name, DO NOT cite it. NEVER drop the first author of a multi-author work, and NEVER alter the publication year.
-   - Integrate citations naturally to support claims (critical synthesis, not a laundry list of summaries), aiming for 2–5 authentic citations per major analytical subsection.
-4. FACTUAL CONSISTENCY ACROSS CHAPTERS:
-   - Keep every factual detail (e.g., Doctoral/PhD thesis vs. Master's thesis, sample size N, instruments, methodology, author spelling) 100% consistent with the attached Context Files and Prior Sections. NEVER contradict earlier chapters.
-5. COMPLETE PROSE & ZERO TRUNCATION:
-   - Write cohesive, high-distinction academic prose in ${session.writingLanguage} with smooth transitions from the prior section.
-   - Ensure the final sentence and paragraph end cleanly with complete punctuation — NEVER stop mid-sentence.
-   - Output ONLY the academic text for this section (zero meta-commentary, zero code fences).`;
+MANDATORY RULES:
+1. Do NOT repeat "${targetSection.title}" on line 1; NEVER use markdown '#'/'##'/'###' or code fences.
+2. Sub-headings: if >= 350w (${targetSection.headingLevel}), use 2–4 paired numbered sub-headings (never orphan X.1 without X.2); every paragraph must strictly match its sub-heading topic.
+3. Citations & Data: ONLY cite verified sources from the Whitelist/Context Files (exact author surname spelling & year). NEVER cite article titles in parentheses, NEVER copy unattributed numbers/scores from anonymous web snippets, and aim for 2–5 natural citations per major subsection.
+4. Keep facts (thesis degree, sample size N, instruments) 100% consistent with Context Files & Prior Sections. End cleanly with full punctuation. Output ONLY the section prose.`;
 
   const raw = await callAiChatbot({
     profile,
@@ -3235,6 +3339,30 @@ export async function runDeterministicPaperAudit(
       .toLowerCase();
 
     const missingCitations: string[] = [];
+    const typoMismatches: Array<{ cite: string; refAuthor: string; sectionId?: string }> = [];
+    const levenshtein1 = (a: string, b: string): boolean => {
+      if (Math.abs(a.length - b.length) > 1 || a.length < 4 || b.length < 4) return false;
+      let diffs = 0;
+      let i = 0;
+      let j = 0;
+      while (i < a.length && j < b.length) {
+        if (a[i] === b[j]) {
+          i++;
+          j++;
+        } else {
+          diffs++;
+          if (diffs > 1) return false;
+          if (a.length > b.length) i++;
+          else if (b.length > a.length) j++;
+          else {
+            i++;
+            j++;
+          }
+        }
+      }
+      return diffs + (a.length - i) + (b.length - j) === 1;
+    };
+
     for (const cite of inTextCitations) {
       const yearMatch = cite.match(/(19|20)\d{2}/);
       const year = yearMatch ? yearMatch[0] : '';
@@ -3247,19 +3375,51 @@ export async function runDeterministicPaperAudit(
           .normalize('NFD')
           .replace(/[\u0300-\u036f]/g, '')
           .toLowerCase();
-        // Check that first author appears near the start of the reference entry (within first 60 chars)
+        // Check that first author appears near the start of the reference entry (within first 70 chars)
         return (
           normEntry.slice(0, 70).replace(/[^a-z0-9]/g, '').includes(normAuthor) &&
           normEntry.includes(year)
         );
       });
 
-      if (!hasEntry && !normalizedRefText.includes(`${normAuthor}`)) {
-        missingCitations.push(cite);
-      } else if (!hasEntry) {
-        // Author exists in ref list or year mismatch / dropped first author
-        missingCitations.push(cite);
+      if (!hasEntry) {
+        // Check if it's a 1-char spelling typo against an existing Reference (e.g., Emyliani vs Emyliana)
+        const nearEntry = refEntries.find((entry) => {
+          if (!entry.includes(year)) return false;
+          const refFirstSurname = normalizeSurnameToken(entry.split(/[,(\s]/)[0] || '');
+          return levenshtein1(normAuthor, refFirstSurname);
+        });
+        if (nearEntry) {
+          const refAuthorWord = nearEntry.split(/[,(\s]/)[0] || '';
+          const owningSec = bodySections.find((s) =>
+            (s.content || '').toLowerCase().includes(firstAuthor.toLowerCase())
+          );
+          typoMismatches.push({
+            cite,
+            refAuthor: refAuthorWord,
+            sectionId: owningSec?.id,
+          });
+        } else if (!normalizedRefText.includes(`${normAuthor}`)) {
+          missingCitations.push(cite);
+        } else {
+          missingCitations.push(cite);
+        }
       }
+    }
+
+    for (const typo of typoMismatches) {
+      const ownerSec = bodySections.find((s) => s.id === typo.sectionId);
+      pushIssue({
+        severity: 'critical',
+        category: 'citation_sync',
+        title: `Sai chính tả họ tác giả giữa thân bài và References: "${typo.cite}" vs "${typo.refAuthor}"`,
+        detail: `Trong bài ghi "${typo.cite}" nhưng danh mục References ghi "${typo.refAuthor}". Cần đồng bộ chính xác từng chữ cái.`,
+        sectionId: ownerSec?.id || refSection.id,
+        sectionTitle: ownerSec?.title || refSection.title,
+        autoFixable: true,
+        matchSnippet: typo.cite.replace(/^\(|\)$/g, ''),
+        fixHint: `Đổi chính tả họ tác giả trong bài cho khớp chính xác với "${typo.refAuthor}" trong References.`,
+      });
     }
 
     if (missingCitations.length > 0) {
