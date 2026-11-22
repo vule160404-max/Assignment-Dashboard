@@ -4,6 +4,7 @@ import { CheckCircle2, X } from 'lucide-react';
 import { AdminPortalView } from './components/admin/AdminPortalView';
 import { ClientPortalView } from './components/client/ClientPortalView';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
+import { FloatingSupportDock } from './components/shared/FloatingSupportDock';
 import { RoleSelectionGate } from './components/shared/RoleSelectionGate';
 import {
   auth,
@@ -229,6 +230,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       {activeContent}
+      {mode !== 'admin' && <FloatingSupportDock />}
 
       {toast && (
         <div
