@@ -1754,6 +1754,38 @@ function buildVerifiedCitationWhitelistBlock(session: WriterSession): string {
   )}\n`;
 }
 
+function isAiRefusalOrDisclaimerLine(line: string): boolean {
+  const s = line.trim();
+  if (!s) return true;
+  if (
+    /^(?:no verified|to avoid fabricating|i cannot|i'm unable|unable to verify|cannot find|note:|please note|disclaimer:|sorry,|unfortunately,|the provided sources do not|no bibliographic data|missing bibliographic)/i.test(
+      s
+    )
+  ) {
+    return true;
+  }
+  if (
+    /\b(?:was found in the provided sources|not found in the provided sources|to avoid fabricating|cannot be verified from the provided|no verified bibliographic data)\b/i.test(
+      s
+    )
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function stripInlineAiMetaNotes(text: string): string {
+  return text
+    .replace(
+      /\s*[([]\s*(?:no verified|doi unavailable|no doi|unverified|missing (?:journal|doi|publisher|pages|volume)|not available in provided sources|journal(?:\s+or\s+doi)?\s+unavailable)[^)\]]*[)\]]/gi,
+      ''
+    )
+    .replace(/\s+\./g, '.')
+    .replace(/\.\s*\./g, '.')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export async function generateSectionWithAi(
   session: WriterSession,
   targetSectionId: string,
@@ -1789,14 +1821,17 @@ export async function generateSectionWithAi(
     const uniqueCitations = extractInTextCitations(priorText);
 
     const leanRefSystemPrompt = `You are a strict Academic Bibliographer.
-Format ONLY complete, authentic ${session.citationStyle} reference entries matching the exact in-text citations provided.
-CRITICAL ANTI-HALLUCINATION RULES:
+Format ONLY clean, publication-ready ${session.citationStyle} reference entries matching the exact in-text citations provided.
+REQUIRED VS. OPTIONAL ELEMENTS:
+- REQUIRED (4 core fields): Author(s) in exact order, Year, Title, and Publication venue (Journal/Publisher/University).
+- OPTIONAL (OMIT SILENTLY IF UNKNOWN): DOI, URL, issue number, page range, access date, place of publication. If an optional field is unavailable, simply leave it out cleanly — do NOT write any placeholder or explanation.
+CRITICAL ANTI-HALLUCINATION & ZERO-META RULES:
 - Preserve EVERY author name in exact order (NEVER drop the first author of a 3-author citation like "Fredricks, Blumenfeld and Paris" or "Xu, Yang and He").
 - NEVER invent, guess, or fabricate a DOI (especially sequential numbers like 123456, 1123456, 1156789) or URL.
 - NEVER copy or reuse one source's DOI, URL, or paper title onto a different author.
-- ONLY include a DOI or URL if it appears verbatim in the VERIFIED SOURCES list for THAT exact author and work. If you are not 100% certain of the DOI/URL, OMIT the DOI/URL completely.
-- Output each reference entry on a SINGLE line (do not insert line breaks inside one entry), separated from the next entry by a blank line.
-- NEVER include the assignment prompt, rubric, syllabus, or skill instructions. No headings, no markdown '#', no commentary.`;
+- ONLY include a DOI or URL if it appears verbatim in the VERIFIED SOURCES list for THAT exact author and work; otherwise silently omit the DOI/URL.
+- ZERO ERROR MESSAGES / ZERO META-NOTES (STRICTLY FORBIDDEN): NEVER write apologies, refusal sentences, or parenthetical disclaimers into the output (e.g., NEVER write "No verified bibliographic data...", "To avoid fabricating...", "(no verified journal or DOI available...)", "[DOI unavailable]", "Note:").
+- Output each reference entry on a SINGLE line (do not insert line breaks inside one entry), separated from the next entry by a blank line. No headings, no markdown '#', no commentary.`;
 
     const researchedSnippet = session.researchedSources?.trim()
       ? `\n\n=== VERIFIED SOURCES FROM WEB RESEARCH (ONLY COPY A DOI/URL IF THE AUTHOR & TITLE ACTUALLY MATCH!) ===\n${session.researchedSources
@@ -1817,11 +1852,13 @@ CRITICAL ANTI-HALLUCINATION RULES:
       const seenDois = new Set<string>();
       const cleaned: string[] = [];
       for (const rawEntry of entries) {
-        let line = stripMarkdownHashesFromText(rawEntry)
-          .replace(/\s*\n+\s*/g, ' ')
-          .replace(/\s+/g, ' ')
-          .trim();
-        if (!line || line.length < 18) continue;
+        let line = stripInlineAiMetaNotes(
+          stripMarkdownHashesFromText(rawEntry)
+            .replace(/\s*\n+\s*/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+        );
+        if (!line || line.length < 18 || isAiRefusalOrDisclaimerLine(line)) continue;
         if (
           /^(references|bibliography|tài liệu tham khảo)/i.test(line) &&
           line.length < 50
@@ -2617,6 +2654,30 @@ export async function runDeterministicPaperAudit(
       continue;
     }
 
+    // Check for leaked AI refusal / meta-disclaimer messages (e.g., "No verified bibliographic data...", "(no verified journal or DOI available...)")
+    const leakedAiLines = trimmed
+      .split(/\r?\n/)
+      .filter(
+        (line) =>
+          isAiRefusalOrDisclaimerLine(line) ||
+          /[([]\s*(?:no verified|doi unavailable|no doi|unverified|missing (?:journal|doi|publisher))[^)\]]*[)\]]/i.test(
+            line
+          )
+      );
+    if (leakedAiLines.length > 0) {
+      pushIssue({
+        severity: 'critical',
+        category: sec.id === refSection?.id ? 'doi_and_sources' : 'completeness',
+        title: `Phát hiện ${leakedAiLines.length} câu thông báo lỗi/ghi chú của AI lọt vào mục "${sec.title}"`,
+        detail: `Ví dụ: "${leakedAiLines[0].trim().slice(0, 120)}..." — cần xóa sạch và chỉ giữ nội dung học thuật chuẩn.`,
+        sectionId: sec.id,
+        sectionTitle: sec.title,
+        autoFixable: true,
+        fixHint:
+          'Xóa toàn bộ câu thông báo lỗi/ghi chú ngoặc đơn của AI; bỏ qua âm thầm các yếu tố không bắt buộc (DOI/URL/Issue/Trang) nếu nguồn không có.',
+      });
+    }
+
     const words = trimmed.split(/\s+/).filter(Boolean).length;
     if (sec.id !== refSection?.id && words < 45) {
       pushIssue({
@@ -3244,8 +3305,12 @@ export async function fixReferencesTargetedWithAi(
 
   let entries = refSection.content
     .split(/\r?\n\s*\r?\n+/)
-    .map((e) => e.replace(/\r?\n+/g, ' ').replace(/\s{2,}/g, ' ').trim())
-    .filter(Boolean);
+    .map((e) =>
+      stripInlineAiMetaNotes(
+        e.replace(/\r?\n+/g, ' ').replace(/\s{2,}/g, ' ').trim()
+      )
+    )
+    .filter((e) => Boolean(e) && !isAiRefusalOrDisclaimerLine(e));
 
   const normalizedBadSet = new Set(
     badDois.map((d) => normalizeExtractedDoi(d).toLowerCase()).filter(Boolean)
@@ -3296,11 +3361,12 @@ export async function fixReferencesTargetedWithAi(
       : '';
 
     const systemPrompt = `You are a strict academic bibliographer.
-Generate ONLY the full ${session.citationStyle} reference entries for the exact missing in-text citations listed below.
+Generate ONLY clean, publication-ready ${session.citationStyle} reference entries for the exact missing in-text citations listed below.
 CRITICAL RULES:
 - PRESERVE THE EXACT FIRST AUTHOR SURNAME AND YEAR from each listed citation (e.g., if listed "Eren and Rakıcıoğlu-Söylemez (2023)", entry MUST start with "Eren, ... (2023)").
-- DO NOT INVENT, GUESS, OR PASTE ANY DOI OR URL unless it is 100% verbatim in the Verified web sources for THAT EXACT author. If unsure, OMIT the DOI/URL completely!
-- Output ONLY the reference entries (one complete entry per paragraph, separated by a blank line). No markdown '#', no numbering, no intro/outro.`;
+- OPTIONAL FIELDS (DOI, URL, issue, page range, access date, city): If unavailable, OMIT THEM SILENTLY. DO NOT INVENT OR GUESS ANY DOI/URL.
+- ZERO META-COMMENTARY OR ERROR MESSAGES: NEVER output sentences like "No verified bibliographic data...", "To avoid fabricating...", or parenthetical notes like "(no verified journal or DOI available...)".
+- Output ONLY the clean reference entries (one complete entry per paragraph, separated by a blank line). No markdown '#', no numbering, no intro/outro.`;
 
     const userPrompt = `Topic: ${session.topic || session.title}
 Citation Style: ${session.citationStyle}
@@ -3322,13 +3388,15 @@ ${uniqueMissing.map((c, idx) => `${idx + 1}. ${c}`).join('\n')}`;
     const addedBlocks = rawAdded
       .split(/\r?\n\s*\r?\n+/)
       .map((blk) =>
-        stripMarkdownHashesFromText(blk)
-          .replace(/\r?\n+/g, ' ')
-          .replace(/^\d+[.)]\s+/, '')
-          .replace(/\s{2,}/g, ' ')
-          .trim()
+        stripInlineAiMetaNotes(
+          stripMarkdownHashesFromText(blk)
+            .replace(/\r?\n+/g, ' ')
+            .replace(/^\d+[.)]\s+/, '')
+            .replace(/\s{2,}/g, ' ')
+            .trim()
+        )
       )
-      .filter((blk) => blk.length >= 20);
+      .filter((blk) => blk.length >= 20 && !isAiRefusalOrDisclaimerLine(blk));
 
     // Verify any DOI inside newly generated entries against Crossref immediately — auto-strip if 404 or fake!
     for (const blk of addedBlocks) {
