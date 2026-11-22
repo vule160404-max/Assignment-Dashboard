@@ -804,7 +804,8 @@ export function AiWriterStudioView({
    */
   const ensureHybridSourcesForSession = async (
     targetSessionId: string,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    forceRefresh = false
   ): Promise<WriterSession | null> => {
     const sess = sessionsRef.current.find((s) => s.id === targetSessionId);
     if (!sess) return null;
@@ -812,13 +813,14 @@ export function AiWriterStudioView({
 
     const topicKey = (sess.topic || sess.title || '').trim();
     if (
+      !forceRefresh &&
       sess.researchedSources?.trim() &&
       (sess.researchedSourcesTopic || '').trim() === topicKey
     ) {
       return sess;
     }
 
-    const stepMsg = `Bước 1/2: Đang tra cứu nguồn web & trích dẫn chuẩn ${sess.citationStyle}...`;
+    const stepMsg = `Bước 1/2: Đang tra cứu song song Crossref (nguồn học thuật thật) + Perplexity Web chuẩn ${sess.citationStyle}...`;
     setCurrentStepLabel(stepMsg);
     onToast(stepMsg);
     const t0 = Date.now();
@@ -1729,6 +1731,8 @@ export function AiWriterStudioView({
         batchStatus: 'idle',
         batchErrorMsg: undefined,
         fullPaperOverride: '',
+        researchedSources: '',
+        researchedSourcesTopic: '',
         historyStack: [],
         historyIndex: -1,
         outline: activeSession.outline.map((sec) => ({
@@ -1741,7 +1745,7 @@ export function AiWriterStudioView({
       };
       nextTab = 'outline';
       toastMessage =
-        'Đã xóa toàn bộ nội dung chữ đã viết (giữ nguyên Đề bài & khung Dàn ý) để viết lại!';
+        'Đã xóa toàn bộ nội dung chữ, báo cáo lỗi & bộ nguồn cũ (giữ nguyên Đề bài & khung Dàn ý) để tra cứu nguồn mới và viết lại!';
     } else if (resetScope === 'everything') {
       const fresh = createDefaultSession(null);
       nextSession = {
@@ -2856,6 +2860,18 @@ export function AiWriterStudioView({
           onStopAi={handleStopActiveAi}
           currentStepLabel={currentStepLabel}
           researchedSources={activeSession.researchedSources}
+          onRefreshSources={
+            effectiveWriter.isHybrid
+              ? () => {
+                  const signal = getFreshAiSignal();
+                  void ensureHybridSourcesForSession(
+                    activeSession.id,
+                    signal,
+                    true
+                  ).finally(() => setCurrentStepLabel(''));
+                }
+              : undefined
+          }
           completedSectionsCount={
             activeSession.outline.filter((s) => countWords(s.content) > 0).length
           }

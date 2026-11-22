@@ -560,6 +560,139 @@ export function resolveEffectiveWriterConfig(settings: AiChatbotSettingsStore): 
  * Step 1 of Hybrid Pipeline: Uses Perplexity (Agent Search / Sonar) ONLY to gather
  * up-to-date real-time web/academic sources and properly formatted citations (low output tokens).
  */
+function formatInTextCitationForWork(
+  work: CrossrefWorkMeta,
+  style: string
+): string {
+  const fams = work.authors
+    .map((a) => cleanCrossrefText(a.family || a.name || ''))
+    .filter(Boolean);
+  if (fams.length === 0) return `(${work.year})`;
+  if (fams.length === 1) return `(${fams[0]}, ${work.year})`;
+  if (fams.length === 2) {
+    const conj = style === 'APA' ? '&' : 'and';
+    return `(${fams[0]} ${conj} ${fams[1]}, ${work.year})`;
+  }
+  return `(${fams[0]} et al., ${work.year})`;
+}
+
+/**
+ * Queries Crossref REST API in parallel with Perplexity to build a 100% real,
+ * complete scholarly bibliography pack ([S1]..[S12]) containing ONLY peer-reviewed
+ * works with full Author(s), Year, Title, Journal, Volume/Pages, and real DOI.
+ */
+async function fetchVerifiedCrossrefDossier(
+  session: WriterSession,
+  signal?: AbortSignal
+): Promise<string> {
+  const coreTopic = (session.topic || session.title || '').trim();
+  const coreSubject = (session.subject || '').trim();
+  const query = `${coreTopic} ${coreSubject}`.trim().slice(0, 220);
+  if (!query) return '';
+
+  const params = new URLSearchParams({
+    'query.bibliographic': query,
+    filter: 'type:journal-article,from-pub-date:2017',
+    rows: '18',
+    sort: 'relevance',
+    select:
+      'DOI,title,author,issued,published,container-title,volume,issue,page,type,publisher',
+  });
+
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), 8500);
+  const onParentAbort = () => controller.abort();
+  signal?.addEventListener('abort', onParentAbort);
+
+  try {
+    const res = await fetch(
+      `https://api.crossref.org/works?${params.toString()}`,
+      {
+        headers: { Accept: 'application/json' },
+        signal: controller.signal,
+      }
+    );
+    if (!res.ok) return '';
+    const json = (await res.json()) as {
+      message?: {
+        items?: Array<{
+          DOI?: string;
+          title?: string[];
+          author?: CrossrefAuthor[];
+          issued?: { 'date-parts'?: number[][] };
+          published?: { 'date-parts'?: number[][] };
+          'container-title'?: string[];
+          volume?: string;
+          issue?: string;
+          page?: string;
+          type?: string;
+          publisher?: string;
+        }>;
+      };
+    };
+    const items = json?.message?.items || [];
+    const verifiedBlocks: string[] = [];
+    const seenDois = new Set<string>();
+
+    for (const it of items) {
+      const authors = (it.author || []).filter((a) =>
+        Boolean((a.family || a.name || '').trim())
+      );
+      const title = cleanCrossrefText(it.title?.[0]);
+      const containerTitle = cleanCrossrefText(it['container-title']?.[0]);
+      const year =
+        it.issued?.['date-parts']?.[0]?.[0] ||
+        it.published?.['date-parts']?.[0]?.[0] ||
+        0;
+      const doi = (it.DOI || '').trim();
+
+      // Require ALL essential academic bibliographic elements
+      if (
+        authors.length === 0 ||
+        !title ||
+        title.length < 15 ||
+        !containerTitle ||
+        !year ||
+        year < 1990 ||
+        !doi ||
+        seenDois.has(doi.toLowerCase())
+      ) {
+        continue;
+      }
+      seenDois.add(doi.toLowerCase());
+
+      const meta: CrossrefWorkMeta = {
+        doi,
+        title,
+        authors,
+        year,
+        containerTitle,
+        volume: it.volume,
+        issue: it.issue,
+        page: it.page,
+        type: it.type,
+        publisher: it.publisher,
+      };
+      const inText = formatInTextCitationForWork(meta, session.citationStyle);
+      const fullRef = formatCrossrefReference(meta, session.citationStyle);
+      verifiedBlocks.push(
+        `[S${verifiedBlocks.length + 1}] In-Text: ${inText}\n    Full ${session.citationStyle}: ${fullRef}`
+      );
+      if (verifiedBlocks.length >= 12) break;
+    }
+
+    if (verifiedBlocks.length === 0) return '';
+    return `=== VERIFIED CROSSREF ACADEMIC SOURCES (100% REAL PEER-REVIEWED METADATA — COMPLETE AUTHOR, YEAR, TITLE, JOURNAL, DOI) ===\n${verifiedBlocks.join(
+      '\n'
+    )}`;
+  } catch {
+    return '';
+  } finally {
+    window.clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', onParentAbort);
+  }
+}
+
 export async function researchSourcesWithPerplexity(
   session: WriterSession,
   researchProfile: AiProviderProfile,
@@ -581,18 +714,25 @@ export async function researchSourcesWithPerplexity(
       ].filter(Boolean);
   const compactSearchQuery = searchLines.join('\n');
 
+  // Run Crossref Academic Search IN PARALLEL with Perplexity so every paper starts with verified complete sources!
+  const crossrefPromise = fetchVerifiedCrossrefDossier(session, signal);
+
   // Fast, ultra-cheap Perplexity Search API (POST /search — raw web results, 0 LLM output tokens, ~1-2s)
   if (researchProfile.model === 'perplexity-search') {
-    const res = await callAiChatbotDetailed({
-      profile: researchProfile,
-      systemPrompt: '',
-      userPrompt: compactSearchQuery,
-      enableWebSearch: true,
-      isResearchStep: true,
-      signal,
-    });
+    const [res, crossrefDossier] = await Promise.all([
+      callAiChatbotDetailed({
+        profile: researchProfile,
+        systemPrompt: '',
+        userPrompt: compactSearchQuery,
+        enableWebSearch: true,
+        isResearchStep: true,
+        signal,
+      }),
+      crossrefPromise,
+    ]);
 
-    return `RAW REAL-TIME WEB & SCHOLARLY SOURCES (Perplexity Search API — Format citations strictly in ${session.citationStyle}):\n\n${res.text}`.trim();
+    const perplexityBlock = `=== PERPLEXITY REAL-TIME WEB RESEARCH (Format citations strictly in ${session.citationStyle}) ===\n${res.text}`;
+    return [crossrefDossier, perplexityBlock].filter(Boolean).join('\n\n').trim();
   }
 
   const systemPrompt = `You are a precision Academic Citation & Web Research Assistant.
@@ -617,16 +757,19 @@ STRICT RULES:
 - Prioritize recent publications (2021-2026) and seminal foundational studies.
 - Do NOT write essay paragraphs — ONLY return the structured verified source & citation dossier.`;
 
-  const res = await callAiChatbotDetailed({
-    profile: researchProfile,
-    systemPrompt,
-    userPrompt,
-    enableWebSearch: true,
-    isResearchStep: true,
-    maxOutputTokens: 1800,
-    searchFallbackQuery: compactSearchQuery,
-    signal,
-  });
+  const [res, crossrefDossier] = await Promise.all([
+    callAiChatbotDetailed({
+      profile: researchProfile,
+      systemPrompt,
+      userPrompt,
+      enableWebSearch: true,
+      isResearchStep: true,
+      maxOutputTokens: 1800,
+      searchFallbackQuery: compactSearchQuery,
+      signal,
+    }),
+    crossrefPromise,
+  ]);
 
   const extraUrls = new Set<string>();
   if (Array.isArray(res.citations)) {
@@ -654,7 +797,8 @@ STRICT RULES:
           .join('\n')}`
       : '';
 
-  return `${res.text}${urlAppendix}`.trim();
+  const perplexityBlock = `${res.text}${urlAppendix}`.trim();
+  return [crossrefDossier, perplexityBlock].filter(Boolean).join('\n\n').trim();
 }
 
 export function buildSkillsAndContextSystemPrompt(
@@ -684,8 +828,15 @@ export function buildSkillsAndContextSystemPrompt(
       : '';
 
   const researchedSourcesBlock = session.researchedSources?.trim()
-    ? `\n\n=== VERIFIED REAL-TIME WEB SOURCES & CITATIONS (FROM PERPLEXITY SEARCH) ===
-CRITICAL GROUNDING RULE: You MUST ground your arguments, empirical statistics, and in-text citations primarily in the verified real-time sources below. Use the exact author names, years, and bibliographic details provided. Do NOT fabricate fake citations or non-existent DOIs.
+    ? `\n\n=== VERIFIED REAL-TIME ACADEMIC & WEB SOURCES (CROSSREF + PERPLEXITY) ===
+STRICT CLOSED-BOOK CITATION LOCK (MANDATORY — ZERO EXCEPTIONS):
+1. You may ONLY cite sources that have COMPLETE, VERIFIED bibliographic metadata (Author(s), Publication Year, Title, and Journal/Publisher/Venue) explicitly present in:
+   (a) The VERIFIED CROSSREF ACADEMIC SOURCES [S1]..[SN] list below, OR
+   (b) The UPLOADED ASSIGNMENT & RESEARCH CONTEXT FILES attached above, OR
+   (c) Complete scholarly entries in the PERPLEXITY WEB RESEARCH section below that explicitly state Author + Year + Title + Venue.
+2. STRICTLY FORBIDDEN: NEVER invent, guess, or recall additional author-year citations from your training memory. NEVER cite any web snippet that lacks a clear author surname, year, or title.
+3. Preserve the EXACT author surnames and publication year from the verified source list (e.g., use the exact In-Text format shown in [S1]..[SN]) so every in-text citation matches the final References 100% 1-to-1.
+4. NEVER fabricate or guess DOIs, page numbers, or thesis degrees (doctoral vs. master's) not supported by the attached files or verified sources.
 ${session.researchedSources.trim()}`
     : '';
 

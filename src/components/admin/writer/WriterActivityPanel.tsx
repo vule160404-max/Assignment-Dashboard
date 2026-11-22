@@ -12,6 +12,7 @@ import {
   PanelRightClose,
   PanelRightOpen,
   PauseCircle,
+  RefreshCw,
   ShieldAlert,
   ShieldCheck,
   Sparkles,
@@ -44,6 +45,7 @@ interface WriterActivityPanelProps {
   onStopAi: () => void;
   currentStepLabel: string;
   researchedSources?: string;
+  onRefreshSources?: () => void;
   completedSectionsCount: number;
   totalSectionsCount: number;
   errorSectionsCount: number;
@@ -73,6 +75,7 @@ export function WriterActivityPanel({
   onStopAi,
   currentStepLabel,
   researchedSources,
+  onRefreshSources,
   completedSectionsCount,
   totalSectionsCount,
   errorSectionsCount,
@@ -306,10 +309,28 @@ export function WriterActivityPanel({
           </button>
         </div>
 
-        {/* Expandable Real-Time Perplexity Sources Inspector */}
+        {/* Expandable Real-Time Perplexity + Crossref Sources Inspector */}
         {hasSources && showSourcesPreview && (
-          <div className="p-2.5 rounded-xl bg-white border border-emerald-200/90 max-h-44 overflow-y-auto text-[10.5px] text-slate-700 leading-relaxed whitespace-pre-wrap break-words font-mono">
-            {researchedSources}
+          <div className="space-y-1.5">
+            {onRefreshSources && (
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-semibold text-emerald-700">
+                  Kho nguồn xác minh (Crossref + Perplexity)
+                </span>
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={onRefreshSources}
+                  className="btn-press inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white border border-emerald-200 hover:bg-emerald-50 text-[10px] font-semibold text-emerald-800 disabled:opacity-40"
+                >
+                  <RefreshCw className="w-2.5 h-2.5" />
+                  <span>Tìm lại nguồn mới</span>
+                </button>
+              </div>
+            )}
+            <div className="p-2.5 rounded-xl bg-white border border-emerald-200/90 max-h-44 overflow-y-auto text-[10.5px] text-slate-700 leading-relaxed whitespace-pre-wrap break-words font-mono">
+              {researchedSources}
+            </div>
           </div>
         )}
 
