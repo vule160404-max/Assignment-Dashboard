@@ -322,6 +322,111 @@ export function triggerClientTelegramNotification(params: {
   })().catch(() => undefined);
 }
 
+export async function uploadPublicInquiryFile(
+  file: File,
+  inquiryCode?: string
+): Promise<{
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+  sizeBytes: number;
+  url: string;
+  r2Key?: string;
+  storageProvider?: string;
+}> {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (inquiryCode) formData.append('inquiryCode', inquiryCode);
+
+  const res = await fetch('/api/files/public-inquiry-upload', {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (res.status === 413 && file.size <= 20 * 1024 * 1024) {
+    const presignRes = await fetch('/api/files/public-inquiry-presign', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileName: file.name,
+        mimeType: file.type || 'application/octet-stream',
+        sizeBytes: file.size,
+        inquiryCode,
+      }),
+    });
+
+    if (presignRes.ok) {
+      const presigned = (await presignRes.json()) as {
+        uploadUrl: string;
+        fileId: string;
+        storedName: string;
+        fileName: string;
+        mimeType: string;
+        sizeBytes: number;
+        r2Key?: string;
+      };
+
+      const putRes = await fetch(presigned.uploadUrl, {
+        method: 'PUT',
+        headers: { 'Content-Type': presigned.mimeType },
+        body: file,
+      }).catch(() => null);
+
+      if (!putRes || !putRes.ok) {
+        throw new Error(
+          'Tệp > 4.5 MB chưa tải trực tiếp lên R2 được. Vui lòng nén nhỏ dưới 4 MB hoặc gửi kèm link Google Drive.'
+        );
+      }
+
+      const confirmRes = await fetch('/api/files/public-inquiry-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fileId: presigned.fileId,
+          storedName: presigned.storedName,
+          fileName: presigned.fileName,
+          mimeType: presigned.mimeType,
+          sizeBytes: presigned.sizeBytes,
+          r2Key: presigned.r2Key,
+          inquiryCode,
+        }),
+      });
+
+      if (!confirmRes.ok) {
+        const err = (await confirmRes.json().catch(() => ({}))) as {
+          error?: string;
+        };
+        throw new Error(err.error || 'Xác nhận tải tệp lên R2 thất bại.');
+      }
+
+      return (await confirmRes.json()) as {
+        fileId: string;
+        fileName: string;
+        mimeType: string;
+        sizeBytes: number;
+        url: string;
+        r2Key?: string;
+        storageProvider?: string;
+      };
+    }
+  }
+
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new Error(err.error || 'Tải tệp đề bài lên thất bại.');
+  }
+
+  return (await res.json()) as {
+    fileId: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    url: string;
+    r2Key?: string;
+    storageProvider?: string;
+  };
+}
+
 export async function triggerNewOrderInquiryTelegramNotification(params: {
   inquiryCode: string;
   customerName: string;
@@ -333,6 +438,7 @@ export async function triggerNewOrderInquiryTelegramNotification(params: {
   citationStyle: string;
   deadlineAt: number;
   notes?: string;
+  attachmentNames?: string[];
 }): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
   try {
     const res = await fetch('/api/notifications/telegram/new-inquiry', {

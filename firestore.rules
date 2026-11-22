@@ -342,7 +342,7 @@ service cloud.firestore {
         && data.keys().hasOnly([
           'inquiryCode', 'customerName', 'contactInfo', 'serviceType',
           'subject', 'topic', 'wordCount', 'citationStyle',
-          'deadlineAt', 'notes', 'status', 'convertedOrderCode',
+          'deadlineAt', 'notes', 'attachments', 'status', 'convertedOrderCode',
           'createdAt', 'updatedAt'
         ])
         && isValidOrderCode(data.inquiryCode)
@@ -355,6 +355,7 @@ service cloud.firestore {
         && data.citationStyle in ['APA', 'Harvard', 'IEEE', 'MLA', 'Chicago', 'Other']
         && data.deadlineAt is number && data.deadlineAt > 0
         && (!('notes' in data) || (data.notes is string && data.notes.size() <= 3000))
+        && (!('attachments' in data) || (isValidAttachmentsList(data.attachments) && data.attachments.size() <= 5))
         && data.status in ['new', 'converted', 'archived']
         && (!('convertedOrderCode' in data) || (data.convertedOrderCode is string && data.convertedOrderCode.size() <= 32))
         && isValidTimestampStr(data.createdAt)

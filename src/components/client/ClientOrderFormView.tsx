@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
   ArrowRight,
@@ -7,18 +7,32 @@ import {
   Clock,
   ExternalLink,
   FileText,
+  Loader2,
+  Paperclip,
   Send,
   ShieldCheck,
   Sparkles,
+  UploadCloud,
+  X,
 } from 'lucide-react';
-import { createOrderInquiry } from '../../services/firestoreService';
 import {
+  createOrderInquiry,
+  uploadPublicInquiryFile,
+} from '../../services/firestoreService';
+import {
+  AttachmentItem,
   CITATION_STYLES,
   CitationStyle,
   ORDER_INQUIRY_SERVICES,
   OrderInquiry,
 } from '../../types/domain';
-import { formatDateTime } from '../../lib/utils';
+import { formatBytes, formatDateTime } from '../../lib/utils';
+
+function generateDraftInquiryCode(): string {
+  const year = new Date().getFullYear();
+  const suffix = String(Math.floor(1000 + Math.random() * 9000));
+  return `REQ-${year}-${suffix}`;
+}
 
 const ZALO_URL = 'https://zalo.me/0916045202';
 const MESSENGER_URL = 'https://www.facebook.com/messages/t/61596358456580';
@@ -54,6 +68,12 @@ export function ClientOrderFormView({
   const [citationStyle, setCitationStyle] = useState<CitationStyle>('APA');
   const [deadlineInput, setDeadlineInput] = useState(getDefaultDeadlineInput);
   const [notes, setNotes] = useState('');
+  const [draftInquiryCode, setDraftInquiryCode] = useState(
+    generateDraftInquiryCode
+  );
+  const [attachments, setAttachments] = useState<AttachmentItem[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -67,10 +87,71 @@ export function ClientOrderFormView({
     }
   }, [defaultServiceType]);
 
+  const handleFilesSelected = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    setErrorMsg('');
+
+    const remainingSlots = Math.max(0, 5 - attachments.length);
+    if (remainingSlots === 0) {
+      setErrorMsg('Bạn chỉ có thể đính kèm tối đa 5 tệp đề bài cho mỗi phiếu.');
+      return;
+    }
+
+    const picked = Array.from(fileList).slice(0, remainingSlots);
+    setUploadingFiles(true);
+    try {
+      const uploadedItems: AttachmentItem[] = [];
+      for (const file of picked) {
+        if (file.size > 20 * 1024 * 1024) {
+          throw new Error(`Tệp "${file.name}" vượt quá giới hạn 20 MB.`);
+        }
+        const uploaded = await uploadPublicInquiryFile(file, draftInquiryCode);
+        uploadedItems.push({
+          id: `att_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          name: uploaded.fileName.slice(0, 240),
+          category: 'brief',
+          sourceType: 'upload',
+          fileIdOrUrl: uploaded.url,
+          mimeType: uploaded.mimeType,
+          sizeBytes: uploaded.sizeBytes,
+          isPaymentLocked: false,
+          previewMaxPages: 20,
+          uploadedAt: new Date().toISOString(),
+          ...(uploaded.r2Key ? { r2Key: uploaded.r2Key } : {}),
+        });
+      }
+      setAttachments((prev) => [...prev, ...uploadedItems].slice(0, 5));
+      onToast?.(
+        uploadedItems.length === 1
+          ? `Đã tải lên tệp "${uploadedItems[0].name}"`
+          : `Đã tải lên ${uploadedItems.length} tệp đề bài.`
+      );
+    } catch (err) {
+      setErrorMsg(
+        err instanceof Error
+          ? err.message
+          : 'Không thể tải tệp đề bài lên lúc này. Vui lòng thử lại.'
+      );
+    } finally {
+      setUploadingFiles(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleRemoveAttachment = (attId: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== attId));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
+    if (uploadingFiles) {
+      setErrorMsg('Vui lòng chờ tệp đề bài tải lên hoàn tất.');
+      return;
+    }
     if (!customerName.trim()) {
       setErrorMsg('Vui lòng nhập họ tên hoặc nickname của bạn.');
       return;
@@ -96,6 +177,7 @@ export function ClientOrderFormView({
     setSubmitting(true);
     try {
       const created = await createOrderInquiry({
+        inquiryCode: draftInquiryCode,
         customerName: customerName.trim(),
         contactInfo: contactInfo.trim(),
         serviceType,
@@ -105,6 +187,7 @@ export function ClientOrderFormView({
         citationStyle,
         deadlineAt: deadlineMs,
         notes: notes.trim(),
+        attachments,
       });
       setSubmittedInquiry(created);
       onToast?.('Đã gửi phiếu đăng ký thành công! Tư vấn viên sẽ liên hệ trong 15 phút.');
@@ -174,6 +257,25 @@ export function ClientOrderFormView({
               {formatDateTime(submittedInquiry.deadlineAt)}
             </div>
           </div>
+          {submittedInquiry.attachments &&
+            submittedInquiry.attachments.length > 0 && (
+              <div className="sm:col-span-2 pt-2 border-t border-zinc-200/70 space-y-1">
+                <span className="text-zinc-500">
+                  Tệp đề bài đã tải lên ({submittedInquiry.attachments.length}):
+                </span>
+                <div className="flex flex-wrap gap-1.5 pt-0.5">
+                  {submittedInquiry.attachments.map((att) => (
+                    <span
+                      key={att.id}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-zinc-200 text-[11px] font-semibold text-slate-700"
+                    >
+                      <Paperclip className="w-3 h-3 text-[#12489B]" />
+                      <span className="max-w-[200px] truncate">{att.name}</span>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
         </div>
 
         <div className="rounded-2xl bg-blue-50/70 border border-blue-200/80 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -214,6 +316,8 @@ export function ClientOrderFormView({
               setSubject('');
               setTopic('');
               setNotes('');
+              setAttachments([]);
+              setDraftInquiryCode(generateDraftInquiryCode());
             }}
             className="btn-press px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-xs font-semibold text-slate-700"
           >
@@ -473,13 +577,106 @@ export function ClientOrderFormView({
           />
         </div>
 
+        {/* File Upload Dropzone (Cloudflare R2) */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <label className="block text-xs font-bold text-slate-700">
+              Tải lên file đề bài / Rubric (Tùy chọn)
+            </label>
+            <span className="text-[11px] text-zinc-400">
+              {attachments.length}/5 tệp · PDF, Word, Excel, PPT, Ảnh, ZIP (≤ 20 MB)
+            </span>
+          </div>
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple
+            accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.png,.jpg,.jpeg,.webp,.zip"
+            onChange={(e) => void handleFilesSelected(e.target.files)}
+            className="hidden"
+          />
+
+          <div
+            onClick={() => {
+              if (!uploadingFiles && attachments.length < 5) {
+                fileInputRef.current?.click();
+              }
+            }}
+            onDragOver={(e) => {
+              e.preventDefault();
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (!uploadingFiles && attachments.length < 5) {
+                void handleFilesSelected(e.dataTransfer.files);
+              }
+            }}
+            className={`rounded-2xl border-2 border-dashed px-4 py-5 text-center transition-colors ${
+              uploadingFiles || attachments.length >= 5
+                ? 'border-zinc-200 bg-zinc-50/60 cursor-not-allowed opacity-75'
+                : 'border-blue-200/90 bg-[#F4F7FB]/70 hover:border-[#12489B] hover:bg-blue-50/50 cursor-pointer'
+            }`}
+          >
+            <div className="flex flex-col items-center justify-center gap-1.5">
+              {uploadingFiles ? (
+                <>
+                  <Loader2 className="w-5 h-5 text-[#12489B] animate-spin" />
+                  <p className="text-xs font-semibold text-[#0B2559]">
+                    Đang tải tệp đề bài lên máy chủ lưu trữ bảo mật...
+                  </p>
+                </>
+              ) : (
+                <>
+                  <UploadCloud className="w-6 h-6 text-[#12489B]" />
+                  <p className="text-xs font-semibold text-slate-800">
+                    Bấm để chọn file hoặc kéo thả đề bài vào đây
+                  </p>
+                  <p className="text-[11px] text-zinc-500">
+                    Tệp đề bài được mã hóa lưu trữ an toàn để chuyên gia xem &amp; báo giá chính xác hơn.
+                  </p>
+                </>
+              )}
+            </div>
+          </div>
+
+          {attachments.length > 0 && (
+            <div className="space-y-1.5 pt-1">
+              {attachments.map((att) => (
+                <div
+                  key={att.id}
+                  className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-blue-50/50 border border-blue-200/80 text-xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Paperclip className="w-3.5 h-3.5 text-[#12489B] shrink-0" />
+                    <span className="font-semibold text-slate-800 truncate">
+                      {att.name}
+                    </span>
+                    <span className="text-[10.5px] font-mono text-zinc-500 shrink-0">
+                      ({formatBytes(att.sizeBytes)})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttachment(att.id)}
+                    aria-label={`Gỡ tệp ${att.name}`}
+                    className="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 shrink-0"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3">
           <span className="text-[11px] text-zinc-500">
             Gửi phiếu hoàn toàn miễn phí · Chốt giá rõ ràng trước khi làm.
           </span>
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || uploadingFiles}
             className="btn-press w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] disabled:opacity-60 text-white text-xs sm:text-sm font-bold shadow-md"
           >
             <Send className="w-4 h-4" />

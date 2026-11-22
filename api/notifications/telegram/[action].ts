@@ -461,6 +461,12 @@ export default async function handler(
         : 0;
     const notes =
       typeof body.notes === 'string' ? body.notes.trim().slice(0, 600) : '';
+    const attachmentNames = Array.isArray(body.attachmentNames)
+      ? body.attachmentNames
+          .filter((n: unknown): n is string => typeof n === 'string' && n.trim().length > 0)
+          .slice(0, 5)
+          .map((n: string) => n.trim().slice(0, 120))
+      : [];
 
     if (
       !inquiryCode ||
@@ -499,6 +505,13 @@ export default async function handler(
       `📏 <b>Độ dài & Chuẩn:</b> ${wordCount > 0 ? `${wordCount.toLocaleString('vi-VN')} từ` : 'Chưa rõ'} · ${escapeTelegramHtml(citationStyle)}`,
       `⏰ <b>Deadline:</b> ${escapeTelegramHtml(deadlineStr)}`,
     ];
+    if (attachmentNames.length > 0) {
+      lines.push(
+        `📎 <b>Tệp đề bài đính kèm (${attachmentNames.length}):</b> ${escapeTelegramHtml(
+          attachmentNames.join(', ')
+        )}`
+      );
+    }
     if (notes) {
       lines.push(`💬 <b>Ghi chú:</b> ${escapeTelegramHtml(notes)}`);
     }

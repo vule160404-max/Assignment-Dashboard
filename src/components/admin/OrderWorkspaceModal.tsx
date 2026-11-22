@@ -270,7 +270,7 @@ export function OrderWorkspaceModal({
       setStaffPayoutAmount(0);
       setStaffPayoutStatus('unpaid');
       setStaffPayoutPaidAt('');
-      setAttachments([]);
+      setAttachments(prefillInquiry.attachments || []);
     } else {
       setOrderCode(generateOrderCode(existingOrderCodes));
       setClientId(clients[0]?.id || '');

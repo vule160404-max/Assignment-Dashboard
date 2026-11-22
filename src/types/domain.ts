@@ -294,6 +294,7 @@ export interface OrderInquiry {
   citationStyle: CitationStyle;
   deadlineAt: number;
   notes?: string;
+  attachments?: AttachmentItem[];
   status: OrderInquiryStatus;
   convertedOrderCode?: string;
   createdAt: string;

@@ -17,6 +17,7 @@ import {
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { sanitizeOrderForTracking } from '../lib/utils';
 import {
+  AttachmentItem,
   BankSettings,
   CHAT_TTL_MS,
   CitationStyle,
@@ -443,6 +444,7 @@ export async function updateRevisionStatus(params: {
 }
 
 export async function createOrderInquiry(input: {
+  inquiryCode?: string;
   customerName: string;
   contactInfo: string;
   serviceType: string;
@@ -452,13 +454,15 @@ export async function createOrderInquiry(input: {
   citationStyle: CitationStyle;
   deadlineAt: number;
   notes?: string;
+  attachments?: AttachmentItem[];
 }): Promise<OrderInquiry> {
   const inquiryId = `inq_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const year = new Date().getFullYear();
   const suffix = String(Math.floor(1000 + Math.random() * 9000));
-  const inquiryCode = `REQ-${year}-${suffix}`;
+  const inquiryCode = input.inquiryCode || `REQ-${year}-${suffix}`;
   const now = new Date().toISOString();
   const path = `orderInquiries/${inquiryId}`;
+  const safeAttachments = (input.attachments || []).slice(0, 5);
 
   const payload: Omit<OrderInquiry, 'id'> = {
     inquiryCode,
@@ -471,6 +475,7 @@ export async function createOrderInquiry(input: {
     citationStyle: input.citationStyle || 'APA',
     deadlineAt: input.deadlineAt,
     notes: (input.notes || '').trim().slice(0, 3000),
+    ...(safeAttachments.length > 0 ? { attachments: safeAttachments } : {}),
     status: 'new',
     convertedOrderCode: '',
     createdAt: now,
@@ -495,6 +500,7 @@ export async function createOrderInquiry(input: {
     citationStyle: payload.citationStyle,
     deadlineAt: payload.deadlineAt,
     notes: payload.notes,
+    attachmentNames: safeAttachments.map((a) => a.name),
   });
 
   return {

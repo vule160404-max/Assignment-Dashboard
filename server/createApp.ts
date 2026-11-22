@@ -1776,6 +1776,230 @@ export function createApiApp(): express.Express {
     }
   });
 
+  // Public guest upload for Order Registration Form (brief / rubric attachments -> Cloudflare R2)
+  app.post(
+    '/api/files/public-inquiry-upload',
+    upload.single('file'),
+    async (req, res) => {
+      if (!req.file) {
+        res.status(400).json({ error: 'Không có tệp đề bài nào được gửi lên.' });
+        return;
+      }
+
+      const originalName = Buffer.from(
+        req.file.originalname,
+        'latin1'
+      ).toString('utf8');
+      const mimeType = req.file.mimetype || 'application/octet-stream';
+
+      if (!isAllowedUpload(originalName, mimeType)) {
+        res.status(400).json({
+          error:
+            'Định dạng tệp không được hỗ trợ. Vui lòng chọn PDF, Word, Excel, PowerPoint, ảnh hoặc file nén ZIP.',
+        });
+        return;
+      }
+
+      if (req.file.size > 20 * 1024 * 1024) {
+        res.status(413).json({
+          error: 'Kích thước mỗi tệp đề bài không được vượt quá 20 MB.',
+        });
+        return;
+      }
+
+      const fileId = `${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+      const ext = sanitizeExt(originalName);
+      const storedName = `${fileId}${ext}`;
+      const inquiryTag =
+        sanitizeOrderCodeForR2(req.body?.inquiryCode) || 'INQUIRY';
+      const targetR2Key = `inquiries/${inquiryTag}/${storedName}`;
+
+      const meta: StoredFileMeta = {
+        fileId,
+        storedName,
+        originalName,
+        mimeType,
+        sizeBytes: req.file.size,
+        isLocked: false,
+        category: 'brief',
+        previewMaxPages: 20,
+        turnitinScorePage: 1,
+        uploadedAt: new Date().toISOString(),
+        storageProvider: r2Config ? 'cloudflare-r2' : 'local-disk',
+        orderCode: inquiryTag,
+        r2Key: r2Config ? targetR2Key : undefined,
+        versionRole: 'attachment',
+      };
+
+      try {
+        await saveFileBinary(storedName, req.file.buffer, mimeType, targetR2Key);
+        await saveFileMeta(meta);
+      } catch (err) {
+        console.error('Public inquiry file upload error:', err);
+        res.status(500).json({
+          error: r2Config
+            ? 'Không thể lưu tệp đề bài lên Cloudflare R2. Vui lòng thử lại.'
+            : 'Không thể lưu tệp đề bài lên máy chủ.',
+        });
+        return;
+      }
+
+      res.json({
+        fileId,
+        fileName: originalName,
+        mimeType: meta.mimeType,
+        sizeBytes: meta.sizeBytes,
+        url: `/api/files/${fileId}`,
+        r2Key: meta.r2Key,
+        storageProvider: meta.storageProvider,
+      });
+    }
+  );
+
+  // Public guest direct-to-R2 presigned upload (for brief files > 4.5 MB on Vercel, up to 20 MB)
+  app.post('/api/files/public-inquiry-presign', async (req, res) => {
+    if (!r2Client || !r2Config) {
+      res.status(501).json({
+        error: 'Cloudflare R2 chưa được cấu hình cho tải lên trực tiếp.',
+      });
+      return;
+    }
+
+    const fileName =
+      typeof req.body?.fileName === 'string' ? req.body.fileName.trim() : '';
+    const mimeType =
+      typeof req.body?.mimeType === 'string' && req.body.mimeType.trim()
+        ? req.body.mimeType.trim()
+        : 'application/octet-stream';
+    const sizeBytes = Number(req.body?.sizeBytes) || 0;
+    const inquiryTag =
+      sanitizeOrderCodeForR2(req.body?.inquiryCode) || 'INQUIRY';
+
+    if (!fileName || !isAllowedUpload(fileName, mimeType)) {
+      res.status(400).json({
+        error: 'Định dạng tệp đề bài không được hỗ trợ.',
+      });
+      return;
+    }
+    if (sizeBytes <= 0 || sizeBytes > 20 * 1024 * 1024) {
+      res.status(413).json({
+        error: 'Kích thước tệp vượt quá giới hạn 20 MB.',
+      });
+      return;
+    }
+
+    const fileId = `${Date.now()}_${crypto.randomBytes(6).toString('hex')}`;
+    const ext = sanitizeExt(fileName);
+    const storedName = `${fileId}${ext}`;
+    const targetR2Key = `inquiries/${inquiryTag}/${storedName}`;
+
+    try {
+      const command = new PutObjectCommand({
+        Bucket: r2Config.bucket,
+        Key: targetR2Key,
+        ContentType: mimeType,
+      });
+      const uploadUrl = await getSignedUrl(r2Client, command, {
+        expiresIn: 300,
+      });
+      res.json({
+        uploadUrl,
+        fileId,
+        storedName,
+        fileName,
+        mimeType,
+        sizeBytes,
+        r2Key: targetR2Key,
+        url: `/api/files/${fileId}`,
+      });
+    } catch (err) {
+      console.error('Public inquiry presign R2 error:', err);
+      res.status(500).json({
+        error: 'Không thể tạo liên kết tải lên Cloudflare R2.',
+      });
+    }
+  });
+
+  app.post('/api/files/public-inquiry-confirm', async (req, res) => {
+    if (!r2Client || !r2Config) {
+      res.status(501).json({ error: 'Cloudflare R2 chưa được cấu hình.' });
+      return;
+    }
+
+    const fileId =
+      typeof req.body?.fileId === 'string' ? req.body.fileId.trim() : '';
+    const storedName =
+      typeof req.body?.storedName === 'string'
+        ? req.body.storedName.trim()
+        : '';
+    const fileName =
+      typeof req.body?.fileName === 'string' ? req.body.fileName.trim() : '';
+    const mimeType =
+      typeof req.body?.mimeType === 'string' && req.body.mimeType.trim()
+        ? req.body.mimeType.trim()
+        : 'application/octet-stream';
+    const sizeBytes = Number(req.body?.sizeBytes) || 0;
+    const inquiryTag =
+      sanitizeOrderCodeForR2(req.body?.inquiryCode) || 'INQUIRY';
+    const explicitR2Key =
+      typeof req.body?.r2Key === 'string' &&
+      req.body.r2Key.trim().startsWith('inquiries/')
+        ? req.body.r2Key.trim()
+        : `inquiries/${inquiryTag}/${storedName}`;
+
+    if (
+      !/^[a-zA-Z0-9_]+$/.test(fileId) ||
+      !storedName ||
+      path.basename(storedName) !== storedName ||
+      !fileName
+    ) {
+      res.status(400).json({ error: 'Thông tin tệp xác nhận không hợp lệ.' });
+      return;
+    }
+
+    try {
+      await r2Client.send(
+        new HeadObjectCommand({
+          Bucket: r2Config.bucket,
+          Key: explicitR2Key,
+        })
+      );
+
+      const meta: StoredFileMeta = {
+        fileId,
+        storedName,
+        originalName: fileName,
+        mimeType,
+        sizeBytes,
+        isLocked: false,
+        category: 'brief',
+        previewMaxPages: 20,
+        turnitinScorePage: 1,
+        uploadedAt: new Date().toISOString(),
+        storageProvider: 'cloudflare-r2',
+        orderCode: inquiryTag,
+        r2Key: explicitR2Key,
+        versionRole: 'attachment',
+      };
+
+      await saveFileMeta(meta);
+      res.json({
+        fileId,
+        fileName,
+        mimeType,
+        sizeBytes,
+        url: `/api/files/${fileId}`,
+        r2Key: explicitR2Key,
+        storageProvider: 'cloudflare-r2',
+      });
+    } catch (err) {
+      console.error('Public inquiry confirm R2 error:', err);
+      res.status(404).json({
+        error: 'Không tìm thấy tệp trên Cloudflare R2 để xác nhận.',
+      });
+    }
+  });
+
   // Move a previously active deliverable to orders/<orderCode>/backup/ on R2
   app.post('/api/files/:fileId/move-backup', requireTeamAuth, async (req, res) => {
     const { fileId } = req.params;
