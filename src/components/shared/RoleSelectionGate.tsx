@@ -19,6 +19,7 @@ import {
   Star,
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
+import { SampleLibraryView } from './SampleLibraryView';
 
 interface RoleSelectionGateProps {
   onSelectClient: () => void;
@@ -225,7 +226,18 @@ export function RoleSelectionGate({
   onSelectClient,
   onSelectAdmin,
 }: RoleSelectionGateProps) {
+  const [activePage, setActivePage] = useState<'home' | 'samples'>('home');
   const [openFaqIdx, setOpenFaqIdx] = useState<number | null>(0);
+
+  const openSampleLibrary = () => {
+    setActivePage('samples');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const openHomePage = () => {
+    setActivePage('home');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   return (
     <div className="min-h-screen bg-[#F4F7FB] text-[#0F172A] flex flex-col">
@@ -249,21 +261,52 @@ export function RoleSelectionGate({
       {/* Sticky White Single-Row Header */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-zinc-200/80">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
-          <BrandLogo />
+          <button
+            type="button"
+            onClick={openHomePage}
+            className="text-left focus:outline-none"
+          >
+            <BrandLogo />
+          </button>
 
           <nav className="hidden md:flex items-center gap-7 text-xs font-semibold text-slate-600">
-            <a href="#quy-trinh" className="hover:text-[#12489B] transition-colors">
-              Quy trình
-            </a>
-            <a href="#cam-ket" className="hover:text-[#12489B] transition-colors">
-              Gói cam kết
-            </a>
-            <a href="#dich-vu" className="hover:text-[#12489B] transition-colors">
-              Dịch vụ
-            </a>
-            <a href="#faq" className="hover:text-[#12489B] transition-colors">
-              Câu hỏi thường gặp
-            </a>
+            <button
+              type="button"
+              onClick={openHomePage}
+              className={`hover:text-[#12489B] transition-colors ${
+                activePage === 'home' ? 'text-[#12489B] font-bold' : ''
+              }`}
+            >
+              Trang chủ
+            </button>
+            <button
+              type="button"
+              onClick={openSampleLibrary}
+              className={`inline-flex items-center gap-1.5 hover:text-[#12489B] transition-colors ${
+                activePage === 'samples'
+                  ? 'text-[#12489B] font-bold bg-blue-50 px-3 py-1.5 rounded-full'
+                  : ''
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Sample Library</span>
+            </button>
+            {activePage === 'home' && (
+              <>
+                <a href="#quy-trinh" className="hover:text-[#12489B] transition-colors">
+                  Quy trình
+                </a>
+                <a href="#cam-ket" className="hover:text-[#12489B] transition-colors">
+                  Gói cam kết
+                </a>
+                <a href="#dich-vu" className="hover:text-[#12489B] transition-colors">
+                  Dịch vụ
+                </a>
+                <a href="#faq" className="hover:text-[#12489B] transition-colors">
+                  FAQ
+                </a>
+              </>
+            )}
           </nav>
 
           <div className="flex items-center gap-2.5 shrink-0">
@@ -291,6 +334,13 @@ export function RoleSelectionGate({
       </header>
 
       <main className="flex-1">
+        {activePage === 'samples' ? (
+          <SampleLibraryView
+            onOrderNow={onSelectClient}
+            onBackHome={openHomePage}
+          />
+        ) : (
+        <>
         {/* HERO SECTION: Deep Academic Navy Canvas + Blueprint Grid + Floating Trust Cards */}
         <section className="relative overflow-hidden bg-[#0B2559] text-white pt-16 pb-20 sm:pt-20 sm:pb-24">
           {/* Subtle Architectural Blueprint Grid & Glow */}
@@ -339,10 +389,10 @@ export function RoleSelectionGate({
 
                 <button
                   type="button"
-                  onClick={onSelectClient}
+                  onClick={openSampleLibrary}
                   className="btn-press group inline-flex items-center gap-2.5 pl-5 pr-2 py-2 rounded-full bg-white/10 hover:bg-white/15 border border-white/20 text-white text-sm font-semibold backdrop-blur-sm transition-colors"
                 >
-                  <span>Tra cứu đơn &amp; Kiểm tra Đạo văn</span>
+                  <span>Xem Thư viện Bài mẫu (Sample Library)</span>
                   <span className="w-8 h-8 rounded-full bg-white/15 flex items-center justify-center">
                     <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5" />
                   </span>
@@ -813,6 +863,8 @@ export function RoleSelectionGate({
             </div>
           </div>
         </section>
+        </>
+        )}
       </main>
 
       {/* CLEAN FOOTER */}
@@ -825,6 +877,13 @@ export function RoleSelectionGate({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-5 text-xs font-semibold text-slate-600">
+            <button
+              type="button"
+              onClick={openSampleLibrary}
+              className="hover:text-[#12489B]"
+            >
+              Sample Library (Bài mẫu)
+            </button>
             <button
               type="button"
               onClick={onSelectClient}
