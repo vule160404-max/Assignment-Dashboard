@@ -46,9 +46,9 @@ const TRUST_CARDS = [
   },
   {
     icon: Lock,
-    badge: 'Kiểm tra trước',
+    badge: 'Portal minh bạch 24/7',
     title: 'Xem trước bài trước khi thanh toán',
-    desc: 'Kiểm tra trực tiếp chất lượng lập luận, định dạng và trích dẫn trước khi tất toán nhận file gốc.',
+    desc: 'Theo dõi tiến độ trực tuyến và xem trước chất lượng bài viết trực tiếp trên Portal trước khi tất toán.',
   },
 ];
 
@@ -127,7 +127,7 @@ const PACKAGES = [
     features: [
       'Phân tích phản biện sâu, lập luận sắc bén ghi điểm giảng viên',
       '100% trích dẫn từ sách & tạp chí học thuật thật — không bịa nguồn',
-      'Tặng kèm báo cáo kiểm tra Đạo văn & AI (đạo văn < 10%)',
+      'Tặng kèm báo cáo kiểm tra Đạo văn & AI Integrity (đạo văn < 10%)',
       'Miễn phí 03 lần chỉnh sửa & bổ sung theo góp ý giảng viên',
       'Được xem trước nội dung bài làm trước khi thanh toán đủ',
     ],
@@ -168,16 +168,16 @@ const SERVICES = [
   {
     code: '03 / 04',
     icon: FileSearch,
-    title: 'Kiểm tra & Hạ tỷ lệ Đạo văn – AI',
-    desc: 'Kiểm tra tỷ lệ trùng lặp và dấu hiệu AI ngay trên web, sau đó viết lại tự nhiên, mượt mà giúp bạn nộp bài an toàn qua Turnitin.',
-    tags: ['Check Turnitin', 'Giảm tỷ lệ AI', 'Paraphrase học thuật', 'Sửa bài có sẵn'],
+    title: 'Kiểm tra Đạo văn & Tối ưu AI Integrity',
+    desc: 'Quét trực tuyến ngay trên Cổng Khách hàng, phát hiện đoạn trùng lặp hoặc dấu hiệu AI và diễn đạt lại tự nhiên chuẩn học thuật.',
+    tags: ['Turnitin Report', 'AI Detection', 'Paraphrasing', 'Humanizer'],
   },
   {
     code: '04 / 04',
     icon: Award,
-    title: 'Chỉnh sửa ngữ pháp, Trích dẫn & Trình bày chuẩn',
-    desc: 'Rà soát câu từ chuẩn học thuật, chuẩn hóa trích dẫn APA 7, Harvard, MLA, IEEE khớp 100% và căn chỉnh Trang bìa, Mục lục đẹp mắt.',
-    tags: ['Proofreading', 'Chuẩn APA / Harvard', 'Kiểm tra nguồn thật', 'Định dạng Word & PDF'],
+    title: 'Proofreading, Citations & Chuẩn hóa Format',
+    desc: 'Rà soát ngữ pháp học thuật, chuẩn hóa trích dẫn APA 7th, Harvard, MLA, IEEE khớp 100% nguồn peer-reviewed và căn chỉnh Trang bìa, Mục lục chuẩn trường.',
+    tags: ['Proofreading', 'APA 7th / Harvard', 'Peer-reviewed Sources', 'Word & PDF'],
   },
 ];
 
