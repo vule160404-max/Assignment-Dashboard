@@ -28,56 +28,56 @@ interface RoleSelectionGateProps {
 const TRUST_CARDS = [
   {
     icon: FileCheck2,
-    badge: 'Turnitin & AI Check',
-    title: 'Đạo văn < 10% · 0% AI',
-    desc: 'Kiểm định 2 lớp kèm báo cáo Turnitin & kiểm tra nguồn Crossref thật.',
+    badge: 'Turnitin & AI 0%',
+    title: 'An toàn tuyệt đối khi nộp bài',
+    desc: 'Tặng kèm báo cáo Turnitin & kiểm tra AI rõ ràng — đạo văn dưới 10%, văn phong tự nhiên như người viết.',
   },
   {
     icon: GraduationCap,
-    badge: 'Chuyên gia GPA 3.6+',
-    title: 'Đúng chuyên ngành & Rubric',
-    desc: 'Phân tích phản biện sâu, bám sát thang điểm của từng môn học.',
+    badge: 'Đội ngũ GPA 3.6+',
+    title: 'Đúng chuyên ngành, bám sát Rubric',
+    desc: 'Người viết tốt nghiệp Thạc sĩ & Đại học quốc tế, phân tích sâu từng tiêu chí chấm điểm của giảng viên.',
   },
   {
     icon: Clock,
-    badge: 'Deadline gấp 12–48h',
-    title: 'Cam kết đúng hẹn 99.2%',
-    desc: 'Hệ thống điều phối thời gian thực, cập nhật tiến độ từng chương.',
+    badge: 'Cứu gấp 12h – 24h',
+    title: 'Đúng hạn 100%, không trễ Deadline',
+    desc: 'Nhận xử lý bài gấp sát giờ nộp, cập nhật tiến độ liên tục giúp bạn hoàn toàn yên tâm.',
   },
   {
     icon: Lock,
-    badge: 'Portal minh bạch 24/7',
-    title: 'Xem trước 3 trang miễn phí',
-    desc: 'Kiểm tra chất lượng bài viết trực tiếp trên Portal trước khi tất toán.',
+    badge: 'Kiểm tra trước',
+    title: 'Xem trước bài trước khi thanh toán',
+    desc: 'Kiểm tra trực tiếp chất lượng lập luận, định dạng và trích dẫn trước khi tất toán nhận file gốc.',
   },
 ];
 
 const ACHIEVEMENTS = [
   {
     value: '5.000+',
-    label: 'Bài nghiên cứu & Assignment hoàn tất',
-    sub: 'UK · Australia · Canada · USA · Việt Nam',
+    label: 'Bài Assignment & Luận văn đã hoàn thành',
+    sub: 'Sinh viên tại Anh · Úc · Mỹ · Canada · Việt Nam',
     accent: 'bg-white border-zinc-200/90 text-slate-900',
     valueColor: 'text-[#0B2559]',
   },
   {
     value: '98.6%',
-    label: 'Tỷ lệ khách hàng hài lòng & quay lại',
-    sub: 'Đánh giá 4.9/5 từ sinh viên quốc tế',
+    label: 'Tỷ lệ sinh viên hài lòng & quay lại',
+    sub: 'Đánh giá 4.9/5 từ hơn 2.000 khách hàng',
     accent: 'bg-white border-zinc-200/90 text-slate-900',
     valueColor: 'text-[#12489B]',
   },
   {
     value: '72+',
-    label: 'Điểm trung bình Distinction / HD',
-    sub: 'Kiểm duyệt học thuật & trích dẫn 1-1',
+    label: 'Điểm trung bình đạt Distinction / HD',
+    sub: 'Đảm bảo nguồn trích dẫn thật, không bịa tài liệu',
     accent: 'bg-gradient-to-br from-amber-50 to-orange-50/80 border-amber-200/90 text-slate-900',
     valueColor: 'text-[#C2410C]',
   },
   {
     value: '100%',
-    label: 'Bảo mật tuyệt đối & Sửa theo Rubric',
-    sub: 'Không lưu trữ công khai · Bảo hành chỉnh sửa',
+    label: 'Bảo mật tuyệt đối & Sửa miễn phí',
+    sub: 'Giữ kín thông tin cá nhân · Bảo hành sửa theo góp ý',
     accent: 'bg-[#0B2559] border-[#163B82] text-white',
     valueColor: 'text-sky-300',
   },
@@ -86,18 +86,18 @@ const ACHIEVEMENTS = [
 const PROCESS_STEPS = [
   {
     num: '01',
-    title: 'Gửi đề bài, Rubric & tài liệu',
-    desc: 'Vào Cổng Khách hàng, tạo yêu cầu tư vấn hoặc gửi file đề bài (.DOCX, .PDF), số từ và hạn nộp.',
+    title: 'Gửi đề bài, Rubric & hạn nộp',
+    desc: 'Bấm "Order Now", gửi yêu cầu và file đề bài của trường — tư vấn viên báo giá minh bạch ngay trong 15 phút.',
   },
   {
     num: '02',
-    title: 'Nghiên cứu nguồn thật & Viết chuẩn học thuật',
-    desc: 'Đội ngũ chuyên môn triển khai dàn ý, trích dẫn nguồn peer-reviewed (APA 7, Harvard, MLA, IEEE) và rà soát 2 lớp.',
+    title: 'Triển khai bài viết & Kiểm tra chất lượng',
+    desc: 'Chuyên gia đúng ngành viết bài theo chuẩn APA / Harvard, đối chiếu 100% tài liệu tham khảo thật và rà soát kỹ từng tiêu chí điểm.',
   },
   {
     num: '03',
-    title: 'Xem trước bài, nhận báo cáo Turnitin & Bàn giao',
-    desc: 'Theo dõi tiến độ trực tuyến, xem trước 3 trang đầu sắc nét, đối chiếu báo cáo đạo văn và tải bản hoàn chỉnh.',
+    title: 'Xem trước bài, nhận báo cáo Turnitin & Nộp bài',
+    desc: 'Bạn xem trước chất lượng bài làm cùng báo cáo kiểm tra đạo văn — ưng ý mới tất toán để tải file hoàn chỉnh nộp ngay.',
   },
 ];
 
@@ -106,46 +106,46 @@ const PACKAGES = [
     name: 'Standard',
     score: '55–64',
     gradeLabel: 'Pass / Credit',
-    tagline: 'Phù hợp bài tập tuần, bài phản biện ngắn và đề bài tiêu chuẩn.',
+    tagline: 'Phù hợp bài tập tuần, bài phản biện ngắn và đề bài tiêu chuẩn cần qua môn chắc chắn.',
     featured: false,
     warm: false,
     features: [
       'Đáp ứng đầy đủ yêu cầu đề bài & Rubric cơ bản',
-      'Trích dẫn nguồn học thuật chuẩn APA / Harvard',
-      'Miễn phí 01 lần chỉnh sửa theo góp ý',
-      'Hỗ trợ theo dõi tiến độ trực tiếp trên Portal',
+      '100% tài liệu tham khảo thật, chuẩn APA / Harvard',
+      'Miễn phí 01 lần chỉnh sửa theo góp ý của bạn',
+      'Theo dõi tiến độ làm bài trực tuyến bất cứ lúc nào',
     ],
   },
   {
     name: 'Premium',
     score: '65–74',
     gradeLabel: 'Merit / Distinction',
-    tagline: 'Lựa chọn tối ưu cho Assignment chính, Essay học thuật & Case Study.',
+    tagline: 'Lựa chọn phổ biến nhất cho Assignment chính, Essay học thuật & Case Study cần điểm cao.',
     featured: true,
     warm: false,
     badge: 'PHỔ BIẾN NHẤT',
     features: [
-      'Phân tích phản biện chuyên sâu, lập luận mạch lạc',
-      '100% nguồn tạp chí khoa học xác minh Crossref DOI',
-      'Kèm báo cáo kiểm tra Đạo văn & AI Integrity',
-      'Miễn phí 03 lần chỉnh sửa & tinh chỉnh theo Rubric',
-      'Xem trước 3 trang A4 chuẩn định dạng trước khi nhận',
+      'Phân tích phản biện sâu, lập luận sắc bén ghi điểm giảng viên',
+      '100% trích dẫn từ sách & tạp chí học thuật thật — không bịa nguồn',
+      'Tặng kèm báo cáo kiểm tra Đạo văn & AI (đạo văn < 10%)',
+      'Miễn phí 03 lần chỉnh sửa & bổ sung theo góp ý giảng viên',
+      'Được xem trước nội dung bài làm trước khi thanh toán đủ',
     ],
   },
   {
     name: 'Ultra Premium',
     score: '75+',
     gradeLabel: 'High Distinction',
-    tagline: 'Dành cho Dissertation, Thesis, Capstone & môn chuyên sâu khó.',
+    tagline: 'Dành cho Luận văn, Dissertation, Capstone & các môn chuyên sâu đòi hỏi điểm xuất sắc.',
     featured: false,
     warm: true,
-    badge: 'CAM KẾT HD',
+    badge: 'CAM KẾT ĐIỂM HD',
     features: [
-      'Chuyên gia đầu ngành (Thạc sĩ / Nghiên cứu sinh) phụ trách',
-      'Kiểm duyệt học thuật 2 lớp + đối chiếu dữ liệu SPSS/R/Stata',
-      'Định dạng hoàn chỉnh Trang bìa, Mục lục Word & PDF chuẩn trường',
-      'Hỗ trợ chỉnh sửa không giới hạn đến khi đạt yêu cầu',
-      'Ưu tiên phản hồi 1-1 & xử lý deadline gấp',
+      'Chuyên gia đầu ngành (Thạc sĩ / Nghiên cứu sinh) trực tiếp viết',
+      'Rà soát chéo 2 vòng + hỗ trợ chạy & phân tích dữ liệu SPSS / Stata / R',
+      'Trình bày hoàn chỉnh Trang bìa, Mục lục tự động sẵn sàng nộp ngay',
+      'Chỉnh sửa miễn phí không giới hạn đến khi bạn hài lòng',
+      'Ưu tiên hỗ trợ 1-1 & nhận cứu bài Deadline gấp',
     ],
   },
 ];
@@ -154,57 +154,57 @@ const SERVICES = [
   {
     code: '01 / 04',
     icon: BookOpen,
-    title: 'Assignment & Academic Essay',
-    desc: 'Hỗ trợ viết mới, biên tập và nâng cấp chiều sâu phản biện cho các môn Business, Finance, Marketing, ELT, Law, IT và Education.',
+    title: 'Viết Assignment & Essay học thuật',
+    desc: 'Hỗ trợ viết mới hoặc nâng cấp bài cho các ngành Kinh doanh, Tài chính, Marketing, Ngôn ngữ Anh, Luật, CNTT và Giáo dục.',
     tags: ['Critical Review', 'Case Study', 'Reflective Essay', 'Business Report'],
   },
   {
     code: '02 / 04',
     icon: GraduationCap,
-    title: 'Dissertation, Thesis & Capstone',
-    desc: 'Đồng hành trọn gói từ Proposal, Literature Review, Research Methodology đến phân tích dữ liệu định lượng/định tính.',
+    title: 'Luận văn, Dissertation & Đồ án tốt nghiệp',
+    desc: 'Đồng hành trọn gói từ lên đề cương (Proposal), tổng quan tài liệu, phương pháp nghiên cứu đến xử lý số liệu thực tế.',
     tags: ['Proposal', 'Literature Review', 'SPSS / Stata / R', 'Full Thesis'],
   },
   {
     code: '03 / 04',
     icon: FileSearch,
-    title: 'Kiểm tra Đạo văn & Tối ưu AI Integrity',
-    desc: 'Quét trực tuyến ngay trên Cổng Khách hàng, phát hiện đoạn trùng lặp hoặc dấu hiệu AI và diễn đạt lại tự nhiên chuẩn học thuật.',
-    tags: ['Turnitin Report', 'AI Detection', 'Paraphrasing', 'Humanizer'],
+    title: 'Kiểm tra & Hạ tỷ lệ Đạo văn – AI',
+    desc: 'Kiểm tra tỷ lệ trùng lặp và dấu hiệu AI ngay trên web, sau đó viết lại tự nhiên, mượt mà giúp bạn nộp bài an toàn qua Turnitin.',
+    tags: ['Check Turnitin', 'Giảm tỷ lệ AI', 'Paraphrase học thuật', 'Sửa bài có sẵn'],
   },
   {
     code: '04 / 04',
     icon: Award,
-    title: 'Proofreading, Citations & Chuẩn hóa Format',
-    desc: 'Rà soát lỗi ngữ pháp học thuật, đối chiếu 1-1 In-Text & References theo chuẩn APA 7th, Harvard, MLA 9, IEEE cùng trang bìa chuẩn trường.',
-    tags: ['APA 7th', 'Harvard', 'Crossref DOI', 'Word & PDF A4'],
+    title: 'Chỉnh sửa ngữ pháp, Trích dẫn & Trình bày chuẩn',
+    desc: 'Rà soát câu từ chuẩn học thuật, chuẩn hóa trích dẫn APA 7, Harvard, MLA, IEEE khớp 100% và căn chỉnh Trang bìa, Mục lục đẹp mắt.',
+    tags: ['Proofreading', 'Chuẩn APA / Harvard', 'Kiểm tra nguồn thật', 'Định dạng Word & PDF'],
   },
 ];
 
 const FAQS = [
   {
-    q: 'Làm sao để đặt bài và theo dõi tiến độ trên AssignTrack?',
-    a: 'Bạn chỉ cần bấm nút "Order Now" ở góc trên hoặc ngay trên trang chủ để vào Cổng Khách hàng. Tại đó bạn có thể gửi yêu cầu làm bài, kiểm tra đạo văn, hoặc nhập mã đơn để xem tiến độ cập nhật theo thời gian thực.',
+    q: 'Làm sao để đặt bài và theo dõi tiến độ làm bài?',
+    a: 'Bạn chỉ cần bấm nút "Order Now" để vào trang Khách hàng, gửi đề bài kèm hạn nộp. Sau khi xác nhận, bạn sẽ nhận một mã đơn riêng để theo dõi tiến độ hoàn thành theo từng ngày ngay trên web.',
   },
   {
-    q: 'Tôi có được xem trước bài làm trước khi thanh toán phần còn lại không?',
-    a: 'Có. Khi bài hoàn tất, bạn có thể mở trực tiếp bản xem trước chuẩn A4 (gồm 3 trang đầu rõ nét: Trang bìa, Mục lục và nội dung mở đầu) ngay trên Cổng Khách hàng trước khi hoàn tất thanh toán để tải bản gốc DOCX/PDF.',
+    q: 'Tôi có được xem trước bài làm trước khi thanh toán đủ không?',
+    a: 'Có. Khi bài hoàn thành, bạn được mở xem trước trực tiếp phần đầu bài viết (gồm Trang bìa, Mục lục và các trang mở đầu) để kiểm tra văn phong và chất lượng trước khi thanh toán phần còn lại để tải bản đầy đủ.',
   },
   {
-    q: 'Hệ thống có cam kết nguồn tài liệu tham khảo thật và không bịa DOI không?',
-    a: 'Có. Mọi tài liệu tham khảo đều trải qua quy trình đối chiếu 1-1 giữa trích dẫn trong bài và danh mục References, kết hợp xác thực mã DOI trực tiếp qua Crossref API để loại bỏ hoàn toàn nguồn giả hoặc trích nhầm bài.',
+    q: 'Bài viết có đảm bảo nguồn tài liệu thật và không bị dính đạo văn / AI không?',
+    a: 'Hoàn toàn đảm bảo. Mọi trích dẫn trong bài đều lấy từ sách và tạp chí khoa học có thật, khớp 100% giữa thân bài và danh mục tài liệu tham khảo. Bài hoàn thiện luôn đi kèm báo cáo kiểm tra đạo văn và AI rõ ràng.',
   },
   {
-    q: 'Thông tin cá nhân, mã sinh viên và bài làm của tôi có được bảo mật không?',
-    a: 'Tuyệt đối bảo mật. Mọi tài liệu chỉ lưu trữ nội bộ phục vụ quá trình xử lý đơn hàng và kiểm tra đạo văn ở chế độ không lưu kho (No Repository), không bao giờ chia sẻ cho bên thứ ba.',
+    q: 'Thông tin cá nhân, mã sinh viên và bài làm của tôi có được giữ kín không?',
+    a: 'Tuyệt đối bảo mật. Toàn bộ file đề bài, tên trường và bài làm của bạn chỉ dùng nội bộ để xử lý đơn hàng, kiểm tra đạo văn không lưu vào kho dữ liệu chung và cam kết không chia sẻ cho bất kỳ ai.',
   },
   {
-    q: 'Nếu giảng viên yêu cầu chỉnh sửa thêm thì có mất phí không?',
-    a: 'Bạn được miễn phí chỉnh sửa theo đúng phạm vi Rubric và gói cam kết ban đầu (1 lần ở gói Standard, 3 lần ở gói Premium và không giới hạn ở gói Ultra Premium).',
+    q: 'Nếu cần chỉnh sửa thêm theo góp ý của giảng viên thì có mất phí không?',
+    a: 'Bạn được chỉnh sửa miễn phí theo đúng yêu cầu ban đầu của đề bài và gói dịch vụ đã chọn (1 lần với gói Standard, 3 lần với gói Premium và không giới hạn với gói Ultra Premium).',
   },
   {
-    q: 'Nút Đăng nhập ở góc trên dành cho ai?',
-    a: 'Nút Đăng nhập dẫn tới khu vực điều hành dành riêng cho Quản trị viên & Nhân sự. Nếu bạn là Khách hàng muốn đặt đơn, tra cứu tiến độ hoặc kiểm tra đạo văn, hãy bấm "Order Now" để vào thẳng Cổng Khách hàng.',
+    q: 'Nút "Đăng nhập" ở góc trên dành cho ai?',
+    a: 'Nút Đăng nhập dành riêng cho Quản trị viên & Đội ngũ điều hành. Nếu bạn là sinh viên / khách hàng cần đặt bài, tra cứu tiến độ hoặc kiểm tra đạo văn, hãy bấm "Order Now" để vào thẳng trang Khách hàng.',
   },
 ];
 
@@ -230,18 +230,18 @@ export function RoleSelectionGate({
   return (
     <div className="min-h-screen bg-[#F4F7FB] text-[#0F172A] flex flex-col">
       {/* Top Promo Strip */}
-      <div className="bg-gradient-to-r from-[#071A42] via-[#0B2559] to-[#12489B] text-white/90 text-[11.5px] font-medium py-2 px-4 text-center">
+      <div className="bg-gradient-to-r from-[#071A42] via-[#0B2559] to-[#12489B] text-white/95 text-[11.5px] font-medium py-2 px-4 text-center">
         <span className="inline-flex items-center gap-2 flex-wrap justify-center">
           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
           <span>
-            AssignTrack Academic Studio · Hỗ trợ kiểm duyệt nguồn Crossref thật &amp; Xem trước 3 trang A4 miễn phí
+            Ưu đãi sinh viên mới: Miễn phí báo cáo Turnitin &amp; AI Check khi đặt bài ngay hôm nay
           </span>
           <button
             type="button"
             onClick={onSelectClient}
             className="underline decoration-amber-300/80 underline-offset-2 font-semibold text-amber-300 hover:text-amber-200"
           >
-            Đặt bài ngay →
+            Nhận ưu đãi &amp; Đặt bài →
           </button>
         </span>
       </div>
@@ -310,20 +310,19 @@ export function RoleSelectionGate({
 
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-3xl mx-auto text-center space-y-6">
-              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-sm text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-200">
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 backdrop-blur-sm text-[11px] font-semibold uppercase tracking-[0.1em] text-sky-200">
                 <span className="w-2 h-2 rounded-full bg-sky-300 shadow-[0_0_10px_#7DD3FC]" />
-                <span>Academic Writing · Turnitin Integrity · Tracking Portal</span>
+                <span>Hỗ trợ Assignment &amp; Luận văn chuẩn Quốc tế · Đúng hẹn 100%</span>
               </div>
 
               <h1 className="text-3xl sm:text-5xl lg:text-[54px] font-bold tracking-[-0.03em] leading-[1.1] text-white">
-                Chinh phục điểm số{' '}
-                <span className="text-sky-300">High Distinction</span> cho mọi
-                bài luận &amp; nghiên cứu học thuật
+                Cứu cánh Deadline &amp; Chinh phục{' '}
+                <span className="text-sky-300">điểm High Distinction</span> cho mọi
+                bài luận của bạn
               </h1>
 
               <p className="text-sm sm:text-base text-slate-200/85 max-w-2xl mx-auto leading-relaxed">
-                Hệ thống hỗ trợ viết bài, biên tập học thuật và kiểm định đạo văn chuẩn đại học quốc tế.
-                Theo dõi tiến độ minh bạch 24/7, xác thực nguồn trích dẫn Crossref thật và xem trước bài trực tiếp trên Cổng Khách hàng.
+                Viết bài đúng chuyên ngành, bám sát Rubric từng môn học, cam kết 100% nguồn trích dẫn thật và tặng kèm báo cáo kiểm tra Đạo văn – AI. Theo dõi tiến độ trực tuyến và xem trước bài trước khi thanh toán.
               </p>
 
               <div className="pt-2 flex flex-wrap items-center justify-center gap-3.5">
@@ -489,9 +488,9 @@ export function RoleSelectionGate({
 
                 <ul className="space-y-2.5 text-xs text-slate-200">
                   {[
-                    'Không cần lập tài khoản phức tạp khi tra cứu bằng mã đơn',
+                    'Gửi đề bài nhanh, nhận báo giá minh bạch chỉ sau 15 phút',
                     'Đính kèm trực tiếp đề bài, Rubric và bản nháp (nếu có)',
-                    'Báo cáo Turnitin & kiểm tra trích dẫn chuẩn Crossref',
+                    'Cam kết 100% nguồn trích dẫn thật & tặng kèm báo cáo Turnitin',
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-2">
                       <CheckCircle2 className="w-4 h-4 text-sky-300 shrink-0 mt-0.5" />
