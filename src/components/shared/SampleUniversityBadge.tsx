@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { getSchoolInitials } from '../../services/sampleLibraryService';
 
 interface SampleUniversityBadgeProps {
@@ -22,6 +22,11 @@ export function SampleUniversityBadge({
   className = '',
 }: SampleUniversityBadgeProps) {
   const [imgFailed, setImgFailed] = useState(false);
+
+  useEffect(() => {
+    setImgFailed(false);
+  }, [logoUrl]);
+
   const showImage = Boolean(logoUrl) && !imgFailed;
 
   return (

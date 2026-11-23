@@ -148,7 +148,7 @@ Cloudflare R2 lưu các **tệp nhị phân nặng và metadata gắn với file
 - **Kiến trúc dữ liệu tĩnh (tối ưu bundle Vite & tải tức thì trên CDN):**
   - `public/samples/index.json`: Mục lục chuẩn hóa cho toàn bộ **122 bài mẫu toàn văn (~245.208 từ)** thuộc **25 trường đại học quốc tế** (RMIT, University of Northampton, Swinburne, La Trobe, Kaplan, Coventry, Deakin, University of Melbourne, Torrens, UniSA, York, ACU, Wollongong, UC Berkeley, Adelaide, UWA, UPenn, v.v.).
   - `public/samples/articles/<slug>.json`: Từng bài mẫu toàn văn kèm `toc` (mục lục tương tác) và HTML đã chuẩn hóa (giữ nguyên đầy đủ bảng dữ liệu có bọc `.sample-table-scroll`, hình ảnh đính kèm, tài liệu tham khảo `References` và phụ lục `Appendix`).
-  - `public/samples/logos/*` (44 file logo trường đại học chính thức) & `public/samples/media/*` (92 hình ảnh biểu đồ/bảng dữ liệu đính kèm trong bài) được lưu cục bộ 100%, không phụ thuộc máy chủ ngoài.
+  - `public/samples/logos/*` (25/25 logo trường đại học chính thức đã chuẩn hóa 1-1 cho toàn bộ 122 bài, loại bỏ hoàn toàn ảnh minh họa ngẫu nhiên) & `public/samples/media/*` (92 hình ảnh biểu đồ/bảng dữ liệu đính kèm trong bài) được lưu cục bộ 100%, không phụ thuộc máy chủ ngoài.
 - **Kiến trúc UI & bảo mật:**
   - `src/services/sampleLibraryService.ts`: Loader có bộ nhớ đệm trong phiên (`fetchSampleCatalog`, `fetchSampleArticle`).
   - `src/components/shared/SampleUniversityBadge.tsx`: Khung vuông nền trắng hiển thị logo trường chính thức (tự động fallback sang chữ viết tắt nếu ảnh lỗi).
