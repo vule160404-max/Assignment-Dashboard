@@ -569,13 +569,22 @@
   }
 }
 
+@keyframes heroGridDriftDeep {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-96px, 96px, 0);
+  }
+}
+
 @keyframes heroOrbDriftA {
   0%, 100% {
     transform: translate3d(-50%, 0, 0) scale(1);
-    opacity: 0.78;
+    opacity: 0.85;
   }
   50% {
-    transform: translate3d(-44%, 26px, 0) scale(1.1);
+    transform: translate3d(-38%, 38px, 0) scale(1.16);
     opacity: 1;
   }
 }
@@ -583,22 +592,22 @@
 @keyframes heroOrbDriftB {
   0%, 100% {
     transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.65;
+    opacity: 0.72;
   }
   50% {
-    transform: translate3d(-48px, -34px, 0) scale(1.14);
-    opacity: 0.95;
+    transform: translate3d(-85px, -55px, 0) scale(1.2);
+    opacity: 1;
   }
 }
 
 @keyframes heroOrbDriftC {
   0%, 100% {
     transform: translate3d(0, 0, 0) scale(1);
-    opacity: 0.55;
+    opacity: 0.65;
   }
   50% {
-    transform: translate3d(42px, -24px, 0) scale(1.12);
-    opacity: 0.85;
+    transform: translate3d(78px, -42px, 0) scale(1.18);
+    opacity: 0.95;
   }
 }
 
@@ -607,49 +616,99 @@
     transform: translate3d(-120%, 0, 0);
     opacity: 0;
   }
-  18% {
-    opacity: 0.55;
+  15% {
+    opacity: 0.85;
   }
-  82% {
-    opacity: 0.55;
+  85% {
+    opacity: 0.85;
   }
   100% {
-    transform: translate3d(240%, 0, 0);
+    transform: translate3d(260%, 0, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes heroBeamSweepVertical {
+  0% {
+    transform: translate3d(0, -120%, 0);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.75;
+  }
+  85% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translate3d(0, 260%, 0);
+    opacity: 0;
+  }
+}
+
+@keyframes heroParticleRise {
+  0% {
+    transform: translate3d(0, 32px, 0) scale(0.75);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.85;
+  }
+  80% {
+    opacity: 0.75;
+  }
+  100% {
+    transform: translate3d(18px, -110px, 0) scale(1.15);
     opacity: 0;
   }
 }
 
 .hero-grid-drift {
-  animation: heroGridDrift 22s linear infinite;
+  animation: heroGridDrift 9s linear infinite;
+}
+
+.hero-grid-drift-deep {
+  animation: heroGridDriftDeep 16s linear infinite;
 }
 
 .hero-orb-1 {
-  animation: heroOrbDriftA 14s ease-in-out infinite;
+  animation: heroOrbDriftA 7.5s ease-in-out infinite;
 }
 
 .hero-orb-2 {
-  animation: heroOrbDriftB 18s ease-in-out infinite;
+  animation: heroOrbDriftB 9.5s ease-in-out infinite;
 }
 
 .hero-orb-3 {
-  animation: heroOrbDriftC 16s ease-in-out infinite;
+  animation: heroOrbDriftC 8.5s ease-in-out infinite;
 }
 
 .hero-beam-1 {
-  animation: heroBeamSweep 9.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: heroBeamSweep 4.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .hero-beam-2 {
-  animation: heroBeamSweep 13s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  animation-delay: 4.2s;
+  animation: heroBeamSweep 6.2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation-delay: 2.1s;
+}
+
+.hero-beam-v {
+  animation: heroBeamSweepVertical 5.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation-delay: 1.2s;
+}
+
+.hero-particle {
+  animation: heroParticleRise 6.5s ease-in-out infinite;
 }
 
 .hero-ambient-paused .hero-grid-drift,
+.hero-ambient-paused .hero-grid-drift-deep,
 .hero-ambient-paused .hero-orb-1,
 .hero-ambient-paused .hero-orb-2,
 .hero-ambient-paused .hero-orb-3,
 .hero-ambient-paused .hero-beam-1,
-.hero-ambient-paused .hero-beam-2 {
+.hero-ambient-paused .hero-beam-2,
+.hero-ambient-paused .hero-beam-v,
+.hero-ambient-paused .hero-particle {
   animation-play-state: paused !important;
 }
 
@@ -678,11 +737,14 @@
 
   .support-halo-pulse,
   .hero-grid-drift,
+  .hero-grid-drift-deep,
   .hero-orb-1,
   .hero-orb-2,
   .hero-orb-3,
   .hero-beam-1,
-  .hero-beam-2 {
+  .hero-beam-2,
+  .hero-beam-v,
+  .hero-particle {
     animation-play-state: paused !important;
     transform: none !important;
   }
