@@ -282,10 +282,9 @@ export function RoleSelectionGate({
                 <span>Hỗ trợ Assignment &amp; Luận văn chuẩn Quốc tế · Đúng hẹn 100%</span>
               </div>
 
-              <h1 className="hero-reveal hero-delay-1 text-3xl sm:text-5xl lg:text-[54px] font-bold tracking-[-0.03em] leading-[1.1] text-white">
-                Cứu cánh Deadline &amp; Chinh phục{' '}
-                <span className="text-sky-300">điểm High Distinction</span> cho mọi
-                bài luận của bạn
+              <h1 className="hero-reveal hero-delay-1 text-3xl sm:text-5xl lg:text-[54px] font-bold tracking-[-0.03em] leading-[1.12] text-white">
+                Gửi đề bài ngay — Nhận bài chuẩn{' '}
+                <span className="text-sky-300">High Distinction</span>
               </h1>
 
               <p className="hero-reveal hero-delay-2 text-sm sm:text-base text-slate-200/85 max-w-2xl mx-auto leading-relaxed">
