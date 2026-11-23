@@ -62,10 +62,12 @@ import {
   CoverPageConfig,
   DocumentFormatConfig,
   SessionContextFile,
+  SessionContextImage,
   SkillDocument,
   WriterOutlineSection,
   WriterSession,
 } from './writer/types';
+import { DataLabAiWriterPayload } from './DataLabView';
 import { WriterApiSettingsModal } from './writer/WriterApiSettingsModal';
 import {
   WriterActivityLogEntry,
@@ -91,6 +93,8 @@ import {
 interface AiWriterStudioViewProps {
   orders: OrderRecord[];
   initialOrderCode?: string;
+  pendingDataLabPayload?: DataLabAiWriterPayload | null;
+  onConsumeDataLabPayload?: () => void;
   onAttachDocxToOrder?: (order: OrderRecord, file: File) => Promise<void>;
   onDeliverDocxToClient?: (
     order: OrderRecord,
@@ -184,6 +188,8 @@ function createDefaultSession(order?: OrderRecord | null): WriterSession {
 export function AiWriterStudioView({
   orders,
   initialOrderCode = '',
+  pendingDataLabPayload = null,
+  onConsumeDataLabPayload,
   onAttachDocxToOrder,
   onDeliverDocxToClient,
   onSendDocxToHumanizer,
@@ -542,6 +548,68 @@ export function AiWriterStudioView({
   useEffect(() => {
     saveWriterSessions(sessions);
   }, [sessions]);
+
+  // Inject APA statistical report + high-res PNG charts pushed from Data Lab tab
+  useEffect(() => {
+    if (!pendingDataLabPayload) return;
+    const targetId = activeSessionId || sessionsRef.current[0]?.id;
+    if (!targetId) return;
+
+    const nowIso = new Date().toISOString();
+    const reportFile: SessionContextFile = {
+      id: `datalab_report_${Date.now()}`,
+      name: `${pendingDataLabPayload.reportTitle} (SPSS-APA).txt`,
+      content: pendingDataLabPayload.reportText,
+      wordCount: countWords(pendingDataLabPayload.reportText),
+      uploadedAt: nowIso,
+    };
+
+    setSessions((prev) =>
+      prev.map((sess) => {
+        if (sess.id !== targetId) return sess;
+        const existingFiles = (sess.contextFiles || []).filter(
+          (f) => !f.id.startsWith('datalab_report_')
+        );
+        const existingImages = (sess.contextImages || []).filter(
+          (img) => !img.id.startsWith('datalab_chart_')
+        );
+        const maxNum = existingImages.reduce((acc, img) => {
+          const m = /^IMG_(\d+)$/i.exec(img.tag);
+          return m ? Math.max(acc, Number(m[1])) : acc;
+        }, 0);
+        let nextNum = maxNum + 1;
+
+        const injectedImages: SessionContextImage[] = pendingDataLabPayload.charts.map(
+          (chart) => ({
+            id: `datalab_chart_${chart.id}_${Date.now()}_${nextNum}`,
+            tag: `IMG_${nextNum++}`,
+            name: `${chart.id}.png`,
+            caption: chart.caption,
+            mimeType: 'image/png',
+            dataUrl: chart.dataUrl,
+            width: chart.width,
+            height: chart.height,
+            sizeBytes: Math.round((chart.dataUrl.length * 3) / 4),
+            insertIntoPaper: true,
+            uploadedAt: nowIso,
+          })
+        );
+
+        return {
+          ...sess,
+          contextFiles: [...existingFiles, reportFile],
+          contextImages: [...existingImages, ...injectedImages],
+          updatedAt: nowIso,
+        };
+      })
+    );
+
+    setLeftTab('brief');
+    onConsumeDataLabPayload?.();
+    onToast(
+      `Đã nạp Báo cáo thống kê APA + ${pendingDataLabPayload.charts.length} biểu đồ PNG từ Data Lab vào phiên AI Writer!`
+    );
+  }, [pendingDataLabPayload, activeSessionId, onConsumeDataLabPayload, onToast]);
 
   // Probe server vault & migrate any legacy localStorage keys to server vault
   useEffect(() => {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { User, signOut } from 'firebase/auth';
 import {
   AlertCircle,
+  BarChart3,
   Calendar,
   Check,
   Copy,
@@ -77,13 +78,14 @@ import { AiWriterStudioView } from './AiWriterStudioView';
 import { BankSettingsView } from './BankSettingsView';
 import { CalendarView } from './CalendarView';
 import { ClientsCrmView } from './ClientsCrmView';
+import { DataLabAiWriterPayload, DataLabView } from './DataLabView';
 import { OrderInquiriesInbox } from './OrderInquiriesInbox';
 import { OrderWorkspaceModal } from './OrderWorkspaceModal';
 import { RevenueDashboardView } from './RevenueDashboardView';
 import { TeamManagementView } from './TeamManagementView';
 import { WordHumanizerView } from './WordHumanizerView';
 
-type AdminTab = 'orders' | 'calendar' | 'ai_writer' | 'humanizer' | 'clients' | 'revenue' | 'team' | 'settings';
+type AdminTab = 'orders' | 'calendar' | 'ai_writer' | 'data_lab' | 'humanizer' | 'clients' | 'revenue' | 'team' | 'settings';
 type OrderFilter = 'all' | 'active' | 'urgent' | 'unpaid_balance' | 'completed';
 
 const ADMIN_TAB_STORAGE_KEY = 'assigntrack_admin_tab_v1';
@@ -91,6 +93,7 @@ const VALID_ADMIN_TABS: AdminTab[] = [
   'orders',
   'calendar',
   'ai_writer',
+  'data_lab',
   'humanizer',
   'clients',
   'revenue',
@@ -209,6 +212,8 @@ export function AdminPortalView({
   const [prefillInquiry, setPrefillInquiry] = useState<OrderInquiry | null>(null);
   const [humanizerOrderCode, setHumanizerOrderCode] = useState('');
   const [writerOrderCode, setWriterOrderCode] = useState('');
+  const [pendingDataLabPayload, setPendingDataLabPayload] =
+    useState<DataLabAiWriterPayload | null>(null);
   const syncedNotifKeyRef = useRef('');
 
   const isBootstrappedOwner = Boolean(
@@ -787,6 +792,7 @@ export function AdminPortalView({
     },
     { key: 'calendar', label: 'Lịch Deadline', icon: Calendar },
     { key: 'ai_writer', label: 'AI Writer Studio', icon: Wand2 },
+    { key: 'data_lab', label: 'Khảo sát & Dữ liệu', icon: BarChart3 },
     { key: 'humanizer', label: 'Humanize Word (HIX)', icon: FileText },
     { key: 'clients', label: 'Khách hàng (CRM)', icon: Users, adminOnly: true },
     { key: 'revenue', label: 'Doanh thu & Công CTV', icon: TrendingUp, adminOnly: true },
@@ -1407,6 +1413,8 @@ export function AdminPortalView({
             <AiWriterStudioView
               orders={orders}
               initialOrderCode={writerOrderCode}
+              pendingDataLabPayload={pendingDataLabPayload}
+              onConsumeDataLabPayload={() => setPendingDataLabPayload(null)}
               onAttachDocxToOrder={async (ord, file) => {
                 await handleAttachHumanizedDocx(ord, file);
                 onToast(`Đã đính kèm bản thảo Word (${file.name}) vào đơn #${ord.orderCode}!`);
@@ -1427,6 +1435,16 @@ export function AdminPortalView({
                 onToast(
                   `Đã xuất "${file.name}" và chuyển sang tab Word Humanizer!`
                 );
+              }}
+              onToast={onToast}
+            />
+          )}
+
+          {activeTab === 'data_lab' && (
+            <DataLabView
+              onPushToAiWriter={(payload) => {
+                setPendingDataLabPayload(payload);
+                setActiveTab('ai_writer');
               }}
               onToast={onToast}
             />
