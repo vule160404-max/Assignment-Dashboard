@@ -220,19 +220,6 @@ const FAQS = [
   },
 ];
 
-const FORMAT_TICKER = [
-  'Assignment',
-  'Critical Review',
-  'Academic Essay',
-  'Case Study',
-  'Literature Review',
-  'Dissertation & Thesis',
-  'Business Report',
-  'Research Proposal',
-  'APA 7th & Harvard',
-  'Turnitin & AI Check',
-];
-
 export function RoleSelectionGate({
   initialPage = 'home',
   onPageChange,
@@ -357,20 +344,6 @@ export function RoleSelectionGate({
             </div>
           </div>
         </section>
-
-        {/* ACADEMIC FORMATS TICKER STRIP */}
-        <div className="bg-white border-b border-zinc-200/80 py-3.5 overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-xs font-semibold text-slate-500">
-            {FORMAT_TICKER.map((item, idx) => (
-              <span key={item} className="inline-flex items-center gap-2">
-                {idx > 0 && (
-                  <span className="w-1 h-1 rounded-full bg-[#12489B]/40 hidden sm:inline-block" />
-                )}
-                <span className="hover:text-[#12489B] transition-colors">{item}</span>
-              </span>
-            ))}
-          </div>
-        </div>
 
         {/* PUBLIC QUICK-SERVICE HUB (NO LOGIN REQUIRED) */}
         <section
