@@ -6,6 +6,11 @@ import {
   WriterSession,
 } from '../components/admin/writer/types';
 import { countWords, parseDocxFile } from './wordHumanizer';
+import {
+  decodeBase64DataUrl,
+  findSessionImageByTag,
+  parseFigureMarkerTag,
+} from './writerImageUtils';
 
 function escapeXml(str: string): string {
   return str
@@ -610,6 +615,62 @@ export async function buildFormattedDocxFromSession(
   const titleParagraphsXml: string[] = [];
   const bodyParagraphsXml: string[] = [];
   const collectedHeadings: CollectedTocHeading[] = [];
+  const embeddedImages: Array<{
+    rId: string;
+    fileName: string;
+    ext: 'png' | 'jpeg';
+    bytes: Uint8Array;
+  }> = [];
+  let figureCounter = 0;
+
+  const buildFigureDrawingParagraphXml = (params: {
+    rId: string;
+    docPrId: number;
+    name: string;
+    widthEmu: number;
+    heightEmu: number;
+  }): string => {
+    const safeName = escapeXml(params.name);
+    return `<w:p>
+  <w:pPr>
+    <w:jc w:val="center"/>
+    <w:spacing w:before="160" w:after="80" w:line="240" w:lineRule="auto"/>
+  </w:pPr>
+  <w:r>
+    <w:drawing>
+      <wp:inline distT="0" distB="0" distL="0" distR="0">
+        <wp:extent cx="${params.widthEmu}" cy="${params.heightEmu}"/>
+        <wp:effectExtent l="0" t="0" r="0" b="0"/>
+        <wp:docPr id="${params.docPrId}" name="${safeName}"/>
+        <wp:cNvGraphicFramePr>
+          <a:graphicFrameLocks noChangeAspect="1"/>
+        </wp:cNvGraphicFramePr>
+        <a:graphic>
+          <a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">
+            <pic:pic>
+              <pic:nvPicPr>
+                <pic:cNvPr id="${params.docPrId}" name="${safeName}"/>
+                <pic:cNvPicPr/>
+              </pic:nvPicPr>
+              <pic:blipFill>
+                <a:blip r:embed="${params.rId}"/>
+                <a:stretch><a:fillRect/></a:stretch>
+              </pic:blipFill>
+              <pic:spPr>
+                <a:xfrm>
+                  <a:off x="0" y="0"/>
+                  <a:ext cx="${params.widthEmu}" cy="${params.heightEmu}"/>
+                </a:xfrm>
+                <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+              </pic:spPr>
+            </pic:pic>
+          </a:graphicData>
+        </a:graphic>
+      </wp:inline>
+    </w:drawing>
+  </w:r>
+</w:p>`;
+  };
 
   let cumulativeWords = 0;
   const wordsPerPage = format.lineSpacing >= 2.0 ? 275 : 350;
@@ -631,6 +692,73 @@ export async function buildFormattedDocxFromSession(
     for (const rawLine of lines) {
       const trimmed = rawLine.trim();
       if (!trimmed) continue;
+
+      // Embed real image + academic caption when AI or author inserts [FIGURE: IMG_X]
+      const figTag = parseFigureMarkerTag(trimmed);
+      if (figTag) {
+        const matchedImg = findSessionImageByTag(session.contextImages, figTag);
+        if (matchedImg) {
+          const decoded = decodeBase64DataUrl(matchedImg.dataUrl);
+          if (decoded) {
+            figureCounter += 1;
+            const rId = `rId${4 + embeddedImages.length}`;
+            const fileName = `image${embeddedImages.length + 1}.${decoded.ext}`;
+            embeddedImages.push({
+              rId,
+              fileName,
+              ext: decoded.ext,
+              bytes: decoded.bytes,
+            });
+            const maxWidthEmu = 5120640; // 5.6 inches (~14.2 cm, centered inside A4 margins)
+            const maxHeightEmu = 3840480; // 4.2 inches max height
+            const natW = Math.max(1, matchedImg.width || 800);
+            const natH = Math.max(1, matchedImg.height || 500);
+            const aspect = natW / natH;
+            let widthEmu = maxWidthEmu;
+            let heightEmu = Math.round(widthEmu / aspect);
+            if (heightEmu > maxHeightEmu) {
+              heightEmu = maxHeightEmu;
+              widthEmu = Math.round(heightEmu * aspect);
+            }
+
+            bodyParagraphsXml.push(
+              buildFigureDrawingParagraphXml({
+                rId,
+                docPrId: 100 + embeddedImages.length,
+                name: matchedImg.name || fileName,
+                widthEmu,
+                heightEmu,
+              })
+            );
+
+            const figPrefix =
+              session.writingLanguage === 'Vietnamese'
+                ? `Hình ${figureCounter}.`
+                : `Figure ${figureCounter}.`;
+            const captionText = `${figPrefix} ${matchedImg.caption || matchedImg.name}`;
+            const escapedCaption = escapeXml(captionText);
+            const captionFont = escapeXml(format.fontFamily);
+            const captionHalfPt = Math.max(18, Math.round((format.fontSizePt - 1) * 2));
+            bodyParagraphsXml.push(`<w:p>
+  <w:pPr>
+    <w:jc w:val="center"/>
+    <w:spacing w:before="40" w:after="200" w:line="240" w:lineRule="auto"/>
+  </w:pPr>
+  <w:r>
+    <w:rPr>
+      <w:rFonts w:ascii="${captionFont}" w:hAnsi="${captionFont}" w:cs="${captionFont}"/>
+      <w:i/>
+      <w:sz w:val="${captionHalfPt}"/>
+      <w:szCs w:val="${captionHalfPt}"/>
+    </w:rPr>
+    <w:t xml:space="preserve">${escapedCaption}</w:t>
+  </w:r>
+</w:p>`);
+            cumulativeWords += 120; // approximate vertical space for TOC page offset
+            continue;
+          }
+        }
+      }
 
       const currentPage =
         startPageOffset + Math.floor(cumulativeWords / wordsPerPage);
@@ -781,7 +909,7 @@ export async function buildFormattedDocxFromSession(
   const lineTwips = Math.round(format.lineSpacing * 240);
 
   const documentXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">
   <w:body>
     ${allParagraphsXml.join('\n    ')}
     <w:sectPr>
@@ -919,6 +1047,9 @@ export async function buildFormattedDocxFromSession(
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
+  <Default Extension="png" ContentType="image/png"/>
+  <Default Extension="jpeg" ContentType="image/jpeg"/>
+  <Default Extension="jpg" ContentType="image/jpeg"/>
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
   <Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/>
@@ -930,11 +1061,19 @@ export async function buildFormattedDocxFromSession(
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
 </Relationships>`;
 
+  const imageRelsLines = embeddedImages
+    .map(
+      (img) =>
+        `  <Relationship Id="${img.rId}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/${img.fileName}"/>`
+    )
+    .join('\n');
+
   const docRelsXml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
   <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>
   <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/footer" Target="footer1.xml"/>
+${imageRelsLines}
 </Relationships>`;
 
   const zip = new JSZip();
@@ -945,6 +1084,9 @@ export async function buildFormattedDocxFromSession(
   zip.file('word/settings.xml', settingsXml);
   zip.file('word/footer1.xml', footerXml);
   zip.file('word/_rels/document.xml.rels', docRelsXml);
+  for (const img of embeddedImages) {
+    zip.file(`word/media/${img.fileName}`, img.bytes);
+  }
 
   const blob = await zip.generateAsync({
     type: 'blob',

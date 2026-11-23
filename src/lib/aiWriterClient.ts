@@ -358,6 +358,7 @@ export interface AiGenerateRequest {
   profile: AiProviderProfile;
   systemPrompt: string;
   userPrompt: string;
+  images?: Array<{ dataUrl: string; mimeType?: string; label?: string }>;
   enableWebSearch?: boolean;
   maxOutputTokens?: number;
   reasoningEffort?: 'low' | 'medium' | 'high';
@@ -423,6 +424,7 @@ export async function callAiChatbotDetailed({
   profile,
   systemPrompt,
   userPrompt,
+  images,
   enableWebSearch,
   maxOutputTokens,
   reasoningEffort,
@@ -454,6 +456,7 @@ export async function callAiChatbotDetailed({
       searchFallbackQuery,
       systemPrompt,
       userPrompt,
+      ...(images && images.length > 0 ? { images } : {}),
     }),
   });
 
@@ -870,6 +873,25 @@ export function buildSkillsAndContextSystemPrompt(
           .join('\n\n')
       : '';
 
+  const attachedImages = session.contextImages || [];
+  const contextImagesBlock =
+    attachedImages.length > 0
+      ? `\n\n=== ATTACHED VISUAL DATA & FIGURES (SURVEY CHARTS / SCREENSHOTS / TABLES) ===
+You have been provided ${attachedImages.length} visual image(s) in this request. Read all exact numbers, percentages, sample sizes, axis labels, and table entries directly from the image(s) — NEVER invent or round away exact figures shown in the images.
+${attachedImages
+  .map(
+    (img, idx) =>
+      `- [${img.tag}] (Image #${idx + 1}, file: "${img.name}"): Caption = "${
+        img.caption || img.name
+      }" | ${
+        img.insertIntoPaper
+          ? `INSERT INTO PAPER: Place the exact marker [FIGURE: ${img.tag}] on its own standalone line immediately before or after analyzing this figure in the relevant findings/analysis section (insert each tag at most once across the paper).`
+          : 'REFERENCE ONLY: Use the data from this image for accurate analysis, do NOT insert a [FIGURE: ...] tag for it.'
+      }`
+  )
+  .join('\n')}`
+      : '';
+
   const compactSources = compactResearchedSourcesForPrompt(
     session.researchedSources || '',
     mode
@@ -908,7 +930,7 @@ ${compactSources}`
   return `You are an elite Academic Researcher & University Writing Specialist assisting inside an academic research & drafting studio.
 
 === ACTIVE SKILL FILES & SYSTEM INSTRUCTIONS ===
-${skillBlock}${contextBlock}${researchedSourcesBlock}${vietnameseRulesBlock}
+${skillBlock}${contextBlock}${contextImagesBlock}${researchedSourcesBlock}${vietnameseRulesBlock}
 
 === ASSIGNMENT BRIEF & FORMATTING RULES ===
 - Document Type: ${docTypeLabel}
@@ -988,10 +1010,17 @@ Example JSON schema:
   }
 ]`;
 
+  const sessionVisionImages = (session.contextImages || []).map((img) => ({
+    dataUrl: img.dataUrl,
+    mimeType: img.mimeType,
+    label: `${img.tag}: ${img.caption || img.name}`,
+  }));
+
   const rawText = await callAiChatbot({
     profile,
     systemPrompt,
     userPrompt,
+    images: sessionVisionImages.length > 0 ? sessionVisionImages : undefined,
     enableWebSearch,
     reasoningEffort: 'low',
     signal,
@@ -2305,10 +2334,17 @@ MANDATORY RULES:
 3. Citations & Data: ONLY cite verified sources from the Whitelist/Context Files (exact author surname spelling & year). NEVER cite article titles in parentheses, NEVER copy unattributed numbers/scores from anonymous web snippets, and aim for 2–5 natural citations per major subsection.
 4. Keep facts (thesis degree, sample size N, instruments) 100% consistent with Context Files & Prior Sections. End cleanly with full punctuation. Output ONLY the section prose.`;
 
+  const sessionVisionImages = (session.contextImages || []).map((img) => ({
+    dataUrl: img.dataUrl,
+    mimeType: img.mimeType,
+    label: `${img.tag}: ${img.caption || img.name}`,
+  }));
+
   const raw = await callAiChatbot({
     profile,
     systemPrompt,
     userPrompt,
+    images: sessionVisionImages.length > 0 ? sessionVisionImages : undefined,
     enableWebSearch,
     signal,
   });
@@ -2397,10 +2433,17 @@ OUTPUT FORMAT:
 2. Immediately after the revised text, on a new line output the exact marker: ${CHANGE_LOG_MARKER}
 3. Right after that marker, write 1-2 concise Vietnamese sentences specifying EXACTLY which paragraphs/parts were modified and what was improved (e.g., "Đoạn 1-2: Nâng cấp văn phong học thuật; Đoạn 3: Mở rộng phân tích phản biện và bổ sung trích dẫn 2024.").`;
 
+  const sessionVisionImages = (session.contextImages || []).map((img) => ({
+    dataUrl: img.dataUrl,
+    mimeType: img.mimeType,
+    label: `${img.tag}: ${img.caption || img.name}`,
+  }));
+
   const raw = await callAiChatbot({
     profile,
     systemPrompt,
     userPrompt,
+    images: sessionVisionImages.length > 0 ? sessionVisionImages : undefined,
     enableWebSearch,
     signal,
   });
@@ -2570,10 +2613,17 @@ Return ONLY a valid JSON array representing the final complete paper outline. Ea
 - "guidanceNotes": string (exact instructions for revising/expanding/writing this section)
 - "changeReason": string (1 short Vietnamese sentence explaining why this section is kept, revised, expanded, or newly added)`;
 
+  const sessionVisionImages = (session.contextImages || []).map((img) => ({
+    dataUrl: img.dataUrl,
+    mimeType: img.mimeType,
+    label: `${img.tag}: ${img.caption || img.name}`,
+  }));
+
   const rawText = await callAiChatbot({
     profile,
     systemPrompt,
     userPrompt,
+    images: sessionVisionImages.length > 0 ? sessionVisionImages : undefined,
     enableWebSearch,
     reasoningEffort: 'low',
     signal,
@@ -2724,10 +2774,17 @@ OUTPUT FORMAT:
 3. Immediately after the prose, on a new line output the exact marker: ${CHANGE_LOG_MARKER}
 4. Right after that marker, write 1-2 concise Vietnamese sentences describing EXACTLY WHERE and WHAT was edited/added in this section (e.g., "Giữ nguyên đoạn mở đầu; mở rộng đoạn 2 thêm phân tích số liệu 2024 và bổ sung 2 trích dẫn; viết tiếp đoạn kết chuyển ý sang chương sau.").`;
 
+  const sessionVisionImages = (session.contextImages || []).map((img) => ({
+    dataUrl: img.dataUrl,
+    mimeType: img.mimeType,
+    label: `${img.tag}: ${img.caption || img.name}`,
+  }));
+
   const raw = await callAiChatbot({
     profile,
     systemPrompt,
     userPrompt,
+    images: sessionVisionImages.length > 0 ? sessionVisionImages : undefined,
     enableWebSearch,
     signal,
   });

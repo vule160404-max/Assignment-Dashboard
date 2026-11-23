@@ -20,6 +20,10 @@ import {
 import { countWords } from '../../../lib/wordHumanizer';
 import { CoverPageSheetPreview } from './CoverPageSheetPreview';
 import {
+  findSessionImageByTag,
+  parseFigureMarkerTag,
+} from '../../../lib/writerImageUtils';
+import {
   COVER_PAGE_TEMPLATES,
   DocumentFormatConfig,
   SectionHeadingLevel,
@@ -933,6 +937,53 @@ export function WriterPaperCanvas({
                     }}
                   />
                 )}
+
+                {/* Visual Figure Preview for any [FIGURE: IMG_X] markers embedded in this section */}
+                {(() => {
+                  const figureTags = Array.from(
+                    new Set(
+                      sec.content
+                        .split(/\r?\n/)
+                        .map((line) => parseFigureMarkerTag(line))
+                        .filter((t): t is string => Boolean(t))
+                    )
+                  );
+                  const matchedFigures = figureTags
+                    .map((tag) => findSessionImageByTag(session.contextImages, tag))
+                    .filter((img): img is NonNullable<typeof img> => Boolean(img));
+                  if (matchedFigures.length === 0) return null;
+
+                  return (
+                    <div className="mt-3 pt-3 border-t border-dashed border-zinc-200 space-y-4">
+                      {matchedFigures.map((fig, figIdx) => (
+                        <figure
+                          key={fig.id}
+                          className="flex flex-col items-center gap-1.5"
+                        >
+                          <img
+                            src={fig.dataUrl}
+                            alt={fig.caption || fig.name}
+                            className="max-h-72 max-w-full rounded-lg border border-zinc-200 shadow-2xs object-contain bg-white"
+                          />
+                          <figcaption
+                            className="text-center italic text-slate-600 text-xs"
+                            style={{
+                              fontFamily: `"${format.fontFamily}", serif`,
+                            }}
+                          >
+                            {session.writingLanguage === 'Vietnamese'
+                              ? `Hình ${figIdx + 1}.`
+                              : `Figure ${figIdx + 1}.`}{' '}
+                            {fig.caption || fig.name}{' '}
+                            <span className="not-italic font-mono text-[10px] text-zinc-400">
+                              [{fig.tag}]
+                            </span>
+                          </figcaption>
+                        </figure>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })}

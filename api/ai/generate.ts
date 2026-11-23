@@ -14,6 +14,12 @@ type AiProviderKeyName =
 
 type StoredAiProviderSecrets = Partial<Record<AiProviderKeyName, string>>;
 
+interface AiInputImage {
+  dataUrl: string;
+  mimeType?: string;
+  label?: string;
+}
+
 interface AiRequestBody {
   provider?: string;
   apiKey?: string;
@@ -22,6 +28,7 @@ interface AiRequestBody {
   schema?: string;
   systemPrompt?: string;
   userPrompt?: string;
+  images?: AiInputImage[];
   temperature?: number;
   previous_response_id?: string;
   enableWebSearch?: boolean;
@@ -31,6 +38,36 @@ interface AiRequestBody {
   searchFallbackQuery?: string;
   tools?: Array<{ type: 'web_search' | 'fetch_url' }>;
   response_format?: Record<string, unknown>;
+}
+
+function normalizeInputImages(raw: unknown): Array<{
+  dataUrl: string;
+  mimeType: string;
+  base64Data: string;
+}> {
+  if (!Array.isArray(raw)) return [];
+  const out: Array<{ dataUrl: string; mimeType: string; base64Data: string }> =
+    [];
+  for (const item of raw.slice(0, 8)) {
+    if (!item || typeof item !== 'object') continue;
+    const rawUrl = (item as AiInputImage).dataUrl;
+    if (typeof rawUrl !== 'string') continue;
+    const trimmed = rawUrl.trim();
+    const m = trimmed.match(
+      /^data:(image\/(?:png|jpeg|jpg|webp|gif));base64,([A-Za-z0-9+/=\s]+)$/i
+    );
+    if (!m) continue;
+    const mimeType =
+      m[1].toLowerCase() === 'image/jpg' ? 'image/jpeg' : m[1].toLowerCase();
+    const base64Data = m[2].replace(/\s+/g, '');
+    if (!base64Data || base64Data.length > 4_000_000) continue;
+    out.push({
+      dataUrl: `data:${mimeType};base64,${base64Data}`,
+      mimeType,
+      base64Data,
+    });
+  }
+  return out;
 }
 
 const AI_VAULT_COOKIE_NAME = 'assigntrack_ai_vault';
@@ -225,6 +262,7 @@ export default async function handler(
   const systemPrompt =
     typeof body.systemPrompt === 'string' ? body.systemPrompt : '';
   const userPrompt = typeof body.userPrompt === 'string' ? body.userPrompt : '';
+  const inputImages = normalizeInputImages(body.images);
   const temperature =
     typeof body.temperature === 'number'
       ? Math.max(0, Math.min(1.5, body.temperature))
@@ -254,8 +292,17 @@ export default async function handler(
         model
       )}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
+      const geminiParts: Array<Record<string, unknown>> = [
+        { text: userPrompt },
+        ...inputImages.map((img) => ({
+          inlineData: {
+            mimeType: img.mimeType,
+            data: img.base64Data,
+          },
+        })),
+      ];
       const payload: Record<string, unknown> = {
-        contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
+        contents: [{ role: 'user', parts: geminiParts }],
         generationConfig: { temperature },
       };
       if (systemPrompt.trim()) {
@@ -393,8 +440,25 @@ export default async function handler(
       const isPreset = PERPLEXITY_AGENT_PRESETS.has(trimmedTarget.toLowerCase());
       const isDeepPreset = /deep-research/i.test(trimmedTarget);
       const isResearchStep = Boolean(body.isResearchStep);
+      const agentInput: unknown =
+        inputImages.length > 0
+          ? [
+              {
+                type: 'message',
+                role: 'user',
+                content: [
+                  { type: 'input_text', text: userPrompt },
+                  ...inputImages.map((img) => ({
+                    type: 'input_image',
+                    image_url: img.dataUrl,
+                  })),
+                ],
+              },
+            ]
+          : userPrompt;
+
       const reqPayload: Record<string, unknown> = {
-        input: userPrompt,
+        input: agentInput,
         max_output_tokens:
           typeof body.maxOutputTokens === 'number' && body.maxOutputTokens > 0
             ? Math.min(8192, Math.round(body.maxOutputTokens))
@@ -484,6 +548,25 @@ export default async function handler(
               Authorization: `Bearer ${apiKey}`,
             },
             body: JSON.stringify({ ...retryPayload, stream: true }),
+            signal: controller.signal,
+          });
+        }
+
+        // If a non-vision model rejects multimodal `input_image` with HTTP 400, gracefully fall back to text-only
+        if (httpResp.status === 400 && inputImages.length > 0) {
+          const textOnlyPayload: Record<string, unknown> = {
+            ...reqPayload,
+            input: userPrompt,
+          };
+          delete textOnlyPayload.reasoning;
+          httpResp = await fetch('https://api.perplexity.ai/v1/agent', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Accept: 'text/event-stream',
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({ ...textOnlyPayload, stream: true }),
             signal: controller.signal,
           });
         }
@@ -713,11 +796,26 @@ export default async function handler(
         ? `${cleanBase}/messages`
         : `${cleanBase}/v1/messages`;
 
+      const anthropicContent: unknown =
+        inputImages.length > 0
+          ? [
+              ...inputImages.map((img) => ({
+                type: 'image',
+                source: {
+                  type: 'base64',
+                  media_type: img.mimeType,
+                  data: img.base64Data,
+                },
+              })),
+              { type: 'text', text: userPrompt },
+            ]
+          : userPrompt;
+
       const payload: Record<string, unknown> = {
         model,
         max_tokens: 8192,
         temperature,
-        messages: [{ role: 'user', content: userPrompt }],
+        messages: [{ role: 'user', content: anthropicContent }],
       };
       if (systemPrompt.trim()) {
         payload.system = systemPrompt;
@@ -783,11 +881,24 @@ export default async function handler(
     const isNvidiaNim = /integrate\.api\.nvidia\.com/i.test(cleanBase);
     const resolvedModel = isNvidiaNim ? resolveNvidiaModel(model) : model;
 
-    const messages: { role: string; content: string }[] = [];
+    const messages: { role: string; content: unknown }[] = [];
     if (systemPrompt.trim()) {
       messages.push({ role: 'system', content: systemPrompt });
     }
-    messages.push({ role: 'user', content: userPrompt });
+    if (inputImages.length > 0) {
+      messages.push({
+        role: 'user',
+        content: [
+          { type: 'text', text: userPrompt },
+          ...inputImages.map((img) => ({
+            type: 'image_url',
+            image_url: { url: img.dataUrl },
+          })),
+        ],
+      });
+    } else {
+      messages.push({ role: 'user', content: userPrompt });
+    }
 
     const resp = await fetch(url, {
       method: 'POST',

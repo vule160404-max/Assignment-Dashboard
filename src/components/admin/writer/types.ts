@@ -272,6 +272,24 @@ export interface SessionContextFile {
   uploadedAt: string;
 }
 
+export interface SessionContextImage {
+  id: string;
+  /** Short stable reference tag used by AI & renderer, e.g. IMG_1, IMG_2 */
+  tag: string;
+  name: string;
+  /** Academic figure caption shown under the image in preview / DOCX / PDF */
+  caption: string;
+  mimeType: string;
+  /** Compressed base64 data URI (data:image/jpeg;base64,... or data:image/png;base64,...) */
+  dataUrl: string;
+  width: number;
+  height: number;
+  sizeBytes: number;
+  /** If true, AI is instructed to insert [FIGURE: IMG_X] into the matching analysis section */
+  insertIntoPaper: boolean;
+  uploadedAt: string;
+}
+
 export type WriterBatchStatus =
   | 'idle'
   | 'queued'
@@ -303,6 +321,7 @@ export interface WriterSession {
   format: DocumentFormatConfig;
   outline: WriterOutlineSection[];
   contextFiles: SessionContextFile[];
+  contextImages?: SessionContextImage[];
   activeSectionId: string;
   viewMode: 'sections' | 'full_paper';
   fullPaperOverride?: string;

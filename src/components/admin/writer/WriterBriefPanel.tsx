@@ -1,12 +1,22 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import {
+  Check,
+  Copy,
   FileText,
   FolderUp,
+  ImagePlus,
+  Loader2,
   Sparkles,
+  Trash2,
 } from 'lucide-react';
 import { CITATION_STYLES, CitationStyle } from '../../../types/domain';
 import {
+  compressImageToContextItem,
+  getNextImageTag,
+} from '../../../lib/writerImageUtils';
+import {
   DEFAULT_COVER_PAGE_CONFIG,
+  SessionContextImage,
   WriterDocumentType,
   WriterSession,
 } from './types';
@@ -82,6 +92,53 @@ export function WriterBriefPanel({
   onSwitchToOutlineWithAi,
 }: WriterBriefPanelProps) {
   const contextFileInputRef = useRef<HTMLInputElement | null>(null);
+  const contextImageInputRef = useRef<HTMLInputElement | null>(null);
+  const [processingImages, setProcessingImages] = useState(false);
+  const [imageError, setImageError] = useState('');
+  const [copiedImgTag, setCopiedImgTag] = useState('');
+
+  const contextImages = session.contextImages || [];
+
+  const handleAddContextImages = async (files: File[] | FileList | null) => {
+    if (!files || files.length === 0) return;
+    setImageError('');
+    const imageFiles = Array.from(files).filter((f) =>
+      f.type.startsWith('image/')
+    );
+    if (imageFiles.length === 0) {
+      setImageError('Vui lòng chọn tệp ảnh hợp lệ (PNG, JPG, WEBP).');
+      return;
+    }
+
+    const remaining = Math.max(0, 6 - contextImages.length);
+    if (remaining === 0) {
+      setImageError('Tối đa 6 ảnh tài liệu cho mỗi bài viết để đảm bảo tốc độ xử lý.');
+      return;
+    }
+
+    setProcessingImages(true);
+    try {
+      const nextList: SessionContextImage[] = [...contextImages];
+      for (const file of imageFiles.slice(0, remaining)) {
+        const tag = getNextImageTag(nextList);
+        const compressed = await compressImageToContextItem(file, tag);
+        nextList.push(compressed);
+      }
+      onUpdateSession((s) => ({
+        ...s,
+        contextImages: nextList,
+      }));
+    } catch (err) {
+      setImageError(
+        err instanceof Error ? err.message : 'Không thể xử lý ảnh đính kèm.'
+      );
+    } finally {
+      setProcessingImages(false);
+      if (contextImageInputRef.current) {
+        contextImageInputRef.current.value = '';
+      }
+    }
+  };
 
   const activeDocType: WriterDocumentType =
     session.documentType ||
@@ -365,6 +422,164 @@ export function WriterBriefPanel({
                   ×
                 </button>
               </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Per-session visual context images (Survey screenshots, Charts, SPSS tables -> Perplexity Vision + DOCX/PDF Figure Embed) */}
+      <div
+        className="pt-2.5 border-t border-zinc-100 space-y-2"
+        onPaste={(e) => {
+          const items = Array.from(e.clipboardData?.items || []);
+          const pastedImages: File[] = [];
+          for (const item of items) {
+            if (item.type.startsWith('image/')) {
+              const f = item.getAsFile();
+              if (f) pastedImages.push(f);
+            }
+          }
+          if (pastedImages.length > 0) {
+            e.preventDefault();
+            void handleAddContextImages(pastedImages);
+          }
+        }}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <div>
+            <span className="block text-[11px] font-semibold text-zinc-700">
+              Tài liệu dạng ảnh (Biểu đồ, Khảo sát, Bảng số liệu) · AI Vision ({contextImages.length}/6)
+            </span>
+            <span className="block text-[10px] text-zinc-400">
+              Chọn ảnh hoặc dán (Ctrl+V) trực tiếp vào đây — Perplexity sẽ đọc số liệu chính xác &amp; tự động chèn ảnh vào bài Word/PDF.
+            </span>
+          </div>
+          <input
+            ref={contextImageInputRef}
+            type="file"
+            multiple
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={(e) => void handleAddContextImages(e.target.files)}
+            className="hidden"
+          />
+          <button
+            type="button"
+            disabled={processingImages || contextImages.length >= 6}
+            onClick={() => contextImageInputRef.current?.click()}
+            className="btn-press shrink-0 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 rounded-md inline-flex items-center gap-1"
+          >
+            {processingImages ? (
+              <Loader2 className="w-3 h-3 animate-spin" />
+            ) : (
+              <ImagePlus className="w-3 h-3" />
+            )}
+            <span>+ Thêm ảnh</span>
+          </button>
+        </div>
+
+        {imageError && (
+          <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-200 rounded-md px-2.5 py-1.5">
+            {imageError}
+          </p>
+        )}
+
+        {contextImages.length > 0 && (
+          <div className="space-y-2">
+            {contextImages.map((img) => (
+              <div
+                key={img.id}
+                className="flex items-start gap-2.5 p-2 rounded-lg bg-zinc-50 border border-zinc-200/90"
+              >
+                <img
+                  src={img.dataUrl}
+                  alt={img.caption || img.name}
+                  className="w-14 h-12 object-cover rounded-md border border-zinc-200 bg-white shrink-0"
+                />
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <span className="px-1.5 py-0.5 rounded bg-[#0B2559] text-white font-mono text-[10px] font-bold shrink-0">
+                        {img.tag}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          void navigator.clipboard
+                            ?.writeText(`[FIGURE: ${img.tag}]`)
+                            .catch(() => {});
+                          setCopiedImgTag(img.tag);
+                          window.setTimeout(() => setCopiedImgTag(''), 1500);
+                        }}
+                        title={`Sao chép thẻ [FIGURE: ${img.tag}] để dán thủ công vào bài`}
+                        className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-[#12489B] hover:underline"
+                      >
+                        {copiedImgTag === img.tag ? (
+                          <>
+                            <Check className="w-2.5 h-2.5 text-emerald-600" />
+                            <span className="text-emerald-700">Đã copy</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-2.5 h-2.5" />
+                            <span>Copy thẻ</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onUpdateSession((s) => ({
+                          ...s,
+                          contextImages: (s.contextImages || []).filter(
+                            (item) => item.id !== img.id
+                          ),
+                        }))
+                      }
+                      aria-label={`Xóa ảnh ${img.tag}`}
+                      className="p-0.5 text-zinc-400 hover:text-rose-600"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={img.caption}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      onUpdateSession((s) => ({
+                        ...s,
+                        contextImages: (s.contextImages || []).map((item) =>
+                          item.id === img.id ? { ...item, caption: val } : item
+                        ),
+                      }));
+                    }}
+                    placeholder="Chú thích hình (VD: Kết quả khảo sát hành vi người tiêu dùng)"
+                    className="w-full px-2 py-1 text-[11px] bg-white border border-zinc-200 rounded focus:outline-none focus:border-[#12489B]"
+                  />
+
+                  <label className="inline-flex items-center gap-1.5 text-[10.5px] text-zinc-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={img.insertIntoPaper}
+                      onChange={(e) => {
+                        const checked = e.target.checked;
+                        onUpdateSession((s) => ({
+                          ...s,
+                          contextImages: (s.contextImages || []).map((item) =>
+                            item.id === img.id
+                              ? { ...item, insertIntoPaper: checked }
+                              : item
+                          ),
+                        }));
+                      }}
+                      className="rounded border-zinc-300 text-[#12489B] focus:ring-[#12489B]"
+                    />
+                    <span>Chèn hình này vào bài viết &amp; Word/PDF</span>
+                  </label>
+                </div>
+              </div>
             ))}
           </div>
         )}

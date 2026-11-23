@@ -3,6 +3,19 @@ import {
   DEFAULT_COVER_PAGE_CONFIG,
   WriterSession,
 } from '../components/admin/writer/types';
+import {
+  findSessionImageByTag,
+  parseFigureMarkerTag,
+} from './writerImageUtils';
+
+function loadHtmlImage(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Không tải được ảnh để xuất PDF.'));
+    img.src = src;
+  });
+}
 
 // A4 dimensions in points (72 DPI) and 2x render canvas (144 DPI = crisp print quality)
 const A4_PT_W = 595.28;
@@ -290,6 +303,8 @@ export async function exportWriterSessionToPdf(
     }
   };
 
+  let pdfFigureCounter = 0;
+
   for (const sec of session.outline) {
     const cleanSecTitle = stripMarkdown(sec.title);
     const isRefSec =
@@ -340,6 +355,54 @@ export async function exportWriterSessionToPdf(
       .filter(Boolean);
 
     for (const para of rawParas) {
+      const figTag = parseFigureMarkerTag(para);
+      if (figTag) {
+        const matchedImg = findSessionImageByTag(session.contextImages, figTag);
+        if (matchedImg) {
+          try {
+            const loaded = await loadHtmlImage(matchedImg.dataUrl);
+            pdfFigureCounter += 1;
+            const maxDrawW = Math.round(contentW * 0.88);
+            const maxDrawH = Math.round(330 * SCALE);
+            const natW = Math.max(1, loaded.naturalWidth || matchedImg.width || 800);
+            const natH = Math.max(1, loaded.naturalHeight || matchedImg.height || 500);
+            const ratio = Math.min(maxDrawW / natW, maxDrawH / natH, 1);
+            const drawW = Math.round(natW * ratio);
+            const drawH = Math.round(natH * ratio);
+            const captionFontPx = Math.max(18, Math.round(baseFontPx * 0.9));
+            const captionBlockH = Math.round(34 * SCALE);
+
+            ensureSpace(drawH + captionBlockH + Math.round(16 * SCALE));
+            cursorY += Math.round(8 * SCALE);
+            const drawX = Math.round((CANVAS_W - drawW) / 2);
+            current.ctx.drawImage(loaded, drawX, cursorY, drawW, drawH);
+            current.ctx.strokeStyle = '#E2E8F0';
+            current.ctx.lineWidth = 1;
+            current.ctx.strokeRect(drawX, cursorY, drawW, drawH);
+            cursorY += drawH + Math.round(16 * SCALE);
+
+            const figPrefix =
+              session.writingLanguage === 'Vietnamese'
+                ? `Hình ${pdfFigureCounter}.`
+                : `Figure ${pdfFigureCounter}.`;
+            const captionStr = `${figPrefix} ${matchedImg.caption || matchedImg.name}`;
+            current.ctx.font = `italic ${captionFontPx}px ${fontStack}`;
+            current.ctx.fillStyle = '#334155';
+            current.ctx.textAlign = 'center';
+            const capLines = wrapTextLines(current.ctx, captionStr, contentW);
+            for (const cl of capLines) {
+              current.ctx.fillText(cl, CANVAS_W / 2, cursorY);
+              cursorY += Math.round(captionFontPx * 1.35);
+            }
+            current.ctx.textAlign = 'left';
+            cursorY += paraGapPx;
+            continue;
+          } catch {
+            // fall through if image fails to load
+          }
+        }
+      }
+
       const isSubHeading =
         !isRefSec &&
         /^\d+\.\d+(?:\.\d+)?\.?\s+\S/.test(para) &&
