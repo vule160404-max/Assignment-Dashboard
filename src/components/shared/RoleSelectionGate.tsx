@@ -18,6 +18,7 @@ import {
   Star,
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
+import { HeroAmbientBackground } from './HeroAmbientBackground';
 import { PolicyModal, PolicyTabKey } from './PolicyModal';
 import { PublicTopNav } from './PublicTopNav';
 import { RevealOnScroll } from './RevealOnScroll';
@@ -283,22 +284,9 @@ export function RoleSelectionGate({
           />
         ) : (
         <>
-        {/* HERO SECTION: Deep Academic Navy Canvas + Blueprint Grid + Floating Trust Cards */}
+        {/* HERO SECTION: Deep Academic Navy Canvas + Animated Blueprint Grid + Floating Trust Cards */}
         <section className="relative overflow-hidden bg-[#0B2559] text-white pt-16 pb-20 sm:pt-20 sm:pb-24">
-          {/* Subtle Architectural Blueprint Grid & Glow */}
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 opacity-[0.09]"
-            style={{
-              backgroundImage:
-                'linear-gradient(to right, #93C5FD 1px, transparent 1px), linear-gradient(to bottom, #93C5FD 1px, transparent 1px)',
-              backgroundSize: '48px 48px',
-            }}
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[780px] h-[380px] rounded-full bg-sky-400/15 blur-3xl"
-          />
+          <HeroAmbientBackground />
 
           <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="max-w-3xl mx-auto text-center space-y-6">
