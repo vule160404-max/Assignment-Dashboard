@@ -1046,51 +1046,11 @@ export function TurnitinProMaxView({
         </div>
       </section>
 
-      {/* 2. ALL-IN-ONE UNIFIED INTAKE & EXECUTION BAR (Gộp chung 3 cách nạp bài làm 1) */}
-      <section className="bg-white border border-zinc-200/90 rounded-2xl p-4 shadow-2xs space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Unified Intake Controls: AI Writer Dropdown + Upload .DOCX + Paste Text Toggle */}
-          <div className="flex flex-wrap items-center gap-2 flex-1 min-w-[280px]">
-            <span className="text-xs font-bold text-slate-700 shrink-0">
-              Nguồn bài:
-            </span>
-
-            {/* 1. Pick AI Writer session */}
-            <div className="relative min-w-[210px] max-w-xs flex-1">
-              <select
-                value={origin === 'ai_writer' ? selectedSessionId : ''}
-                disabled={isProcessing}
-                onChange={(e) => {
-                  if (e.target.value) {
-                    handleSelectAiWriterSession(e.target.value);
-                  }
-                }}
-                className={`w-full pl-3 pr-7 py-2 text-xs font-semibold rounded-xl border transition-colors focus:outline-none ${
-                  origin === 'ai_writer' && unifiedSections.length > 0
-                    ? 'bg-blue-50/80 border-[#12489B] text-[#0B2559]'
-                    : 'bg-zinc-50 border-zinc-200 text-slate-700 hover:bg-zinc-100'
-                }`}
-              >
-                <option value="">
-                  {sessions.length > 0
-                    ? `-- Chọn từ AI Writer Studio (${sessions.length} bài) --`
-                    : '-- Chưa có bài trong AI Writer --'}
-                </option>
-                {sessions.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.linkedOrderCode ? `[#${s.linkedOrderCode}] ` : ''}
-                    {s.topic || s.title || 'Phiên chưa đặt tên'} (
-                    {s.outline.reduce(
-                      (sum, sec) => sum + countWords(sec.content),
-                      0
-                    )}
-                    w)
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* 2. Upload Word .DOCX directly */}
+      {/* 2. STREAMLINED SINGLE-CARD TOOLBAR (Nguồn bài + Thông tin file + Nút chạy & Xuất file gọn trên 1 khung) */}
+      <section className="bg-white border border-zinc-200/90 rounded-2xl p-3.5 sm:p-4 shadow-2xs space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          {/* Left: Compact Source Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
             <input
               ref={docxInputRef}
               type="file"
@@ -1104,26 +1064,21 @@ export function TurnitinProMaxView({
               onClick={() => docxInputRef.current?.click()}
               className={`btn-press inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-colors ${
                 origin === 'docx_file'
-                  ? 'bg-blue-50 border-[#12489B] text-[#0B2559]'
+                  ? 'bg-blue-50/90 border-[#12489B] text-[#0B2559]'
                   : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200 text-slate-700'
               }`}
             >
               <Upload className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>
-                {origin === 'docx_file' && parsedDocx
-                  ? `File: ${parsedDocx.fileName.slice(0, 22)}`
-                  : 'Tải file .DOCX'}
-              </span>
+              <span>Tải file .DOCX</span>
             </button>
 
-            {/* 3. Paste text directly */}
             <button
               type="button"
               disabled={isProcessing}
               onClick={() => setShowPasteBox((v) => !v)}
               className={`btn-press inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-bold transition-colors ${
                 showPasteBox || origin === 'pasted_text'
-                  ? 'bg-blue-50 border-[#12489B] text-[#0B2559]'
+                  ? 'bg-blue-50/90 border-[#12489B] text-[#0B2559]'
                   : 'bg-zinc-50 hover:bg-zinc-100 border-zinc-200 text-slate-700'
               }`}
             >
@@ -1135,45 +1090,165 @@ export function TurnitinProMaxView({
                 <ChevronDown className="w-3.5 h-3.5" />
               )}
             </button>
+
+            {sessions.length > 0 && (
+              <select
+                value={origin === 'ai_writer' ? selectedSessionId : ''}
+                disabled={isProcessing}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    handleSelectAiWriterSession(e.target.value);
+                  }
+                }}
+                className={`px-3 py-2 text-xs font-semibold rounded-xl border transition-colors focus:outline-none max-w-[220px] truncate ${
+                  origin === 'ai_writer' && unifiedSections.length > 0
+                    ? 'bg-blue-50/90 border-[#12489B] text-[#0B2559]'
+                    : 'bg-zinc-50 border-zinc-200 text-slate-700 hover:bg-zinc-100'
+                }`}
+              >
+                <option value="">
+                  -- Bài từ AI Writer ({sessions.length}) --
+                </option>
+                {sessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.linkedOrderCode ? `[#${s.linkedOrderCode}] ` : ''}
+                    {s.topic || s.title || 'Phiên chưa đặt tên'}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Active Document Summary Pill right inline */}
+            {unifiedSections.length > 0 && (
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#F4F7FB] border border-blue-200/70 text-xs text-slate-700 max-w-md">
+                <span className="font-bold text-[#0B2559] truncate max-w-[200px]">
+                  {documentLabel}
+                </span>
+                <span className="text-zinc-300">|</span>
+                <span className="font-mono text-[11px] text-zinc-600 shrink-0">
+                  {unifiedSections.length} mục · {totalWords.toLocaleString()} từ
+                </span>
+                {origin === 'ai_writer' && activeWriterSession && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOpenInAiWriter(activeWriterSession.linkedOrderCode)
+                    }
+                    className="text-[#12489B] font-bold hover:underline inline-flex items-center gap-0.5 shrink-0"
+                    title="Mở lại trong AI Writer Studio"
+                  >
+                    <Wand2 className="w-3 h-3" />
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
-          {/* Primary Single Unified Action Button */}
-          <div className="flex flex-wrap items-center gap-2">
+          {/* Right: Export + Primary Run Action */}
+          <div className="flex flex-wrap items-center gap-2 ml-auto">
+            {unifiedSections.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void handleCopyAllText()}
+                  className="btn-press inline-flex items-center gap-1 px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-slate-700 text-xs font-semibold"
+                  title="Sao chép toàn bộ nội dung bài viết"
+                >
+                  {copiedAll ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Đã copy</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      <span>Copy</span>
+                    </>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  disabled={exportingDocx}
+                  onClick={() => void handleDownloadDocx()}
+                  className="btn-press inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 text-emerald-800 text-xs font-bold disabled:opacity-40"
+                  title="Tải xuống file Word (.DOCX) đã tích hợp Forensic Metadata"
+                >
+                  {exportingDocx ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <Download className="w-3.5 h-3.5" />
+                  )}
+                  <span>Tải .DOCX</span>
+                </button>
+
+                {onAttachDocxToOrder && orders.length > 0 && (
+                  <div className="inline-flex items-center gap-1">
+                    <select
+                      value={selectedOrderCode}
+                      onChange={(e) => setSelectedOrderCode(e.target.value)}
+                      className="px-2 py-2 text-xs rounded-xl border border-zinc-200 bg-zinc-50 max-w-[135px]"
+                    >
+                      <option value="">Gắn đơn...</option>
+                      {orders.map((o) => (
+                        <option key={o.id} value={o.orderCode}>
+                          #{o.orderCode} · {o.topic.slice(0, 18)}
+                        </option>
+                      ))}
+                    </select>
+                    {selectedOrderCode && (
+                      <button
+                        type="button"
+                        disabled={attachingOrder}
+                        onClick={() => void handleAttachToOrder()}
+                        className="btn-press p-2 rounded-xl bg-[#0B2559] hover:bg-[#12489B] text-white"
+                        title="Đính kèm vào đơn hàng đã chọn"
+                      >
+                        {attachingOrder ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Paperclip className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+
             <button
               type="button"
               disabled={isProcessing || unifiedSections.length === 0}
               onClick={() => void handleRunFullProMaxAi()}
-              className="btn-press inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#0B2559] to-[#12489B] hover:from-[#071A42] hover:to-[#0B2559] text-white text-xs sm:text-sm font-bold shadow-sm disabled:opacity-40"
-              title="AI tự động thực thi đồng thời cả 6 lớp lý thuyết chống Turnitin AIW-2 (Xanh) & AIR-1 (Tím) trên 100% đoạn văn, cam kết < 20% AI, khóa chống tăng điểm AI và bảo toàn 100% trích dẫn"
+              className="btn-press inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-[#0B2559] to-[#12489B] hover:from-[#071A42] hover:to-[#0B2559] text-white text-xs font-bold shadow-xs disabled:opacity-40"
             >
               {isProcessing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Sparkles className="w-4 h-4 text-sky-300" />
+                <Sparkles className="w-3.5 h-3.5 text-sky-300" />
               )}
-              <span>
-                Chạy Vượt Turnitin ProMax (&lt; 20% AI · AI Toàn Diện 6 Lớp)
-              </span>
+              <span>Chạy Vượt Turnitin ProMax</span>
             </button>
           </div>
         </div>
 
-        {/* Collapsible Quick-Paste Box inside the same unified bar */}
+        {/* Collapsible Quick-Paste Box */}
         {showPasteBox && (
-          <div className="pt-3 border-t border-zinc-100 space-y-2.5">
+          <div className="pt-3 border-t border-zinc-100 space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-800">
-                Dán toàn bộ bài luận hoặc chương cần vượt Turnitin (Hệ thống tự động chia thành các mục 250–380 từ và khóa trích dẫn):
+              <span className="font-semibold text-slate-700">
+                Dán bài luận hoặc chương cần xử lý (Tự động chia mục 250–380 từ &amp; khóa trích dẫn):
               </span>
               <span className="font-mono text-zinc-500">
                 {countWords(pasteDraft)} từ
               </span>
             </div>
             <textarea
-              rows={5}
+              rows={4}
               value={pasteDraft}
               onChange={(e) => setPasteDraft(e.target.value)}
-              placeholder="Dán nội dung bài làm vào đây rồi bấm 'Nạp vào danh sách xử lý'..."
+              placeholder="Dán nội dung bài làm vào đây..."
               className="w-full p-3 text-xs sm:text-sm rounded-xl border border-zinc-200 bg-[#F4F7FB]/50 focus:bg-white focus:outline-none focus:border-[#12489B]"
             />
             <div className="flex justify-end gap-2">
@@ -1189,220 +1264,29 @@ export function TurnitinProMaxView({
                 onClick={handleApplyPastedText}
                 className="btn-press px-4 py-1.5 rounded-xl bg-[#0B2559] hover:bg-[#12489B] text-white text-xs font-bold"
               >
-                Nạp vào danh sách xử lý ({countWords(pasteDraft)} từ)
+                Nạp văn bản ({countWords(pasteDraft)} từ)
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* Active Document Summary & Export Strip */}
-        {unifiedSections.length > 0 && (
-          <div className="pt-2.5 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-2 text-xs">
-            <div className="flex flex-wrap items-center gap-2 text-slate-700">
-              <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#12489B] font-bold">
-                {origin === 'ai_writer'
-                  ? 'Nguồn: AI Writer Studio'
-                  : origin === 'docx_file'
-                  ? 'Nguồn: File Word (.DOCX)'
-                  : 'Nguồn: Văn bản dán'}
-              </span>
-              <strong className="truncate max-w-xs">{documentLabel}</strong>
-              <span className="text-zinc-400">·</span>
-              <span className="font-mono text-zinc-600">
-                {unifiedSections.length} mục · {totalWords.toLocaleString()} từ
-              </span>
-              {origin === 'ai_writer' && activeWriterSession && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    onOpenInAiWriter(activeWriterSession.linkedOrderCode)
-                  }
-                  className="text-[#12489B] font-bold hover:underline inline-flex items-center gap-1 ml-1"
-                >
-                  <Wand2 className="w-3 h-3" />
-                  <span>Mở trong AI Writer</span>
-                  <ArrowRight className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void handleCopyAllText()}
-                className="btn-press inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-slate-800 font-semibold"
-              >
-                {copiedAll ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Đã copy toàn bài</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Copy toàn bài</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                disabled={exportingDocx}
-                onClick={() => void handleDownloadDocx()}
-                className="btn-press inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-2xs disabled:opacity-40"
-              >
-                {exportingDocx ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Download className="w-3.5 h-3.5" />
-                )}
-                <span>Tải Word (.DOCX) &lt; 20% AI</span>
-              </button>
-
-              {onAttachDocxToOrder && orders.length > 0 && (
-                <div className="inline-flex items-center gap-1.5">
-                  <select
-                    value={selectedOrderCode}
-                    onChange={(e) => setSelectedOrderCode(e.target.value)}
-                    className="px-2 py-1.5 text-xs rounded-xl border border-zinc-200 bg-white max-w-[160px]"
-                  >
-                    <option value="">-- Gắn vào đơn --</option>
-                    {orders.map((o) => (
-                      <option key={o.id} value={o.orderCode}>
-                        #{o.orderCode} · {o.topic.slice(0, 22)}
-                      </option>
-                    ))}
-                  </select>
-                  {selectedOrderCode && (
-                    <button
-                      type="button"
-                      disabled={attachingOrder}
-                      onClick={() => void handleAttachToOrder()}
-                      className="btn-press px-2.5 py-1.5 rounded-xl bg-[#0B2559] hover:bg-[#12489B] text-white font-bold inline-flex items-center gap-1"
-                    >
-                      {attachingOrder ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : (
-                        <Paperclip className="w-3 h-3" />
-                      )}
-                      <span>Đính kèm</span>
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           </div>
         )}
       </section>
 
-      {/* 3. BUỒNG LÁI TIẾN ĐỘ THỜI GIAN THỰC (Live Execution Cockpit) */}
+      {/* 3. COMPACT LIVE PROGRESS BAR (Gọn gàng, không lặp lại danh sách mục gây rối mắt) */}
       {(isProcessing || (showCockpitBanner && executionLogs.length > 0)) && (
         <section
-          className={`rounded-2xl border p-5 shadow-md space-y-4 transition-all ${
+          className={`rounded-2xl border px-4 py-3.5 shadow-xs space-y-2.5 transition-all ${
             isProcessing
-              ? 'bg-gradient-to-br from-blue-50 via-white to-sky-50/70 border-[#12489B]/45 ring-2 ring-[#12489B]/20'
-              : 'bg-gradient-to-br from-emerald-50/80 via-white to-emerald-50/30 border-emerald-300/80'
+              ? 'bg-blue-50/80 border-[#12489B]/40'
+              : 'bg-emerald-50/75 border-emerald-300/80'
           }`}
         >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3 min-w-0">
-              {isProcessing ? (
-                <span className="w-10 h-10 rounded-xl bg-[#0B2559] text-white flex items-center justify-center shrink-0 shadow-xs">
-                  <Loader2 className="w-5 h-5 animate-spin text-sky-300" />
-                </span>
-              ) : (
-                <span className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-                  <CheckCircle2 className="w-5 h-5" />
-                </span>
-              )}
-
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h2 className="text-sm sm:text-base font-bold text-[#0B2559] truncate">
-                    {isProcessing && progressInfo
-                      ? `Đang xử lý mục ${progressInfo.step}/${progressInfo.total}: “${progressInfo.label}”`
-                      : `Đã hoàn tất Vượt Turnitin ProMax (${executionLogs.length} mục đã xử lý)`}
-                  </h2>
-                  {isProcessing && progressInfo && (
-                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-[#12489B] font-mono text-[10.5px] font-bold">
-                      Toàn diện 100% đoạn · Cửa sổ 250w
-                    </span>
-                  )}
-                </div>
-
-                <p className="text-xs text-slate-600 mt-0.5">
-                  {isProcessing && progressInfo ? (
-                    <>
-                      <strong className="text-[#12489B]">
-                        {progressInfo.phaseDetail}
-                      </strong>
-                      {progressInfo.total - progressInfo.step <= 1 && (
-                        <span className="ml-2 px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[11px]">
-                          ⚡ Đang ở mục cuối — Sắp hoàn thành!
-                        </span>
-                      )}
-                    </>
-                  ) : (
-                    <span>
-                      Toàn bộ các mục đã chọn đã được đưa xuống dưới ngưỡng{' '}
-                      <strong>&lt; 20% AI</strong> và khóa nguyên vẹn 100% trích dẫn.
-                    </span>
-                  )}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2.5 shrink-0">
-              {isProcessing && progressInfo ? (
-                <>
-                  <div className="px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-xs font-mono flex items-center gap-2 text-slate-700">
-                    <Clock className="w-3.5 h-3.5 text-[#12489B]" />
-                    <span>Đã chạy: {elapsedSec}s</span>
-                    <span className="text-zinc-300">|</span>
-                    <span className="font-bold text-[#12489B]">
-                      Còn ~
-                      {Math.max(
-                        1,
-                        Math.round(
-                          (progressInfo.total - progressInfo.step) *
-                            avgSecPerSection +
-                            ((5 - progressInfo.phase) / 4) * avgSecPerSection
-                        )
-                      )}
-                      s
-                    </span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={handleStopProcessing}
-                    className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs"
-                  >
-                    <Square className="w-3.5 h-3.5 fill-current" />
-                    <span>Dừng ngay</span>
-                  </button>
-                </>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setShowCockpitBanner(false)}
-                  className="btn-press inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-zinc-200 text-xs font-semibold text-zinc-600 hover:text-slate-900"
-                >
-                  <X className="w-3.5 h-3.5" />
-                  <span>Ẩn bảng tiến trình</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Overall Animated Progress Bar (0% -> 100%) */}
           {(() => {
             const pct =
               isProcessing && progressInfo
                 ? Math.min(
                     98,
                     Math.max(
-                      4,
+                      5,
                       Math.round(
                         ((progressInfo.step - 1 + progressInfo.phase / 4) /
                           Math.max(1, progressInfo.total)) *
@@ -1411,179 +1295,119 @@ export function TurnitinProMaxView({
                     )
                   )
                 : 100;
+
             return (
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between text-xs font-semibold">
-                  <span className="text-slate-700">
-                    Tiến độ tổng thể:{' '}
-                    <strong className="text-[#0B2559]">
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  {/* Left: Concise Status & Current Section */}
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {isProcessing ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-[#12489B] shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    )}
+                    <div className="text-xs sm:text-sm font-bold text-[#0B2559] truncate">
                       {isProcessing && progressInfo
-                        ? `Xong ${progressInfo.step - 1}/${progressInfo.total} mục (Đang xử lý mục ${progressInfo.step})`
-                        : `Hoàn tất ${executionLogs.length}/${executionLogs.length} mục`}
-                    </strong>
-                  </span>
-                  <span className="font-mono text-sm font-bold text-[#12489B]">
-                    {pct}%
-                  </span>
-                </div>
-                <div className="h-3 w-full rounded-full bg-zinc-200/80 overflow-hidden p-0.5">
-                  <div
-                    className={`h-full rounded-full transition-all duration-300 ${
-                      isProcessing
-                        ? 'bg-gradient-to-r from-[#0B2559] via-[#12489B] to-sky-500 animate-pulse'
-                        : 'bg-emerald-600'
-                    }`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </div>
-            );
-          })()}
-
-          {/* 4-Phase Sub-Step Pipeline Tracker */}
-          {isProcessing && progressInfo && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-              {[
-                {
-                  p: 1 as const,
-                  title: '1. Quét Cửa Sổ 250 Từ',
-                  sub: 'Khóa 100% Trích dẫn & Số liệu',
-                },
-                {
-                  p: 2 as const,
-                  title: '2. Nạp 6 Lớp Lý Thuyết',
-                  sub: 'Chống AIW-2 (Xanh) & AIR-1 (Tím)',
-                },
-                {
-                  p: 3 as const,
-                  title: '3. AI Viết Lại 100% Đoạn',
-                  sub: 'Biến thiên câu bằng dấu chấm (.)',
-                },
-                {
-                  p: 4 as const,
-                  title: '4. Khóa Chống Tăng Điểm',
-                  sub: 'Đảm bảo < 20% AI & Khôi phục 1-1',
-                },
-              ].map((st) => {
-                const isDone = progressInfo.phase > st.p;
-                const isCurrent = progressInfo.phase === st.p;
-                return (
-                  <div
-                    key={st.p}
-                    className={`rounded-xl px-3 py-2 border text-xs transition-all ${
-                      isCurrent
-                        ? 'bg-[#0B2559] text-white border-[#0B2559] shadow-xs'
-                        : isDone
-                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                        : 'bg-white/70 border-zinc-200 text-zinc-400'
-                    }`}
-                  >
-                    <div className="font-bold flex items-center justify-between gap-1">
-                      <span className="truncate">{st.title}</span>
-                      {isDone && (
-                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                      )}
-                      {isCurrent && (
-                        <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-300 shrink-0" />
-                      )}
+                        ? `Đang xử lý mục ${progressInfo.step}/${progressInfo.total}: “${progressInfo.label}”`
+                        : `Hoàn tất Vượt Turnitin ProMax (${executionLogs.length}/${executionLogs.length} mục đạt < 20% AI)`}
                     </div>
-                    <div
-                      className={`text-[10.5px] truncate mt-0.5 ${
-                        isCurrent ? 'text-sky-200' : 'opacity-80'
-                      }`}
-                    >
-                      {st.sub}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Interactive Section Roadmap Pills */}
-          {activeReport.sections.length > 0 && (
-            <div className="space-y-1.5 pt-1">
-              <div className="text-[11px] font-bold text-slate-700">
-                Bản đồ trạng thái từng mục (Bấm vào mục bất kỳ để cuộn tới đoạn đó):
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {activeReport.sections.map((sec, idx) => {
-                  const st = sectionExecMap[sec.sectionId];
-                  const isRunningSec = st?.status === 'running';
-                  const isDoneSec = st?.status === 'completed';
-                  const isQueuedSec = st?.status === 'queued';
-                  return (
-                    <button
-                      key={sec.sectionId}
-                      type="button"
-                      onClick={() => scrollToSectionCard(sec.sectionId)}
-                      className={`btn-press inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all ${
-                        isRunningSec
-                          ? 'bg-[#12489B] text-white border-[#0B2559] ring-2 ring-sky-300 shadow-xs'
-                          : isDoneSec
-                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
-                          : isQueuedSec
-                          ? 'bg-amber-50 text-amber-900 border-amber-200'
-                          : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
-                      }`}
-                    >
-                      {isRunningSec ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                      ) : isDoneSec ? (
-                        <CheckCircle2 className="w-3 h-3 text-emerald-700" />
-                      ) : (
-                        <span className="font-mono text-[10px] opacity-70">
-                          #{idx + 1}
+                    {isProcessing &&
+                      progressInfo &&
+                      progressInfo.total - progressInfo.step <= 1 && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 font-bold text-[10.5px] shrink-0">
+                          ⚡ Sắp xong
                         </span>
                       )}
-                      <span className="max-w-[160px] truncate">
-                        {sec.sectionTitle}
-                      </span>
-                      <span className="font-mono text-[10px] opacity-90">
-                        {isRunningSec
-                          ? `Pha ${st.phase}/4`
-                          : isDoneSec
-                          ? `${st.beforeRisk}%→${sec.aiRiskPercent}%`
-                          : `${sec.aiRiskPercent}%`}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Completed Step-by-Step Activity Feed */}
-          {executionLogs.length > 0 && (
-            <div className="pt-2 border-t border-zinc-200/80 space-y-1.5 max-h-40 overflow-y-auto">
-              <div className="text-[11px] font-bold text-slate-700">
-                Nhật ký hoàn tất từng mục ({executionLogs.length} mục):
-              </div>
-              {executionLogs.map((log) => (
-                <div
-                  key={log.id}
-                  onClick={() => scrollToSectionCard(log.sectionId)}
-                  className="cursor-pointer flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-white/90 border border-zinc-200/80 hover:border-[#12489B] text-xs"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    <span className="font-bold text-slate-900 truncate">
-                      {log.sectionTitle}
-                    </span>
-                    <span className="text-zinc-500 truncate hidden sm:inline">
-                      — {log.detail}
-                    </span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 font-mono text-[11px]">
-                    <span className="px-2 py-0.2 rounded bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
-                      {log.beforeRisk}% → {log.afterRisk}% AI
-                    </span>
-                    <span className="text-zinc-400">{log.durationSec}s</span>
+
+                  {/* Right: Numbered Quick-Jump Dots + Timer + Stop/Close */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Compact numbered section dots (#1, #2, #3...) instead of bulky duplicate cards */}
+                    <div className="hidden md:flex items-center gap-1">
+                      {activeReport.sections.map((sec, idx) => {
+                        const st = sectionExecMap[sec.sectionId];
+                        const isRun = st?.status === 'running';
+                        const isDone = st?.status === 'completed';
+                        return (
+                          <button
+                            key={sec.sectionId}
+                            type="button"
+                            onClick={() => scrollToSectionCard(sec.sectionId)}
+                            title={`${sec.sectionTitle} (${sec.aiRiskPercent}% AI)`}
+                            className={`w-6 h-6 rounded-lg font-mono text-[10.5px] font-bold flex items-center justify-center border transition-all ${
+                              isRun
+                                ? 'bg-[#12489B] text-white border-[#0B2559] ring-2 ring-sky-300'
+                                : isDone
+                                ? 'bg-emerald-500 text-white border-emerald-600'
+                                : 'bg-white text-zinc-500 border-zinc-200 hover:bg-zinc-100'
+                            }`}
+                          >
+                            {idx + 1}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {isProcessing && progressInfo ? (
+                      <>
+                        <span className="px-2.5 py-1 rounded-lg bg-white border border-blue-200 font-mono text-[11px] font-semibold text-slate-700">
+                          {elapsedSec}s · Còn ~
+                          {Math.max(
+                            1,
+                            Math.round(
+                              (progressInfo.total - progressInfo.step) *
+                                avgSecPerSection +
+                                ((5 - progressInfo.phase) / 4) * avgSecPerSection
+                            )
+                          )}
+                          s ({pct}%)
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleStopProcessing}
+                          className="btn-press inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold"
+                        >
+                          <Square className="w-3 h-3 fill-current" />
+                          <span>Dừng</span>
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowCockpitBanner(false)}
+                        className="p-1 rounded-lg text-zinc-400 hover:text-slate-700 hover:bg-white/80"
+                        title="Đóng thanh tiến trình"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+
+                {/* Crisp Slim Progress Bar + Subtle Phase Subtitle */}
+                <div className="space-y-1">
+                  <div className="h-2 w-full rounded-full bg-zinc-200/80 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-300 ${
+                        isProcessing
+                          ? 'bg-gradient-to-r from-[#0B2559] via-[#12489B] to-sky-500'
+                          : 'bg-emerald-600'
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  {isProcessing && progressInfo && (
+                    <div className="flex items-center justify-between text-[11px] text-slate-600">
+                      <span>{progressInfo.phaseDetail}</span>
+                      <span className="font-mono font-semibold text-[#12489B]">
+                        Pha {progressInfo.phase}/4
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </>
+            );
+          })()}
         </section>
       )}
 
@@ -1669,31 +1493,29 @@ export function TurnitinProMaxView({
                         : [...prev, sec.sectionId]
                     )
                   }
-                  className={`p-4 rounded-xl border transition-all cursor-pointer space-y-2.5 ${
+                  className={`px-4 py-3 rounded-xl border transition-all cursor-pointer space-y-2 ${
                     isRunningThis
                       ? 'bg-blue-50/90 border-[#12489B] ring-2 ring-[#12489B] shadow-md'
                       : isCompletedThis
-                      ? 'bg-emerald-50/35 border-emerald-300/90 shadow-2xs'
+                      ? 'bg-emerald-50/30 border-emerald-300/90'
                       : checked
-                      ? 'bg-blue-50/35 border-[#12489B]/60 shadow-2xs'
+                      ? 'bg-blue-50/25 border-[#12489B]/50'
                       : 'bg-white border-zinc-200/90 hover:border-zinc-300'
                   }`}
                 >
-                  {/* Active Running Highlight Strip inside the section card */}
+                  {/* Active Running Highlight Strip (ONLY shown on the 1 section currently running) */}
                   {isRunningThis && (
-                    <div className="px-3 py-2 rounded-lg bg-[#0B2559] text-white text-xs space-y-1.5">
+                    <div className="px-3 py-1.5 rounded-lg bg-[#0B2559] text-white text-xs space-y-1">
                       <div className="flex items-center justify-between gap-2 font-bold">
-                        <span className="inline-flex items-center gap-2">
+                        <span className="inline-flex items-center gap-2 truncate">
                           <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-300 shrink-0" />
-                          <span>
-                            ĐANG XỬ LÝ MỤC NÀY — {execState.phaseLabel}
-                          </span>
+                          <span className="truncate">{execState.phaseLabel}</span>
                         </span>
-                        <span className="font-mono text-sky-200">
-                          Pha {execState.phase}/4 ({execState.phase * 25}%)
+                        <span className="font-mono text-sky-200 shrink-0">
+                          Pha {execState.phase}/4
                         </span>
                       </div>
-                      <div className="h-1.5 w-full rounded-full bg-white/20 overflow-hidden">
+                      <div className="h-1 w-full rounded-full bg-white/20 overflow-hidden">
                         <div
                           className="h-full rounded-full bg-sky-300 transition-all duration-300"
                           style={{ width: `${execState.phase * 25}%` }}
@@ -1702,59 +1524,62 @@ export function TurnitinProMaxView({
                     </div>
                   )}
 
-                  {isCompletedThis && !isRunningThis && (
-                    <div className="px-3 py-1.5 rounded-lg bg-emerald-100/80 border border-emerald-200 text-emerald-900 text-xs font-semibold flex flex-wrap items-center justify-between gap-2">
-                      <span className="inline-flex items-center gap-1.5">
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                        <span>
-                          Đã hoàn tất Vượt Turnitin mục này ({execState.beforeRisk}% →{' '}
-                          {sec.aiRiskPercent}% AI)
-                          {execState.paragraphsInfo
-                            ? ` · ${execState.paragraphsInfo}`
-                            : ''}
-                        </span>
-                      </span>
-                      {execState.durationSec !== undefined && (
-                        <span className="font-mono text-[11px] text-emerald-800">
-                          ✓ Xong trong {execState.durationSec}s
-                        </span>
-                      )}
-                    </div>
-                  )}
-
-                  {isQueuedThis && isProcessing && (
-                    <div className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold inline-flex items-center gap-1.5">
-                      <Clock className="w-3 h-3" />
-                      <span>Đang xếp hàng chờ xử lý tiếp theo...</span>
-                    </div>
-                  )}
-
+                  {/* Single-Row Clean Card Header */}
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
                       <input
                         type="checkbox"
                         checked={checked}
                         disabled={isProcessing}
                         onChange={() => {}}
-                        className="w-4 h-4 rounded accent-[#12489B]"
+                        className="w-4 h-4 rounded accent-[#12489B] shrink-0"
                       />
                       <span className="text-xs sm:text-sm font-bold text-slate-900 truncate">
                         {sec.sectionTitle}
                       </span>
-                      <span className="text-[11px] font-mono text-zinc-400">
-                        ({sec.wordCount} từ · {sec.sentenceCount} câu)
+                      <span className="text-[11px] font-mono text-zinc-400 shrink-0">
+                        {sec.wordCount}w · {sec.sentenceCount} câu
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      {beforeScore !== undefined &&
-                        beforeScore !== sec.aiRiskPercent && (
-                          <span className="px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 font-mono text-[11px] line-through">
-                            Trước: {beforeScore}%
-                          </span>
-                        )}
+                    {/* Right Inline Telemetry & Action Pills */}
+                    <div className="flex flex-wrap items-center gap-1.5 shrink-0 text-[11px]">
+                      {isQueuedThis && isProcessing && (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 text-amber-800 font-semibold inline-flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          <span>Chờ</span>
+                        </span>
+                      )}
+
                       <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${
+                        className={`px-2 py-0.5 rounded-md font-mono font-semibold ${
+                          sec.burstinessCvPercent >= 42
+                            ? 'bg-zinc-100 text-slate-700'
+                            : 'bg-amber-50 text-amber-800 border border-amber-200'
+                        }`}
+                        title="Độ biến thiên nhịp câu (Burstiness CV >= 42% là chuẩn người viết)"
+                      >
+                        CV {sec.burstinessCvPercent}%
+                      </span>
+
+                      {sec.protectedCitations.length > 0 && (
+                        <span
+                          className="px-2 py-0.5 rounded-md bg-zinc-100 text-slate-700 font-medium inline-flex items-center gap-1"
+                          title={`Khóa bảo toàn: ${sec.protectedCitations.join(', ')}`}
+                        >
+                          <Lock className="w-3 h-3 text-emerald-700" />
+                          <span>{sec.protectedCitations.length} trích dẫn</span>
+                        </span>
+                      )}
+
+                      {isCompletedThis && execState.durationSec !== undefined && (
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-100/80 text-emerald-800 font-mono font-semibold">
+                          ✓ {execState.durationSec}s
+                        </span>
+                      )}
+
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-bold border ${
                           sec.aiRiskPercent < 20
                             ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
                             : sec.aiRiskPercent < 45
@@ -1767,9 +1592,11 @@ export function TurnitinProMaxView({
                         ) : (
                           <AlertTriangle className="w-3 h-3" />
                         )}
-                        <span>
-                          {sec.aiRiskPercent}% AI{' '}
-                          {sec.aiRiskPercent < 20 ? '(Pass < 20%)' : '(Cần xử lý)'}
+                        <span className="font-mono">
+                          {beforeScore !== undefined &&
+                          beforeScore !== sec.aiRiskPercent
+                            ? `${beforeScore}% → ${sec.aiRiskPercent}% AI`
+                            : `${sec.aiRiskPercent}% AI`}
                         </span>
                       </span>
 
@@ -1781,49 +1608,11 @@ export function TurnitinProMaxView({
                             prev === sec.sectionId ? null : sec.sectionId
                           );
                         }}
-                        className="px-2.5 py-0.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-[11px] font-semibold text-slate-700"
+                        className="px-2.5 py-0.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 font-semibold text-slate-700"
                       >
                         {isExpanded ? 'Thu gọn' : 'Xem / Sửa'}
                       </button>
                     </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
-                    <span
-                      className={`px-2 py-0.5 rounded-md font-mono font-semibold ${
-                        sec.burstinessCvPercent >= 42
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : 'bg-amber-50 text-amber-800 border border-amber-200'
-                      }`}
-                    >
-                      Burstiness CV: {sec.burstinessCvPercent}%
-                    </span>
-
-                    {sec.monotonousRunCount > 0 && (
-                      <span className="px-2 py-0.5 rounded-md bg-rose-50 text-rose-700 border border-rose-200 font-semibold">
-                        {sec.monotonousRunCount} cụm câu đều nhịp 18–24 từ
-                      </span>
-                    )}
-
-                    {sec.detectedAiPhrases.length > 0 && (
-                      <span className="px-2 py-0.5 rounded-md bg-orange-50 text-[#EA580C] border border-orange-200 font-semibold">
-                        Từ nối AI: {sec.detectedAiPhrases.join(', ')}
-                      </span>
-                    )}
-
-                    {sec.air1StructureFlagsCount > 0 && (
-                      <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 font-semibold">
-                        Cấu trúc AIR-1 (Tô tím): {sec.air1StructureFlagsCount}
-                      </span>
-                    )}
-
-                    <span className="px-2 py-0.5 rounded-md bg-zinc-100 text-slate-700 font-medium inline-flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-emerald-700" />
-                      Khóa bảo toàn: {sec.protectedCitations.length} trích dẫn
-                      {sec.protectedStatTokens.length > 0
-                        ? ` · ${sec.protectedStatTokens.length} chỉ số`
-                        : ''}
-                    </span>
                   </div>
 
                   {/* Inline Expandable Content Viewer & Editor */}
