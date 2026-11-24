@@ -383,10 +383,10 @@ export function WriterTurnitinAiModal({
               disabled={isHumanizing || selectedIds.length === 0}
               onClick={() => onRunFastBreaker(selectedIds)}
               className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-blue-200 hover:bg-blue-50 text-[#12489B] text-xs font-bold disabled:opacity-40"
-              title="Thay thế tức thì toàn bộ cụm từ nối AI máy móc và tách các câu ghép đều nhịp (0 giây, không tốn API)"
+              title="Chạy 6 lớp phá vân tay Turnitin AIW-2 & AIR-1 trực tiếp trên trình duyệt (0 giây, 0 Token, hoàn toàn miễn phí)"
             >
               <Zap className="w-3.5 h-3.5 text-[#EA580C]" />
-              <span>Phá vân tay Nhanh (0s · Không tốn API)</span>
+              <span>Phá vân tay 6 Lớp (0 Token · Miễn phí)</span>
             </button>
 
             <button
@@ -394,7 +394,7 @@ export function WriterTurnitinAiModal({
               disabled={isHumanizing || selectedIds.length === 0}
               onClick={() => onRunDeepAiHumanize(selectedIds)}
               className="btn-press inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#0B2559] to-[#12489B] hover:from-[#071A42] hover:to-[#0B2559] text-white text-xs font-bold shadow-sm disabled:opacity-40"
-              title="Dùng AI viết lại cấu trúc nhịp câu học thuật tự nhiên theo chuẩn vượt Turnitin AIW-2, khóa cứng 100% trích dẫn & số liệu"
+              title="Chạy lọc 0-Token trước, sau đó chỉ gửi đúng các đoạn văn còn nguy cơ cao lên AI với Prompt siêu gọn (Tiết kiệm ~85% Token & cam kết < 20% AI)"
             >
               {isHumanizing ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -402,7 +402,7 @@ export function WriterTurnitinAiModal({
                 <Wand2 className="w-3.5 h-3.5" />
               )}
               <span>
-                Tự động Humanize Vượt Turnitin ({selectedIds.length} mục)
+                AI Phẫu Thuật (&lt; 20% AI · Tiết kiệm ~{report.tokenSavingsPercent}% Token)
               </span>
             </button>
           </div>

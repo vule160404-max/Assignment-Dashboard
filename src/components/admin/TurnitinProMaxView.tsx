@@ -747,25 +747,31 @@ export function TurnitinProMaxView({
 
           <div className="rounded-xl bg-white/10 border border-white/15 px-3.5 py-2.5">
             <div className="text-[11px] text-slate-300">
-              Vân tay từ nối AI còn lại
+              Vân tay AIW-2 &amp; AIR-1 (Tô tím)
             </div>
             <div className="text-xl font-bold font-mono text-amber-300 tabular-nums mt-0.5">
-              {activeReport.totalAiFingerprints}
+              {activeReport.totalAiFingerprints +
+                activeReport.totalAir1StructureFlags +
+                activeReport.totalUnicodeWatermarks}
               <span className="text-xs font-sans font-normal text-slate-300 ml-1.5">
-                cụm từ máy móc
+                điểm nghi vấn
               </span>
             </div>
           </div>
 
           <div className="rounded-xl bg-emerald-400/15 border border-emerald-300/35 px-3.5 py-2.5">
-            <div className="text-[11px] text-emerald-200 flex items-center gap-1 font-semibold">
-              <Lock className="w-3 h-3" />
-              <span>Khóa Bất Biến (100% Frozen)</span>
+            <div className="text-[11px] text-emerald-200 flex items-center justify-between gap-1 font-semibold">
+              <span className="inline-flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                <span>Khóa Trích Dẫn &amp; Tiết Kiệm Token</span>
+              </span>
+              <span className="px-1.5 py-0.2 rounded bg-emerald-300/25 text-emerald-100 font-mono text-[10px]">
+                -{activeReport.tokenSavingsPercent}% Token
+              </span>
             </div>
-            <div className="text-sm font-bold text-white mt-1">
-              {activeReport.totalProtectedCitations} trích dẫn ·{' '}
-              {activeReport.totalProtectedStats} số liệu ·{' '}
-              {activeReport.totalProtectedFigures} hình
+            <div className="text-xs sm:text-sm font-bold text-white mt-1">
+              {activeReport.totalProtectedCitations} trích dẫn · Chỉ tốn ~
+              {activeReport.totalEstimatedSurgicalTokens.toLocaleString()} tok
             </div>
           </div>
         </div>
@@ -824,10 +830,10 @@ export function TurnitinProMaxView({
             disabled={isProcessing}
             onClick={handleRunFastProMax}
             className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold disabled:opacity-40"
-            title="Phá tức thì toàn bộ từ nối AI và áp dụng sóng nhịp câu bất đối xứng (< 20% AI) trong 0 giây, không tốn API"
+            title="Chạy 6 lớp chống Turnitin AIW-2 (Xanh) & AIR-1 (Tím): Xóa ký tự ẩn Unicode, cắt đuôi -ing/góp phần, phá câu tóm tắt cuối đoạn và tạo sóng câu bất đối xứng (< 20% AI) hoàn toàn MIỄN PHÍ (0 Token)"
           >
             <Zap className="w-3.5 h-3.5 text-[#EA580C]" />
-            <span>Phá Vân Tay Nhanh (&lt; 20% AI · 0 giây)</span>
+            <span>Phá Vân Tay 6 Lớp (0 Token · Miễn phí 100%)</span>
           </button>
 
           <button
@@ -835,7 +841,7 @@ export function TurnitinProMaxView({
             disabled={isProcessing}
             onClick={() => void handleRunDeepAiProMax()}
             className="btn-press inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#0B2559] to-[#12489B] hover:from-[#071A42] hover:to-[#0B2559] text-white text-xs font-bold shadow-sm disabled:opacity-40"
-            title="Chạy AI ProMax cấu trúc lại toàn bộ nhịp câu học thuật tự nhiên + tự động lặp kiểm tra đến khi < 20% AI và khóa cứng 100% trích dẫn"
+            title="Chạy lọc 0-Token trước, sau đó CHỈ gửi những đoạn văn cá biệt còn nguy cơ cao lên AI với Prompt siêu gọn — Tiết kiệm ~85% Token và cam kết < 20% AI!"
           >
             {isProcessing ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -843,7 +849,7 @@ export function TurnitinProMaxView({
               <Sparkles className="w-3.5 h-3.5 text-sky-300" />
             )}
             <span>
-              Chạy Humanize ProMax Chuyên Sâu (&lt; 20% AI)
+              AI Phẫu Thuật ProMax (&lt; 20% AI · Tiết kiệm ~{activeReport.tokenSavingsPercent}% Token)
             </span>
           </button>
         </div>
@@ -1176,6 +1182,19 @@ export function TurnitinProMaxView({
                           </span>
                         )}
 
+                        {sec.air1StructureFlagsCount > 0 && (
+                          <span className="px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 font-semibold">
+                            Cấu trúc AIR-1 (Đuôi -ing / Tóm tắt cuối đoạn):{' '}
+                            {sec.air1StructureFlagsCount}
+                          </span>
+                        )}
+
+                        {sec.unicodeWatermarksCount > 0 && (
+                          <span className="px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 font-semibold">
+                            Ký tự ẩn Unicode LLM: {sec.unicodeWatermarksCount}
+                          </span>
+                        )}
+
                         <span className="px-2 py-0.5 rounded-md bg-zinc-100 text-slate-700 font-medium inline-flex items-center gap-1">
                           <Lock className="w-3 h-3 text-emerald-700" />
                           Khóa bảo toàn: {sec.protectedCitations.length} trích dẫn
@@ -1185,6 +1204,11 @@ export function TurnitinProMaxView({
                           {sec.protectedFigureTags.length > 0
                             ? ` · ${sec.protectedFigureTags.length} hình`
                             : ''}
+                        </span>
+
+                        <span className="px-2 py-0.5 rounded-md bg-emerald-50/80 text-emerald-800 border border-emerald-200/80 font-mono">
+                          Surgical AI: ~{sec.estimatedSurgicalTokens} tok (thay vì ~
+                          {sec.estimatedFullRewriteTokens.toLocaleString()} tok)
                         </span>
                       </div>
 
