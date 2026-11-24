@@ -1,4 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import {
+  SITE_ORIGIN,
+  parseSampleRouteFromLocation,
+  syncDocumentSeoMeta,
+  type OrderPrefillData,
+} from '../../lib/sampleSeo';
 import {
   ArrowRight,
   ArrowUpRight,
@@ -29,10 +35,12 @@ import { ClientIntentHubView } from '../client/ClientIntentHubView';
 export interface ClientPortalLaunchOptions {
   tab?: 'order' | 'lookup' | 'checker';
   serviceType?: string;
+  orderPrefill?: OrderPrefillData;
 }
 
 interface RoleSelectionGateProps {
   initialPage?: 'home' | 'samples';
+  isAdmin?: boolean;
   onPageChange?: (page: 'home' | 'samples') => void;
   onSelectClient: (options?: ClientPortalLaunchOptions) => void;
   onSelectAdmin: () => void;
@@ -223,12 +231,16 @@ const FAQS = [
 
 export function RoleSelectionGate({
   initialPage = 'home',
+  isAdmin = false,
   onPageChange,
   onSelectClient,
   onSelectAdmin,
 }: RoleSelectionGateProps) {
   const [activePage, setActivePage] = useState<'home' | 'samples'>(() => {
-    if (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('sample')) {
+    if (
+      typeof window !== 'undefined' &&
+      parseSampleRouteFromLocation(window.location).isSamplesRoute
+    ) {
       return 'samples';
     }
     return initialPage;
@@ -237,6 +249,17 @@ export function RoleSelectionGate({
   const [activePolicyTab, setActivePolicyTab] = useState<PolicyTabKey | null>(
     null
   );
+
+  useEffect(() => {
+    if (activePage !== 'home') return;
+    syncDocumentSeoMeta({
+      title:
+        'AssignTrack — Hỗ trợ Assignment, Essay & Luận văn Đại học Quốc tế chuẩn High Distinction',
+      description:
+        'Viết bài Assignment, Essay, Report & Luận văn đúng chuyên ngành, bám sát Rubric RMIT, Swinburne, Melbourne, UK/Úc/Mỹ. Cam kết nguồn thật 100%, tặng báo cáo Turnitin & AI 0%, xem trước bài trên Portal.',
+      canonicalUrl: `${SITE_ORIGIN}/`,
+    });
+  }, [activePage]);
 
   const openSampleLibrary = () => {
     setActivePage('samples');
@@ -251,6 +274,13 @@ export function RoleSelectionGate({
   };
 
   const handleOrderNow = () => onSelectClient({ tab: 'order' });
+
+  const handleOrderWithPrefill = (prefill?: OrderPrefillData) =>
+    onSelectClient({
+      tab: 'order',
+      serviceType: prefill?.serviceType,
+      orderPrefill: prefill,
+    });
 
   return (
     <div className="min-h-screen bg-[#F4F7FB] text-[#0F172A] flex flex-col">
@@ -267,7 +297,8 @@ export function RoleSelectionGate({
       <main className="flex-1">
         {activePage === 'samples' ? (
           <SampleLibraryView
-            onOrderNow={handleOrderNow}
+            isAdmin={isAdmin}
+            onOrderNow={handleOrderWithPrefill}
             onBackHome={openHomePage}
           />
         ) : (
@@ -772,7 +803,7 @@ export function RoleSelectionGate({
             <div className="relative flex flex-wrap items-center justify-center gap-3">
               <button
                 type="button"
-                onClick={handleOrderNow}
+                onClick={() => handleOrderNow()}
                 className="btn-press group inline-flex items-center gap-3 pl-6 pr-2 py-2 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-sm font-bold shadow-lg"
               >
                 <span>Order Now — Đặt bài ngay</span>
@@ -808,7 +839,7 @@ export function RoleSelectionGate({
               </button>
               <button
                 type="button"
-                onClick={handleOrderNow}
+                onClick={() => handleOrderNow()}
                 className="hover:text-[#EA580C]"
               >
                 Đặt bài mới (Order Now)
@@ -852,7 +883,7 @@ export function RoleSelectionGate({
         </div>
       </footer>
 
-      <LiveConversionFomoDock onOrderNow={handleOrderNow} />
+      <LiveConversionFomoDock onOrderNow={() => handleOrderNow()} />
 
       <PolicyModal
         initialTab={activePolicyTab}

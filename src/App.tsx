@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import { CheckCircle2, X } from 'lucide-react';
 import { AdminPortalView } from './components/admin/AdminPortalView';
 import {
@@ -18,6 +18,10 @@ import {
   clearAllSensitiveBrowserStorage,
   testConnection,
 } from './lib/firebase';
+import {
+  parseSampleRouteFromLocation,
+  type OrderPrefillData,
+} from './lib/sampleSeo';
 import { normalizeOrderCode } from './lib/utils';
 import {
   ensureOwnerOrReadProfile,
@@ -33,6 +37,10 @@ function resolveInitialPortalMode(): 'select' | 'admin' | 'client' {
   const urlPortal = params.get('portal');
   if (urlPortal === 'admin' || urlPortal === 'client' || urlPortal === 'select') {
     return urlPortal;
+  }
+  // Always honor direct SEO landings (/samples, /samples/<slug>, /uni/<school>, ?sample=...)
+  if (parseSampleRouteFromLocation(window.location).isSamplesRoute) {
+    return 'select';
   }
   try {
     const saved = localStorage.getItem(PORTAL_MODE_STORAGE_KEY);
@@ -63,15 +71,19 @@ export default function App() {
   );
   const [clientInitialTab, setClientInitialTab] = useState<ClientPortalTab>('lookup');
   const [clientInitialServiceType, setClientInitialServiceType] = useState<string | undefined>(undefined);
-  const [roleGatePage, setRoleGatePage] = useState<'home' | 'samples'>(() => {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('sample') || params.get('page') === 'samples') {
-      return 'samples';
-    }
-    return 'home';
-  });
+  const [roleGatePage, setRoleGatePage] = useState<'home' | 'samples'>(() =>
+    parseSampleRouteFromLocation(window.location).isSamplesRoute ? 'samples' : 'home'
+  );
   const [quickOrderOpen, setQuickOrderOpen] = useState(false);
   const [quickOrderServiceType, setQuickOrderServiceType] = useState<string | undefined>(undefined);
+  const [quickOrderPrefill, setQuickOrderPrefill] = useState<OrderPrefillData | undefined>(undefined);
+
+  const isAdminSession = Boolean(
+    user &&
+      emailVerified &&
+      userProfile &&
+      (userProfile.role === 'owner' || userProfile.role === 'admin')
+  );
 
   useEffect(() => {
     testConnection();
@@ -163,15 +175,14 @@ export default function App() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  // Support native browser Back / Forward button across public & client views
+  // Support native browser Back / Forward button across public, SEO & client views
   useEffect(() => {
     const handlePopState = () => {
       const params = new URLSearchParams(window.location.search);
       const code = params.get('code') || '';
       const portalParam = params.get('portal');
       const tabParam = params.get('tab');
-      const pageParam = params.get('page');
-      const sampleParam = params.get('sample');
+      const sampleRoute = parseSampleRouteFromLocation(window.location);
 
       setQuickOrderOpen(false);
 
@@ -197,7 +208,7 @@ export default function App() {
       }
 
       setClientInitialCode('');
-      setRoleGatePage(sampleParam || pageParam === 'samples' ? 'samples' : 'home');
+      setRoleGatePage(sampleRoute.isSamplesRoute ? 'samples' : 'home');
       setMode('select');
     };
 
@@ -220,16 +231,16 @@ export default function App() {
         url.searchParams.delete('portal');
         url.searchParams.delete('tab');
         url.searchParams.delete('code');
-        if (extraParams?.page === 'samples') {
-          url.searchParams.set('page', 'samples');
-        } else {
-          url.searchParams.delete('page');
-          url.searchParams.delete('sample');
-        }
+        url.searchParams.delete('page');
+        url.searchParams.delete('sample');
+        url.searchParams.delete('uni');
+        url.pathname = extraParams?.page === 'samples' ? '/samples' : '/';
       } else {
+        url.pathname = '/';
         url.searchParams.set('portal', nextMode);
         url.searchParams.delete('page');
         url.searchParams.delete('sample');
+        url.searchParams.delete('uni');
         if (nextMode === 'client') {
           if (extraParams?.code) {
             url.searchParams.set('code', extraParams.code);
@@ -250,8 +261,12 @@ export default function App() {
     []
   );
 
-  const openQuickOrderModal = (serviceType?: string) => {
+  const openQuickOrderModal = (
+    serviceType?: string,
+    orderPrefill?: OrderPrefillData
+  ) => {
     setQuickOrderServiceType(serviceType);
+    setQuickOrderPrefill(orderPrefill);
     setQuickOrderOpen(true);
   };
 
@@ -264,7 +279,7 @@ export default function App() {
     // Opening "Đặt bài mới" / "ORDER NOW" opens the lightweight QuickOrderModal
     // so the user stays right on their current page and closes with 1 click / ESC.
     if (!normalized && (!options?.tab || options.tab === 'order')) {
-      openQuickOrderModal(options?.serviceType);
+      openQuickOrderModal(options?.serviceType, options?.orderPrefill);
       return;
     }
 
@@ -302,6 +317,7 @@ export default function App() {
     <RoleSelectionGate
       key={`role-gate-${roleGatePage}`}
       initialPage={roleGatePage}
+      isAdmin={isAdminSession}
       onPageChange={(page) => {
         setRoleGatePage(page);
         persistPortalMode('select', { page });
@@ -321,7 +337,7 @@ export default function App() {
         onSwitchToAdmin={handleSwitchToAdmin}
         onBackToRoleSelect={() => handleBackToRoleSelect('home')}
         onOpenSamples={() => handleBackToRoleSelect('samples')}
-        onOpenOrderModal={openQuickOrderModal}
+        onOpenOrderModal={(svc) => openQuickOrderModal(svc, undefined)}
         onToast={showToast}
       />
     );
@@ -350,6 +366,7 @@ export default function App() {
         <QuickOrderModal
           isOpen={quickOrderOpen}
           defaultServiceType={quickOrderServiceType}
+          orderPrefill={quickOrderPrefill}
           onClose={() => setQuickOrderOpen(false)}
           onGoToLookup={() => handleSwitchToClient(undefined, { tab: 'lookup' })}
           onToast={showToast}

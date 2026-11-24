@@ -1,11 +1,13 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Clock, FileText, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { CheckCircle2, Clock, FileText, ShieldCheck, Sparkles, X } from 'lucide-react';
+import type { OrderPrefillData } from '../../lib/sampleSeo';
 import { ClientOrderFormView } from './ClientOrderFormView';
 
 interface QuickOrderModalProps {
   isOpen: boolean;
   defaultServiceType?: string;
+  orderPrefill?: OrderPrefillData;
   onClose: () => void;
   onGoToLookup: () => void;
   onToast: (msg: string) => void;
@@ -14,6 +16,7 @@ interface QuickOrderModalProps {
 export function QuickOrderModal({
   isOpen,
   defaultServiceType,
+  orderPrefill,
   onClose,
   onGoToLookup,
   onToast,
@@ -60,9 +63,17 @@ export function QuickOrderModal({
                 <Sparkles className="w-3 h-3" />
                 <span>Đặt bài nhanh · Không cần đăng nhập</span>
               </span>
+              {orderPrefill?.sourceBadge && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-400/20 border border-emerald-300/35 text-[10.5px] font-bold text-emerald-200">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>{orderPrefill.sourceBadge}</span>
+                </span>
+              )}
             </div>
             <h2 className="text-base sm:text-lg font-bold leading-snug">
-              Phiếu đăng ký đặt bài &amp; Báo giá trong 15 phút
+              {orderPrefill?.sourceBadge
+                ? 'Nhận bài viết mới độc bản cho kỳ học hiện tại · Báo giá trong 15 phút'
+                : 'Phiếu đăng ký đặt bài & Báo giá trong 15 phút'}
             </h2>
             <div className="hidden sm:flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-sky-200/90">
               <span className="inline-flex items-center gap-1">
@@ -97,6 +108,7 @@ export function QuickOrderModal({
           <ClientOrderFormView
             compactModal
             defaultServiceType={defaultServiceType}
+            orderPrefill={orderPrefill}
             onGoToLookup={() => {
               onClose();
               onGoToLookup();

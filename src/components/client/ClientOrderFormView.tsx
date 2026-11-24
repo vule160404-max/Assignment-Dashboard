@@ -27,6 +27,7 @@ import {
   OrderInquiry,
 } from '../../types/domain';
 import { formatBytes, formatDateTime } from '../../lib/utils';
+import type { OrderPrefillData } from '../../lib/sampleSeo';
 
 function generateDraftInquiryCode(): string {
   const year = new Date().getFullYear();
@@ -48,6 +49,7 @@ function getDefaultDeadlineInput(): string {
 
 interface ClientOrderFormViewProps {
   defaultServiceType?: string;
+  orderPrefill?: OrderPrefillData;
   compactModal?: boolean;
   onGoToLookup?: () => void;
   onClose?: () => void;
@@ -56,6 +58,7 @@ interface ClientOrderFormViewProps {
 
 export function ClientOrderFormView({
   defaultServiceType,
+  orderPrefill,
   compactModal = false,
   onGoToLookup,
   onClose,
@@ -64,14 +67,16 @@ export function ClientOrderFormView({
   const [customerName, setCustomerName] = useState('');
   const [contactInfo, setContactInfo] = useState('');
   const [serviceType, setServiceType] = useState(
-    defaultServiceType || ORDER_INQUIRY_SERVICES[0]
+    orderPrefill?.serviceType || defaultServiceType || ORDER_INQUIRY_SERVICES[0]
   );
-  const [subject, setSubject] = useState('');
-  const [topic, setTopic] = useState('');
-  const [wordCount, setWordCount] = useState('2000');
-  const [citationStyle, setCitationStyle] = useState<CitationStyle>('APA');
+  const [subject, setSubject] = useState(orderPrefill?.subject || '');
+  const [topic, setTopic] = useState(orderPrefill?.topic || '');
+  const [wordCount, setWordCount] = useState(orderPrefill?.wordCount || '2000');
+  const [citationStyle, setCitationStyle] = useState<CitationStyle>(
+    orderPrefill?.citationStyle || 'APA'
+  );
   const [deadlineInput, setDeadlineInput] = useState(getDefaultDeadlineInput);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState(orderPrefill?.notes || '');
   const [draftInquiryCode, setDraftInquiryCode] = useState(
     generateDraftInquiryCode
   );
@@ -90,6 +95,16 @@ export function ClientOrderFormView({
       setServiceType(defaultServiceType);
     }
   }, [defaultServiceType]);
+
+  useEffect(() => {
+    if (!orderPrefill) return;
+    if (orderPrefill.serviceType) setServiceType(orderPrefill.serviceType);
+    if (orderPrefill.subject !== undefined) setSubject(orderPrefill.subject);
+    if (orderPrefill.topic !== undefined) setTopic(orderPrefill.topic);
+    if (orderPrefill.wordCount !== undefined) setWordCount(orderPrefill.wordCount);
+    if (orderPrefill.citationStyle) setCitationStyle(orderPrefill.citationStyle);
+    if (orderPrefill.notes !== undefined) setNotes(orderPrefill.notes);
+  }, [orderPrefill]);
 
   const handleFilesSelected = async (fileList: FileList | null) => {
     if (!fileList || fileList.length === 0) return;

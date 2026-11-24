@@ -546,7 +546,7 @@
       "wpId": 3418,
       "slug": "english-writing",
       "title": "English Writing",
-      "courseCode": "",
+      "courseCode": "ADB2021",
       "school": "International University",
       "schools": [],
       "major": "Business / Management",
@@ -838,7 +838,7 @@
       "wpId": 3390,
       "slug": "accting7026-accounting-systems-and-processes",
       "title": "ACCTING7026 – Accounting Systems and Processes",
-      "courseCode": "",
+      "courseCode": "ACCTING7026",
       "school": "University of Adelaide",
       "schools": [
         "University of Adelaide"
@@ -1135,7 +1135,7 @@
       "wpId": 3363,
       "slug": "ela30-free-sample-canadian-issue-research-essay",
       "title": "ELA30 – Canadian Issue Research Essay",
-      "courseCode": "",
+      "courseCode": "ELA30",
       "school": "York University",
       "schools": [
         "York University"
@@ -1170,7 +1170,7 @@
       "wpId": 2879,
       "slug": "fin2sev-investment-securities",
       "title": "FIN2SEV – Investment Securities",
-      "courseCode": "",
+      "courseCode": "FIN2SEV",
       "school": "La Trobe University",
       "schools": [
         "La Trobe University"
@@ -1205,7 +1205,7 @@
       "wpId": 2874,
       "slug": "fin2sev-investment-securities",
       "title": "FIN2SEV – Investment Securities",
-      "courseCode": "",
+      "courseCode": "FIN2SEV",
       "school": "La Trobe University",
       "schools": [
         "La Trobe University"
@@ -2289,7 +2289,7 @@
       "wpId": 2736,
       "slug": "mgt1fom-foundations-of-management",
       "title": "MGT1FOM – Foundations Of Management",
-      "courseCode": "",
+      "courseCode": "MGT1FOM",
       "school": "La Trobe University",
       "schools": [
         "La Trobe University"
@@ -4296,7 +4296,7 @@
       "wpId": 1022,
       "slug": "mgt1fom-foundations-of-management",
       "title": "MGT1FOM – Foundations Of Management",
-      "courseCode": "",
+      "courseCode": "MGT1FOM",
       "school": "La Trobe University",
       "schools": [
         "La Trobe University"

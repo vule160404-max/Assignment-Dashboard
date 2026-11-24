@@ -9,13 +9,25 @@ import {
   FileSpreadsheet,
   FileText,
   GraduationCap,
+  Hash,
   Image as ImageIcon,
   Layers,
   Loader2,
+  Lock,
   RotateCcw,
   Search,
   Table2,
 } from 'lucide-react';
+import {
+  SITE_ORIGIN,
+  getSampleCanonicalPath,
+  getSchoolHubPath,
+  getSchoolHubUrl,
+  parseSampleRouteFromLocation,
+  syncDocumentSeoMeta,
+  toSchoolSlug,
+  type OrderPrefillData,
+} from '../../lib/sampleSeo';
 import {
   fetchSampleCatalog,
   getShortSchoolName,
@@ -26,7 +38,8 @@ import { SampleUniversityBadge } from './SampleUniversityBadge';
 import { SampleReaderView } from './SampleReaderView';
 
 interface SampleLibraryViewProps {
-  onOrderNow: () => void;
+  isAdmin?: boolean;
+  onOrderNow: (prefill?: OrderPrefillData) => void;
   onBackHome: () => void;
 }
 
@@ -53,6 +66,7 @@ function buildPaginationWindow(current: number, total: number): Array<number | '
 }
 
 export function SampleLibraryView({
+  isAdmin = false,
   onOrderNow,
   onBackHome,
 }: SampleLibraryViewProps) {
@@ -61,10 +75,27 @@ export function SampleLibraryView({
   const [error, setError] = useState<string | null>(null);
   const [reloadNonce, setReloadNonce] = useState(0);
 
-  const [selectedSlug, setSelectedSlug] = useState<string | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return new URLSearchParams(window.location.search).get('sample');
-  });
+  const initialRoute = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return {
+        isSamplesRoute: true,
+        sampleSlug: null,
+        courseCodeSlug: null,
+        schoolSlug: null,
+      };
+    }
+    return parseSampleRouteFromLocation(window.location);
+  }, []);
+
+  const [selectedSlug, setSelectedSlug] = useState<string | null>(
+    initialRoute.sampleSlug
+  );
+  const [pendingCourseCode, setPendingCourseCode] = useState<string | null>(
+    initialRoute.courseCodeSlug
+  );
+  const [pendingSchoolSlug, setPendingSchoolSlug] = useState<string | null>(
+    initialRoute.schoolSlug
+  );
 
   const [searchQuery, setSearchQuery] = useState('');
   const [schoolFilter, setSchoolFilter] = useState<string>('all');
@@ -98,41 +129,155 @@ export function SampleLibraryView({
     };
   }, [reloadNonce]);
 
-  const items = catalog?.items ?? [];
+  const rawItems = catalog?.items ?? [];
+  // Deduplicate identical slugs from WordPress taxonomy multi-mapping so cards & SEO URLs are 100% unique
+  const items = useMemo(() => {
+    const seen = new Set<string>();
+    return rawItems.filter((it) => {
+      if (!it.slug || seen.has(it.slug)) return false;
+      seen.add(it.slug);
+      return true;
+    });
+  }, [rawItems]);
   const schools = catalog?.schools ?? [];
+
+  // Resolve initial /course/<COURSE_CODE> short link once catalog items load
+  useEffect(() => {
+    if (!pendingCourseCode || items.length === 0) return;
+    const upper = pendingCourseCode.replace(/[^A-Z0-9]/gi, '').toUpperCase();
+    const matched = items.find(
+      (i) => i.courseCode.replace(/[^A-Z0-9]/gi, '').toUpperCase() === upper
+    );
+    if (matched) {
+      setSelectedSlug(matched.slug);
+    } else {
+      setSearchQuery(pendingCourseCode);
+    }
+    setPendingCourseCode(null);
+  }, [pendingCourseCode, items]);
+
+  // Resolve initial /uni/<school-slug> once catalog schools load
+  useEffect(() => {
+    if (!pendingSchoolSlug || schools.length === 0) return;
+    const matched = schools.find(
+      (s) => toSchoolSlug(s.name) === pendingSchoolSlug.toLowerCase()
+    );
+    if (matched) {
+      setSchoolFilter(matched.name);
+    }
+    setPendingSchoolSlug(null);
+  }, [pendingSchoolSlug, schools]);
+
+  // Listen to browser Back/Forward inside SampleLibraryView
+  useEffect(() => {
+    const onPopState = () => {
+      const route = parseSampleRouteFromLocation(window.location);
+      setSelectedSlug(route.sampleSlug);
+      if (route.schoolSlug && schools.length > 0) {
+        const matched = schools.find(
+          (s) => toSchoolSlug(s.name) === route.schoolSlug?.toLowerCase()
+        );
+        setSchoolFilter(matched ? matched.name : 'all');
+      } else if (!route.sampleSlug) {
+        setSchoolFilter('all');
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [schools]);
 
   const activeItem: SampleCatalogItem | null = useMemo(() => {
     if (!selectedSlug || items.length === 0) return null;
-    return items.find((item) => item.slug === selectedSlug || item.id === selectedSlug) || null;
+    return (
+      items.find(
+        (item) => item.slug === selectedSlug || item.id === selectedSlug
+      ) || null
+    );
   }, [items, selectedSlug]);
 
-  // Synchronize ?sample=<slug> query parameter cleanly
+  // Synchronize clean SEO URLs (/samples/<slug>, /uni/<school-slug>, /samples) + dynamic <head> SEO tags
   useEffect(() => {
     if (typeof window === 'undefined' || loading) return;
-    const url = new URL(window.location.href);
+
     if (activeItem) {
-      url.searchParams.set('sample', activeItem.slug);
-    } else {
-      url.searchParams.delete('sample');
+      const targetPath = getSampleCanonicalPath(activeItem.slug);
+      if (window.location.pathname !== targetPath || window.location.search) {
+        window.history.replaceState({}, '', targetPath);
+      }
+      return;
     }
-    window.history.replaceState({}, '', url.toString());
-  }, [activeItem, loading]);
+
+    if (schoolFilter !== 'all') {
+      const targetPath = getSchoolHubPath(schoolFilter);
+      if (window.location.pathname !== targetPath || window.location.search) {
+        window.history.replaceState({}, '', targetPath);
+      }
+      const shortUni = getShortSchoolName(schoolFilter);
+      const uniCount = items.filter((i) => i.school === schoolFilter).length;
+      const uniCodes = Array.from(
+        new Set(
+          items
+            .filter((i) => i.school === schoolFilter && i.courseCode)
+            .map((i) => i.courseCode)
+        )
+      ).slice(0, 6);
+      syncDocumentSeoMeta({
+        title: `Bài Mẫu Assignment ${schoolFilter} (${shortUni}) — ${uniCount} Mã Môn Chuẩn HD | AssignTrack`,
+        description: `Tổng hợp ${uniCount} bài mẫu Assignment, Essay, Report đạt HD/DI tại ${schoolFilter}${
+          uniCodes.length > 0 ? ` (gồm mã môn ${uniCodes.join(', ')})` : ''
+        }. Xem phân tích Rubric và đặt bài viết mới độc bản 0% Turnitin & AI.`,
+        canonicalUrl: getSchoolHubUrl(schoolFilter),
+      });
+      return;
+    }
+
+    if (window.location.pathname !== '/samples' || window.location.search) {
+      window.history.replaceState({}, '', '/samples');
+    }
+    syncDocumentSeoMeta({
+      title:
+        'Kho 122+ Bài Mẫu Assignment Đại Học Quốc Tế & Tra Cứu Mã Môn RMIT, Swinburne, Melbourne | AssignTrack',
+      description:
+        'Tra cứu 122+ bài mẫu Assignment, Report, Essay chuẩn High Distinction theo đúng mã môn học của 25 trường Đại học Quốc tế (RMIT, Swinburne, Deakin, Melbourne, Coventry...). Bóc tách Rubric & hỗ trợ viết bài mới độc bản 24/7.',
+      canonicalUrl: `${SITE_ORIGIN}/samples`,
+    });
+  }, [activeItem, schoolFilter, items, loading]);
 
   const stats = useMemo(() => {
     let totalWords = 0;
+    let withCourseCodes = 0;
     let withTablesOrImages = 0;
-    let withAppendix = 0;
     for (const item of items) {
       totalWords += item.wordCount || 0;
+      if (item.courseCode) withCourseCodes++;
       if (item.tableCount > 0 || item.imageCount > 0) withTablesOrImages++;
-      if (item.hasAppendix) withAppendix++;
     }
     return {
       totalWords,
+      withCourseCodes,
       withTablesOrImages,
-      withAppendix,
     };
   }, [items]);
+
+  // Unique course-code sniper chips (filtered dynamically when a school is chosen)
+  const sniperCourseCodes = useMemo(() => {
+    const seen = new Set<string>();
+    const result: Array<{ code: string; slug: string; school: string; title: string }> = [];
+    for (const item of items) {
+      if (!item.courseCode) continue;
+      if (schoolFilter !== 'all' && item.school !== schoolFilter) continue;
+      const upper = item.courseCode.toUpperCase();
+      if (seen.has(upper)) continue;
+      seen.add(upper);
+      result.push({
+        code: item.courseCode,
+        slug: item.slug,
+        school: getShortSchoolName(item.school),
+        title: item.title,
+      });
+    }
+    return result.slice(0, 24);
+  }, [items, schoolFilter]);
 
   const majors = useMemo(() => {
     const counts = new Map<string, number>();
@@ -223,6 +368,7 @@ export function SampleLibraryView({
     setAttachmentFilter('all');
     setSortMode('default');
     setCurrentPage(1);
+    window.history.pushState({}, '', '/samples');
   };
 
   const totalPages = Math.max(1, Math.ceil(filteredSamples.length / ITEMS_PER_PAGE));
@@ -238,7 +384,21 @@ export function SampleLibraryView({
   );
 
   const handleOpenSample = (slug: string) => {
+    window.history.pushState({}, '', getSampleCanonicalPath(slug));
     setSelectedSlug(slug);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSelectSchool = (schoolName: string) => {
+    const next = schoolName === schoolFilter ? 'all' : schoolName;
+    setSelectedSlug(null);
+    setSchoolFilter(next);
+    setCurrentPage(1);
+    window.history.pushState(
+      {},
+      '',
+      next === 'all' ? '/samples' : getSchoolHubPath(next)
+    );
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -249,15 +409,28 @@ export function SampleLibraryView({
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  // Render full 3-column Scholarly Reader View when a sample is active
+  // Render full 3-column Scholarly Sniper Reader View when a sample is active
   if (activeItem) {
     return (
       <SampleReaderView
         activeItem={activeItem}
         allItems={items}
+        isAdmin={isAdmin}
         onSelectSample={handleOpenSample}
+        onSelectSchool={(uniName) => {
+          setSelectedSlug(null);
+          setSchoolFilter(uniName);
+          setCurrentPage(1);
+          window.history.pushState({}, '', getSchoolHubPath(uniName));
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
         onBackToList={() => {
           setSelectedSlug(null);
+          window.history.pushState(
+            {},
+            '',
+            schoolFilter !== 'all' ? getSchoolHubPath(schoolFilter) : '/samples'
+          );
           window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
         onOrderNow={onOrderNow}
@@ -283,14 +456,23 @@ export function SampleLibraryView({
             <div className="max-w-2xl space-y-2.5">
               <div className="inline-flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-amber-300">
                 <GraduationCap className="w-4 h-4" />
-                <span>AssignTrack Academic Sample Library</span>
+                <span>AssignTrack Course-Code &amp; Rubric Library</span>
               </div>
               <h1 className="text-2xl sm:text-4xl font-bold tracking-tight text-white leading-[1.15]">
-                Thư viện Bài mẫu Đại học Quốc tế{' '}
-                <span className="text-sky-300">Toàn văn đầy đủ</span>
+                {schoolFilter !== 'all' ? (
+                  <>
+                    Kho Bài Mẫu &amp; Phân Tích Rubric{' '}
+                    <span className="text-sky-300">{schoolFilter}</span>
+                  </>
+                ) : (
+                  <>
+                    Tra Cứu Mã Môn Học &amp; Bài Mẫu{' '}
+                    <span className="text-sky-300">Đại Học Quốc Tế Chuẩn HD</span>
+                  </>
+                )}
               </h1>
               <p className="text-xs sm:text-sm text-slate-200/85 leading-relaxed">
-                Trọn bộ bài mẫu nguyên văn dài hàng nghìn từ của các trường Đại học Úc, Anh, Mỹ, Canada &amp; Quốc tế — giữ nguyên đầy đủ bảng dữ liệu, hình ảnh biểu đồ, danh mục nguồn trích dẫn (References) và Phụ lục (Appendix).
+                Phân tích tiêu chí ăn điểm Marking Rubric, mở đọc 35% bố cục mở đầu chuẩn High Distinction của 25 trường Đại học Quốc tế (RMIT, Swinburne, Melbourne, Deakin, Coventry...) và hỗ trợ triển khai bài viết mới độc bản 100% cho kỳ học hiện tại.
               </p>
             </div>
 
@@ -300,21 +482,19 @@ export function SampleLibraryView({
                 <div className="text-lg font-bold font-mono tabular-nums text-white">
                   {items.length || '122'}
                 </div>
-                <div className="text-[11px] text-sky-200">Bài mẫu toàn văn</div>
+                <div className="text-[11px] text-sky-200">Bài mẫu chuẩn HD/DI</div>
               </div>
               <div className="rounded-2xl bg-white/10 border border-white/15 px-3.5 py-2.5">
                 <div className="text-lg font-bold font-mono tabular-nums text-amber-300">
-                  {schools.length || '25'}
+                  {stats.withCourseCodes || '107'}
                 </div>
-                <div className="text-[11px] text-sky-200">Trường Đại học</div>
+                <div className="text-[11px] text-sky-200">Mã môn định danh</div>
               </div>
               <div className="rounded-2xl bg-white/10 border border-white/15 px-3.5 py-2.5">
                 <div className="text-lg font-bold font-mono tabular-nums text-white">
-                  {stats.totalWords > 0
-                    ? `${Math.round(stats.totalWords / 1000)}K+`
-                    : '245K+'}
+                  {schools.length || '25'}
                 </div>
-                <div className="text-[11px] text-sky-200">Tổng từ học thuật</div>
+                <div className="text-[11px] text-sky-200">Trường Quốc tế</div>
               </div>
               <div className="rounded-2xl bg-white/10 border border-white/15 px-3.5 py-2.5">
                 <div className="text-lg font-bold font-mono tabular-nums text-emerald-300">
@@ -336,7 +516,7 @@ export function SampleLibraryView({
                   setSearchQuery(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Tìm theo tên môn, mã môn (BUSM2570, MKTG1205, OMGT...), tên trường (RMIT, Northampton, Melbourne...) hoặc chủ đề..."
+                placeholder="Nhập thẳng mã môn đang cần tìm (VD: BUSM2570, BAFI2094, MKTG2305, ACC80008...) hoặc tên trường..."
                 className="w-full pl-11 pr-4 py-3.5 rounded-2xl bg-white text-slate-900 placeholder:text-slate-400 text-xs sm:text-sm font-medium shadow-lg focus:outline-none focus:ring-2 focus:ring-[#F5B700]"
               />
             </div>
@@ -346,13 +526,13 @@ export function SampleLibraryView({
 
       <section
         id="sample-catalog"
-        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-7"
+        className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 space-y-6"
       >
         {loading ? (
           <div className="py-20 bg-white rounded-3xl border border-slate-200 flex flex-col items-center justify-center gap-3 text-slate-500">
             <Loader2 className="w-8 h-8 text-[#12489B] animate-spin" />
             <div className="text-sm font-semibold text-slate-700">
-              Đang tải danh mục bài mẫu &amp; logo các trường đại học...
+              Đang tải danh mục mã môn học &amp; logo các trường đại học...
             </div>
           </div>
         ) : error ? (
@@ -370,38 +550,46 @@ export function SampleLibraryView({
           </div>
         ) : (
           <>
-            {/* OUTSIDE UNIVERSITY LOGO SHOWCASE & QUICK-FILTER GRID (ALL 25 UNIVERSITIES) */}
+            {/* OUTSIDE UNIVERSITY LOGO SHOWCASE & SEO HUB LINKS (ALL 25 UNIVERSITIES) */}
             <div className="rounded-3xl bg-white border border-slate-200/90 p-5 sm:p-6 shadow-[0_6px_24px_rgba(11,37,89,0.04)] space-y-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h2 className="text-sm sm:text-base font-bold text-[#0B2559]">
-                    Logo các Trường Đại học ({schools.length} trường · {items.length} bài mẫu)
+                    Chọn Trường Đại học ({schools.length} trường · {items.length} bài mẫu)
                   </h2>
                   <p className="text-xs text-slate-500">
-                    Nhấn trực tiếp vào logo trường bên dưới để lọc nhanh toàn bộ bài mẫu của trường đó
+                    Mỗi trường có trang danh mục mã môn riêng chuẩn hóa cho tra cứu học phần
                   </p>
                 </div>
                 {schoolFilter !== 'all' && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSchoolFilter('all');
-                      setCurrentPage(1);
+                  <a
+                    href="/samples"
+                    onClick={(e) => {
+                      if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+                        e.preventDefault();
+                        setSchoolFilter('all');
+                        setCurrentPage(1);
+                        window.history.pushState({}, '', '/samples');
+                      }
                     }}
                     className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 text-[#12489B] text-xs font-bold hover:bg-blue-100 transition-colors"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
                     <span>Xem tất cả {schools.length} trường</span>
-                  </button>
+                  </a>
                 )}
               </div>
 
               <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-9 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSchoolFilter('all');
-                    setCurrentPage(1);
+                <a
+                  href="/samples"
+                  onClick={(e) => {
+                    if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+                      e.preventDefault();
+                      setSchoolFilter('all');
+                      setCurrentPage(1);
+                      window.history.pushState({}, '', '/samples');
+                    }
                   }}
                   className={`btn-press rounded-2xl border p-2.5 flex flex-col items-center justify-center gap-1.5 text-center transition-colors ${
                     schoolFilter === 'all'
@@ -426,17 +614,19 @@ export function SampleLibraryView({
                   >
                     {items.length} bài
                   </div>
-                </button>
+                </a>
 
                 {schools.map((uni) => {
                   const isSelected = schoolFilter === uni.name;
                   return (
-                    <button
+                    <a
                       key={uni.name}
-                      type="button"
-                      onClick={() => {
-                        setSchoolFilter(isSelected ? 'all' : uni.name);
-                        setCurrentPage(1);
+                      href={getSchoolHubPath(uni.name)}
+                      onClick={(e) => {
+                        if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+                          e.preventDefault();
+                          handleSelectSchool(uni.name);
+                        }
                       }}
                       title={`${uni.name} (${uni.count} bài mẫu)`}
                       className={`btn-press rounded-2xl border p-2.5 flex flex-col items-center justify-center gap-1.5 text-center transition-colors ${
@@ -460,11 +650,51 @@ export function SampleLibraryView({
                       <div className="text-[10px] font-mono tabular-nums text-slate-500">
                         {uni.count} bài
                       </div>
-                    </button>
+                    </a>
                   );
                 })}
               </div>
             </div>
+
+            {/* COURSE-CODE SNIPER QUICK-JUMP BAR */}
+            {sniperCourseCodes.length > 0 && (
+              <div className="rounded-3xl bg-white border border-slate-200/90 p-4 sm:p-5 shadow-[0_6px_24px_rgba(11,37,89,0.03)] space-y-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-[#0B2559]">
+                    <Hash className="w-4 h-4 text-[#D97706]" />
+                    <span>
+                      Mã môn học tra cứu nhiều nhất
+                      {schoolFilter !== 'all' ? ` tại ${getShortSchoolName(schoolFilter)}` : ''}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-slate-500">
+                    Nhấn thẳng vào mã môn để xem phân tích Rubric &amp; trích đoạn HD
+                  </span>
+                </div>
+
+                <div className="flex flex-wrap gap-1.5">
+                  {sniperCourseCodes.map((entry) => (
+                    <a
+                      key={entry.slug}
+                      href={getSampleCanonicalPath(entry.slug)}
+                      onClick={(e) => {
+                        if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+                          e.preventDefault();
+                          handleOpenSample(entry.slug);
+                        }
+                      }}
+                      title={`${entry.code} — ${entry.title}`}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-50 hover:bg-[#0B2559] border border-slate-200 hover:border-[#0B2559] text-xs font-mono font-bold text-slate-800 hover:text-white transition-colors"
+                    >
+                      <span>{entry.code}</span>
+                      <span className="text-[10px] font-sans font-medium text-slate-400">
+                        {entry.school}
+                      </span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Secondary Facet Filter Row + Results Summary */}
             <div
@@ -550,42 +780,72 @@ export function SampleLibraryView({
                 <span className="px-3 py-1 rounded-full bg-white border border-slate-200 font-semibold text-slate-600 tabular-nums">
                   Trang {safePage} / {totalPages}
                 </span>
-                <button
-                  type="button"
-                  onClick={onBackHome}
+                <a
+                  href="/"
+                  onClick={(e) => {
+                    if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+                      e.preventDefault();
+                      onBackHome();
+                    }
+                  }}
                   className="text-xs font-semibold text-[#12489B] hover:underline whitespace-nowrap"
                 >
                   ← Trang chủ
-                </button>
+                </a>
               </div>
             </div>
 
-            {/* 2-COLUMN SAMPLE CARD GRID (Crisp White University Logo Cards) */}
+            {/* 2-COLUMN SAMPLE CARD GRID (Crawlable Clean SEO Links + Course Code Pills) */}
             {filteredSamples.length === 0 ? (
               <div className="py-16 text-center bg-white rounded-3xl border border-slate-200 space-y-3">
                 <BookOpen className="w-10 h-10 text-slate-300 mx-auto" />
                 <div className="text-sm font-bold text-slate-800">
-                  Không tìm thấy bài mẫu khớp bộ lọc hiện tại
+                  Không tìm thấy mã môn khớp bộ lọc hiện tại
                 </div>
-                <button
-                  type="button"
-                  onClick={resetAllFilters}
-                  className="btn-press px-4 py-2 rounded-full bg-[#0B2559] text-white text-xs font-bold"
-                >
-                  Đặt lại toàn bộ bộ lọc
-                </button>
+                <div className="flex flex-wrap items-center justify-center gap-2.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={resetAllFilters}
+                    className="btn-press px-4 py-2 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold"
+                  >
+                    Đặt lại bộ lọc
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onOrderNow(
+                        searchQuery.trim()
+                          ? {
+                              subject: searchQuery.trim().toUpperCase(),
+                              topic: `Đặt viết bài mới độc bản cho học phần: ${searchQuery.trim()}`,
+                              sourceBadge: `Yêu cầu mã môn: ${searchQuery.trim().toUpperCase()}`,
+                            }
+                          : undefined
+                      )
+                    }
+                    className="btn-press px-4 py-2 rounded-full bg-[#EA580C] text-white text-xs font-bold"
+                  >
+                    Đặt viết mới riêng cho mã môn "{searchQuery.trim() || 'của bạn'}" →
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-8">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {paginatedSamples.map((sample) => (
-                    <article
+                    <a
                       key={sample.slug}
-                      onClick={() => handleOpenSample(sample.slug)}
-                      className="card-interactive group cursor-pointer rounded-3xl bg-white border border-slate-200/90 p-5 sm:p-6 flex flex-col justify-between shadow-[0_6px_24px_rgba(11,37,89,0.04)]"
+                      href={getSampleCanonicalPath(sample.slug)}
+                      onClick={(e) => {
+                        if (!e.metaKey && !e.ctrlKey && !e.shiftKey && e.button === 0) {
+                          e.preventDefault();
+                          handleOpenSample(sample.slug);
+                        }
+                      }}
+                      className="card-interactive group cursor-pointer rounded-3xl bg-white border border-slate-200/90 p-5 sm:p-6 flex flex-col justify-between shadow-[0_6px_24px_rgba(11,37,89,0.04)] text-left"
                     >
                       <div className="space-y-4">
-                        {/* Top row: Official University Logo Box + Pills + Title */}
+                        {/* Top row: Official University Logo Box + Course Code + Pills + Title */}
                         <div className="flex items-start gap-4">
                           <SampleUniversityBadge
                             logoUrl={sample.logoUrl}
@@ -595,14 +855,20 @@ export function SampleLibraryView({
 
                           <div className="min-w-0 flex-1 space-y-2">
                             <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
-                              <span className="px-2.5 py-0.5 rounded-full bg-[#0B2559] text-white font-bold">
-                                Free sample
-                              </span>
+                              {sample.courseCode ? (
+                                <span className="px-2.5 py-0.5 rounded-full bg-[#0B2559] text-amber-300 font-mono font-bold">
+                                  {sample.courseCode}
+                                </span>
+                              ) : (
+                                <span className="px-2.5 py-0.5 rounded-full bg-[#0B2559] text-white font-bold">
+                                  {getShortSchoolName(sample.school)}
+                                </span>
+                              )}
                               <span className="px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-100 text-[#12489B] font-semibold">
                                 {sample.major}
                               </span>
                               {sample.gradeLabel && (
-                                <span className="px-2 py-0.5 rounded-full bg-amber-50 border border-amber-200 text-amber-800 font-mono font-bold">
+                                <span className="px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 font-mono font-bold">
                                   {sample.gradeLabel}
                                 </span>
                               )}
@@ -649,10 +915,14 @@ export function SampleLibraryView({
                               Appendix
                             </span>
                           )}
+                          <span className="inline-flex items-center gap-1 text-amber-700 font-semibold">
+                            <Lock className="w-3 h-3" />
+                            Mở 35% + Phân tích Rubric
+                          </span>
                         </div>
                       </div>
 
-                      {/* Dashed Footer Row matching reference layout */}
+                      {/* Dashed Footer Row */}
                       <div className="mt-5 pt-4 border-t border-dashed border-slate-200 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-2 text-xs text-slate-500 min-w-0">
                           <span className="inline-flex items-center gap-1 font-mono tabular-nums shrink-0">
@@ -667,14 +937,14 @@ export function SampleLibraryView({
 
                         <div className="inline-flex items-center gap-2.5 shrink-0">
                           <span className="text-xs font-bold text-slate-900 group-hover:text-[#12489B] transition-colors">
-                            Đọc thêm
+                            Xem Rubric &amp; Bài mẫu
                           </span>
                           <span className="w-9 h-9 rounded-full bg-[#0B2559] group-hover:bg-[#12489B] text-white flex items-center justify-center transition-colors shadow-xs">
                             <ArrowRight className="w-4 h-4" />
                           </span>
                         </div>
                       </div>
-                    </article>
+                    </a>
                   ))}
                 </div>
 
