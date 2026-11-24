@@ -593,30 +593,6 @@ export async function humanizeSectionForTurnitinWithAi(opts: {
 
   const totalParagraphsCount = Math.max(1, targetIndices.length);
 
-  // If the section is ALREADY under 15% AI with zero AI phrase clichés and zero AIR-1 flags,
-  // preserve it directly so a low score (e.g. 11%-13% AI) NEVER regresses upward!
-  if (
-    beforeScan.aiRiskPercent <= 14 &&
-    beforeScan.detectedAiPhrases.length === 0 &&
-    beforeScan.air1StructureFlagsCount === 0 &&
-    beforeScan.monotonousRunCount === 0
-  ) {
-    onPhaseChange?.(
-      4,
-      `Mục này đã đạt chuẩn an toàn tuyệt đối (${beforeScan.aiRiskPercent}% AI < 20%) — Đã khóa chống tăng điểm AI!`
-    );
-    return {
-      content: cleanedSource,
-      restoredCount: 0,
-      beforeRisk: beforeScan.aiRiskPercent,
-      afterRisk: beforeScan.aiRiskPercent,
-      tokensSavedEstimate: beforeScan.estimatedFullRewriteTokens,
-      flaggedParagraphsCount: totalParagraphsCount,
-      totalParagraphsCount,
-      changeSummary: `Mục đã đạt ngưỡng tối ưu (${beforeScan.aiRiskPercent}% AI < 20%, Burstiness CV ${beforeScan.burstinessCvPercent}%) — Đã dọn ký tự ẩn và giữ nguyên văn phong học thuật.`,
-    };
-  }
-
   onPhaseChange?.(
     2,
     'Pha 2/4: Đang nạp 6 quy chuẩn chống Turnitin AIW-2 (Xanh) & AIR-1 (Tím) cho AI...'
@@ -731,16 +707,12 @@ ${taggedBlocks}`;
     content: bestContent,
   });
 
-  // If Pass 1 still produced uniform ~38-word sentences (aiRiskPercent >= 20 or higher than beforeScan),
+  // If Pass 1 still produced uniform ~38-word sentences (aiRiskPercent >= 20),
   // automatically run Pass 2 with strict period-separated sentence length targets!
-  if (
-    (bestScan.aiRiskPercent >= 20 ||
-      bestScan.aiRiskPercent > beforeScan.aiRiskPercent) &&
-    !signal?.aborted
-  ) {
+  if (bestScan.aiRiskPercent >= 20 && !signal?.aborted) {
     onPhaseChange?.(
       3,
-      `Pha 3/4 (Tinh chỉnh nhịp câu lần 2): Đang cân chỉnh lại độ biến thiên câu (CV ${bestScan.burstinessCvPercent}% → >= 48%) để ép điểm AI xuống < 15%...`
+      `Pha 3/4 (Tinh chỉnh nhịp câu lần 2): Đang cân chỉnh lại độ biến thiên câu (CV ${bestScan.burstinessCvPercent}% → >= 48%) để ép điểm AI xuống < 20%...`
     );
     const retryContent = await applyAiPass(true);
     const retryScan = scanSectionTurnitinAiRisk({
@@ -755,18 +727,8 @@ ${taggedBlocks}`;
 
   onPhaseChange?.(
     4,
-    'Pha 4/4: Đang kiểm định khóa chống tăng điểm AI & đối chiếu 100% trích dẫn...'
+    'Pha 4/4: Đang kiểm định chuẩn < 20% AI & đối chiếu khôi phục 100% trích dẫn...'
   );
-
-  // Strict Non-Regression Guardrail: NEVER allow a section that was already low-risk (< 20% AI)
-  // to end up with a higher AI % than it started with!
-  if (
-    beforeScan.aiRiskPercent < 20 &&
-    bestScan.aiRiskPercent > beforeScan.aiRiskPercent
-  ) {
-    bestContent = cleanedSource;
-    bestScan = beforeScan;
-  }
 
   const finalGuarded = enforceProtectedTokensIntegrity(
     cleanedSource,
