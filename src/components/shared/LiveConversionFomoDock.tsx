@@ -15,7 +15,7 @@ const FOMO_ACTIVITIES: FomoActivityItem[] = [
     action: 'vừa đặt gói High Distinction · 2,500 từ',
     subject: 'Strategic Management (Case Study)',
     timeAgo: '4 phút trước',
-    badge: 'Đã khóa slot',
+    badge: 'Đã đăng ký',
   },
   {
     uni: 'SV ĐH Kinh tế TP.HCM (UEH)',
@@ -26,10 +26,10 @@ const FOMO_ACTIVITIES: FomoActivityItem[] = [
   },
   {
     uni: 'SV Swinburne Vietnam',
-    action: 'vừa giữ slot cứu gấp 24h · 1,800 từ',
+    action: 'vừa đăng ký gói cứu gấp 24h · 1,800 từ',
     subject: 'Digital Marketing & Consumer Behavior',
     timeAgo: '11 phút trước',
-    badge: 'Slot gấp 24h',
+    badge: 'Cứu gấp 24h',
   },
   {
     uni: 'SV ĐH Kinh tế Quốc dân (NEU)',
@@ -129,7 +129,7 @@ export function LiveConversionFomoDock({
               className="shrink-0 inline-flex items-center gap-1 text-[11px] font-bold text-[#EA580C] hover:underline"
             >
               <Flame className="w-3 h-3" />
-              <span>Giữ slot</span>
+              <span>Đặt bài</span>
             </button>
           </div>
         </div>
