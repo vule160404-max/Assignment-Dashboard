@@ -78,6 +78,13 @@ import { WriterBriefPanel } from './writer/WriterBriefPanel';
 import { WriterCoverPageModal } from './writer/WriterCoverPageModal';
 import { WriterDeliverModal } from './writer/WriterDeliverModal';
 import { WriterAuditModal } from './writer/WriterAuditModal';
+import { WriterTurnitinAiModal } from './writer/WriterTurnitinAiModal';
+import {
+  TurnitinPaperScanReport,
+  applyDeterministicTurnitinBreaker,
+  humanizeSectionForTurnitinWithAi,
+  scanSessionTurnitinAiRisk,
+} from '../../lib/turnitinAiBreaker';
 import { WriterOutlinePanel } from './writer/WriterOutlinePanel';
 import {
   SectionAuditVisualState,
@@ -253,6 +260,15 @@ export function AiWriterStudioView({
   const [showCoverModal, setShowCoverModal] = useState(false);
   const [showDeliverModal, setShowDeliverModal] = useState(false);
   const [showAuditModal, setShowAuditModal] = useState(false);
+  const [showTurnitinModal, setShowTurnitinModal] = useState(false);
+  const [turnitinReport, setTurnitinReport] =
+    useState<TurnitinPaperScanReport | null>(null);
+  const [isTurnitinHumanizing, setIsTurnitinHumanizing] = useState(false);
+  const [turnitinProgress, setTurnitinProgress] = useState<{
+    currentStep: number;
+    totalSteps: number;
+    currentSectionTitle: string;
+  } | null>(null);
   const [auditReport, setAuditReport] = useState<PaperAuditReport | null>(null);
   const [isAuditingPaper, setIsAuditingPaper] = useState(false);
   const [isAutoFixingAudit, setIsAutoFixingAudit] = useState(false);
@@ -2180,6 +2196,146 @@ export function AiWriterStudioView({
     }
   };
 
+  // --- Turnitin AIW-2 / AIR-1 Scanner & Citation-Safe Humanizer Pipeline ---
+  const handleRunFastTurnitinBreaker = (sectionIds: string[]) => {
+    if (!activeSession || sectionIds.length === 0) return;
+    const idSet = new Set(sectionIds);
+    let totalChanges = 0;
+
+    let updatedSessionSnapshot: WriterSession | null = null;
+    mutateActiveSession((s) => {
+      const nextOutline = s.outline.map((sec) => {
+        if (!idSet.has(sec.id) || !sec.content.trim()) return sec;
+        const res = applyDeterministicTurnitinBreaker(sec.content);
+        totalChanges += res.modificationsCount;
+        return {
+          ...sec,
+          content: res.text,
+        };
+      });
+      updatedSessionSnapshot = {
+        ...s,
+        outline: nextOutline,
+      };
+      return updatedSessionSnapshot;
+    }, true);
+
+    if (updatedSessionSnapshot) {
+      setTurnitinReport(scanSessionTurnitinAiRisk(updatedSessionSnapshot));
+    }
+    pushActivityLog(
+      'success',
+      'Phá vân tay Turnitin AI (Chế độ Nhanh)',
+      `Đã thay thế ${totalChanges} cụm từ nối AI & ngắt nhịp câu trên ${sectionIds.length} mục (Bảo toàn 100% trích dẫn).`
+    );
+    onToast(
+      totalChanges > 0
+        ? `Đã phá ${totalChanges} vân tay từ nối AI & nhịp câu đều trên ${sectionIds.length} mục!`
+        : 'Các mục đã chọn không còn cụm từ nối AI máy móc.'
+    );
+  };
+
+  const handleRunDeepTurnitinAiHumanize = async (sectionIds: string[]) => {
+    if (!activeSession || sectionIds.length === 0) return;
+    if (!hasEffectiveApiKey) {
+      setShowApiModal(true);
+      onToast('Vui lòng nhập API Key Chatbot trước khi chạy Humanize chuyên sâu.');
+      return;
+    }
+
+    const targetSessionId = activeSession.id;
+    const targetSections = activeSession.outline.filter(
+      (sec) => sectionIds.includes(sec.id) && sec.content.trim().length > 0
+    );
+    if (targetSections.length === 0) return;
+
+    setIsTurnitinHumanizing(true);
+    const signal = getFreshAiSignal();
+    const t0 = Date.now();
+    const logId = pushActivityLog(
+      'running',
+      `Turnitin AI Humanizer (${targetSections.length} mục)`,
+      'Đang tái cấu trúc độ biến thiên nhịp câu (Burstiness) & khóa bảo toàn 100% trích dẫn...'
+    );
+
+    let totalRestoredCitations = 0;
+    try {
+      for (let idx = 0; idx < targetSections.length; idx += 1) {
+        const sec = targetSections[idx];
+        setTurnitinProgress({
+          currentStep: idx + 1,
+          totalSteps: targetSections.length,
+          currentSectionTitle: sec.title,
+        });
+        setCurrentStepLabel(
+          `Đang Humanize vượt Turnitin mục ${idx + 1}/${targetSections.length}: "${sec.title}"...`
+        );
+
+        const latestSess =
+          sessionsRef.current.find((s) => s.id === targetSessionId) ||
+          activeSession;
+        const latestSec =
+          latestSess.outline.find((s) => s.id === sec.id) || sec;
+
+        const res = await humanizeSectionForTurnitinWithAi({
+          session: latestSess,
+          section: latestSec,
+          skills,
+          profile: activeProfile,
+          signal,
+        });
+
+        totalRestoredCitations += res.restoredCount;
+        mutateSessionById(targetSessionId, (prev) => ({
+          ...prev,
+          outline: prev.outline.map((item) =>
+            item.id === sec.id
+              ? { ...item, content: res.content, status: 'completed' }
+              : item
+          ),
+        }));
+      }
+
+      const finalSess =
+        sessionsRef.current.find((s) => s.id === targetSessionId) ||
+        activeSession;
+      const nextReport = scanSessionTurnitinAiRisk(finalSess);
+      setTurnitinReport(nextReport);
+
+      updateActivityLog(logId, {
+        status: 'success',
+        title: `Đã Humanize Vượt Turnitin (${targetSections.length} mục)`,
+        detail: `Dự báo Turnitin AI giảm còn ${nextReport.overallAiRiskPercent}% (Burstiness CV: ${nextReport.overallBurstinessCvPercent}%). Đã khóa nguyên vẹn 100% trích dẫn${
+          totalRestoredCitations > 0
+            ? ` (tự động khôi phục ${totalRestoredCitations} trích dẫn/hình)`
+            : ''
+        }.`,
+        durationSec: (Date.now() - t0) / 1000,
+      });
+      onToast(
+        `Đã Humanize xong ${targetSections.length} mục! Dự báo Turnitin AI giảm còn ${nextReport.overallAiRiskPercent}% (Bảo toàn 100% trích dẫn).`
+      );
+    } catch (err) {
+      if (!isAbortError(err)) {
+        const msg =
+          err instanceof Error
+            ? err.message
+            : 'Quá trình Humanize vượt Turnitin bị gián đoạn.';
+        updateActivityLog(logId, {
+          status: 'error',
+          title: 'Turnitin Humanizer gián đoạn',
+          detail: msg,
+          durationSec: (Date.now() - t0) / 1000,
+        });
+        onToast(msg);
+      }
+    } finally {
+      setIsTurnitinHumanizing(false);
+      setTurnitinProgress(null);
+      setCurrentStepLabel('');
+    }
+  };
+
   // --- Final Academic QA Auditor Agent (Layer 1: Deterministic + Crossref, Layer 2: AI Examiner) ---
   const handleRunPaperAudit = async () => {
     if (!activeSession) return;
@@ -2928,6 +3084,11 @@ export function AiWriterStudioView({
             void handleAiRefineCurrentSection(action, customPrompt)
           }
           onOpenCoverPage={() => setShowCoverModal(true)}
+          onOpenTurnitinBreaker={() => {
+            const report = scanSessionTurnitinAiRisk(activeSession);
+            setTurnitinReport(report);
+            setShowTurnitinModal(true);
+          }}
           onRequestResetPaper={() => setShowResetConfirmModal(true)}
         />
       </div>
@@ -3145,6 +3306,24 @@ export function AiWriterStudioView({
       </div>
 
       {/* Modals */}
+      <WriterTurnitinAiModal
+        isOpen={showTurnitinModal}
+        report={turnitinReport}
+        isHumanizing={isTurnitinHumanizing}
+        progressState={turnitinProgress}
+        onRescan={() => {
+          setTurnitinReport(scanSessionTurnitinAiRisk(activeSession));
+          onToast('Đã quét lại chỉ số Turnitin AI & khóa trích dẫn.');
+        }}
+        onRunFastBreaker={handleRunFastTurnitinBreaker}
+        onRunDeepAiHumanize={(ids) => void handleRunDeepTurnitinAiHumanize(ids)}
+        onJumpToSection={(secId) => {
+          setLeftTab('outline');
+          mutateActiveSession((s) => ({ ...s, activeSectionId: secId }));
+        }}
+        onClose={() => setShowTurnitinModal(false)}
+      />
+
       <WriterAuditModal
         isOpen={showAuditModal}
         report={auditReport}

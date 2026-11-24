@@ -761,16 +761,182 @@ export function DataLabView({ onPushToAiWriter, onToast }: DataLabViewProps) {
               </div>
             </div>
 
-            {/* Synthetic Sandbox Generator */}
-            <div className="bg-gradient-to-br from-[#F4F7FB] to-white border border-blue-200/90 rounded-2xl p-5 space-y-3">
-              <h3 className="text-sm font-bold text-[#0B2559] flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#EA580C]" />
-                <span>Tạo bộ dữ liệu kiểm thử (Demo / Sandbox)</span>
-              </h3>
+            {/* Goal-Seek Backwards Data Engine (Chạy Ngược Số Liệu SPSS theo Kịch Bản) */}
+            <div className="bg-gradient-to-br from-[#F4F7FB] to-white border border-blue-200/90 rounded-2xl p-5 space-y-3.5">
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-bold text-[#0B2559] flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-[#EA580C]" />
+                  <span>Chạy Ngược Số Liệu theo Kịch Bản (Goal-Seek SPSS)</span>
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-orange-100 text-[#EA580C] font-mono text-[10px] font-bold">
+                  Khớp SPSS 100%
+                </span>
+              </div>
               <p className="text-xs text-zinc-600 leading-relaxed">
-                Sinh nhanh dữ liệu Likert có phân phối chuẩn và cấu trúc tương quan thực tế để kiểm thử mô hình hồi quy, bảng biểu và biểu đồ trước khi thu mẫu thực địa.
+                Khóa trước <strong>Adjusted R²</strong>, chọn nhân tố nào <strong>Chấp nhận (Sig. &lt; 0.05)</strong> hoặc <strong>Bác bỏ (Sig. &gt; 0.05)</strong> và sắp xếp thứ tự <strong>Beta chuẩn hóa</strong>. Hệ thống tự giải ngược ra bảng dữ liệu thô <code>.CSV</code> khớp kịch bản Chương 4.
               </p>
-              <div className="flex items-center gap-3">
+
+              {/* Target Adjusted R2 Slider */}
+              <div className="p-3 rounded-xl bg-white border border-zinc-200/90 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-700">
+                    Độ giải thích mô hình mục tiêu (Adjusted R²):
+                  </span>
+                  <span className="font-mono font-bold text-[#12489B]">
+                    {Math.round((project.targetAdjRSquare ?? 0.66) * 100)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0.4}
+                  max={0.84}
+                  step={0.02}
+                  value={project.targetAdjRSquare ?? 0.66}
+                  onChange={(e) =>
+                    setProject((p) => ({
+                      ...p,
+                      targetAdjRSquare: Number(e.target.value),
+                    }))
+                  }
+                  className="w-full accent-[#12489B]"
+                />
+                <div className="flex justify-between text-[10px] text-zinc-400 font-mono">
+                  <span>40% (Vừa phải)</span>
+                  <span>65% (Chuẩn luận văn)</span>
+                  <span>84% (Rất mạnh)</span>
+                </div>
+              </div>
+
+              {/* Per-Construct Goal-Seek Controls */}
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                {project.constructs
+                  .filter((c) => c.role === 'independent')
+                  .map((ic, idx) => {
+                    const isSupported = ic.targetSupported !== false;
+                    const betaVal =
+                      ic.targetBeta ??
+                      Number(Math.max(0.14, 0.38 - idx * 0.06).toFixed(2));
+                    const meanVal =
+                      ic.targetMean ??
+                      Number(
+                        ((project.likertScale === 7 ? 4.95 : 3.78) - idx * 0.07).toFixed(
+                          2
+                        )
+                      );
+                    return (
+                      <div
+                        key={ic.id}
+                        className={`p-2.5 rounded-xl border text-xs space-y-2 ${
+                          isSupported
+                            ? 'bg-white border-zinc-200/90'
+                            : 'bg-zinc-50 border-zinc-200/70 opacity-85'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="px-1.5 py-0.5 rounded bg-[#0B2559] text-white font-mono text-[10.5px] font-bold">
+                              {ic.code}
+                            </span>
+                            <span className="font-bold text-slate-800 truncate">
+                              {ic.name}
+                            </span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setProject((p) => ({
+                                ...p,
+                                constructs: p.constructs.map((item) =>
+                                  item.id === ic.id
+                                    ? {
+                                        ...item,
+                                        targetSupported: !isSupported,
+                                      }
+                                    : item
+                                ),
+                              }))
+                            }
+                            className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold border transition-colors shrink-0 ${
+                              isSupported
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
+                            }`}
+                            title="Bấm để đảo trạng thái Chấp nhận hoặc Bác bỏ giả thuyết của nhân tố này"
+                          >
+                            {isSupported
+                              ? '✓ Chấp nhận (Sig. < 0.05)'
+                              : '✕ Bác bỏ (Sig. > 0.05)'}
+                          </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 pt-0.5">
+                          <div>
+                            <div className="flex justify-between text-[10.5px] text-zinc-500 mb-0.5">
+                              <span>Trọng số Beta:</span>
+                              <span className="font-mono font-bold text-[#12489B]">
+                                {isSupported ? betaVal.toFixed(2) : '~0.01'}
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              disabled={!isSupported}
+                              min={0.12}
+                              max={0.58}
+                              step={0.02}
+                              value={betaVal}
+                              onChange={(e) =>
+                                setProject((p) => ({
+                                  ...p,
+                                  constructs: p.constructs.map((item) =>
+                                    item.id === ic.id
+                                      ? {
+                                          ...item,
+                                          targetBeta: Number(e.target.value),
+                                        }
+                                      : item
+                                  ),
+                                }))
+                              }
+                              className="w-full accent-[#12489B] disabled:opacity-40"
+                            />
+                          </div>
+
+                          <div>
+                            <div className="flex justify-between text-[10.5px] text-zinc-500 mb-0.5">
+                              <span>Mean mục tiêu:</span>
+                              <span className="font-mono font-bold text-slate-700">
+                                {meanVal.toFixed(2)}
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={project.likertScale === 7 ? 3.5 : 2.8}
+                              max={project.likertScale === 7 ? 6.2 : 4.45}
+                              step={0.05}
+                              value={meanVal}
+                              onChange={(e) =>
+                                setProject((p) => ({
+                                  ...p,
+                                  constructs: p.constructs.map((item) =>
+                                    item.id === ic.id
+                                      ? {
+                                          ...item,
+                                          targetMean: Number(e.target.value),
+                                        }
+                                      : item
+                                  ),
+                                }))
+                              }
+                              className="w-full accent-slate-700"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+
+              <div className="flex items-center gap-3 pt-1">
                 <label className="text-xs font-semibold text-slate-700 shrink-0">
                   Cỡ mẫu (N):
                 </label>
@@ -781,15 +947,18 @@ export function DataLabView({ onPushToAiWriter, onToast }: DataLabViewProps) {
                   step={10}
                   value={synthSize}
                   onChange={(e) => setSynthSize(Number(e.target.value) || 180)}
-                  className="w-28 px-3 py-1.5 text-xs font-mono font-bold rounded-lg border border-zinc-200 bg-white"
+                  className="w-24 px-2.5 py-1.5 text-xs font-mono font-bold rounded-lg border border-zinc-200 bg-white"
                 />
                 <button
                   type="button"
-                  onClick={handleGenerateSynthetic}
-                  className="btn-press flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] text-white text-xs font-bold"
+                  onClick={() => {
+                    handleGenerateSynthetic();
+                    setSubTab('stats');
+                  }}
+                  className="btn-press flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-xl bg-[#EA580C] hover:bg-[#C2410C] text-white text-xs font-bold shadow-xs"
                 >
                   <RefreshCw className="w-3.5 h-3.5" />
-                  <span>Chạy sinh dữ liệu</span>
+                  <span>Chạy giải ngược &amp; Xem bảng SPSS</span>
                 </button>
               </div>
             </div>

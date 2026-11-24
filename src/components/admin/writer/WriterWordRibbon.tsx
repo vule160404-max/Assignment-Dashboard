@@ -8,6 +8,7 @@ import {
   BookMarked,
   ChevronDown,
   Eraser,
+  Fingerprint,
   Indent,
   Italic,
   List,
@@ -50,6 +51,7 @@ interface WriterWordRibbonProps {
   onZoomChange: (nextZoom: number) => void;
   onAiRefineSection: (action: AiRefineAction, customPrompt?: string) => void;
   onOpenCoverPage: () => void;
+  onOpenTurnitinBreaker?: () => void;
   onRequestResetPaper?: () => void;
 }
 
@@ -92,6 +94,7 @@ export function WriterWordRibbon({
   onZoomChange,
   onAiRefineSection,
   onOpenCoverPage,
+  onOpenTurnitinBreaker,
   onRequestResetPaper,
 }: WriterWordRibbonProps) {
   const [showFindBar, setShowFindBar] = useState(false);
@@ -396,8 +399,20 @@ export function WriterWordRibbon({
           </select>
         </div>
 
-        {/* Right Tools: Reset Content, AI Assistant Drawer Toggle, Find/Replace, Zoom */}
+        {/* Right Tools: Turnitin AI Breaker, Reset Content, AI Assistant Drawer Toggle, Find/Replace, Zoom */}
         <div className="inline-flex items-center gap-1.5 ml-auto">
+          {onOpenTurnitinBreaker && (
+            <button
+              type="button"
+              onClick={onOpenTurnitinBreaker}
+              title="Tự động rà soát vân tay AI (Burstiness & Từ nối) và Humanize vượt Turnitin AI mà không làm mất trích dẫn hay số liệu"
+              className="btn-press px-2.5 py-1 text-xs font-bold rounded-md inline-flex items-center gap-1 border bg-emerald-50 text-emerald-800 border-emerald-300/90 hover:bg-emerald-100 shadow-2xs"
+            >
+              <Fingerprint className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Vượt Turnitin AI</span>
+            </button>
+          )}
+
           {onRequestResetPaper && (
             <button
               type="button"

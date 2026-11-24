@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 import { HeroAmbientBackground } from './HeroAmbientBackground';
+import { LiveConversionFomoDock } from './LiveConversionFomoDock';
 import { PolicyModal, PolicyTabKey } from './PolicyModal';
 import { PublicTopNav } from './PublicTopNav';
 import { RevealOnScroll } from './RevealOnScroll';
@@ -313,6 +314,29 @@ export function RoleSelectionGate({
                     <ArrowRight className="w-4 h-4 transition-transform duration-150 group-hover:translate-x-0.5" />
                   </span>
                 </button>
+              </div>
+
+              {/* Live Rush-Slot Capacity & FOMO Bar */}
+              <div className="hero-reveal hero-delay-3 pt-1 flex justify-center">
+                <div className="inline-flex flex-wrap items-center justify-center gap-2 px-4 py-2 rounded-2xl bg-slate-950/45 border border-amber-300/30 backdrop-blur-md text-xs text-slate-100 shadow-sm">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-400" />
+                  </span>
+                  <span>
+                    Công suất đội ngũ Writer hôm nay: <strong>88% kín lịch</strong> · Chỉ còn nhận thêm{' '}
+                    <strong className="text-amber-300 underline decoration-amber-300/60 underline-offset-2">
+                      02 slot bài gấp (12h – 24h)
+                    </strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleOrderNow}
+                    className="ml-1 px-2.5 py-0.5 rounded-full bg-amber-400/20 hover:bg-amber-400/30 border border-amber-300/40 text-amber-200 font-bold text-[11px] transition-colors"
+                  >
+                    Khóa slot ngay →
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -850,6 +874,8 @@ export function RoleSelectionGate({
           </div>
         </div>
       </footer>
+
+      <LiveConversionFomoDock onOrderNow={handleOrderNow} />
 
       <PolicyModal
         initialTab={activePolicyTab}

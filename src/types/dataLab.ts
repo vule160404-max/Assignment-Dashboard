@@ -16,6 +16,12 @@ export interface LikertConstruct {
   name: string; // e.g. 'Chất lượng dịch vụ'
   role: 'independent' | 'dependent';
   items: LikertItem[];
+  /** Goal-Seek target standardized regression weight Beta (0.10 - 0.65) */
+  targetBeta?: number;
+  /** Goal-Seek whether this IV's hypothesis should be statistically significant (Sig. < 0.05) */
+  targetSupported?: boolean;
+  /** Goal-Seek target construct mean on Likert scale */
+  targetMean?: number;
 }
 
 export type SurveyResponseRow = {
@@ -30,6 +36,8 @@ export interface SurveyProject {
   title: string;
   description: string;
   likertScale: 5 | 7;
+  /** Goal-Seek target Adjusted R-Square (e.g. 0.66 for 66%) */
+  targetAdjRSquare?: number;
   demographics: DemographicQuestion[];
   constructs: LikertConstruct[];
   rows: SurveyResponseRow[];

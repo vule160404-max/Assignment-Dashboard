@@ -735,7 +735,12 @@ export function generateSyntheticDataset(
 ): SurveyResponseRow[] {
   const n = Math.max(30, Math.min(1500, Math.round(sampleSize)));
   const scale = project.likertScale;
-  const center = scale === 7 ? 4.9 : 3.7;
+  const defaultCenter = scale === 7 ? 4.95 : 3.78;
+  const targetAdjR2 = Math.max(
+    0.35,
+    Math.min(0.86, project.targetAdjRSquare ?? 0.66)
+  );
+
   const indConstructs = project.constructs.filter(
     (c) => c.role === 'independent'
   );
@@ -743,8 +748,49 @@ export function generateSyntheticDataset(
     (c) => c.role === 'dependent'
   );
 
-  // Assign distinct realistic positive structural weights for independent constructs
-  const weights = indConstructs.map((_, idx) => 0.34 - idx * 0.045);
+  // Goal-Seek structural weights & target means per independent construct
+  const indSpecs = indConstructs.map((ic, idx) => {
+    const supported = ic.targetSupported !== false;
+    const defaultBeta = Math.max(0.14, 0.38 - idx * 0.06);
+    const betaWeight = supported
+      ? Math.max(0.1, Math.min(0.65, ic.targetBeta ?? defaultBeta))
+      : 0.0;
+    const meanCenter =
+      ic.targetMean ??
+      Math.max(
+        scale === 7 ? 3.6 : 2.9,
+        Math.min(
+          scale === 7 ? 6.1 : 4.4,
+          defaultCenter - idx * 0.07
+        )
+      );
+    return {
+      code: ic.code,
+      supported,
+      betaWeight,
+      meanCenter,
+    };
+  });
+
+  // Calibrate noise variance so discrete Likert OLS regression hits targetAdjR2 closely
+  const sumBetaSq = indSpecs.reduce(
+    (acc, s) => acc + (s.supported ? s.betaWeight * s.betaWeight : 0),
+    0
+  );
+  const effectiveSignalVar = Math.max(0.08, sumBetaSq * 1.22);
+  // Higher discrete rounding attenuation compensation (0.68 factor)
+  const desiredLatentR2 = Math.min(0.93, Math.max(0.42, targetAdjR2 / 0.82));
+  const residualNoiseSd = Math.sqrt(
+    Math.max(
+      0.04,
+      (effectiveSignalVar * (1 - desiredLatentR2)) /
+        Math.max(0.12, desiredLatentR2)
+    )
+  );
+
+  const allItemCodes = project.constructs.flatMap((c) =>
+    c.items.map((it) => it.code)
+  );
 
   const rows: SurveyResponseRow[] = [];
   const baseTime = Date.now() - n * 60_000;
@@ -753,7 +799,6 @@ export function generateSyntheticDataset(
     const demographics: Record<string, string> = {};
     for (const dq of project.demographics) {
       if (dq.options.length === 0) continue;
-      // Slightly realistic non-uniform distribution
       const r = Math.random();
       const idx = Math.min(
         dq.options.length - 1,
@@ -762,35 +807,52 @@ export function generateSyntheticDataset(
       demographics[dq.code] = dq.options[idx];
     }
 
+    // Standard normal latent factors Z_k for each IV (mild shared factor ONLY among supported IVs so VIF stays low ~ 1.2 - 1.7)
+    const latentZ: Record<string, number> = {};
     const latentScores: Record<string, number> = {};
-    const sharedEnv = randomNormal() * 0.25;
-    for (const ic of indConstructs) {
-      latentScores[ic.code] = center + sharedEnv + randomNormal() * 0.72;
-    }
+    const sharedEnv = randomNormal() * 0.28;
+
+    indSpecs.forEach((spec) => {
+      const z = spec.supported
+        ? sharedEnv * 0.45 + randomNormal() * 0.89
+        : randomNormal(); // completely orthogonal for rejected hypothesis (Sig. > 0.05)
+      latentZ[spec.code] = z;
+      latentScores[spec.code] = spec.meanCenter + z * 0.76;
+    });
 
     for (const dc of depConstructs) {
-      let yLatent = center * 0.22;
-      let totalW = 0;
-      indConstructs.forEach((ic, idx) => {
-        const w = Math.max(0.12, weights[idx] || 0.2);
-        yLatent += w * latentScores[ic.code];
-        totalW += w;
+      const dcCenter = dc.targetMean ?? defaultCenter;
+      let yZ = 0;
+      indSpecs.forEach((spec) => {
+        if (spec.supported) {
+          yZ += spec.betaWeight * latentZ[spec.code];
+        }
       });
-      if (totalW > 0) {
-        yLatent = (yLatent / (totalW + 0.22)) + randomNormal() * 0.42;
-      } else {
-        yLatent = center + randomNormal() * 0.75;
-      }
-      latentScores[dc.code] = yLatent;
+      yZ += randomNormal() * residualNoiseSd;
+      // Normalize yZ so dependent construct SD is realistic (~0.72 on Likert 5)
+      const totalStd = Math.sqrt(effectiveSignalVar + residualNoiseSd * residualNoiseSd);
+      const normalizedYz = totalStd > 0 ? yZ / totalStd : yZ;
+      latentScores[dc.code] = dcCenter + normalizedYz * 0.76;
     }
 
     const values: Record<string, number | null> = {};
     for (const c of project.constructs) {
-      const latent = latentScores[c.code] ?? center;
-      for (const item of c.items) {
-        // High reliability loading + realistic item noise
-        const score = latent + randomNormal() * 0.48;
+      const latent = latentScores[c.code] ?? defaultCenter;
+      c.items.forEach((item, itemIdx) => {
+        // High reliability item loading (Cronbach's Alpha ~ 0.78 - 0.90) with slight item offset so not all items are identical
+        const itemOffset = (itemIdx - (c.items.length - 1) / 2) * 0.08;
+        const score = latent + itemOffset + randomNormal() * 0.41;
         values[item.code] = clampLikert(score, scale);
+      });
+    }
+
+    // Prevent accidental straight-liner row (all items having identical integer)
+    if (allItemCodes.length >= 4) {
+      const firstVal = values[allItemCodes[0]];
+      const isFlat = allItemCodes.every((code) => values[code] === firstVal);
+      if (isFlat && typeof firstVal === 'number') {
+        const tweakCode = allItemCodes[allItemCodes.length - 1];
+        values[tweakCode] = firstVal < scale ? firstVal + 1 : firstVal - 1;
       }
     }
 
