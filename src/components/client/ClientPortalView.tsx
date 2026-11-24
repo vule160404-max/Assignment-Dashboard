@@ -277,39 +277,39 @@ export function ClientPortalView({
     }
   > = {
     order: {
-      eyebrow: 'AssignTrack · Đặt bài trực tuyến không cần đăng nhập',
-      titlePrefix: 'ĐĂNG KÝ ĐẶT BÀI &',
-      titleHighlight: 'BÁO GIÁ TRONG 15 PHÚT',
+      eyebrow: 'Đặt bài trực tuyến · Không cần tạo tài khoản',
+      titlePrefix: 'Đăng ký đặt bài &',
+      titleHighlight: 'Nhận báo giá trong 15 phút',
       subtitle:
-        'Điền nhanh yêu cầu, đính kèm file đề bài / Rubric bảo mật — tư vấn viên báo giá rõ ràng và cấp Mã đơn theo dõi tiến độ 24/7.',
+        'Đính kèm trực tiếp đề bài và Marking Rubric — chuyên viên phân tích yêu cầu, báo giá minh bạch và cấp Mã đơn theo dõi 24/7.',
       badges: [
-        'Báo giá minh bạch trước khi làm',
-        'Tải lên file đề bài bảo mật',
-        'Tặng báo cáo Turnitin & AI 0%',
+        'Báo giá rõ ràng trước khi làm',
+        'Bảo mật thông tin tuyệt đối',
+        'Tặng kèm báo cáo Turnitin & AI',
       ],
     },
     lookup: {
-      eyebrow: 'AssignTrack · Cổng theo dõi thời gian thực 24/7',
-      titlePrefix: 'TRA CỨU TIẾN ĐỘ',
-      titleHighlight: 'BẰNG MÃ ĐƠN HÀNG',
+      eyebrow: 'Cổng quản lý tiến độ & bàn giao trực tuyến',
+      titlePrefix: 'Tra cứu đơn hàng bằng',
+      titleHighlight: 'Mã bảo mật (Passcode)',
       subtitle:
-        'Không cần tạo tài khoản — nhập Mã đơn hàng (Passcode) được cấp để theo dõi 6 mốc tiến độ, xem trước bài viết và thanh toán QR.',
+        'Nhập Mã đơn hàng do AssignTrack cung cấp để kiểm tra tiến độ thời gian thực, xem trước bản nháp và tất toán VietQR.',
       badges: [
-        'Cập nhật 6 mốc tiến độ trực tiếp',
-        'Xem trước tài liệu & Turnitin',
-        'Nhắn tin trực tiếp với đội ngũ',
+        'Theo dõi 6 mốc triển khai',
+        'Xem trước tài liệu trên Web',
+        'Trao đổi riêng với đội ngũ',
       ],
     },
     checker: {
-      eyebrow: 'AssignTrack · Công cụ kiểm định học thuật miễn phí',
-      titlePrefix: 'KIỂM TRA',
-      titleHighlight: 'ĐẠO VĂN & AI SƠ BỘ',
+      eyebrow: 'Công cụ rà soát văn bản học thuật miễn phí',
+      titlePrefix: 'Kiểm tra sơ bộ',
+      titleHighlight: 'Đạo văn & Dấu vết AI',
       subtitle:
-        'Tải lên file Word/PDF hoặc dán văn bản để phân tích từng câu, phát hiện đoạn trùng lặp và dấu vết AI hoàn toàn miễn phí.',
+        'Tải lên tệp Word (.docx) hoặc dán đoạn văn để quét đối chiếu nguồn mở và đo chỉ số ngôn ngữ AI từng câu hoàn toàn miễn phí.',
       badges: [
         'Miễn phí · Không cần đăng nhập',
-        'Phân tích chi tiết từng câu',
-        'Không lưu trữ bài viết của bạn',
+        'Phân tích trực quan từng câu',
+        'Không lưu bài viết của bạn',
       ],
     },
   };
@@ -318,7 +318,7 @@ export function ClientPortalView({
   const showHeroBanner = !portal && !(activeCode && loading);
 
   return (
-    <div className="min-h-screen bg-[#F4F7FB] text-[#0F172A] flex flex-col">
+    <div className="min-h-screen bg-[#F6F8FC] text-[#0F172A] flex flex-col">
       <PublicTopNav
         activeNav={portal ? 'lookup' : homeTab}
         onGoHome={() => {
@@ -357,49 +357,40 @@ export function ClientPortalView({
         onSelectAdmin={onSwitchToAdmin}
       />
 
-      {/* Deep Academic Navy Blueprint Hero Banner (Synchronized with Landing Page & Sample Library) */}
+      {/* Refined Editorial Sub-Page Header */}
       {showHeroBanner && (
-        <section className="relative overflow-hidden bg-[#0B2559] text-white py-10 sm:py-12">
+        <section className="relative overflow-hidden bg-[#081C44] text-white py-8 sm:py-10 border-b border-white/10">
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-0 opacity-[0.08]"
-            style={{
-              backgroundImage:
-                'linear-gradient(to right, #93C5FD 1px, transparent 1px), linear-gradient(to bottom, #93C5FD 1px, transparent 1px)',
-              backgroundSize: '44px 44px',
-            }}
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 w-[620px] h-[280px] rounded-full bg-sky-400/15 blur-3xl"
+            className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[560px] h-[240px] rounded-full bg-[#1D4ED8]/25 blur-3xl"
           />
 
-          <div className="relative max-w-5xl mx-auto px-4 sm:px-6 text-center space-y-4">
-            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/10 border border-white/15 text-[11px] font-semibold uppercase tracking-[0.1em] text-sky-200">
-              <span className="w-2 h-2 rounded-full bg-sky-300 shadow-[0_0_8px_#7DD3FC]" />
+          <div className="relative max-w-5xl mx-auto px-4 sm:px-6 text-center space-y-3">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/[0.08] border border-white/12 text-[11px] font-semibold tracking-wide text-sky-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-300" />
               <span>{currentHero.eyebrow}</span>
             </div>
 
-            <h1 className="text-2xl sm:text-4xl font-black tracking-[-0.03em] leading-tight">
+            <h1 className="text-2xl sm:text-4xl font-bold tracking-[-0.025em] leading-tight">
               {currentHero.titlePrefix}{' '}
               <span className="text-sky-300">{currentHero.titleHighlight}</span>
             </h1>
 
-            <p className="text-xs sm:text-sm text-slate-200/85 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-300 max-w-2xl mx-auto leading-relaxed">
               {currentHero.subtitle}
             </p>
 
-            <div className="pt-1 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-semibold text-slate-200">
+            <div className="pt-1 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5 text-xs font-medium text-slate-200">
               <span className="inline-flex items-center gap-1.5">
-                <FileCheck2 className="w-4 h-4 text-sky-300" />
+                <FileCheck2 className="w-3.5 h-3.5 text-sky-300" />
                 <span>{currentHero.badges[0]}</span>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-300" />
                 <span>{currentHero.badges[1]}</span>
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <Sparkles className="w-4 h-4 text-amber-300" />
+                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
                 <span>{currentHero.badges[2]}</span>
               </span>
             </div>
@@ -448,50 +439,52 @@ export function ClientPortalView({
             }
 
             return (
-              <div className="surface-enter space-y-5">
-                {/* Row 1: 2-Column Hero Split — Tra cứu bằng Mã đơn (Passcode) + Cam kết cốt lõi */}
+              <div className="surface-enter space-y-6">
+                {/* Row 1: 2-Column Passcode Vault + Live Portal Capabilities */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-stretch">
-                  <section className="relative overflow-hidden lg:col-span-7 bg-white border border-zinc-200/90 rounded-3xl p-6 sm:p-7 flex flex-col justify-between shadow-[0_14px_38px_rgba(15,23,42,0.06)] space-y-5">
-                    <span
-                      aria-hidden="true"
-                      className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#0B2559] via-[#12489B] to-[#F5B700]"
-                    />
-
+                  <section className="lg:col-span-7 bg-white border border-slate-200/90 rounded-2xl p-6 sm:p-7 flex flex-col justify-between shadow-[0_6px_24px_rgba(15,23,42,0.04)] space-y-5">
                     <div className="space-y-4">
-                      <div className="space-y-1.5">
-                        <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-blue-50 border border-blue-200/80 text-[#12489B] text-[11px] font-semibold">
-                          <KeyRound className="w-3 h-3" />
-                          <span>Mở khóa nhanh bằng Mã đơn hàng (Passcode)</span>
-                        </span>
-                        <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                          Nhập mã đơn hàng của bạn
-                        </h2>
-                        <p className="text-xs text-zinc-600 leading-relaxed">
-                          Không cần tài khoản — nhập chính xác <strong>Mã đơn hàng</strong> do AssignTrack cung cấp để xem tiến độ, tài liệu &amp; thanh toán.
-                        </p>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="space-y-1">
+                          <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#12489B]">
+                            <KeyRound className="w-3.5 h-3.5" />
+                            <span>Xác thực bằng Mã đơn hàng</span>
+                          </div>
+                          <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+                            Mở khóa tiến độ &amp; Tài liệu bàn giao
+                          </h2>
+                          <p className="text-xs text-slate-500 leading-relaxed">
+                            Nhập chính xác mã định danh đơn hàng do AssignTrack cấp qua Zalo hoặc phiếu xác nhận.
+                          </p>
+                        </div>
                       </div>
 
-                      <form onSubmit={handleLookup} className="space-y-2">
-                        <label className="block text-xs font-medium text-slate-700">
-                          Mã đơn hàng (Passcode) *
-                        </label>
-                        <div className="flex flex-col sm:flex-row gap-2 p-1.5 bg-slate-100/80 border border-slate-200/90 rounded-2xl focus-within:bg-white focus-within:border-[#12489B]/75 focus-within:ring-4 focus-within:ring-[#12489B]/10 transition-colors">
+                      <form onSubmit={handleLookup} className="space-y-2.5">
+                        <div className="flex items-center justify-between text-xs">
+                          <label className="font-semibold text-slate-700">
+                            Mã đơn hàng (Passcode)
+                          </label>
+                          <span className="text-[11px] font-mono text-slate-400">
+                            Định dạng: ASG-2026-XXX
+                          </span>
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2 p-1.5 bg-slate-50 border border-slate-200/90 rounded-xl focus-within:bg-white focus-within:border-[#0B2559] focus-within:ring-4 focus-within:ring-[#0B2559]/8 transition-all">
                           <div className="relative flex-1">
-                            <Search className="w-4 h-4 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                             <input
                               type="text"
                               value={codeInput}
                               onChange={(e) => setCodeInput(e.target.value)}
-                              placeholder="Ví dụ: ASG-2026-001"
-                              className="w-full pl-9 pr-3 py-2 text-sm font-mono uppercase bg-transparent border-0 text-slate-900 placeholder:text-zinc-400 rounded-xl focus:outline-none"
+                              placeholder="ASG-2026-001"
+                              className="w-full pl-9 pr-3 py-2 text-sm font-mono font-semibold uppercase bg-transparent border-0 text-slate-900 placeholder:text-slate-400 rounded-lg focus:outline-none"
                             />
                           </div>
                           <button
                             type="submit"
                             disabled={loading || !codeInput.trim()}
-                            className="btn-press sm:w-auto w-full py-2 px-5 text-sm font-semibold bg-gradient-to-r from-[#0B2559] to-[#12489B] hover:from-[#081B42] hover:to-[#0E3A7D] text-white rounded-xl shadow-[0_6px_16px_-6px_rgba(11,37,89,0.5)] disabled:opacity-75 whitespace-nowrap shrink-0"
+                            className="btn-press sm:w-auto w-full py-2.5 px-5 text-xs sm:text-sm font-semibold bg-[#0B2559] hover:bg-[#12489B] text-white rounded-lg disabled:opacity-45 whitespace-nowrap shrink-0 transition-colors"
                           >
-                            {loading ? 'Đang mở khóa...' : 'Mở khóa đơn hàng'}
+                            {loading ? 'Đang kiểm tra...' : 'Mở khóa đơn hàng'}
                           </button>
                         </div>
 
@@ -504,21 +497,21 @@ export function ClientPortalView({
                     </div>
 
                     {/* Locally Saved Recent Passcodes */}
-                    <div className="pt-3 border-t border-slate-100 space-y-2">
+                    <div className="pt-3.5 border-t border-slate-100 space-y-2">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
-                          <Bookmark className="w-3.5 h-3.5 text-[#12489B]" />
-                          Mã đơn đã mở gần đây trên máy này
+                        <span className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                          <Bookmark className="w-3.5 h-3.5 text-slate-400" />
+                          <span>Mã đơn đã tra cứu trên thiết bị này</span>
                         </span>
-                        <span className="text-[11px] font-mono text-zinc-400 tabular-nums">
+                        <span className="text-[11px] font-mono text-slate-400 tabular-nums">
                           {recentCodes.length} mã
                         </span>
                       </div>
 
                       {recentCodes.length === 0 ? (
-                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-zinc-500">
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                           <span>
-                            Mã đơn hợp lệ sau khi mở sẽ tự lưu nhanh tại đây.
+                            Mã hợp lệ sẽ được lưu tự động để mở lại chỉ với 1 chạm.
                           </span>
                           <button
                             type="button"
@@ -527,9 +520,9 @@ export function ClientPortalView({
                                 ? onOpenOrderModal()
                                 : setHomeTab('order')
                             }
-                            className="font-bold text-[#EA580C] hover:underline"
+                            className="font-semibold text-[#12489B] hover:underline"
                           >
-                            Chưa có mã đơn? Đăng ký đặt bài mới →
+                            Chưa có đơn? Đăng ký đặt bài mới →
                           </button>
                         </div>
                       ) : (
@@ -537,12 +530,12 @@ export function ClientPortalView({
                           {recentCodes.map((savedCode) => (
                             <div
                               key={savedCode}
-                              className="inline-flex items-center bg-blue-50/60 border border-blue-200/70 rounded-lg overflow-hidden"
+                              className="inline-flex items-center bg-slate-50 border border-slate-200/90 rounded-lg overflow-hidden"
                             >
                               <button
                                 type="button"
                                 onClick={() => void openOrderByCode(savedCode)}
-                                className="btn-press px-2.5 py-1 text-xs font-mono font-semibold text-[#12489B] hover:bg-blue-100/70"
+                                className="btn-press px-2.5 py-1 text-xs font-mono font-semibold text-[#0B2559] hover:bg-slate-100"
                               >
                                 #{savedCode}
                               </button>
@@ -550,7 +543,7 @@ export function ClientPortalView({
                                 type="button"
                                 onClick={() => removeRecentOrderCode(savedCode)}
                                 aria-label={`Bỏ lưu ${savedCode}`}
-                                className="px-1.5 py-1 text-blue-400 hover:text-[#DC2626] hover:bg-red-50 border-l border-blue-200/70"
+                                className="px-1.5 py-1 text-slate-400 hover:text-[#DC2626] hover:bg-red-50 border-l border-slate-200/90"
                               >
                                 <X className="w-3 h-3" />
                               </button>
@@ -566,7 +559,7 @@ export function ClientPortalView({
                   </div>
                 </div>
 
-                {/* Row 2 (Social Proof Strip) + Row 3 (3 Service Cards) */}
+                {/* Row 2 (Operational Metrics) + Row 3 (3 Cohesive Service Cards) */}
                 <ClientLandingSections
                   onOpenChecker={(hintToast) => {
                     handleResetLookup();
@@ -576,6 +569,9 @@ export function ClientPortalView({
                       onToast(hintToast);
                     }
                   }}
+                  onOpenOrder={() =>
+                    onOpenOrderModal ? onOpenOrderModal() : setHomeTab('order')
+                  }
                 />
               </div>
             );

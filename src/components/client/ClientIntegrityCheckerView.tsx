@@ -312,331 +312,382 @@ export function ClientIntegrityCheckerView({
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Prominent Reference-Only Advisory Banner (Always Visible & High Contrast) */}
+    <div className="space-y-5">
+      {/* Single Compact Reference Notice Bar (Eliminates stacked double yellow warnings) */}
       <div
         role="note"
-        className="bg-amber-50/95 border border-amber-300/90 border-l-4 border-l-amber-500 rounded-2xl px-4 py-3.5 sm:px-5 sm:py-4 flex items-start gap-3.5 shadow-[0_2px_10px_rgb(217,119,6,0.06)]"
+        className="bg-white border border-slate-200/90 rounded-2xl px-4 py-3 sm:px-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-[0_2px_10px_rgba(15,23,42,0.03)]"
       >
-        <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-200/80 flex items-center justify-center text-amber-700 shrink-0 mt-0.5">
-          <ShieldAlert className="w-5 h-5" />
-        </div>
-        <div className="space-y-1 min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs sm:text-sm font-bold text-amber-950 tracking-tight">
-              LƯU Ý QUAN TRỌNG: Dữ liệu kiểm tra Đạo văn &amp; AI chỉ mang tính chất tham khảo sơ bộ
-            </span>
-            <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-200/80 text-amber-950 rounded-md">
-              Chỉ tham khảo · Có sai lệch
-            </span>
-          </div>
-          <p className="text-xs text-amber-900/90 leading-relaxed">
-            Hệ thống sử dụng các <strong>nguồn dữ liệu học thuật mở trực tuyến</strong> kết hợp phân tích thống kê ngôn ngữ học, do đó{' '}
-            <strong>kết quả chắc chắn sẽ có độ sai lệch nhất định</strong> so với báo cáo Turnitin nội bộ của từng trường đại học (do khác biệt kho bài sinh viên và thuật toán độc quyền). Nếu bạn cần báo cáo Turnitin chính thức, vui lòng liên hệ Admin qua Zalo để được hỗ trợ.
+        <div className="flex items-start sm:items-center gap-3 min-w-0">
+          <span className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center text-amber-700 shrink-0">
+            <Info className="w-4 h-4" />
+          </span>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            <strong className="font-bold text-slate-900">Phân tích tham khảo sơ bộ:</strong>{' '}
+            Đối chiếu trên nguồn học thuật mở &amp; thống kê ngôn ngữ (không lưu bài viết), kết quả có thể chênh lệch so với kho nội bộ Turnitin của trường.
           </p>
         </div>
+
+        <a
+          href="https://zalo.me/0916045202"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-press inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-[#0B2559] text-white text-xs font-semibold shrink-0 transition-colors"
+        >
+          <span>Cần xuất PDF Turnitin gốc</span>
+          <ExternalLink className="w-3.5 h-3.5 text-sky-300" />
+        </a>
       </div>
 
-      {/* Main Input & Upload Studio Card */}
-      <section className="relative bg-white border border-zinc-200/90 rounded-3xl overflow-hidden shadow-[0_14px_38px_rgba(15,23,42,0.06)]">
-        <span
-          aria-hidden="true"
-          className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-[#0B2559] via-[#12489B] to-[#F5B700]"
-        />
-        {/* Card Header */}
-        <div className="px-6 py-5 sm:px-8 sm:py-6 border-b border-zinc-100 flex flex-wrap items-end justify-between gap-4 bg-gradient-to-b from-[#F4F7FB]/80 to-white">
-          <div className="space-y-1.5 max-w-2xl">
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#12489B]">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Academic Similarity &amp; AI Forensics</span>
+      {/* Balanced 12-Col Studio Layout (8-Col Input Studio + 4-Col Forensic Specs when idle) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+        <section
+          className={`${
+            report ? 'lg:col-span-12' : 'lg:col-span-8'
+          } bg-white border border-slate-200/90 rounded-2xl overflow-hidden shadow-[0_8px_28px_rgba(15,23,42,0.04)]`}
+        >
+          {/* Studio Top Toolbar */}
+          <div className="px-5 py-4 sm:px-6 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3 bg-slate-50/50">
+            <div className="inline-grid grid-cols-2 p-1 rounded-xl bg-slate-100 border border-slate-200/80 gap-1">
+              <button
+                type="button"
+                onClick={() => setInputMode('file')}
+                className={`btn-press px-3.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors ${
+                  inputMode === 'file'
+                    ? 'bg-white text-[#0B2559] shadow-2xs border border-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <UploadCloud className="w-3.5 h-3.5 text-[#12489B]" />
+                <span>Tải tệp (.docx, .txt)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setInputMode('text')}
+                className={`btn-press px-3.5 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors ${
+                  inputMode === 'text'
+                    ? 'bg-white text-[#0B2559] shadow-2xs border border-slate-200/80'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5 text-[#12489B]" />
+                <span>Dán văn bản</span>
+              </button>
             </div>
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-              Tải bài lên để phân tích từng câu
-            </h2>
-            <p className="text-xs sm:text-[13px] text-zinc-600 leading-relaxed">
-              Lưu ý đây không phải là check Turnitin. Nếu bạn cần check Turnitin vui lòng liên hệ Admin{' '}
+
+            <div className="flex items-center gap-2.5">
+              <span className="px-2.5 py-1 rounded-lg bg-white border border-slate-200/80 text-[11px] font-mono font-medium text-slate-600 tabular-nums">
+                {inputWords.toLocaleString('vi-VN')} từ · {textInput.length.toLocaleString('vi-VN')}/150.000 ký tự
+              </span>
+              {uploadedFileName && (
+                <button
+                  type="button"
+                  disabled={analyzing}
+                  onClick={() => {
+                    setTitle('');
+                    setTextInput('');
+                    setUploadedFileName('');
+                    setReport(null);
+                    setSelectedSentenceId(null);
+                  }}
+                  className="btn-press inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200/80 rounded-lg shrink-0"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Đặt lại</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Workspace Body — File Upload OR Direct Text Paste */}
+          <div
+            className="p-5 sm:p-6 space-y-5"
+            onPaste={(e) => {
+              const pastedFiles = e.clipboardData?.files;
+              if (pastedFiles && pastedFiles.length > 0) {
+                e.preventDefault();
+                setInputMode('file');
+                void handleUploadDocument(pastedFiles);
+              }
+            }}
+          >
+            {inputMode === 'file' ? (
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setIsDraggingFile(true);
+                }}
+                onDragLeave={() => setIsDraggingFile(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDraggingFile(false);
+                  void handleUploadDocument(e.dataTransfer.files);
+                }}
+                onClick={() => {
+                  if (!loadingFile && !analyzing) {
+                    fileInputRef.current?.click();
+                  }
+                }}
+                className={`rounded-2xl border border-dashed px-6 py-9 sm:py-11 flex flex-col items-center justify-center text-center gap-3.5 cursor-pointer transition-colors duration-150 ${
+                  isDraggingFile
+                    ? 'border-[#12489B] bg-blue-50/60'
+                    : uploadedFileName
+                    ? 'border-emerald-300 bg-emerald-50/30 hover:border-emerald-400'
+                    : 'border-slate-300/90 bg-slate-50/50 hover:border-[#12489B]/60 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".docx,.txt,.md"
+                  className="hidden"
+                  onChange={(e) => void handleUploadDocument(e.target.files)}
+                />
+
+                <div
+                  className={`w-12 h-12 rounded-2xl border flex items-center justify-center ${
+                    uploadedFileName
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
+                      : 'bg-white border-slate-200/90 text-[#0B2559] shadow-2xs'
+                  }`}
+                >
+                  {loadingFile ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : uploadedFileName ? (
+                    <FileCheck2 className="w-5 h-5" />
+                  ) : (
+                    <UploadCloud className="w-5 h-5" />
+                  )}
+                </div>
+
+                {uploadedFileName ? (
+                  <div className="space-y-1 max-w-md">
+                    <p className="text-sm font-bold text-slate-900 break-all">
+                      {uploadedFileName}
+                    </p>
+                    <p className="text-xs font-mono text-emerald-700 tabular-nums">
+                      Đã nạp {inputWords.toLocaleString('vi-VN')} từ · Sẵn sàng quét kiểm định
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-w-md">
+                    <p className="text-sm font-bold text-slate-900">
+                      Kéo thả tài liệu vào đây hoặc bấm để chọn tệp
+                    </p>
+                    <p className="text-xs text-slate-500 leading-relaxed flex flex-wrap items-center justify-center gap-1">
+                      <span>Hỗ trợ dán nhanh</span>
+                      <kbd className="px-1.5 py-0.5 text-[10.5px] font-mono font-semibold bg-white border border-slate-200 rounded text-slate-700">
+                        Ctrl + V
+                      </kbd>
+                      <span>· Định dạng .docx, .txt, .md (tối đa 150.000 ký tự)</span>
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  disabled={loadingFile || analyzing}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-white text-slate-900 border border-slate-200 hover:border-[#12489B] hover:text-[#12489B] rounded-xl shadow-2xs disabled:opacity-50"
+                >
+                  <FolderUp className="w-3.5 h-3.5 text-[#12489B]" />
+                  <span>{uploadedFileName ? 'Đổi tệp khác' : 'Chọn tệp từ máy tính'}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <label className="text-xs font-semibold text-slate-800">
+                    Nội dung văn bản cần phân tích từng câu:
+                  </label>
+                  {textInput.trim() && (
+                    <button
+                      type="button"
+                      disabled={analyzing}
+                      onClick={() => {
+                        setTextInput('');
+                        setUploadedFileName('');
+                        setTitle('');
+                        setReport(null);
+                        setSelectedSentenceId(null);
+                      }}
+                      className="btn-press text-xs text-rose-600 hover:text-rose-700 font-semibold"
+                    >
+                      Xóa nội dung
+                    </button>
+                  )}
+                </div>
+                <textarea
+                  rows={9}
+                  maxLength={150000}
+                  disabled={analyzing}
+                  value={textInput}
+                  onChange={(e) => {
+                    setTextInput(e.target.value);
+                    if (uploadedFileName) setUploadedFileName('');
+                    if (report) setReport(null);
+                  }}
+                  placeholder="Dán trực tiếp đoạn luận văn hoặc toàn bộ bài viết của bạn vào đây (tối thiểu 40 ký tự)..."
+                  className="w-full p-4 text-sm leading-relaxed text-slate-800 bg-slate-50/60 focus:bg-white border border-slate-200 focus:border-[#12489B] rounded-2xl focus:outline-none resize-y transition-colors"
+                />
+              </div>
+            )}
+
+            {/* Filter Options + Primary Action Bar */}
+            <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-4">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-600">
+                <label className="inline-flex items-center gap-2 cursor-pointer select-none hover:text-slate-900">
+                  <input
+                    type="checkbox"
+                    checked={excludeReferences}
+                    onChange={(e) => setExcludeReferences(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-[#0B2559] focus:ring-[#12489B]"
+                  />
+                  <span>Loại trừ mục References</span>
+                </label>
+
+                <label className="inline-flex items-center gap-2 cursor-pointer select-none hover:text-slate-900">
+                  <input
+                    type="checkbox"
+                    checked={excludeQuotes}
+                    onChange={(e) => setExcludeQuotes(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-[#0B2559] focus:ring-[#12489B]"
+                  />
+                  <span>Loại trừ trích dẫn ngoặc kép</span>
+                </label>
+              </div>
+
+              <button
+                type="button"
+                disabled={analyzing || textInput.trim().length < 40}
+                onClick={() => void handleRunScan()}
+                className="btn-press inline-flex items-center justify-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-semibold bg-[#0B2559] hover:bg-[#12489B] text-white rounded-xl disabled:opacity-40 shadow-xs min-w-[220px] transition-colors"
+              >
+                {analyzing ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Đang phân tích từng câu...</span>
+                  </>
+                ) : (
+                  <>
+                    <FileCheck2 className="w-4 h-4" />
+                    <span>Quét Đạo văn &amp; Kiểm định AI</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Live 3-Step Scanning Progress Strip */}
+            {analyzing && (
+              <div className="popover-enter bg-slate-50 border border-slate-200/90 rounded-xl p-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {scanStepsMeta.map((item) => {
+                  const isDone = scanStep > item.step;
+                  const isCurrent = scanStep === item.step;
+                  return (
+                    <div
+                      key={item.step}
+                      className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${
+                        isCurrent
+                          ? 'bg-white border-[#12489B]/40 text-[#0B2559] font-semibold shadow-2xs'
+                          : isDone
+                          ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 font-medium'
+                          : 'bg-white/60 border-slate-200/70 text-slate-500'
+                      }`}
+                    >
+                      {isDone ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      ) : isCurrent ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0 text-[#12489B]" />
+                      ) : (
+                        <span className="w-4 h-4 rounded-full bg-slate-200 text-[10px] font-mono flex items-center justify-center shrink-0">
+                          {item.step}
+                        </span>
+                      )}
+                      <span className="truncate">{item.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Right 4-Col Forensic Capability Rail (Shown when idle before report runs) */}
+        {!report && (
+          <aside className="lg:col-span-4 space-y-4">
+            <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-[0_4px_20px_rgba(15,23,42,0.03)]">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#0B2559]">
+                  Cơ chế 3 tầng phân tích
+                </span>
+                <ShieldCheck className="w-4 h-4 text-[#12489B]" />
+              </div>
+
+              <div className="space-y-3">
+                {[
+                  {
+                    code: '01',
+                    title: 'Đối chiếu nguồn học thuật mở',
+                    desc: 'Quét chéo văn bản với cơ sở dữ liệu bài báo khoa học trực tuyến và nguồn internet công khai.',
+                  },
+                  {
+                    code: '02',
+                    title: 'Đo dấu vết ngôn ngữ AI (Forensics)',
+                    desc: 'Phân tích độ đồng đều cấu trúc câu (Burstiness) và cụm từ đặc trưng của các mô hình LLM.',
+                  },
+                  {
+                    code: '03',
+                    title: 'Khoanh vùng từng câu rủi ro',
+                    desc: 'Tô màu trực quan từng câu nghi vấn kèm xuất bản in PDF phục vụ tự rà soát trước khi nộp.',
+                  },
+                ].map((layer) => (
+                  <div
+                    key={layer.code}
+                    className="flex items-start gap-3 pb-3 last:pb-0 border-b last:border-b-0 border-slate-100"
+                  >
+                    <span className="w-6 h-6 rounded-md bg-slate-100 text-[#0B2559] font-mono text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
+                      {layer.code}
+                    </span>
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-bold text-slate-900">
+                        {layer.title}
+                      </div>
+                      <p className="text-[11.5px] text-slate-500 leading-relaxed">
+                        {layer.desc}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-2xl bg-[#081C44] text-white p-5 space-y-3 border border-white/10">
+              <div className="inline-flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-amber-300">
+                <Bot className="w-3.5 h-3.5" />
+                <span>Turnitin No-Repository</span>
+              </div>
+              <h3 className="text-sm font-bold leading-snug">
+                Cần báo cáo Turnitin chính thức giống hệt giảng viên?
+              </h3>
+              <p className="text-xs text-slate-300 leading-relaxed">
+                Hỗ trợ xuất 02 file báo cáo gốc (Similarity + AI Writing) trên tài khoản No-Repository — tuyệt đối không lưu bài vào kho trường.
+              </p>
               <a
                 href="https://zalo.me/0916045202"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="btn-press inline-flex items-center gap-1 font-semibold text-[#12489B] bg-blue-50 hover:bg-[#0B2559] hover:text-white border border-blue-200/80 px-2 py-0.5 rounded-md align-baseline"
+                className="btn-press w-full inline-flex items-center justify-center gap-1.5 py-2.5 px-4 rounded-xl bg-white text-[#081C44] hover:bg-sky-50 text-xs font-bold transition-colors"
               >
-                <span>tại đây</span>
-                <ExternalLink className="w-3 h-3" />
+                <span>Nhận báo cáo sau 5 phút qua Zalo</span>
+                <ExternalLink className="w-3.5 h-3.5" />
               </a>
-            </p>
-          </div>
-
-          {uploadedFileName && (
-            <button
-              type="button"
-              disabled={analyzing}
-              onClick={() => {
-                setTitle('');
-                setTextInput('');
-                setUploadedFileName('');
-                setReport(null);
-                setSelectedSentenceId(null);
-              }}
-              className="btn-press inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-600 hover:text-slate-900 bg-zinc-100 hover:bg-zinc-200/80 rounded-xl shrink-0"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>Chọn tệp khác</span>
-            </button>
-          )}
-        </div>
-
-        {/* Workspace Body — File Upload OR Direct Text Paste */}
-        <div
-          className="p-6 sm:p-8 space-y-5"
-          onPaste={(e) => {
-            const pastedFiles = e.clipboardData?.files;
-            if (pastedFiles && pastedFiles.length > 0) {
-              e.preventDefault();
-              setInputMode('file');
-              void handleUploadDocument(pastedFiles);
-            }
-          }}
-        >
-          {/* Mode Switcher: Upload File vs Paste Text */}
-          <div className="inline-grid grid-cols-2 p-1 rounded-xl bg-zinc-100 border border-zinc-200/80 gap-1">
-            <button
-              type="button"
-              onClick={() => setInputMode('file')}
-              className={`btn-press px-3.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors ${
-                inputMode === 'file'
-                  ? 'bg-white text-[#0B2559] shadow-2xs border border-zinc-200/80'
-                  : 'text-zinc-600 hover:text-slate-900'
-              }`}
-            >
-              <UploadCloud className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>Tải tệp lên (.docx, .txt)</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setInputMode('text')}
-              className={`btn-press px-3.5 py-2 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors ${
-                inputMode === 'text'
-                  ? 'bg-white text-[#0B2559] shadow-2xs border border-zinc-200/80'
-                  : 'text-zinc-600 hover:text-slate-900'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>Dán / Nhập văn bản</span>
-            </button>
-          </div>
-
-          {inputMode === 'file' ? (
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDraggingFile(true);
-            }}
-            onDragLeave={() => setIsDraggingFile(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDraggingFile(false);
-              void handleUploadDocument(e.dataTransfer.files);
-            }}
-            onClick={() => {
-              if (!loadingFile && !analyzing) {
-                fileInputRef.current?.click();
-              }
-            }}
-            className={`rounded-2xl border-2 border-dashed px-6 py-10 sm:py-12 flex flex-col items-center justify-center text-center gap-4 cursor-pointer transition-colors duration-150 ${
-              isDraggingFile
-                ? 'border-[#12489B] bg-blue-50/70'
-                : uploadedFileName
-                ? 'border-emerald-300 bg-emerald-50/35 hover:border-emerald-400'
-                : 'border-zinc-200/90 bg-zinc-50/60 hover:border-blue-300 hover:bg-blue-50/25'
-            }`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".docx,.txt,.md"
-              className="hidden"
-              onChange={(e) => void handleUploadDocument(e.target.files)}
-            />
-
-            <div
-              className={`w-14 h-14 rounded-2xl border shadow-2xs flex items-center justify-center ${
-                uploadedFileName
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
-                  : 'bg-white border-zinc-200/90 text-[#12489B]'
-              }`}
-            >
-              {loadingFile ? (
-                <Loader2 className="w-6 h-6 animate-spin" />
-              ) : uploadedFileName ? (
-                <FileCheck2 className="w-6 h-6" />
-              ) : (
-                <UploadCloud className="w-6 h-6" />
-              )}
             </div>
-
-            {uploadedFileName ? (
-              <div className="space-y-1.5 max-w-md">
-                <p className="text-sm sm:text-base font-bold text-slate-900 break-all">
-                  {uploadedFileName}
-                </p>
-                <p className="text-xs font-mono text-emerald-700 tabular-nums">
-                  Đã trích xuất {inputWords.toLocaleString('vi-VN')} từ ·{' '}
-                  {textInput.length.toLocaleString('vi-VN')} ký tự · Sẵn sàng kiểm tra
-                </p>
-                <p className="text-[11px] text-zinc-500">
-                  Bấm vào đây hoặc kéo thả tệp mới để thay thế
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-1.5 max-w-md">
-                <p className="text-sm sm:text-base font-bold text-slate-900">
-                  Kéo thả tệp vào đây, dán tệp (`Ctrl + V`) hoặc bấm để chọn tệp
-                </p>
-                <p className="text-xs text-zinc-500 leading-relaxed">
-                  Hỗ trợ định dạng <strong className="text-slate-700">.docx</strong>,{' '}
-                  <strong className="text-slate-700">.txt</strong>,{' '}
-                  <strong className="text-slate-700">.md</strong> · Tối đa 150.000 ký tự mỗi lượt kiểm tra
-                </p>
-              </div>
-            )}
-
-            <button
-              type="button"
-              disabled={loadingFile || analyzing}
-              onClick={(e) => {
-                e.stopPropagation();
-                fileInputRef.current?.click();
-              }}
-              className="btn-press inline-flex items-center gap-1.5 px-4 py-2 text-xs font-semibold bg-white text-slate-900 border border-zinc-200 hover:border-blue-300 hover:text-[#12489B] rounded-xl shadow-2xs disabled:opacity-50"
-            >
-              <FolderUp className="w-3.5 h-3.5 text-[#12489B]" />
-              <span>{uploadedFileName ? 'Đổi tệp khác' : 'Chọn tệp từ máy tính'}</span>
-            </button>
-          </div>
-          ) : (
-          <div className="space-y-2.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label className="text-xs font-semibold text-slate-800">
-                Dán hoặc nhập đoạn văn bản cần kiểm tra Đạo văn &amp; AI:
-              </label>
-              <div className="flex items-center gap-2 text-[11px] font-mono text-zinc-500 tabular-nums">
-                <span>
-                  {inputWords.toLocaleString('vi-VN')} từ ·{' '}
-                  {textInput.length.toLocaleString('vi-VN')} / 150.000 ký tự
-                </span>
-                {textInput.trim() && (
-                  <button
-                    type="button"
-                    disabled={analyzing}
-                    onClick={() => {
-                      setTextInput('');
-                      setUploadedFileName('');
-                      setTitle('');
-                      setReport(null);
-                      setSelectedSentenceId(null);
-                    }}
-                    className="btn-press text-rose-600 hover:text-rose-700 font-sans font-semibold underline"
-                  >
-                    Xóa nội dung
-                  </button>
-                )}
-              </div>
-            </div>
-            <textarea
-              rows={9}
-              maxLength={150000}
-              disabled={analyzing}
-              value={textInput}
-              onChange={(e) => {
-                setTextInput(e.target.value);
-                if (uploadedFileName) setUploadedFileName('');
-                if (report) setReport(null);
-              }}
-              placeholder="Dán trực tiếp 1 đoạn, nhiều phần hoặc toàn bộ bài viết của bạn vào đây (tối thiểu 40 ký tự) rồi bấm Kiểm tra ngay..."
-              className="w-full p-4 text-sm leading-relaxed text-slate-800 bg-zinc-50/70 focus:bg-white border border-zinc-200 focus:border-[#12489B] rounded-2xl focus:outline-none resize-y transition-colors"
-            />
-          </div>
-          )}
-
-          {/* Filter Options + Primary Action Bar */}
-          <div className="pt-2 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-4">
-            <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-slate-700">
-              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={excludeReferences}
-                  onChange={(e) => setExcludeReferences(e.target.checked)}
-                  className="w-4 h-4 rounded border-zinc-300 text-[#12489B] focus:ring-[#12489B]"
-                />
-                <span>Loại trừ Tài liệu tham khảo (Bibliography)</span>
-              </label>
-
-              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={excludeQuotes}
-                  onChange={(e) => setExcludeQuotes(e.target.checked)}
-                  className="w-4 h-4 rounded border-zinc-300 text-[#12489B] focus:ring-[#12489B]"
-                />
-                <span>Loại trừ Trích dẫn trong ngoặc kép (Quotes)</span>
-              </label>
-            </div>
-
-            <button
-              type="button"
-              disabled={analyzing || textInput.trim().length < 40}
-              onClick={() => void handleRunScan()}
-              className="btn-press inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold bg-gradient-to-r from-[#0B2559] to-[#12489B] text-white rounded-xl hover:from-[#081B42] hover:to-[#0E3A7D] disabled:opacity-45 shadow-[0_6px_18px_rgb(11,37,89,0.28)] min-w-[230px]"
-            >
-              {analyzing ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Đang phân tích tài liệu...</span>
-                </>
-              ) : (
-                <>
-                  <FileCheck2 className="w-4 h-4" />
-                  <span>Quét Đạo văn &amp; Kiểm định AI</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Live 3-Step Scanning Progress Strip */}
-          {analyzing && (
-            <div className="popover-enter bg-blue-50/60 border border-blue-200/80 rounded-xl p-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-              {scanStepsMeta.map((item) => {
-                const isDone = scanStep > item.step;
-                const isCurrent = scanStep === item.step;
-                return (
-                  <div
-                    key={item.step}
-                    className={`flex items-center gap-2 text-xs px-3 py-2 rounded-lg border ${
-                      isCurrent
-                        ? 'bg-white border-blue-300 text-[#12489B] font-semibold shadow-2xs'
-                        : isDone
-                        ? 'bg-emerald-50/70 border-emerald-200 text-emerald-800 font-medium'
-                        : 'bg-white/60 border-zinc-200/70 text-zinc-500'
-                    }`}
-                  >
-                    {isDone ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                    ) : isCurrent ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin shrink-0" />
-                    ) : (
-                      <span className="w-4 h-4 rounded-full bg-zinc-200 text-[10px] font-mono flex items-center justify-center shrink-0">
-                        {item.step}
-                      </span>
-                    )}
-                    <span className="truncate">{item.label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </section>
+          </aside>
+        )}
+      </div>
 
       {/* Dual Integrity Studio Report */}
       {report && (

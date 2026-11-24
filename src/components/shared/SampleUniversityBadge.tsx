@@ -9,10 +9,10 @@ interface SampleUniversityBadgeProps {
 }
 
 const SIZE_CLASSES: Record<NonNullable<SampleUniversityBadgeProps['size']>, string> = {
-  xs: 'w-9 h-9 rounded-xl p-1',
-  sm: 'w-12 h-12 rounded-xl p-1.5',
-  md: 'w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-2xl p-2',
-  lg: 'w-20 h-20 rounded-2xl p-2',
+  xs: 'w-9 h-9 rounded-lg p-1',
+  sm: 'w-10 h-10 rounded-xl p-1.5',
+  md: 'w-14 h-14 sm:w-16 sm:h-16 rounded-2xl p-2',
+  lg: 'w-18 h-18 sm:w-20 sm:h-20 rounded-2xl p-2.5',
 };
 
 export function SampleUniversityBadge({
@@ -31,7 +31,7 @@ export function SampleUniversityBadge({
 
   return (
     <div
-      className={`shrink-0 bg-white border border-slate-200/90 shadow-xs flex items-center justify-center overflow-hidden select-none ${SIZE_CLASSES[size]} ${className}`}
+      className={`shrink-0 bg-white border border-slate-200/80 flex items-center justify-center overflow-hidden select-none ${SIZE_CLASSES[size]} ${className}`}
       title={schoolName}
     >
       {showImage ? (
@@ -44,7 +44,7 @@ export function SampleUniversityBadge({
           className="w-full h-full object-contain"
         />
       ) : (
-        <span className="font-mono font-bold text-[#0B2559] text-xs tracking-tight text-center leading-none">
+        <span className="font-mono font-bold text-[#0B2559] text-[11px] tracking-tight text-center leading-none">
           {getSchoolInitials(schoolName)}
         </span>
       )}
