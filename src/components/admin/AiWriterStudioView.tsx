@@ -3069,6 +3069,10 @@ export function AiWriterStudioView({
           onToggleFocusPaperMode={() => setFocusPaperMode((v) => !v)}
           onUpdateFormat={handleUpdateFormat}
           onOpenCoverPage={() => setShowCoverModal(true)}
+          onUpdateContextImages={(nextImages) =>
+            mutateActiveSession((s) => ({ ...s, contextImages: nextImages }))
+          }
+          onToast={onToast}
           onUpdateSection={handleUpdateOutlineSection}
         />
 

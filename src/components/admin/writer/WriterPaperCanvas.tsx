@@ -2,7 +2,9 @@ import { ReactNode, RefObject, useEffect, useMemo, useRef, useState } from 'reac
 import {
   AlertCircle,
   BookMarked,
+  Check,
   CheckCircle2,
+  ImagePlus,
   ListTree,
   Loader2,
   Maximize2,
@@ -10,7 +12,10 @@ import {
   PencilLine,
   ShieldAlert,
   ShieldCheck,
+  Trash2,
+  Upload,
   Wrench,
+  X,
 } from 'lucide-react';
 import {
   PaperAuditIssue,
@@ -20,13 +25,16 @@ import {
 import { countWords } from '../../../lib/wordHumanizer';
 import { CoverPageSheetPreview } from './CoverPageSheetPreview';
 import {
+  compressImageToContextItem,
   findSessionImageByTag,
+  getNextImageTag,
   parseFigureMarkerTag,
 } from '../../../lib/writerImageUtils';
 import {
   COVER_PAGE_TEMPLATES,
   DocumentFormatConfig,
   SectionHeadingLevel,
+  SessionContextImage,
   WriterOutlineSection,
   WriterSession,
 } from './types';
@@ -75,6 +83,8 @@ interface WriterPaperCanvasProps {
   onToggleFocusPaperMode: () => void;
   onUpdateFormat: (patch: Partial<DocumentFormatConfig>) => void;
   onOpenCoverPage?: () => void;
+  onUpdateContextImages?: (nextImages: SessionContextImage[]) => void;
+  onToast?: (msg: string) => void;
   onUpdateSection: (
     sectionId: string,
     patch: Partial<WriterOutlineSection>,
@@ -100,6 +110,8 @@ export function WriterPaperCanvas({
   onToggleFocusPaperMode,
   onUpdateFormat,
   onOpenCoverPage,
+  onUpdateContextImages,
+  onToast,
   onUpdateSection,
 }: WriterPaperCanvasProps) {
   const { format } = session;
@@ -108,7 +120,106 @@ export function WriterPaperCanvas({
   const [activeBubbleIssueId, setActiveBubbleIssueId] = useState<string | null>(
     null
   );
+  const [imagePickerSectionId, setImagePickerSectionId] = useState<string | null>(
+    null
+  );
+  const [uploadingManualImage, setUploadingManualImage] = useState(false);
+  const [manualCaptionDraft, setManualCaptionDraft] = useState('');
+  const manualFileInputRef = useRef<HTMLInputElement | null>(null);
   const hideBubbleTimerRef = useRef<number | null>(null);
+
+  const insertMarkerIntoSection = (
+    sec: WriterOutlineSection,
+    tag: string,
+    atCursor?: { start: number; end: number } | null
+  ) => {
+    const marker = `[FIGURE: ${tag}]`;
+    const prevContent = sec.content || '';
+    let nextContent: string;
+    if (atCursor && atCursor.start >= 0 && atCursor.start <= prevContent.length) {
+      const before = prevContent.slice(0, atCursor.start).replace(/\s*$/, '');
+      const after = prevContent.slice(atCursor.end).replace(/^\s*/, '');
+      nextContent = [before, marker, after].filter(Boolean).join('\n\n');
+    } else if (!prevContent.trim()) {
+      nextContent = marker;
+    } else {
+      nextContent = `${prevContent.replace(/\s+$/, '')}\n\n${marker}`;
+    }
+    onUpdateSection(sec.id, { content: nextContent }, true);
+  };
+
+  const removeMarkerFromSection = (sec: WriterOutlineSection, tag: string) => {
+    const normTag = tag.trim().toUpperCase();
+    const nextLines = (sec.content || '')
+      .split(/\r?\n/)
+      .filter((line) => parseFigureMarkerTag(line) !== normTag);
+    const cleaned = nextLines.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    onUpdateSection(sec.id, { content: cleaned }, true);
+    onToast?.(`Đã gỡ ảnh [${normTag}] khỏi mục "${sec.title}".`);
+  };
+
+  const handleManualImageFiles = async (
+    sec: WriterOutlineSection,
+    files: File[],
+    atCursor?: { start: number; end: number } | null
+  ) => {
+    if (!onUpdateContextImages || files.length === 0) return;
+    const imageFiles = files.filter((f) => f.type.startsWith('image/'));
+    if (imageFiles.length === 0) {
+      onToast?.('Vui lòng chọn tệp ảnh hợp lệ (PNG, JPG, WebP).');
+      return;
+    }
+    setUploadingManualImage(true);
+    try {
+      const currentImages = [...(session.contextImages || [])];
+      const addedTags: string[] = [];
+      for (const file of imageFiles) {
+        const tag = getNextImageTag(currentImages);
+        const item = await compressImageToContextItem(file, tag);
+        if (manualCaptionDraft.trim() && imageFiles.length === 1) {
+          item.caption = manualCaptionDraft.trim();
+        }
+        item.insertIntoPaper = true;
+        currentImages.push(item);
+        addedTags.push(tag);
+      }
+      onUpdateContextImages(currentImages);
+
+      // Insert all newly uploaded image markers into the target section
+      const markersBlock = addedTags.map((t) => `[FIGURE: ${t}]`).join('\n\n');
+      const prevContent = sec.content || '';
+      let nextContent: string;
+      if (atCursor && atCursor.start >= 0 && atCursor.start <= prevContent.length) {
+        const before = prevContent.slice(0, atCursor.start).replace(/\s*$/, '');
+        const after = prevContent.slice(atCursor.end).replace(/^\s*/, '');
+        nextContent = [before, markersBlock, after].filter(Boolean).join('\n\n');
+      } else if (!prevContent.trim()) {
+        nextContent = markersBlock;
+      } else {
+        nextContent = `${prevContent.replace(/\s+$/, '')}\n\n${markersBlock}`;
+      }
+      onUpdateSection(sec.id, { content: nextContent }, true);
+      setManualCaptionDraft('');
+      onToast?.(
+        `Đã chèn ${addedTags.length} ảnh (${addedTags.join(', ')}) vào mục "${sec.title}"! Ảnh sẽ tự xuất hiện khi tải Word/PDF.`
+      );
+    } catch (err) {
+      onToast?.(
+        err instanceof Error ? err.message : 'Không thể xử lý ảnh tải lên.'
+      );
+    } finally {
+      setUploadingManualImage(false);
+      if (manualFileInputRef.current) manualFileInputRef.current.value = '';
+    }
+  };
+
+  const handleUpdateImageCaption = (imageId: string, nextCaption: string) => {
+    if (!onUpdateContextImages) return;
+    const nextList = (session.contextImages || []).map((img) =>
+      img.id === imageId ? { ...img, caption: nextCaption } : img
+    );
+    onUpdateContextImages(nextList);
+  };
 
   const openBubble = (issueId: string) => {
     if (hideBubbleTimerRef.current !== null) {
@@ -497,6 +608,37 @@ export function WriterPaperCanvas({
             {format.fontFamily} · {format.fontSizePt}pt · Dòng{' '}
             {format.lineSpacing} · Lề {format.marginInch}"
           </span>
+
+          {onUpdateContextImages && session.outline.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                const targetId =
+                  currentSectionId || session.outline[0]?.id || null;
+                if (!targetId) return;
+                setImagePickerSectionId((prev) =>
+                  prev === targetId ? null : targetId
+                );
+                onSelectSection(targetId);
+                window.requestAnimationFrame(() => {
+                  const secEl = document.querySelector<HTMLElement>(
+                    `[data-writer-section-id="${targetId}"]`
+                  );
+                  secEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                });
+              }}
+              className="btn-press px-2.5 py-1 text-xs font-semibold bg-blue-50 border border-blue-200/90 rounded-lg text-[#12489B] hover:bg-blue-100 inline-flex items-center gap-1.5 shadow-2xs"
+              title="Tải ảnh mới, dán Ctrl+V hoặc chọn từ thư viện ảnh để chèn thủ công vào mục đang chọn"
+            >
+              <ImagePlus className="w-3.5 h-3.5" />
+              <span>Chèn ảnh vào bài</span>
+              {(session.contextImages?.length || 0) > 0 && (
+                <span className="px-1.5 py-0.2 rounded-full bg-[#12489B] text-white font-mono text-[10px]">
+                  {session.contextImages?.length}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         <div className="inline-flex rounded-lg bg-white border border-zinc-200 p-0.5">
@@ -881,14 +1023,187 @@ export function WriterPaperCanvas({
                     }}
                   />
 
-                  {session.viewMode === 'sections' && (
-                    <span className="text-[11px] font-sans font-mono text-zinc-400 shrink-0 select-none tabular-nums">
-                      {isReferencesSectionTitle(sec.title) || sec.targetWords === 0
-                        ? `${countWords(sec.content)}w · Không giới hạn`
-                        : `${countWords(sec.content)}/${sec.targetWords}w`}
-                    </span>
-                  )}
+                  <div className="flex items-center gap-1.5 shrink-0 select-none">
+                    {onUpdateContextImages && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSelectSection(sec.id);
+                          setImagePickerSectionId((prev) =>
+                            prev === sec.id ? null : sec.id
+                          );
+                        }}
+                        className={`btn-press inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-sans text-[11px] font-semibold border transition-colors ${
+                          imagePickerSectionId === sec.id
+                            ? 'bg-[#12489B] text-white border-[#12489B]'
+                            : 'bg-white/90 text-[#12489B] border-blue-200/80 hover:bg-blue-50'
+                        }`}
+                        title="Chèn ảnh thủ công vào mục này (tải ảnh, dán Ctrl+V hoặc chọn ảnh có sẵn)"
+                      >
+                        <ImagePlus className="w-3 h-3" />
+                        <span>Chèn ảnh</span>
+                      </button>
+                    )}
+
+                    {session.viewMode === 'sections' && (
+                      <span className="text-[11px] font-sans font-mono text-zinc-400 tabular-nums">
+                        {isReferencesSectionTitle(sec.title) || sec.targetWords === 0
+                          ? `${countWords(sec.content)}w · Không giới hạn`
+                          : `${countWords(sec.content)}/${sec.targetWords}w`}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* Inline Manual Image Inserter Drawer for this section */}
+                {imagePickerSectionId === sec.id && onUpdateContextImages && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    onPaste={(e) => {
+                      const items = Array.from(e.clipboardData?.items || []);
+                      const pastedImages = items
+                        .filter((it) => it.type.startsWith('image/'))
+                        .map((it) => it.getAsFile())
+                        .filter((f): f is File => Boolean(f));
+                      if (pastedImages.length > 0) {
+                        e.preventDefault();
+                        void handleManualImageFiles(sec, pastedImages);
+                      }
+                    }}
+                    className="mb-3 p-3.5 rounded-xl bg-[#F4F7FB] border border-blue-200/90 font-sans text-left space-y-3 shadow-2xs"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-[#0B2559]">
+                        <ImagePlus className="w-4 h-4 text-[#12489B]" />
+                        <span>Chèn ảnh thủ công vào mục &ldquo;{sec.title}&rdquo;</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setImagePickerSectionId(null)}
+                        className="p-1 rounded-lg text-zinc-400 hover:text-slate-700 hover:bg-white"
+                        title="Đóng khung chèn ảnh"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Upload new image / Paste Ctrl+V */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <input
+                        type="text"
+                        value={manualCaptionDraft}
+                        onChange={(e) => setManualCaptionDraft(e.target.value)}
+                        placeholder="Chú thích ảnh (VD: Biểu đồ kết quả hồi quy OLS) — tùy chọn..."
+                        className="flex-1 min-w-[200px] px-2.5 py-1.5 text-xs rounded-lg border border-zinc-200 bg-white focus:outline-none focus:border-[#12489B]"
+                      />
+                      <input
+                        ref={manualFileInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          const list = Array.from(e.target.files || []);
+                          void handleManualImageFiles(sec, list);
+                        }}
+                      />
+                      <button
+                        type="button"
+                        disabled={uploadingManualImage}
+                        onClick={() => manualFileInputRef.current?.click()}
+                        className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#12489B] hover:bg-[#0D387A] text-white text-xs font-bold disabled:opacity-60"
+                      >
+                        {uploadingManualImage ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Upload className="w-3.5 h-3.5" />
+                        )}
+                        <span>Tải ảnh từ máy</span>
+                      </button>
+                    </div>
+
+                    <p className="text-[11px] text-zinc-500">
+                      Mẹo: Bạn có thể bấm <strong>Ctrl+V</strong> ngay tại khung này hoặc trực tiếp tại vị trí con trỏ trong đoạn văn để dán ảnh chụp màn hình (SPSS, Excel, biểu đồ...). Ảnh chèn vào sẽ tự xuất hiện khi xuất Word (.docx) &amp; PDF.
+                    </p>
+
+                    {/* Existing session images library */}
+                    {(session.contextImages?.length || 0) > 0 && (
+                      <div className="pt-2 border-t border-blue-200/70 space-y-2">
+                        <div className="text-[11px] font-bold text-slate-700">
+                          Hoặc chọn nhanh ảnh đã có trong phiên ({session.contextImages?.length}):
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {(session.contextImages || []).map((img) => {
+                            const alreadyInserted = sec.content
+                              .split(/\r?\n/)
+                              .some(
+                                (line) =>
+                                  parseFigureMarkerTag(line) === img.tag.toUpperCase()
+                              );
+                            return (
+                              <div
+                                key={img.id}
+                                className="flex items-center gap-2.5 p-2 rounded-lg bg-white border border-zinc-200/90"
+                              >
+                                <img
+                                  src={img.dataUrl}
+                                  alt={img.caption || img.name}
+                                  className="w-12 h-10 rounded object-cover border border-zinc-200 shrink-0 bg-zinc-50"
+                                />
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex items-center gap-1">
+                                    <span className="px-1.5 py-0.2 rounded bg-blue-50 text-[#12489B] font-mono text-[10px] font-bold">
+                                      {img.tag}
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-slate-800 truncate">
+                                      {img.caption || img.name}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] text-zinc-400">
+                                    {img.width}×{img.height}px
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (alreadyInserted) {
+                                      removeMarkerFromSection(sec, img.tag);
+                                    } else {
+                                      insertMarkerIntoSection(sec, img.tag);
+                                      onToast?.(
+                                        `Đã chèn [${img.tag}] vào mục "${sec.title}".`
+                                      );
+                                    }
+                                  }}
+                                  className={`btn-press shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold ${
+                                    alreadyInserted
+                                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200'
+                                      : 'bg-[#0B2559] text-white hover:bg-[#12489B]'
+                                  }`}
+                                  title={
+                                    alreadyInserted
+                                      ? 'Bấm để gỡ ảnh này khỏi mục hiện tại'
+                                      : 'Chèn ảnh này vào mục hiện tại'
+                                  }
+                                >
+                                  {alreadyInserted ? (
+                                    <>
+                                      <Check className="w-3 h-3" />
+                                      <span>Đã chèn</span>
+                                    </>
+                                  ) : (
+                                    <span>+ Chèn</span>
+                                  )}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Editable Section Prose OR Interactive Inline Red-Highlighted Sentences */}
                 {showInlineHighlightMode ? (
@@ -912,6 +1227,22 @@ export function WriterPaperCanvas({
                     ref={isCurrent ? activeTextareaRef : undefined}
                     rows={lineCount}
                     value={sec.content}
+                    onPaste={(e) => {
+                      if (!onUpdateContextImages) return;
+                      const items = Array.from(e.clipboardData?.items || []);
+                      const pastedImages = items
+                        .filter((it) => it.type.startsWith('image/'))
+                        .map((it) => it.getAsFile())
+                        .filter((f): f is File => Boolean(f));
+                      if (pastedImages.length > 0) {
+                        e.preventDefault();
+                        const target = e.currentTarget;
+                        void handleManualImageFiles(sec, pastedImages, {
+                          start: target.selectionStart ?? sec.content.length,
+                          end: target.selectionEnd ?? sec.content.length,
+                        });
+                      }
+                    }}
                     onBlur={() => {
                       if (editingSectionId === sec.id) {
                         setEditingSectionId(null);
@@ -958,24 +1289,53 @@ export function WriterPaperCanvas({
                       {matchedFigures.map((fig, figIdx) => (
                         <figure
                           key={fig.id}
-                          className="flex flex-col items-center gap-1.5"
+                          className="group relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl bg-zinc-50/70 border border-zinc-200/80"
                         >
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeMarkerFromSection(sec, fig.tag);
+                            }}
+                            title={`Gỡ ảnh [${fig.tag}] khỏi mục này`}
+                            className="btn-press absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/95 border border-zinc-200 hover:border-rose-300 text-[10.5px] font-sans font-semibold text-zinc-500 hover:text-rose-600 shadow-2xs"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Gỡ ảnh</span>
+                          </button>
+
                           <img
                             src={fig.dataUrl}
                             alt={fig.caption || fig.name}
                             className="max-h-72 max-w-full rounded-lg border border-zinc-200 shadow-2xs object-contain bg-white"
                           />
+
                           <figcaption
-                            className="text-center italic text-slate-600 text-xs"
+                            className="w-full max-w-xl flex items-center justify-center gap-1.5 text-center italic text-slate-600 text-xs"
                             style={{
                               fontFamily: `"${format.fontFamily}", serif`,
                             }}
                           >
-                            {session.writingLanguage === 'Vietnamese'
-                              ? `Hình ${figIdx + 1}.`
-                              : `Figure ${figIdx + 1}.`}{' '}
-                            {fig.caption || fig.name}{' '}
-                            <span className="not-italic font-mono text-[10px] text-zinc-400">
+                            <span className="shrink-0 font-semibold not-italic text-slate-700">
+                              {session.writingLanguage === 'Vietnamese'
+                                ? `Hình ${figIdx + 1}.`
+                                : `Figure ${figIdx + 1}.`}
+                            </span>
+                            {onUpdateContextImages ? (
+                              <input
+                                type="text"
+                                value={fig.caption || ''}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={(e) =>
+                                  handleUpdateImageCaption(fig.id, e.target.value)
+                                }
+                                placeholder="Nhập chú thích hình ảnh..."
+                                className="flex-1 min-w-0 bg-transparent border-b border-transparent hover:border-zinc-300 focus:border-[#12489B] focus:outline-none text-center italic text-slate-700 px-1 py-0.5"
+                              />
+                            ) : (
+                              <span>{fig.caption || fig.name}</span>
+                            )}
+                            <span className="not-italic font-mono text-[10px] text-zinc-400 shrink-0">
                               [{fig.tag}]
                             </span>
                           </figcaption>

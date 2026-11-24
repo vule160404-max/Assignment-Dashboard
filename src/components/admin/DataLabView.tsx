@@ -2,12 +2,16 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   BarChart3,
+  BookOpen,
   Check,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Copy,
   Database,
   Download,
   FileSpreadsheet,
+  Info,
   Plus,
   RefreshCw,
   Send,
@@ -40,6 +44,7 @@ import {
 import { copyTextToClipboard } from '../../lib/utils';
 
 const DATA_LAB_STORAGE_KEY = 'assigntrack_data_lab_project_v1';
+const DATA_LAB_GUIDE_KEY = 'assigntrack_data_lab_guide_open_v1';
 
 type DataLabSubTab = 'design' | 'sheet' | 'stats' | 'charts';
 
@@ -72,9 +77,30 @@ function loadSavedProject(): SurveyProject {
 export function DataLabView({ onPushToAiWriter, onToast }: DataLabViewProps) {
   const [project, setProject] = useState<SurveyProject>(loadSavedProject);
   const [subTab, setSubTab] = useState<DataLabSubTab>('stats');
+  const [showGuide, setShowGuide] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(DATA_LAB_GUIDE_KEY);
+      if (saved === '0') return false;
+      return true;
+    } catch {
+      return true;
+    }
+  });
   const [synthSize, setSynthSize] = useState(200);
   const [copiedApa, setCopiedApa] = useState(false);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
+
+  const toggleGuide = () => {
+    setShowGuide((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(DATA_LAB_GUIDE_KEY, next ? '1' : '0');
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  };
 
   // New construct form state
   const [newCode, setNewCode] = useState('');
@@ -275,6 +301,23 @@ export function DataLabView({ onPushToAiWriter, onToast }: DataLabViewProps) {
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button
               type="button"
+              onClick={toggleGuide}
+              className={`btn-press inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-colors ${
+                showGuide
+                  ? 'bg-blue-50 border-blue-200 text-[#12489B]'
+                  : 'bg-white border-zinc-200 hover:bg-zinc-50 text-slate-700'
+              }`}
+            >
+              <BookOpen className="w-3.5 h-3.5" />
+              <span>Hướng dẫn</span>
+              {showGuide ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
+            <button
+              type="button"
               onClick={handleDownloadCsv}
               className="btn-press inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-slate-800 text-xs font-semibold"
             >
@@ -336,6 +379,139 @@ export function DataLabView({ onPushToAiWriter, onToast }: DataLabViewProps) {
           </div>
         </div>
       </section>
+
+      {/* Collapsible Step-by-Step User Guide */}
+      {showGuide && (
+        <section className="bg-gradient-to-br from-[#F4F7FB] to-white border border-blue-200/90 rounded-2xl p-5 shadow-2xs space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded-lg bg-[#0B2559] text-white flex items-center justify-center shrink-0">
+                <BookOpen className="w-4 h-4" />
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-[#0B2559]">
+                  Hướng dẫn sử dụng nhanh — Quy trình chạy dữ liệu định lượng 4 bước
+                </h2>
+                <p className="text-[11.5px] text-zinc-500">
+                  Mọi tính toán chạy trực tiếp trên trình duyệt theo công thức SPSS/APA. Bấm nút từng bước để chuyển nhanh.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={toggleGuide}
+              className="text-xs font-semibold text-zinc-500 hover:text-[#0B2559] px-2.5 py-1 rounded-lg hover:bg-white"
+            >
+              Ẩn hướng dẫn
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
+            <div className="rounded-xl bg-white border border-zinc-200/90 p-3.5 flex flex-col justify-between gap-2.5">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#12489B] font-mono text-[11px] font-bold">
+                    BƯỚC 1
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSubTab('design')}
+                    className="text-[11px] font-semibold text-[#12489B] hover:underline"
+                  >
+                    Mở tab 1 →
+                  </button>
+                </div>
+                <h3 className="text-xs font-bold text-slate-900">
+                  Thiết kế mô hình &amp; Nạp dữ liệu
+                </h3>
+                <p className="text-[11.5px] text-zinc-600 leading-relaxed">
+                  Khai báo nhân tố <strong>IV</strong> (độc lập) và <strong>DV</strong> (phụ thuộc), chọn Likert 5/7. Có dữ liệu thật thì tải file <strong>.CSV</strong> lên (bấm <em>Xuất .CSV</em> để xem đúng tên cột chuẩn), hoặc chọn cỡ mẫu <strong>N</strong> rồi bấm <strong>Chạy sinh dữ liệu</strong> để test.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white border border-zinc-200/90 p-3.5 flex flex-col justify-between gap-2.5">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#12489B] font-mono text-[11px] font-bold">
+                    BƯỚC 2
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSubTab('sheet')}
+                    className="text-[11px] font-semibold text-[#12489B] hover:underline"
+                  >
+                    Mở tab 2 →
+                  </button>
+                </div>
+                <h3 className="text-xs font-bold text-slate-900">
+                  Kiểm tra &amp; Làm sạch phiếu lỗi
+                </h3>
+                <p className="text-[11.5px] text-zinc-600 leading-relaxed">
+                  Hệ thống tự phát hiện phiếu <strong>thiếu ô trả lời</strong> và phiếu <strong>đánh 1 cột đồng loạt</strong> (straight-liner). Bấm nút <strong>Làm sạch ngay</strong> để lọc bỏ các dòng nhiễu trước khi đọc kết quả.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white border border-zinc-200/90 p-3.5 flex flex-col justify-between gap-2.5">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="px-2 py-0.5 rounded-md bg-blue-50 text-[#12489B] font-mono text-[11px] font-bold">
+                    BƯỚC 3
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSubTab('stats')}
+                    className="text-[11px] font-semibold text-[#12489B] hover:underline"
+                  >
+                    Mở tab 3 →
+                  </button>
+                </div>
+                <h3 className="text-xs font-bold text-slate-900">
+                  Đọc bảng kết quả chuẩn SPSS/APA
+                </h3>
+                <p className="text-[11.5px] text-zinc-600 leading-relaxed">
+                  Kiểm tra ngưỡng đạt chuẩn: <strong>Alpha ≥ 0.60</strong>, <strong>Item-Total ≥ 0.30</strong>, <strong>Durbin-Watson 1.5–2.5</strong>, <strong>VIF &lt; 2.0</strong> và <strong>Sig. &lt; 0.05</strong> để chấp nhận giả thuyết. Có nút <strong>Copy toàn bộ bảng APA</strong> dán thẳng vào Word.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white border border-zinc-200/90 p-3.5 flex flex-col justify-between gap-2.5">
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="px-2 py-0.5 rounded-md bg-orange-50 text-[#EA580C] font-mono text-[11px] font-bold">
+                    BƯỚC 4
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSubTab('charts')}
+                    className="text-[11px] font-semibold text-[#EA580C] hover:underline"
+                  >
+                    Mở tab 4 →
+                  </button>
+                </div>
+                <h3 className="text-xs font-bold text-slate-900">
+                  Xuất biểu đồ &amp; Đẩy sang AI Writer
+                </h3>
+                <p className="text-[11.5px] text-zinc-600 leading-relaxed">
+                  Tải từng biểu đồ PNG độ nét cao hoặc bấm <strong>Đẩy sang AI Writer Studio</strong> để tự động đính kèm báo cáo APA + biểu đồ (<code>IMG_1..IMG_3</code>) vào phiên viết bài, giúp AI viết Chương 4 và chèn hình thẳng vào Word/PDF.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-2 rounded-xl bg-blue-50/70 border border-blue-200/70 px-3.5 py-2.5 text-[11.5px] text-slate-700">
+            <Info className="w-4 h-4 text-[#12489B] shrink-0 mt-0.5" />
+            <div>
+              <strong>Lưu ý khi nhập file .CSV từ Google Forms / Excel:</strong> Dòng đầu tiên (Header) cần đặt trùng mã biến đã khai báo ở Bước 1 (VD:{' '}
+              <code className="px-1 py-0.5 rounded bg-white border border-blue-200 font-mono text-[10.5px]">
+                GioiTinh, DoTuoi, CL1, CL2, CL3, HL1, HL2, HL3
+              </code>
+              ) và câu trả lời thang đo Likert phải ở dạng số (<code>1–5</code> hoặc <code>1–7</code>).
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* 4 Sub-Tab Switcher */}
       <div className="inline-flex flex-wrap items-center gap-1 bg-white border border-zinc-200/90 p-1 rounded-2xl shadow-2xs text-xs font-semibold">
