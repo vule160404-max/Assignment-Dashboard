@@ -10,6 +10,7 @@ import {
   WriterOutlineSection,
   WriterSession,
 } from '../components/admin/writer/types';
+import { buildCohortAntiSimilarityPromptBlock } from './cohortEngine';
 import { auth } from './firebase';
 
 const AI_SETTINGS_STORAGE_KEY = 'assigntrack_ai_writer_settings_v1';
@@ -833,16 +834,16 @@ function compactResearchedSourcesForPrompt(
   const perpMarker = '=== PERPLEXITY REAL-TIME WEB RESEARCH';
   const splitIdx = trimmed.indexOf(perpMarker);
   if (splitIdx === -1) {
-    return trimmed.slice(0, mode === 'outline' ? 2400 : 4800);
+    return trimmed.slice(0, mode === 'outline' ? 4200 : 7200);
   }
   const crossrefPart = trimmed.slice(0, splitIdx).trim();
   if (mode === 'outline') {
-    // Outline generation only needs the verified [S1]..[S12] Crossref titles/citations (saves ~3,000 tokens!)
-    return crossrefPart.slice(0, 3200);
+    // Outline generation keeps all verified [S1]..[S20] Crossref titles/citations
+    return crossrefPart.slice(0, 4800);
   }
-  // Body writing keeps 100% of verified [S1]..[S12] Crossref pack + compact capped Perplexity web context
+  // Body writing keeps 100% of verified [S1]..[S25] Crossref pack + compact capped Perplexity web context
   const perplexityPart = trimmed.slice(splitIdx).trim().slice(0, 2600);
-  return `${crossrefPart}\n\n${perplexityPart}`.trim();
+  return `${crossrefPart.slice(0, 6800)}\n\n${perplexityPart}`.trim();
 }
 
 export function buildSkillsAndContextSystemPrompt(
@@ -927,10 +928,15 @@ ${compactSources}`
 - Trích dẫn nguồn chuẩn ${session.citationStyle} với tên tác giả Việt Nam hoặc quốc tế (VD: (Nguyễn Văn A, 2024), (Tổng cục Thống kê, 2025)).`
       : '';
 
+  const cohortAntiSimilarityBlock = buildCohortAntiSimilarityPromptBlock(
+    session,
+    mode
+  );
+
   return `You are an elite Academic Researcher & University Writing Specialist assisting inside an academic research & drafting studio.
 
 === ACTIVE SKILL FILES & SYSTEM INSTRUCTIONS ===
-${skillBlock}${contextBlock}${contextImagesBlock}${researchedSourcesBlock}${vietnameseRulesBlock}
+${skillBlock}${contextBlock}${contextImagesBlock}${researchedSourcesBlock}${vietnameseRulesBlock}${cohortAntiSimilarityBlock}
 
 === ASSIGNMENT BRIEF & FORMATTING RULES ===
 - Document Type: ${docTypeLabel}

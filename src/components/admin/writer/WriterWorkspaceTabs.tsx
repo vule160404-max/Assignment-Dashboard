@@ -6,12 +6,14 @@ import {
   Download,
   FilePlus2,
   FolderPlus,
+  GitCompareArrows,
   Loader2,
   Paperclip,
   Pause,
   Play,
   Send,
   Sparkles,
+  Users,
   X,
 } from 'lucide-react';
 import { countWords } from '../../../lib/wordHumanizer';
@@ -36,6 +38,8 @@ interface WriterWorkspaceTabsProps {
   onSelectSession: (sessionId: string) => void;
   onAddNewBlank: () => void;
   onImportMultipleOrders: (selectedOrders: OrderRecord[]) => void;
+  onOpenCohortCloner: () => void;
+  onOpenCohortSimilarity: () => void;
   onCloseSession: (sessionId: string) => void;
   onRunAllParallel: () => void;
   onPauseAll: () => void;
@@ -88,6 +92,8 @@ export function WriterWorkspaceTabs({
   onSelectSession,
   onAddNewBlank,
   onImportMultipleOrders,
+  onOpenCohortCloner,
+  onOpenCohortSimilarity,
   onCloseSession,
   onRunAllParallel,
   onPauseAll,
@@ -207,6 +213,11 @@ export function WriterWorkspaceTabs({
                   ) : (
                     <span className={`w-2 h-2 rounded-full shrink-0 ${dotClass}`} />
                   )}
+                  {sess.cohortMeta && (
+                    <span className="px-1 py-0.2 rounded bg-[#0B2559] text-amber-300 font-mono text-[9.5px] font-bold shrink-0">
+                      N{sess.cohortMeta.cloneIndex}/{sess.cohortMeta.cohortSize}
+                    </span>
+                  )}
                   <span className="truncate max-w-[145px]">{tabLabel}</span>
                   <span className="font-mono text-[10px] text-zinc-400 tabular-nums">
                     {completedSections}/{totalSections}
@@ -260,6 +271,16 @@ export function WriterWorkspaceTabs({
             <span>+ Nạp nhiều đơn</span>
           </button>
 
+          <button
+            type="button"
+            onClick={onOpenCohortCloner}
+            title="Nhân bản 1 đề bài thành nhiều bài độc lập cho nhóm khách cùng lớp (Bốc nguồn ngẫu nhiên & Chống trùng Similarity)"
+            className="btn-press inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 hover:bg-[#0B2559] text-[#0B2559] hover:text-white border border-blue-200/90 hover:border-[#0B2559] transition-colors"
+          >
+            <Users className="w-3.5 h-3.5" />
+            <span>Nhân bản cùng lớp</span>
+          </button>
+
           {/* Parallel Runner Controls (only prominent when multiple tabs or running) */}
           {sessions.length >= 2 && (
             <div className="inline-flex items-center gap-1 pl-1.5 ml-1 border-l border-zinc-200">
@@ -284,6 +305,16 @@ export function WriterWorkspaceTabs({
                   <span>Chạy {runnableCount} bài</span>
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={onOpenCohortSimilarity}
+                title="Kiểm tra tỷ lệ trùng lặp thân bài chéo giữa các bài cùng lớp (Đã loại trừ References)"
+                className="btn-press inline-flex items-center gap-1 px-2 py-1 text-[11px] font-semibold bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-md"
+              >
+                <GitCompareArrows className="w-3 h-3 text-amber-700" />
+                <span>Soi trùng chéo</span>
+              </button>
 
               {draftedPapersCount >= 2 && (
                 <button

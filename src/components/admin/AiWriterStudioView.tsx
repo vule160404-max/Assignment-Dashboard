@@ -60,6 +60,7 @@ import {
   AiChatbotSettingsStore,
   AiProviderType,
   CoverPageConfig,
+   DEFAULT_COVER_PAGE_CONFIG,
   DocumentFormatConfig,
   SessionContextFile,
   SessionContextImage,
@@ -67,8 +68,19 @@ import {
   WriterOutlineSection,
   WriterSession,
 } from './writer/types';
+import {
+  COHORT_STRUCTURAL_ARCHETYPES,
+  CohortPairSimilarity,
+  buildRandomSampledDossierForClone,
+  fetchCohortMasterCrossrefPool,
+} from '../../lib/cohortEngine';
 import { DataLabAiWriterPayload } from './DataLabView';
 import { WriterApiSettingsModal } from './writer/WriterApiSettingsModal';
+import {
+  CohortCloneLaunchConfig,
+  WriterCohortCloneModal,
+} from './writer/WriterCohortCloneModal';
+import { WriterCohortSimilarityModal } from './writer/WriterCohortSimilarityModal';
 import {
   WriterActivityLogEntry,
   WriterActivityPanel,
@@ -520,6 +532,11 @@ export function AiWriterStudioView({
   const [exportingDocx, setExportingDocx] = useState(false);
   const [exportingAllDocx, setExportingAllDocx] = useState(false);
   const [attachingToOrder, setAttachingToOrder] = useState(false);
+  const [showCohortCloneModal, setShowCohortCloneModal] = useState(false);
+  const [launchingCohort, setLaunchingCohort] = useState(false);
+  const [cohortLaunchStatus, setCohortLaunchStatus] = useState('');
+  const [showCohortSimilarityModal, setShowCohortSimilarityModal] = useState(false);
+  const [scrubbingPairKey, setScrubbingPairKey] = useState<string | null>(null);
   const [cloudSyncState, setCloudSyncState] = useState<CloudSyncState>('connecting');
   const [serverKeysConfigured, setServerKeysConfigured] = useState<
     Record<AiProviderType, boolean>
@@ -1511,7 +1528,53 @@ export function AiWriterStudioView({
       // In Hybrid mode, run Step 1 (Perplexity web search) once before writing all sections
       await ensureHybridSourcesForSession(targetSessionId, signal);
 
-      const sectionIds = initialSnap.outline.map((sec) => sec.id);
+      // For Same-Class Cohort Clones, automatically generate a structurally distinct AI Outline first!
+      const afterSourceSnap =
+        sessionsRef.current.find((s) => s.id === targetSessionId) || initialSnap;
+      let activeOutline = afterSourceSnap.outline;
+
+      if (afterSourceSnap.cohortMeta?.needsDistinctOutline) {
+        mutateSessionById(targetSessionId, (s) => ({
+          ...s,
+          batchStatus: 'outlining',
+        }));
+        setCurrentStepLabel(
+          `Đang lập dàn ý độc lập cho "${afterSourceSnap.title}"...`
+        );
+        const outlineLogId = pushActivityLog(
+          'running',
+          `Lập dàn ý riêng (${afterSourceSnap.cohortMeta.archetypeLabel})`,
+          `Đảm bảo tiêu đề & bố cục khác biệt trong nhóm ${afterSourceSnap.cohortMeta.cohortSize} bài.`,
+          activeProfile.model.replace(/^perplexity\//, ''),
+          undefined,
+          targetSessionId
+        );
+        const tOut = Date.now();
+        const freshOutline = await generateOutlineWithAi(
+          afterSourceSnap,
+          skillsRef.current,
+          activeProfile,
+          effectiveWriter.enableWebSearch,
+          signal
+        );
+        activeOutline = freshOutline;
+        updateActivityLog(outlineLogId, {
+          status: 'success',
+          title: `Đã tạo dàn ý riêng (${freshOutline.length} mục)`,
+          durationSec: (Date.now() - tOut) / 1000,
+        });
+        mutateSessionById(targetSessionId, (s) => ({
+          ...s,
+          outline: freshOutline,
+          activeSectionId: freshOutline[0]?.id || '',
+          batchStatus: 'writing_sections',
+          cohortMeta: s.cohortMeta
+            ? { ...s.cohortMeta, needsDistinctOutline: false }
+            : undefined,
+        }));
+      }
+
+      const sectionIds = activeOutline.map((sec) => sec.id);
 
       for (let i = 0; i < sectionIds.length; i++) {
         const secId = sectionIds[i];
@@ -1780,6 +1843,323 @@ export function AiWriterStudioView({
     );
 
     onToast('Đã hoàn tất đợt chạy song song các bài viết!');
+  };
+
+  /**
+   * Launches N independent Same-Class Cohort Clones from `activeSession`:
+   * 1. Queries ONE rich Master CrossRef Pool (~35-45 real peer-reviewed DOI works) + optional shared Perplexity context.
+   * 2. Randomly shuffles & draws `config.sourcesPerPaper` (e.g. 15) sources per student clone.
+   * 3. Assigns distinct structural/rhetorical archetypes, optional student metadata & typography diversity.
+   * 4. Optionally runs parallel distinct outline + full-paper writing immediately.
+   */
+  const handleLaunchCohortClones = async (config: CohortCloneLaunchConfig) => {
+    if (!activeSession) return;
+    if (config.autoRunImmediately && !hasEffectiveApiKey) {
+      setShowCohortCloneModal(false);
+      setShowApiModal(true);
+      onToast('Vui lòng cấu hình API Key trước khi chạy viết tự động cả nhóm.');
+      return;
+    }
+
+    setLaunchingCohort(true);
+    setCohortLaunchStatus(
+      `Đang quét bể nguồn học thuật lớn (CrossRef DOI${
+        effectiveWriter.isHybrid ? ' + Perplexity Web' : ''
+      }) cho cả nhóm...`
+    );
+
+    const signal = getFreshAiSignal();
+    try {
+      const masterPoolPromise = fetchCohortMasterCrossrefPool(
+        activeSession,
+        signal
+      );
+
+      let sharedWebContext = '';
+      const existingRaw = (activeSession.researchedSources || '').trim();
+      const perpMarker = '=== PERPLEXITY REAL-TIME WEB RESEARCH';
+      const existingSplit = existingRaw.indexOf(perpMarker);
+      if (existingSplit !== -1) {
+        sharedWebContext = existingRaw.slice(existingSplit).trim();
+      } else if (effectiveWriter.isHybrid && hasPerplexityKey) {
+        try {
+          const fullDossier = await researchSourcesWithPerplexity(
+            activeSession,
+            effectiveWriter.researchProfile,
+            signal
+          );
+          const idx = fullDossier.indexOf(perpMarker);
+          sharedWebContext =
+            idx !== -1 ? fullDossier.slice(idx).trim() : fullDossier;
+        } catch {
+          // Non-fatal: CrossRef pool still powers verified citations
+        }
+      }
+
+      const masterPool = await masterPoolPromise;
+      const cohortGroupId = `cohort_${Date.now().toString(36)}`;
+      const topicKey = (activeSession.topic || activeSession.title || '').trim();
+      const nowMs = Date.now();
+      const isViPaper = activeSession.writingLanguage === 'Vietnamese';
+
+      const createdClones: WriterSession[] = config.slots.map((slot, idx) => {
+        const cloneNumber = idx + 1;
+        const archetype =
+          COHORT_STRUCTURAL_ARCHETYPES[
+            idx % COHORT_STRUCTURAL_ARCHETYPES.length
+          ];
+        const { dossier, sampledCount } = buildRandomSampledDossierForClone(
+          masterPool,
+          activeSession.citationStyle,
+          config.sourcesPerPaper,
+          sharedWebContext
+        );
+
+        const jitteredWords = config.diversifyTypography
+          ? Math.max(
+              300,
+              Math.round(
+                (activeSession.targetWordCount * archetype.wordJitterRatio) / 25
+              ) * 25
+            )
+          : activeSession.targetWordCount;
+
+        const baseOutline = parseAiOutlineJson(
+          '',
+          jitteredWords,
+          activeSession.citationStyle
+        ).map((sec, sIdx) => ({
+          ...sec,
+          id: `sec_${nowMs}_${cloneNumber}_${sIdx}`,
+        }));
+
+        const linkedOrderObj = slot.linkedOrderCode
+          ? orders.find((o) => o.orderCode === slot.linkedOrderCode)
+          : undefined;
+        const resolvedStudentName =
+          slot.studentName.trim() || linkedOrderObj?.clientDisplayName || '';
+        const resolvedStudentId = slot.studentId.trim();
+
+        const baseCover =
+          activeSession.format.coverPage || DEFAULT_COVER_PAGE_CONFIG;
+        const nextCover: CoverPageConfig = {
+          ...baseCover,
+          enabled: Boolean(
+            baseCover.enabled || resolvedStudentName || resolvedStudentId
+          ),
+          templateId: config.diversifyTypography
+            ? archetype.coverTemplate
+            : baseCover.templateId,
+          studentName: resolvedStudentName || baseCover.studentName,
+          studentId: resolvedStudentId || baseCover.studentId,
+        };
+
+        const nextFormat: DocumentFormatConfig =
+          config.diversifyTypography && !isViPaper
+            ? {
+                ...activeSession.format,
+                fontFamily: archetype.fontEn,
+                fontSizePt: archetype.fontSizeEn,
+                lineSpacing: archetype.lineSpacingEn,
+                textAlign: archetype.alignEn,
+                coverPage: nextCover,
+              }
+            : {
+                ...activeSession.format,
+                coverPage: nextCover,
+              };
+
+        const shortTopic = (activeSession.topic || activeSession.subject || 'Nhóm')
+          .trim()
+          .slice(0, 26);
+        const tabTitle = slot.linkedOrderCode
+          ? `${slot.linkedOrderCode} · Bản #${cloneNumber}`
+          : resolvedStudentName
+          ? `Bản #${cloneNumber} (${resolvedStudentName}) · ${shortTopic}`
+          : `Bản #${cloneNumber}/${config.cloneCount} · ${shortTopic}`;
+
+        return {
+          ...activeSession,
+          id: `ws_cohort_${nowMs}_${cloneNumber}_${Math.random()
+            .toString(36)
+            .slice(2, 6)}`,
+          title: tabTitle,
+          linkedOrderCode: slot.linkedOrderCode,
+          targetWordCount: jitteredWords,
+          format: nextFormat,
+          outline: baseOutline,
+          activeSectionId: baseOutline[0]?.id || '',
+          fullPaperOverride: '',
+          batchStatus: config.autoRunImmediately ? 'queued' : 'idle',
+          batchErrorMsg: undefined,
+          researchedSources: dossier || activeSession.researchedSources || '',
+          researchedSourcesTopic: topicKey,
+          cohortMeta: {
+            cohortGroupId,
+            cloneIndex: cloneNumber,
+            cohortSize: config.cloneCount,
+            archetypeId: archetype.id,
+            archetypeLabel: archetype.label,
+            customCaseFocus: slot.customCaseFocus.trim() || undefined,
+            sampledSourceCount: sampledCount,
+            poolTotalCount: masterPool.length,
+            needsDistinctOutline: true,
+          },
+          historyStack: [],
+          historyIndex: -1,
+          updatedAt: new Date(nowMs + idx).toISOString(),
+        };
+      });
+
+      const mergedSessions = [...sessionsRef.current, ...createdClones];
+      sessionsRef.current = mergedSessions;
+      setSessions(mergedSessions);
+      setActiveSessionId(createdClones[0].id);
+      setLeftTab('outline');
+      setShowCohortCloneModal(false);
+      setLaunchingCohort(false);
+      setCohortLaunchStatus('');
+
+      onToast(
+        masterPool.length > 0
+          ? `Đã tạo ${createdClones.length} bản nhân bản độc lập (bốc ngẫu nhiên ${config.sourcesPerPaper} nguồn/bài từ bể ${masterPool.length} nguồn DOI thật)!`
+          : `Đã tạo ${createdClones.length} bản nhân bản độc lập với cấu trúc dàn ý riêng!`
+      );
+
+      if (config.autoRunImmediately) {
+        const cloneIds = createdClones.map((c) => c.id);
+        cloneIds.forEach((id) => pausedSessionIdsRef.current.delete(id));
+        const queue = [...cloneIds];
+        const workerCount = Math.min(concurrencyLimit, queue.length);
+        const runCloneWorker = async () => {
+          while (queue.length > 0) {
+            const nextId = queue.shift();
+            if (!nextId || pausedSessionIdsRef.current.has(nextId)) continue;
+            try {
+              await runSinglePaperPipeline(nextId, true);
+            } catch {
+              // Recorded per session tab
+            }
+          }
+        };
+        await Promise.allSettled(
+          Array.from({ length: workerCount }, () => runCloneWorker())
+        );
+        onToast(
+          `Đã viết xong toàn bộ ${createdClones.length} bài nhóm cùng lớp! Bấm "Soi trùng chéo" để kiểm tra.`
+        );
+      }
+    } catch (err) {
+      setLaunchingCohort(false);
+      setCohortLaunchStatus('');
+      onToast(
+        err instanceof Error
+          ? err.message
+          : 'Không thể khởi tạo nhóm nhân bản lúc này.'
+      );
+    }
+  };
+
+  /**
+   * Rewrites ONLY the colliding sentences in `pair.sessionIdB` so pairwise contiguous
+   * 5-word overlap between two classmates drops cleanly below < 1% while preserving citations.
+   */
+  const scrubSingleCohortPair = async (pair: CohortPairSimilarity) => {
+    const sessB = sessionsRef.current.find((s) => s.id === pair.sessionIdB);
+    if (!sessB || pair.collisions.length === 0) return;
+
+    const bySectionB = new Map<string, string[]>();
+    for (const col of pair.collisions) {
+      const list = bySectionB.get(col.sectionIdB) || [];
+      list.push(
+        `- Overlapping phrase ("${col.sharedPhrase}") inside sentence: "${col.sentenceB}"`
+      );
+      bySectionB.set(col.sectionIdB, list);
+    }
+
+    const signal = getFreshAiSignal();
+    for (const [secIdB, collisionLines] of bySectionB.entries()) {
+      const latestB = sessionsRef.current.find((s) => s.id === pair.sessionIdB);
+      const secObj = latestB?.outline.find((sec) => sec.id === secIdB);
+      if (!latestB || !secObj || !secObj.content.trim()) continue;
+
+      const customPrompt =
+        latestB.writingLanguage === 'Vietnamese'
+          ? `Chỉ viết lại các câu bị trùng cụm từ với bài bạn cùng lớp dưới đây bằng cấu trúc câu và từ vựng học thuật mới hoàn toàn (tuyệt đối không còn bất kỳ chuỗi 5 từ liên tiếp nào giống cụm bị đánh dấu), giữ nguyên 100% các trích dẫn (Tác giả, Năm), số liệu và độ dài đoạn văn:\n${collisionLines.join(
+              '\n'
+            )}`
+          : `Rewrite ONLY the sentences containing cross-student overlapping phrases listed below using fresh clause structure and distinct academic phrasing (eliminate every 5+ word contiguous match with the flagged phrases), while preserving 100% of existing in-text citations (Author, Year), numbers, and section length:\n${collisionLines.join(
+              '\n'
+            )}`;
+
+      const res = await refineTextWithAi(
+        latestB,
+        secObj.title,
+        secObj.content,
+        'rewrite_academic',
+        customPrompt,
+        skillsRef.current,
+        activeProfile,
+        effectiveWriter.enableWebSearch,
+        signal
+      );
+
+      if (res.content.trim()) {
+        mutateSessionById(
+          pair.sessionIdB,
+          (s) => ({
+            ...s,
+            outline: s.outline.map((sec) =>
+              sec.id === secIdB ? { ...sec, content: res.content } : sec
+            ),
+          }),
+          true
+        );
+      }
+    }
+  };
+
+  const handleScrubPairCollisions = async (pair: CohortPairSimilarity) => {
+    if (!hasEffectiveApiKey) {
+      setShowCohortSimilarityModal(false);
+      setShowApiModal(true);
+      onToast('Vui lòng cấu hình API Key trước khi khử câu trùng bằng AI.');
+      return;
+    }
+    const key = `${pair.sessionIdA}__${pair.sessionIdB}`;
+    setScrubbingPairKey(key);
+    try {
+      await scrubSingleCohortPair(pair);
+      onToast('Đã viết lại khử sạch các câu trùng chéo của cặp bài này!');
+    } catch (err) {
+      onToast(
+        err instanceof Error ? err.message : 'Lỗi khi khử câu trùng chéo.'
+      );
+    } finally {
+      setScrubbingPairKey(null);
+    }
+  };
+
+  const handleScrubAllRiskyPairs = async (pairs: CohortPairSimilarity[]) => {
+    if (!hasEffectiveApiKey) {
+      setShowCohortSimilarityModal(false);
+      setShowApiModal(true);
+      onToast('Vui lòng cấu hình API Key trước khi khử câu trùng bằng AI.');
+      return;
+    }
+    setScrubbingPairKey('__ALL__');
+    try {
+      for (const p of pairs) {
+        await scrubSingleCohortPair(p);
+      }
+      onToast(`Đã khử sạch trùng lặp chéo cho toàn bộ ${pairs.length} cặp bài!`);
+    } catch (err) {
+      onToast(
+        err instanceof Error ? err.message : 'Lỗi khi khử câu trùng hàng loạt.'
+      );
+    } finally {
+      setScrubbingPairKey(null);
+    }
   };
 
   const handlePauseAllPapers = () => {
@@ -2864,6 +3244,8 @@ export function AiWriterStudioView({
         onSelectSession={setActiveSessionId}
         onAddNewBlank={handleCreateNewSession}
         onImportMultipleOrders={handleImportMultipleOrders}
+        onOpenCohortCloner={() => setShowCohortCloneModal(true)}
+        onOpenCohortSimilarity={() => setShowCohortSimilarityModal(true)}
         onCloseSession={handleDeleteSession}
         onRunAllParallel={() => void handleRunAllPapersParallel()}
         onPauseAll={handlePauseAllPapers}
@@ -3220,6 +3602,32 @@ export function AiWriterStudioView({
         }}
         onClose={() => setShowDeliverModal(false)}
         onToast={onToast}
+      />
+
+      <WriterCohortCloneModal
+        isOpen={showCohortCloneModal}
+        baseSession={activeSession}
+        orders={orders}
+        launching={launchingCohort}
+        launchStatusLabel={cohortLaunchStatus}
+        onLaunchCohort={(cfg) => void handleLaunchCohortClones(cfg)}
+        onClose={() => setShowCohortCloneModal(false)}
+      />
+
+      <WriterCohortSimilarityModal
+        isOpen={showCohortSimilarityModal}
+        sessions={sessions}
+        scrubbingPairKey={scrubbingPairKey}
+        exportingAll={exportingAllDocx}
+        onScrubPairCollisions={handleScrubPairCollisions}
+        onScrubAllRiskyPairs={handleScrubAllRiskyPairs}
+        onExportAllDocx={() => void handleExportAllDraftedDocx()}
+        onJumpToSessionSection={(sid, secId) => {
+          setActiveSessionId(sid);
+          setLeftTab('outline');
+          mutateSessionById(sid, (s) => ({ ...s, activeSectionId: secId }));
+        }}
+        onClose={() => setShowCohortSimilarityModal(false)}
       />
 
       {showResetConfirmModal &&

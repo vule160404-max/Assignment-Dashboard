@@ -305,6 +305,18 @@ export type WriterDocumentType =
   | 'vn_report'
   | 'vn_research';
 
+export interface CohortCloneMeta {
+  cohortGroupId: string;
+  cloneIndex: number;
+  cohortSize: number;
+  archetypeId: string;
+  archetypeLabel: string;
+  customCaseFocus?: string;
+  sampledSourceCount: number;
+  poolTotalCount: number;
+  needsDistinctOutline?: boolean;
+}
+
 export interface WriterSession {
   id: string;
   title: string;
@@ -329,6 +341,7 @@ export interface WriterSession {
   batchErrorMsg?: string;
   researchedSources?: string;
   researchedSourcesTopic?: string;
+  cohortMeta?: CohortCloneMeta;
   historyStack: string[];
   historyIndex: number;
   updatedAt: string;
