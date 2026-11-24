@@ -609,11 +609,26 @@ export function applyDeterministicTurnitinBreaker(
     modificationsCount += 1;
     return ' ';
   });
-  // Normalize tight em-dashes "word—word" -> "word — word"
-  cleanedGlobal = cleanedGlobal.replace(/([A-Za-zÀ-ỹ0-9])—([A-Za-zÀ-ỹ0-9])/g, () => {
-    modificationsCount += 1;
-    return '$1 — $2';
-  });
+  // Self-heal any "$1 — $2" artifact from earlier regex callback & normalize tight em-dashes "word—word" -> "word — word"
+  cleanedGlobal = cleanedGlobal.replace(
+    /\$1\s*[—–-]\s*\$2/g,
+    ' — '
+  );
+  cleanedGlobal = cleanedGlobal.replace(
+    /([A-Za-zÀ-ỹ0-9])—([A-Za-zÀ-ỹ0-9])/g,
+    (_, leftChar: string, rightChar: string) => {
+      modificationsCount += 1;
+      return `${leftChar} — ${rightChar}`;
+    }
+  );
+  // Join accidental subordinate sentence fragments like ". Because it ties..." -> ", because it ties..."
+  cleanedGlobal = cleanedGlobal.replace(
+    /\.\s+((?:Because|Whereas)\s+[^.!?,\n]{10,95}\.)/g,
+    (_, frag: string) => {
+      modificationsCount += 1;
+      return `, ${frag.charAt(0).toLowerCase()}${frag.slice(1)}`;
+    }
+  );
 
   const lines = cleanedGlobal.split(/\r?\n/);
   const processedLines = lines.map((line) => {
@@ -966,18 +981,20 @@ export async function humanizeSectionForTurnitinWithAi(opts: {
       : `You are an Academic Prose Editor specialized in defeating Turnitin AIW-2 (Blue) and AIR-1 (Purple Paraphrase) detectors across 250-word sliding windows. Rewrite 100% of the tagged [[PARA_X]] paragraphs to achieve <12% AI detection while preserving 100% of citations, statistics, and scholarly arguments.`;
 
     const fullWindowUserPrompt = isVi
-      ? `Viết lại TOÀN BỘ các đoạn văn dưới đây theo 4 quy tắc chống cửa sổ trượt 250 từ của Turnitin AIW-2 & AIR-1:
-1. SÓNG NHỊP CÂU BẤT ĐỐI XỨNG XUYÊN SUỐT (Burstiness CV > 48%): Trong mỗi đoạn và giữa ranh giới 2 đoạn liền kề, đan xen câu nhận định cực ngắn, sắc gọn (6-10 từ) ngay cạnh câu phân tích đa mệnh đề dài (30-42 từ nối bằng dấu chấm phẩy ";"). Tuyệt đối không để các câu dài đều nhau 17-24 từ.
-2. CHỐNG TURNITIN AIR-1 (TÔ TÍM): Cấm dùng câu tự tóm tắt ở cuối đoạn ("Như vậy,", "Tóm lại,", "Do đó, điều này khẳng định..."). Kết thúc mỗi đoạn ngay tại dữ kiện hoặc trích dẫn thực nghiệm.
-3. CẤM MỆNH ĐỀ ĐUÔI RẬP KHUÔN & TỪ NỐI AI: Cấm dùng ", góp phần...", ", tạo tiền đề...", "Hơn nữa,", "Thêm vào đó,", "Ngoài ra,", "đóng vai trò then chốt". Đổi danh từ trừu tượng thành động từ chủ động học thuật.
-4. KHÓA BẤT BIẾN 100%: Giữ nguyên từng ký tự mọi trích dẫn (${blockCitations || 'mọi trích dẫn có trong bài'}) và con số (${blockStats || 'mọi số liệu'}). Giữ nguyên thẻ [[PARA_X]] ở đầu mỗi đoạn.
+      ? `Viết lại TOÀN BỘ các đoạn văn dưới đây theo 5 quy tắc chống cửa sổ trượt 250 từ của Turnitin AIW-2 & AIR-1:
+1. BIẾN THIÊN ĐỘ DÀI CÂU HỌC THUẬT TỰ NHIÊN (Burstiness CV > 45%): Phối hợp tự nhiên giữa câu học thuật gọn (10-14 từ, có đầy đủ Chủ ngữ - Vị ngữ chuyên ngành), câu trung bình (18-22 từ) và câu phân tích đa mệnh đề dài (30-40 từ nối bằng dấu chấm phẩy ";" hoặc mệnh đề tương phản). vị trí câu ngắn phải đảo linh hoạt (lúc ở giữa đoạn, lúc ở cuối đoạn), TUYỆT ĐỐI KHÔNG lặp lại kiểu mở đầu mỗi đoạn bằng 1 câu ngắn 4-6 từ kiểu báo chí.
+2. CẤM CÂU CỤT (NO SENTENCE FRAGMENTS): Không bao giờ tách mệnh đề phụ bắt đầu bằng "Bởi vì...", "Mặc dù...", "Trong khi..." thành một câu đứng riêng lẻ thiếu mệnh đề chính.
+3. CHỐNG TURNITIN AIR-1 (TÔ TÍM): Cấm dùng câu tự tóm tắt ở cuối đoạn ("Như vậy,", "Tóm lại,", "Do đó, điều này khẳng định..."). Kết thúc mỗi đoạn ngay tại dữ kiện hoặc trích dẫn thực nghiệm.
+4. CẤM MỆNH ĐỀ ĐUÔI RẬP KHUÔN & TỪ NỐI AI: Cấm dùng ", góp phần...", ", tạo tiền đề...", "Hơn nữa,", "Thêm vào đó,", "Ngoài ra,", "đóng vai trò then chốt".
+5. KHÓA BẤT BIẾN 100%: Giữ nguyên từng ký tự mọi trích dẫn (${blockCitations || 'mọi trích dẫn có trong bài'}) và con số (${blockStats || 'mọi số liệu'}). Giữ nguyên thẻ [[PARA_X]] ở đầu mỗi đoạn.
 
 ${taggedBlocks}`
-      : `Rewrite ALL tagged paragraphs below following 4 strict anti-Turnitin 250-word sliding-window rules (AIW-2 & AIR-1):
-1. CONTINUOUS ASYMMETRIC SENTENCE WAVE (Burstiness CV > 48%): Within every paragraph and across paragraph boundaries, alternate crisp 6-10 word analytical assertions with 30-42 word multi-clause empirical sentences joined by a semicolon ";". Never allow uniform 17-24 word chains.
-2. DEFEAT TURNITIN AIR-1 (PURPLE PARAPHRASE FLAG): Never end any paragraph with a formulaic mini-conclusion ("Ultimately, this highlights...", "Therefore, it is clear..."). End paragraphs directly on concrete empirical evidence or citations.
-3. BAN PARTICIPIAL "-ING" TAILS & AI TRANSITIONS: Eliminate trailing ", highlighting...", ", thereby fostering...", "Furthermore,", "Moreover,", "In addition,", "plays a pivotal role". Replace stacked nominalizations with concrete active scholarly verbs.
-4. 100% FROZEN CITATIONS & STATS: Preserve every citation (${blockCitations || 'all existing citations'}) and number (${blockStats || 'all statistics'}) verbatim. Keep the exact [[PARA_X]] tag at the start of each paragraph.
+      : `Rewrite ALL tagged paragraphs below following 5 strict anti-Turnitin 250-word sliding-window rules (AIW-2 & AIR-1):
+1. NATURAL ACADEMIC SENTENCE VARIATION (Burstiness CV > 45%): Blend concise scholarly sentences (10-14 words with complete academic subject-verb structure), medium analytical sentences (18-23 words), and complex multi-clause empirical sentences (30-40 words joined by a semicolon ";" or subordinate contrast). Vary where shorter sentences appear (mid-paragraph or end-paragraph) — NEVER start multiple paragraphs with dramatic 4-6 word journalistic one-liners (e.g. NEVER write "The verdict is mixed.", "The evidence keeps piling up.", "The choice is defensible.").
+2. ZERO SENTENCE FRAGMENTS: Never leave a subordinate clause starting with "Because...", "Although...", "Whereas...", or "Which..." standing alone as a separate sentence; always attach it to its main clause with a comma.
+3. DEFEAT TURNITIN AIR-1 (PURPLE PARAPHRASE FLAG): Never end any paragraph with a formulaic mini-conclusion ("Ultimately, this highlights...", "Therefore, it is clear..."). End paragraphs directly on concrete empirical evidence or citations.
+4. BAN PARTICIPIAL "-ING" TAILS & AI TRANSITIONS: Eliminate trailing ", highlighting...", ", thereby fostering...", "Furthermore,", "Moreover,", "In addition,", "plays a pivotal role".
+5. 100% FROZEN CITATIONS & STATS: Preserve every citation (${blockCitations || 'all existing citations'}) and number (${blockStats || 'all statistics'}) verbatim. Keep the exact [[PARA_X]] tag at the start of each paragraph.
 
 ${taggedBlocks}`;
 
