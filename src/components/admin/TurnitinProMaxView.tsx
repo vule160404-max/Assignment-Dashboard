@@ -141,11 +141,21 @@ function splitPastedTextIntoUnifiedSections(
 
   for (const para of paragraphs) {
     const words = countWords(para);
+    const isTocLine = /(?:\.{2,}|\t|\s{2,})\d{1,3}$/.test(para) || (words <= 15 && /\s+\d{1,3}$/.test(para));
+    if (isTocLine && sections.length === 0 && buffer.length === 0) {
+      continue;
+    }
     const looksLikeHeading =
       words <= 18 &&
       (/^(?:chương|phần|mục|chapter|section|\d+(?:\.\d+)*[.\s])/i.test(para) ||
         !/[.!?]$/.test(para));
-    if (looksLikeHeading && isReferencesSectionTitle(para)) {
+    if (
+      looksLikeHeading &&
+      words <= 6 &&
+      !isTocLine &&
+      (sections.length > 0 || buffer.length > 0) &&
+      isReferencesSectionTitle(para)
+    ) {
       flush();
       break;
     }
@@ -321,6 +331,28 @@ export function TurnitinProMaxView({
     }
     try {
       const parsed = await parseDocxFile(file);
+      const nonEmptyParas = parsed.paragraphs.filter((p) => !p.isEmpty);
+
+      // Find the LAST standalone References heading in the final 35% of the document
+      // (so a "References ... 12" line inside the Table of Contents at the top NEVER aborts parsing!)
+      let terminalRefStartIndex = -1;
+      const minTailPosition = Math.floor(nonEmptyParas.length * 0.55);
+      for (let i = nonEmptyParas.length - 1; i >= minTailPosition; i -= 1) {
+        const txt = nonEmptyParas[i].text.trim();
+        const isTocEntry = /(?:\.{2,}|\t|\s{2,})\d{1,3}$/.test(txt) || /\s+\d{1,3}$/.test(txt);
+        const wc = countWords(txt);
+        if (
+          !isTocEntry &&
+          wc >= 1 &&
+          wc <= 6 &&
+          !/[.!?]$/.test(txt) &&
+          isReferencesSectionTitle(txt)
+        ) {
+          terminalRefStartIndex = nonEmptyParas[i].index;
+          break;
+        }
+      }
+
       const groups: UnifiedTurnitinSection[] = [];
       let currentTitle = 'Phần 1. Mở đầu & Nội dung';
       let currentIndices: number[] = [];
@@ -330,7 +362,7 @@ export function TurnitinProMaxView({
         const text = currentIndices
           .map((idx) => parsed.paragraphs[idx].text)
           .join('\n\n');
-        if (countWords(text) >= 15) {
+        if (countWords(text) >= 8) {
           groups.push({
             id: `docx_sec_${groups.length + 1}`,
             title: currentTitle,
@@ -342,18 +374,40 @@ export function TurnitinProMaxView({
         currentIndices = [];
       };
 
+      let insideTocBlock = false;
       for (const p of parsed.paragraphs) {
         if (p.isEmpty) continue;
-        if (isReferencesSectionTitle(p.text)) {
+        const txt = p.text.trim();
+
+        // Stop only when reaching the verified terminal References section at the end of the paper
+        if (terminalRefStartIndex !== -1 && p.index >= terminalRefStartIndex) {
           flushGroup();
           break;
         }
-        if (p.isHeading && countWords(p.text) <= 22) {
-          flushGroup();
-          currentTitle = p.text.trim();
+
+        // Skip Table of Contents header & dotted/numbered TOC lines
+        if (/^(?:mục lục|table of contents)$/i.test(txt)) {
+          insideTocBlock = true;
           continue;
         }
-        if (countWords(p.text) >= 10) {
+        if (
+          insideTocBlock &&
+          countWords(txt) <= 18 &&
+          /\s+\d{1,3}$/.test(txt)
+        ) {
+          continue;
+        }
+        if (countWords(txt) >= 22) {
+          insideTocBlock = false;
+        }
+
+        if (p.isHeading && countWords(txt) <= 20 && !/\s+\d{1,3}$/.test(txt)) {
+          flushGroup();
+          currentTitle = txt;
+          continue;
+        }
+
+        if (countWords(txt) >= 6) {
           currentIndices.push(p.index);
           const runningWords = currentIndices.reduce(
             (sum, i) => sum + countWords(parsed.paragraphs[i].text),
@@ -367,6 +421,19 @@ export function TurnitinProMaxView({
       }
       flushGroup();
 
+      // Fallback: if document consists of short lines/table cells (< 6 words each), group all non-empty paragraphs so 0 sections never happens
+      if (groups.length === 0 && nonEmptyParas.length > 0) {
+        const allIndices = nonEmptyParas.map((p) => p.index);
+        const allText = nonEmptyParas.map((p) => p.text).join('\n\n');
+        groups.push({
+          id: 'docx_sec_1',
+          title: file.name.replace(/\.docx$/i, ''),
+          originalContent: allText,
+          content: allText,
+          docxParagraphIndices: allIndices,
+        });
+      }
+
       setOrigin('docx_file');
       setParsedDocx(parsed);
       setUnifiedSections(groups);
@@ -376,7 +443,7 @@ export function TurnitinProMaxView({
       setExecutionLogs([]);
       setShowPasteBox(false);
       onToast(
-        `Đã nạp file "${file.name}" (${groups.length} mục nội dung · Đã khóa Bìa, Mục lục & Tài liệu tham khảo).`
+        `Đã nạp file "${file.name}" (${groups.length} mục nội dung · Sẵn sàng bấm Chạy Vượt Turnitin ProMax!).`
       );
     } catch (err) {
       onToast(
