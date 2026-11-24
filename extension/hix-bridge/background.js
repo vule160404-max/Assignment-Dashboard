@@ -5,6 +5,44 @@ const HIX_URL_PATTERNS = [
   'https://*.hix.ai/*',
 ];
 
+const APP_URL_PATTERNS = [
+  'http://localhost:3000/*',
+  'http://127.0.0.1:3000/*',
+  'https://assigntrack.site/*',
+  'https://*.assigntrack.site/*',
+  'https://*.run.app/*',
+  'https://*.vercel.app/*',
+  'https://*.pages.dev/*',
+  'https://*.web.app/*',
+  'https://*.firebaseapp.com/*',
+];
+
+async function autoInjectExistingTabs() {
+  try {
+    const appTabs = await chrome.tabs.query({ url: APP_URL_PATTERNS });
+    for (const tab of appTabs || []) {
+      if (typeof tab.id === 'number' && !tab.discarded) {
+        chrome.scripting
+          .executeScript({
+            target: { tabId: tab.id },
+            files: ['bridge.js'],
+          })
+          .catch(() => undefined);
+      }
+    }
+  } catch (_err) {
+    // Ignore tab query errors
+  }
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  autoInjectExistingTabs();
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  autoInjectExistingTabs();
+});
+
 /** Track which HIX tab currently runs which jobId with timestamp TTL (prevents stale locks on reload) */
 const busyTabJobs = new Map();
 const jobToTabMap = new Map();

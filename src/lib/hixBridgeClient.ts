@@ -1,6 +1,6 @@
 export type HixBypassMode = 'Fast' | 'Balanced' | 'Aggressive';
 
-export const EXPECTED_EXTENSION_VERSION = '1.3.0';
+export const EXPECTED_EXTENSION_VERSION = '1.3.1';
 
 export interface HixTabInfo {
   tabId: number;

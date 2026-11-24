@@ -1,14 +1,23 @@
 {
   "manifest_version": 3,
   "name": "AssignTrack HIX Bypass Bridge",
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Kết nối an toàn & chạy song song nhiều tab hixbypass.com ở chế độ nền không cần chuyển tab.",
   "permissions": ["tabs", "scripting"],
   "host_permissions": [
     "https://hixbypass.com/*",
     "https://*.hixbypass.com/*",
     "https://bypass.hix.ai/*",
-    "https://*.hix.ai/*"
+    "https://*.hix.ai/*",
+    "http://localhost:3000/*",
+    "http://127.0.0.1:3000/*",
+    "https://assigntrack.site/*",
+    "https://*.assigntrack.site/*",
+    "https://*.run.app/*",
+    "https://*.vercel.app/*",
+    "https://*.pages.dev/*",
+    "https://*.web.app/*",
+    "https://*.firebaseapp.com/*"
   ],
   "background": {
     "service_worker": "background.js"
@@ -22,6 +31,8 @@
       "matches": [
         "http://localhost:3000/*",
         "http://127.0.0.1:3000/*",
+        "https://assigntrack.site/*",
+        "https://*.assigntrack.site/*",
         "https://*.run.app/*",
         "https://*.vercel.app/*",
         "https://*.pages.dev/*",
