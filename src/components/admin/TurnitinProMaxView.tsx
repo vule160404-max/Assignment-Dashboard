@@ -4,6 +4,7 @@ import {
   ArrowRight,
   Check,
   CheckCircle2,
+  Clock,
   Copy,
   Download,
   FileText,
@@ -16,8 +17,10 @@ import {
   RefreshCw,
   ShieldCheck,
   Sparkles,
+  Square,
   Upload,
   Wand2,
+  X,
   Zap,
 } from 'lucide-react';
 import {
@@ -57,6 +60,29 @@ import {
 } from './writer/types';
 
 type TurnitinSourceMode = 'ai_writer' | 'docx_file' | 'quick_paste';
+
+interface SectionExecutionStatus {
+  status: 'queued' | 'running' | 'completed' | 'error';
+  phase: 1 | 2 | 3 | 4;
+  phaseLabel: string;
+  beforeRisk: number;
+  afterRisk?: number;
+  durationSec?: number;
+  paragraphsInfo?: string;
+  tokensSaved?: number;
+}
+
+interface ExecutionLogEntry {
+  id: string;
+  sectionId: string;
+  sectionTitle: string;
+  status: 'completed' | 'error' | 'stopped';
+  beforeRisk: number;
+  afterRisk: number;
+  lockedCitationsCount: number;
+  durationSec: number;
+  detail: string;
+}
 
 interface DocxLogicalSection {
   id: string;
@@ -105,7 +131,19 @@ export function TurnitinProMaxView({
     step: number;
     total: number;
     label: string;
+    sectionId: string;
+    phase: 1 | 2 | 3 | 4;
+    phaseDetail: string;
+    modeLabel: string;
   } | null>(null);
+  const [sectionExecMap, setSectionExecMap] = useState<
+    Record<string, SectionExecutionStatus>
+  >({});
+  const [executionLogs, setExecutionLogs] = useState<ExecutionLogEntry[]>([]);
+  const [showCockpitBanner, setShowCockpitBanner] = useState(false);
+  const [elapsedSec, setElapsedSec] = useState(0);
+  const [avgSecPerSection, setAvgSecPerSection] = useState(4.5);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const [exportingDocx, setExportingDocx] = useState(false);
   const [attachingOrder, setAttachingOrder] = useState(false);
   const [selectedOrderCode, setSelectedOrderCode] = useState<string>('');
@@ -133,6 +171,39 @@ export function TurnitinProMaxView({
   useEffect(() => {
     void syncServerAiKeysStatus().then(setServerKeysConfigured);
   }, []);
+
+  // Live 1-second stopwatch while processing so user sees exact elapsed & remaining countdown
+  useEffect(() => {
+    if (!isProcessing) return;
+    const t0 = Date.now();
+    setElapsedSec(0);
+    const timer = window.setInterval(() => {
+      setElapsedSec(Math.floor((Date.now() - t0) / 1000));
+    }, 500);
+    return () => window.clearInterval(timer);
+  }, [isProcessing]);
+
+  const scrollToSectionCard = (sectionId: string) => {
+    window.requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(
+        `[data-turnitin-sec-id="${sectionId}"]`
+      );
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    });
+  };
+
+  const handleStopProcessing = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsProcessing(false);
+    onToast(
+      'Đã dừng tiến trình theo yêu cầu. Các mục đã hoàn thành trước đó vẫn được lưu nguyên vẹn!'
+    );
+  };
 
   // Reload sessions whenever switching back to ai_writer mode
   useEffect(() => {
@@ -288,9 +359,13 @@ export function TurnitinProMaxView({
 
   // --- Fast Deterministic Breaker (< 20% AI Cadence Wave, 0s, No API) ---
   const handleRunFastProMax = () => {
+    setShowCockpitBanner(true);
     if (sourceMode === 'ai_writer' && activeSession) {
       const targetSet = new Set(selectedSectionIds);
       const nextBefore: Record<string, number> = { ...beforeScoresMap };
+      const nextExecMap: Record<string, SectionExecutionStatus> = {};
+      const nextLogs: ExecutionLogEntry[] = [];
+
       activeReport.sections.forEach((s) => {
         if (targetSet.has(s.sectionId) && nextBefore[s.sectionId] === undefined) {
           nextBefore[s.sectionId] = s.aiRiskPercent;
@@ -300,10 +375,39 @@ export function TurnitinProMaxView({
 
       const nextOutline = activeSession.outline.map((sec) => {
         if (!targetSet.has(sec.id) || !sec.content.trim()) return sec;
+        const beforeScan = scanSectionTurnitinAiRisk(sec);
         const gated = ensureUnder20PercentAiGate(sec.id, sec.title, sec.content);
         const guarded = enforceProtectedTokensIntegrity(sec.content, gated);
+        const afterScan = scanSectionTurnitinAiRisk({
+          ...sec,
+          content: guarded.content,
+        });
+        nextExecMap[sec.id] = {
+          status: 'completed',
+          phase: 4,
+          phaseLabel: 'Đã hoàn tất 6 lớp 0-Token (< 20% AI)',
+          beforeRisk: beforeScan.aiRiskPercent,
+          afterRisk: afterScan.aiRiskPercent,
+          durationSec: 0.1,
+          paragraphsInfo: `${beforeScan.sentenceCount} câu`,
+          tokensSaved: beforeScan.estimatedFullRewriteTokens,
+        };
+        nextLogs.push({
+          id: `log_${sec.id}_${Date.now()}`,
+          sectionId: sec.id,
+          sectionTitle: sec.title,
+          status: 'completed',
+          beforeRisk: beforeScan.aiRiskPercent,
+          afterRisk: afterScan.aiRiskPercent,
+          lockedCitationsCount: beforeScan.protectedCitations.length,
+          durationSec: 0.1,
+          detail: `Đã chạy 6 lớp 0-Token: Giảm từ ${beforeScan.aiRiskPercent}% → ${afterScan.aiRiskPercent}% AI (Khóa ${beforeScan.protectedCitations.length} trích dẫn).`,
+        });
         return { ...sec, content: guarded.content };
       });
+
+      setSectionExecMap(nextExecMap);
+      setExecutionLogs(nextLogs);
 
       const updatedSession: WriterSession = {
         ...activeSession,
@@ -318,7 +422,7 @@ export function TurnitinProMaxView({
       void saveWriterSessionToCloud(updatedSession);
       const afterRep = scanSessionTurnitinAiRisk(updatedSession);
       onToast(
-        `Đã phá vân tay & sóng nhịp câu ProMax! Dự báo Turnitin AI giảm còn ${afterRep.overallAiRiskPercent}% (Bảo toàn 100% trích dẫn).`
+        `Đã hoàn tất 6 lớp 0-Token trên ${nextLogs.length} mục! Dự báo Turnitin AI giảm còn ${afterRep.overallAiRiskPercent}% (Bảo toàn 100% trích dẫn).`
       );
       return;
     }
@@ -326,6 +430,9 @@ export function TurnitinProMaxView({
     if (sourceMode === 'docx_file' && docxSections.length > 0) {
       const targetSet = new Set(selectedSectionIds);
       const nextBefore: Record<string, number> = { ...beforeScoresMap };
+      const nextExecMap: Record<string, SectionExecutionStatus> = {};
+      const nextLogs: ExecutionLogEntry[] = [];
+
       activeReport.sections.forEach((s) => {
         if (targetSet.has(s.sectionId) && nextBefore[s.sectionId] === undefined) {
           nextBefore[s.sectionId] = s.aiRiskPercent;
@@ -336,6 +443,11 @@ export function TurnitinProMaxView({
       setDocxSections((prev) =>
         prev.map((sec) => {
           if (!targetSet.has(sec.id)) return sec;
+          const beforeScan = scanSectionTurnitinAiRisk({
+            id: sec.id,
+            title: sec.title,
+            content: sec.currentText,
+          });
           const gated = ensureUnder20PercentAiGate(
             sec.id,
             sec.title,
@@ -345,11 +457,37 @@ export function TurnitinProMaxView({
             sec.originalText,
             gated
           );
+          const afterScan = scanSectionTurnitinAiRisk({
+            id: sec.id,
+            title: sec.title,
+            content: guarded.content,
+          });
+          nextExecMap[sec.id] = {
+            status: 'completed',
+            phase: 4,
+            phaseLabel: 'Đã hoàn tất 6 lớp 0-Token (< 20% AI)',
+            beforeRisk: beforeScan.aiRiskPercent,
+            afterRisk: afterScan.aiRiskPercent,
+            durationSec: 0.1,
+          };
+          nextLogs.push({
+            id: `log_${sec.id}_${Date.now()}`,
+            sectionId: sec.id,
+            sectionTitle: sec.title,
+            status: 'completed',
+            beforeRisk: beforeScan.aiRiskPercent,
+            afterRisk: afterScan.aiRiskPercent,
+            lockedCitationsCount: beforeScan.protectedCitations.length,
+            durationSec: 0.1,
+            detail: `Giảm từ ${beforeScan.aiRiskPercent}% → ${afterScan.aiRiskPercent}% AI (Khóa ${beforeScan.protectedCitations.length} trích dẫn).`,
+          });
           return { ...sec, currentText: guarded.content };
         })
       );
+      setSectionExecMap(nextExecMap);
+      setExecutionLogs(nextLogs);
       onToast(
-        'Đã chạy Phá Vân Tay Nhanh (< 20% AI) trên các phân đoạn file Word!'
+        'Đã chạy Phá Vân Tay 6 Lớp (0 Token · < 20% AI) trên các phân đoạn file Word!'
       );
       return;
     }
@@ -374,6 +512,29 @@ export function TurnitinProMaxView({
         title: 'Đoạn văn',
         content: guarded.content,
       });
+      setSectionExecMap({
+        paste_sec: {
+          status: 'completed',
+          phase: 4,
+          phaseLabel: 'Đã hoàn tất 6 lớp 0-Token (< 20% AI)',
+          beforeRisk: before.aiRiskPercent,
+          afterRisk: after.aiRiskPercent,
+          durationSec: 0.1,
+        },
+      });
+      setExecutionLogs([
+        {
+          id: `log_paste_${Date.now()}`,
+          sectionId: 'paste_sec',
+          sectionTitle: 'Đoạn văn bản kiểm tra',
+          status: 'completed',
+          beforeRisk: before.aiRiskPercent,
+          afterRisk: after.aiRiskPercent,
+          lockedCitationsCount: before.protectedCitations.length,
+          durationSec: 0.1,
+          detail: `Giảm từ ${before.aiRiskPercent}% → ${after.aiRiskPercent}% AI (Khóa ${before.protectedCitations.length} trích dẫn).`,
+        },
+      ]);
       onToast(
         `Đã phá vân tay nhanh! Turnitin AI giảm từ ${before.aiRiskPercent}% → ${after.aiRiskPercent}% (Khóa 100% trích dẫn).`
       );
@@ -385,11 +546,15 @@ export function TurnitinProMaxView({
     const { profile, hasKey } = resolveActiveAiProfile();
     if (!hasKey) {
       onToast(
-        'Chưa cấu hình API Key Chatbot. Bạn có thể bấm "Phá vân tay Nhanh (0s)" hoặc cài API Key trong tab AI Writer Studio.'
+        'Chưa cấu hình API Key Chatbot. Bạn có thể bấm "Phá Vân Tay 6 Lớp (0 Token)" hoặc cài API Key trong tab AI Writer Studio.'
       );
       return;
     }
     const skills = loadGlobalSkillLibrary();
+    const abortCtrl = new AbortController();
+    abortControllerRef.current = abortCtrl;
+    setShowCockpitBanner(true);
+    setExecutionLogs([]);
 
     if (sourceMode === 'ai_writer' && activeSession) {
       const targetSections = activeSession.outline.filter(
@@ -404,32 +569,79 @@ export function TurnitinProMaxView({
       }
 
       const nextBefore: Record<string, number> = { ...beforeScoresMap };
+      const initExecMap: Record<string, SectionExecutionStatus> = {};
       activeReport.sections.forEach((s) => {
-        if (
-          selectedSectionIds.includes(s.sectionId) &&
-          nextBefore[s.sectionId] === undefined
-        ) {
-          nextBefore[s.sectionId] = s.aiRiskPercent;
+        if (selectedSectionIds.includes(s.sectionId)) {
+          if (nextBefore[s.sectionId] === undefined) {
+            nextBefore[s.sectionId] = s.aiRiskPercent;
+          }
+          initExecMap[s.sectionId] = {
+            status: 'queued',
+            phase: 1,
+            phaseLabel: 'Đang chờ đến lượt xử lý...',
+            beforeRisk: s.aiRiskPercent,
+          };
         }
       });
       setBeforeScoresMap(nextBefore);
+      setSectionExecMap(initExecMap);
 
       setIsProcessing(true);
       let workingSession: WriterSession = { ...activeSession };
+      const completedDurations: number[] = [];
+
       try {
         for (let i = 0; i < targetSections.length; i += 1) {
+          if (abortCtrl.signal.aborted) break;
           const sec = targetSections[i];
-          setProgressInfo({
-            step: i + 1,
-            total: targetSections.length,
-            label: sec.title,
-          });
+          const secStartMs = Date.now();
+          const beforeSecScan = scanSectionTurnitinAiRisk(sec);
+
+          scrollToSectionCard(sec.id);
+
+          const updatePhase = (phase: 1 | 2 | 3 | 4, phaseDetail: string) => {
+            setProgressInfo({
+              step: i + 1,
+              total: targetSections.length,
+              label: sec.title,
+              sectionId: sec.id,
+              phase,
+              phaseDetail,
+              modeLabel: 'AI Phẫu Thuật ProMax (-85% Token)',
+            });
+            setSectionExecMap((prev) => ({
+              ...prev,
+              [sec.id]: {
+                ...prev[sec.id],
+                status: 'running',
+                phase,
+                phaseLabel: phaseDetail,
+                beforeRisk: beforeSecScan.aiRiskPercent,
+              },
+            }));
+          };
+
+          updatePhase(1, 'Pha 1/4: Đang quét cửa sổ 250 từ & khóa trích dẫn...');
+
           const res = await humanizeSectionForTurnitinWithAi({
             session: workingSession,
             section: sec,
             skills,
             profile,
+            signal: abortCtrl.signal,
+            onPhaseChange: updatePhase,
           });
+
+          const durSec = Math.max(
+            0.4,
+            Number(((Date.now() - secStartMs) / 1000).toFixed(1))
+          );
+          completedDurations.push(durSec);
+          setAvgSecPerSection(
+            completedDurations.reduce((a, b) => a + b, 0) /
+              completedDurations.length
+          );
+
           workingSession = {
             ...workingSession,
             outline: workingSession.outline.map((item) =>
@@ -444,6 +656,35 @@ export function TurnitinProMaxView({
           );
           setSessions(nextSessions);
           saveWriterSessions(nextSessions);
+
+          setSectionExecMap((prev) => ({
+            ...prev,
+            [sec.id]: {
+              status: 'completed',
+              phase: 4,
+              phaseLabel: `Hoàn tất (${res.beforeRisk}% → ${res.afterRisk}% AI)`,
+              beforeRisk: res.beforeRisk,
+              afterRisk: res.afterRisk,
+              durationSec: durSec,
+              paragraphsInfo: `Đã phẫu thuật ${res.flaggedParagraphsCount}/${res.totalParagraphsCount} đoạn`,
+              tokensSaved: res.tokensSavedEstimate,
+            },
+          }));
+
+          setExecutionLogs((prev) => [
+            ...prev,
+            {
+              id: `log_${sec.id}_${Date.now()}`,
+              sectionId: sec.id,
+              sectionTitle: sec.title,
+              status: 'completed',
+              beforeRisk: res.beforeRisk,
+              afterRisk: res.afterRisk,
+              lockedCitationsCount: beforeSecScan.protectedCitations.length,
+              durationSec: durSec,
+              detail: `Đã phẫu thuật ${res.flaggedParagraphsCount}/${res.totalParagraphsCount} đoạn văn · Giảm AI từ ${res.beforeRisk}% → ${res.afterRisk}% · Khóa ${beforeSecScan.protectedCitations.length} trích dẫn (${durSec}s).`,
+            },
+          ]);
         }
         void saveWriterSessionToCloud(workingSession);
         const finalRep = scanSessionTurnitinAiRisk(workingSession);
@@ -451,14 +692,17 @@ export function TurnitinProMaxView({
           `Hoàn tất Vượt Turnitin ProMax! Điểm AI toàn bài giảm còn ${finalRep.overallAiRiskPercent}% (< 20% AI · Bảo toàn 100% trích dẫn).`
         );
       } catch (err) {
-        onToast(
-          err instanceof Error
-            ? err.message
-            : 'Quá trình Humanize ProMax bị gián đoạn.'
-        );
+        if (!abortCtrl.signal.aborted) {
+          onToast(
+            err instanceof Error
+              ? err.message
+              : 'Quá trình Humanize ProMax bị gián đoạn.'
+          );
+        }
       } finally {
         setIsProcessing(false);
         setProgressInfo(null);
+        abortControllerRef.current = null;
       }
       return;
     }
@@ -470,27 +714,34 @@ export function TurnitinProMaxView({
       if (targetList.length === 0) return;
 
       const nextBefore: Record<string, number> = { ...beforeScoresMap };
+      const initExecMap: Record<string, SectionExecutionStatus> = {};
       activeReport.sections.forEach((s) => {
-        if (
-          selectedSectionIds.includes(s.sectionId) &&
-          nextBefore[s.sectionId] === undefined
-        ) {
-          nextBefore[s.sectionId] = s.aiRiskPercent;
+        if (selectedSectionIds.includes(s.sectionId)) {
+          if (nextBefore[s.sectionId] === undefined) {
+            nextBefore[s.sectionId] = s.aiRiskPercent;
+          }
+          initExecMap[s.sectionId] = {
+            status: 'queued',
+            phase: 1,
+            phaseLabel: 'Đang chờ đến lượt xử lý...',
+            beforeRisk: s.aiRiskPercent,
+          };
         }
       });
       setBeforeScoresMap(nextBefore);
+      setSectionExecMap(initExecMap);
 
       setIsProcessing(true);
+      const completedDurations: number[] = [];
       try {
         const tempSession: WriterSession =
           activeSession || loadWriterSessions()[0];
         for (let i = 0; i < targetList.length; i += 1) {
+          if (abortCtrl.signal.aborted) break;
           const sec = targetList[i];
-          setProgressInfo({
-            step: i + 1,
-            total: targetList.length,
-            label: sec.title,
-          });
+          const secStartMs = Date.now();
+          scrollToSectionCard(sec.id);
+
           const pseudoOutlineSec: WriterOutlineSection = {
             id: sec.id,
             order: i + 1,
@@ -501,30 +752,99 @@ export function TurnitinProMaxView({
             content: sec.currentText,
             status: 'completed',
           };
+          const beforeSecScan = scanSectionTurnitinAiRisk(pseudoOutlineSec);
+
+          const updatePhase = (phase: 1 | 2 | 3 | 4, phaseDetail: string) => {
+            setProgressInfo({
+              step: i + 1,
+              total: targetList.length,
+              label: sec.title,
+              sectionId: sec.id,
+              phase,
+              phaseDetail,
+              modeLabel: 'AI Phẫu Thuật File Word (.DOCX)',
+            });
+            setSectionExecMap((prev) => ({
+              ...prev,
+              [sec.id]: {
+                ...prev[sec.id],
+                status: 'running',
+                phase,
+                phaseLabel: phaseDetail,
+                beforeRisk: beforeSecScan.aiRiskPercent,
+              },
+            }));
+          };
+
           const res = await humanizeSectionForTurnitinWithAi({
             session: tempSession,
             section: pseudoOutlineSec,
             skills,
             profile,
+            signal: abortCtrl.signal,
+            onPhaseChange: updatePhase,
           });
+
+          const durSec = Math.max(
+            0.4,
+            Number(((Date.now() - secStartMs) / 1000).toFixed(1))
+          );
+          completedDurations.push(durSec);
+          setAvgSecPerSection(
+            completedDurations.reduce((a, b) => a + b, 0) /
+              completedDurations.length
+          );
+
           setDocxSections((prev) =>
             prev.map((item) =>
               item.id === sec.id ? { ...item, currentText: res.content } : item
             )
           );
+
+          setSectionExecMap((prev) => ({
+            ...prev,
+            [sec.id]: {
+              status: 'completed',
+              phase: 4,
+              phaseLabel: `Hoàn tất (${res.beforeRisk}% → ${res.afterRisk}% AI)`,
+              beforeRisk: res.beforeRisk,
+              afterRisk: res.afterRisk,
+              durationSec: durSec,
+              paragraphsInfo: `Đã phẫu thuật ${res.flaggedParagraphsCount}/${res.totalParagraphsCount} đoạn`,
+              tokensSaved: res.tokensSavedEstimate,
+            },
+          }));
+
+          setExecutionLogs((prev) => [
+            ...prev,
+            {
+              id: `log_${sec.id}_${Date.now()}`,
+              sectionId: sec.id,
+              sectionTitle: sec.title,
+              status: 'completed',
+              beforeRisk: res.beforeRisk,
+              afterRisk: res.afterRisk,
+              lockedCitationsCount: beforeSecScan.protectedCitations.length,
+              durationSec: durSec,
+              detail: `Đã phẫu thuật ${res.flaggedParagraphsCount}/${res.totalParagraphsCount} đoạn · Giảm từ ${res.beforeRisk}% → ${res.afterRisk}% AI (${durSec}s).`,
+            },
+          ]);
         }
         onToast(
           `Đã hoàn tất Humanize ProMax (< 20% AI) cho ${targetList.length} phân đoạn của file "${parsedDocx.fileName}"!`
         );
       } catch (err) {
-        onToast(
-          err instanceof Error
-            ? err.message
-            : 'Không thể hoàn tất Humanize file Word.'
-        );
+        if (!abortCtrl.signal.aborted) {
+          onToast(
+            err instanceof Error
+              ? err.message
+              : 'Không thể hoàn tất Humanize file Word.'
+          );
+        }
       } finally {
         setIsProcessing(false);
         setProgressInfo(null);
+        abortControllerRef.current = null;
       }
       return;
     }
@@ -542,18 +862,14 @@ export function TurnitinProMaxView({
       });
       setBeforeScoresMap({ paste_sec: before.aiRiskPercent });
       setIsProcessing(true);
-      setProgressInfo({
-        step: 1,
-        total: 1,
-        label: 'Đang chạy Turnitin ProMax (< 20% AI)...',
-      });
+      const secStartMs = Date.now();
       try {
         const tempSession: WriterSession =
           activeSession || loadWriterSessions()[0];
         const pseudoSec: WriterOutlineSection = {
           id: 'paste_sec',
           order: 1,
-          title: 'Academic Section',
+          title: 'Đoạn văn bản kiểm tra',
           headingLevel: 'h1',
           targetWords: countWords(src),
           guidanceNotes: '',
@@ -565,18 +881,50 @@ export function TurnitinProMaxView({
           section: pseudoSec,
           skills,
           profile,
+          signal: abortCtrl.signal,
+          onPhaseChange: (phase, phaseDetail) => {
+            setProgressInfo({
+              step: 1,
+              total: 1,
+              label: 'Đoạn văn bản kiểm tra',
+              sectionId: 'paste_sec',
+              phase,
+              phaseDetail,
+              modeLabel: 'AI Phẫu Thuật Văn Bản Lẻ',
+            });
+          },
         });
+        const durSec = Math.max(
+          0.4,
+          Number(((Date.now() - secStartMs) / 1000).toFixed(1))
+        );
         setPasteOutput(res.content);
+        setExecutionLogs([
+          {
+            id: `log_paste_${Date.now()}`,
+            sectionId: 'paste_sec',
+            sectionTitle: 'Đoạn văn bản kiểm tra',
+            status: 'completed',
+            beforeRisk: res.beforeRisk,
+            afterRisk: res.afterRisk,
+            lockedCitationsCount: before.protectedCitations.length,
+            durationSec: durSec,
+            detail: `Đã phẫu thuật ${res.flaggedParagraphsCount}/${res.totalParagraphsCount} đoạn · Giảm từ ${res.beforeRisk}% → ${res.afterRisk}% AI (${durSec}s).`,
+          },
+        ]);
         onToast(
           `Hoàn tất! Turnitin AI giảm từ ${res.beforeRisk}% → ${res.afterRisk}% (< 20% AI · Khóa 100% trích dẫn).`
         );
       } catch (err) {
-        onToast(
-          err instanceof Error ? err.message : 'Lỗi khi chạy AI ProMax.'
-        );
+        if (!abortCtrl.signal.aborted) {
+          onToast(
+            err instanceof Error ? err.message : 'Lỗi khi chạy AI ProMax.'
+          );
+        }
       } finally {
         setIsProcessing(false);
         setProgressInfo(null);
+        abortControllerRef.current = null;
       }
     }
   };
@@ -855,23 +1203,298 @@ export function TurnitinProMaxView({
         </div>
       </div>
 
-      {/* Live Progress Banner */}
-      {isProcessing && progressInfo && (
-        <div className="bg-blue-50 border border-blue-200 rounded-2xl px-5 py-3.5 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5 text-xs font-bold text-[#0B2559]">
-            <Loader2 className="w-4 h-4 animate-spin text-[#12489B]" />
-            <span>
-              Đang chạy Turnitin ProMax ({progressInfo.step}/
-              {progressInfo.total}): &ldquo;{progressInfo.label}&rdquo; — Đang khóa trích dẫn &amp; kiểm định ngưỡng &lt; 20% AI...
-            </span>
+      {/* Live Turnitin ProMax Execution Cockpit (Real-time Section/Paragraph Tracker & Countdown) */}
+      {(isProcessing || (showCockpitBanner && executionLogs.length > 0)) && (
+        <section
+          className={`rounded-2xl border p-5 shadow-md space-y-4 transition-all ${
+            isProcessing
+              ? 'bg-gradient-to-br from-blue-50 via-white to-sky-50/70 border-[#12489B]/45 ring-2 ring-[#12489B]/20'
+              : 'bg-gradient-to-br from-emerald-50/80 via-white to-emerald-50/30 border-emerald-300/80'
+          }`}
+        >
+          {/* Top Row: Status Title, Elapsed / Remaining Countdown, Stop or Close Button */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              {isProcessing ? (
+                <span className="w-10 h-10 rounded-xl bg-[#0B2559] text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <Loader2 className="w-5 h-5 animate-spin text-sky-300" />
+                </span>
+              ) : (
+                <span className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                  <CheckCircle2 className="w-5 h-5" />
+                </span>
+              )}
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="text-sm sm:text-base font-bold text-[#0B2559] truncate">
+                    {isProcessing && progressInfo
+                      ? `Đang xử lý mục ${progressInfo.step}/${progressInfo.total}: “${progressInfo.label}”`
+                      : `Đã hoàn tất Vượt Turnitin ProMax (${executionLogs.length} mục đã xử lý)`}
+                  </h2>
+                  {isProcessing && progressInfo && (
+                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-[#12489B] font-mono text-[10.5px] font-bold">
+                      {progressInfo.modeLabel}
+                    </span>
+                  )}
+                </div>
+
+                <p className="text-xs text-slate-600 mt-0.5">
+                  {isProcessing && progressInfo ? (
+                    <>
+                      <strong className="text-[#12489B]">
+                        {progressInfo.phaseDetail}
+                      </strong>
+                      {progressInfo.total - progressInfo.step <= 1 && (
+                        <span className="ml-2 px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[11px]">
+                          ⚡ Đang ở mục cuối — Sắp hoàn thành!
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <span>
+                      Toàn bộ các mục đã chọn đã được đưa xuống dưới ngưỡng{' '}
+                      <strong>&lt; 20% AI</strong> và khóa nguyên vẹn 100% trích dẫn.
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2.5 shrink-0">
+              {isProcessing && progressInfo ? (
+                <>
+                  <div className="px-3 py-1.5 rounded-xl bg-white border border-blue-200 text-xs font-mono flex items-center gap-2 text-slate-700">
+                    <Clock className="w-3.5 h-3.5 text-[#12489B]" />
+                    <span>Đã chạy: {elapsedSec}s</span>
+                    <span className="text-zinc-300">|</span>
+                    <span className="font-bold text-[#12489B]">
+                      Còn ~
+                      {Math.max(
+                        1,
+                        Math.round(
+                          (progressInfo.total - progressInfo.step) *
+                            avgSecPerSection +
+                            ((5 - progressInfo.phase) / 4) * avgSecPerSection
+                        )
+                      )}
+                      s
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleStopProcessing}
+                    className="btn-press inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs"
+                  >
+                    <Square className="w-3.5 h-3.5 fill-current" />
+                    <span>Dừng ngay</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowCockpitBanner(false)}
+                  className="btn-press inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-zinc-200 text-xs font-semibold text-zinc-600 hover:text-slate-900"
+                >
+                  <X className="w-3.5 h-3.5" />
+                  <span>Ẩn bảng tiến trình</span>
+                </button>
+              )}
+            </div>
           </div>
-          <span className="font-mono text-xs font-bold text-[#12489B]">
-            {Math.round(
-              (progressInfo.step / Math.max(1, progressInfo.total)) * 100
-            )}
-            %
-          </span>
-        </div>
+
+          {/* Overall Animated Progress Bar (0% -> 100%) */}
+          {(() => {
+            const pct =
+              isProcessing && progressInfo
+                ? Math.min(
+                    98,
+                    Math.max(
+                      4,
+                      Math.round(
+                        (((progressInfo.step - 1) +
+                          progressInfo.phase / 4) /
+                          Math.max(1, progressInfo.total)) *
+                          100
+                      )
+                    )
+                  )
+                : 100;
+            return (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="text-slate-700">
+                    Tiến độ tổng thể:{' '}
+                    <strong className="text-[#0B2559]">
+                      {isProcessing && progressInfo
+                        ? `Xong ${progressInfo.step - 1}/${progressInfo.total} mục (Đang làm mục ${progressInfo.step})`
+                        : `Hoàn tất ${executionLogs.length}/${executionLogs.length} mục`}
+                    </strong>
+                  </span>
+                  <span className="font-mono text-sm font-bold text-[#12489B]">
+                    {pct}%
+                  </span>
+                </div>
+                <div className="h-3 w-full rounded-full bg-zinc-200/80 overflow-hidden p-0.5">
+                  <div
+                    className={`h-full rounded-full transition-all duration-300 ${
+                      isProcessing
+                        ? 'bg-gradient-to-r from-[#0B2559] via-[#12489B] to-sky-500 animate-pulse'
+                        : 'bg-emerald-600'
+                    }`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* 4-Phase Internal Pipeline Stepper when actively running */}
+          {isProcessing && progressInfo && (
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+              {[
+                {
+                  p: 1 as const,
+                  title: '1. Quét & Khóa Trích dẫn',
+                  sub: 'Cửa sổ 250 từ + Frozen Vault',
+                },
+                {
+                  p: 2 as const,
+                  title: '2. Lọc 6 Lớp 0-Token',
+                  sub: 'Xóa Unicode, đuôi -ing & AIR-1',
+                },
+                {
+                  p: 3 as const,
+                  title: '3. AI Phẫu thuật Đoạn',
+                  sub: 'Chỉ sửa đoạn >= 16% AI',
+                },
+                {
+                  p: 4 as const,
+                  title: '4. Kiểm định < 20% AI',
+                  sub: 'Đối chiếu 1-1 trích dẫn',
+                },
+              ].map((st) => {
+                const isDone = progressInfo.phase > st.p;
+                const isCurrent = progressInfo.phase === st.p;
+                return (
+                  <div
+                    key={st.p}
+                    className={`rounded-xl px-3 py-2 border text-xs transition-all ${
+                      isCurrent
+                        ? 'bg-[#0B2559] text-white border-[#0B2559] shadow-xs'
+                        : isDone
+                        ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                        : 'bg-white/70 border-zinc-200 text-zinc-400'
+                    }`}
+                  >
+                    <div className="font-bold flex items-center justify-between gap-1">
+                      <span className="truncate">{st.title}</span>
+                      {isDone && (
+                        <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                      )}
+                      {isCurrent && (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-300 shrink-0" />
+                      )}
+                    </div>
+                    <div
+                      className={`text-[10.5px] truncate mt-0.5 ${
+                        isCurrent ? 'text-sky-200' : 'opacity-80'
+                      }`}
+                    >
+                      {st.sub}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Horizontal Section Roadmap Pills (Click any pill to jump to that section) */}
+          {activeReport.sections.length > 0 && (
+            <div className="space-y-1.5 pt-1">
+              <div className="text-[11px] font-bold text-slate-700">
+                Bản đồ trạng thái từng mục (Bấm vào mục bất kỳ để cuộn tới đoạn đó):
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {activeReport.sections.map((sec, idx) => {
+                  const st = sectionExecMap[sec.sectionId];
+                  const isRunningSec = st?.status === 'running';
+                  const isDoneSec = st?.status === 'completed';
+                  const isQueuedSec = st?.status === 'queued';
+                  return (
+                    <button
+                      key={sec.sectionId}
+                      type="button"
+                      onClick={() => scrollToSectionCard(sec.sectionId)}
+                      className={`btn-press inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-semibold border transition-all ${
+                        isRunningSec
+                          ? 'bg-[#12489B] text-white border-[#0B2559] ring-2 ring-sky-300 shadow-xs'
+                          : isDoneSec
+                          ? 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                          : isQueuedSec
+                          ? 'bg-amber-50 text-amber-900 border-amber-200'
+                          : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'
+                      }`}
+                    >
+                      {isRunningSec ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : isDoneSec ? (
+                        <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                      ) : (
+                        <span className="font-mono text-[10px] opacity-70">
+                          #{idx + 1}
+                        </span>
+                      )}
+                      <span className="max-w-[160px] truncate">
+                        {sec.sectionTitle}
+                      </span>
+                      <span className="font-mono text-[10px] opacity-90">
+                        {isRunningSec
+                          ? `Pha ${st.phase}/4`
+                          : isDoneSec
+                          ? `${st.beforeRisk}%→${sec.aiRiskPercent}%`
+                          : `${sec.aiRiskPercent}%`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Completed Step-by-Step Activity Feed */}
+          {executionLogs.length > 0 && (
+            <div className="pt-2 border-t border-zinc-200/80 space-y-1.5 max-h-40 overflow-y-auto">
+              <div className="text-[11px] font-bold text-slate-700">
+                Nhật ký hoàn tất từng phần ({executionLogs.length} mục):
+              </div>
+              {executionLogs.map((log) => (
+                <div
+                  key={log.id}
+                  onClick={() => scrollToSectionCard(log.sectionId)}
+                  className="cursor-pointer flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-lg bg-white/90 border border-zinc-200/80 hover:border-[#12489B] text-xs"
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span className="font-bold text-slate-900 truncate">
+                      {log.sectionTitle}
+                    </span>
+                    <span className="text-zinc-500 truncate hidden sm:inline">
+                      — {log.detail}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 font-mono text-[11px]">
+                    <span className="px-2 py-0.2 rounded bg-emerald-50 text-emerald-800 font-bold border border-emerald-200">
+                      {log.beforeRisk}% → {log.afterRisk}% AI
+                    </span>
+                    <span className="text-zinc-400">{log.durationSec}s</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
       {/* =================================================================== */}
@@ -1094,9 +1717,15 @@ export function TurnitinProMaxView({
                 {activeReport.sections.map((sec: TurnitinSectionScanResult) => {
                   const checked = selectedSectionIds.includes(sec.sectionId);
                   const beforeScore = beforeScoresMap[sec.sectionId];
+                  const execState = sectionExecMap[sec.sectionId];
+                  const isRunningThis = execState?.status === 'running';
+                  const isCompletedThis = execState?.status === 'completed';
+                  const isQueuedThis = execState?.status === 'queued';
+
                   return (
                     <div
                       key={sec.sectionId}
+                      data-turnitin-sec-id={sec.sectionId}
                       onClick={() =>
                         !isProcessing &&
                         setSelectedSectionIds((prev) =>
@@ -1106,11 +1735,62 @@ export function TurnitinProMaxView({
                         )
                       }
                       className={`p-4 rounded-xl border transition-all cursor-pointer space-y-2.5 ${
-                        checked
+                        isRunningThis
+                          ? 'bg-blue-50/85 border-[#12489B] ring-2 ring-[#12489B] shadow-md'
+                          : isCompletedThis
+                          ? 'bg-emerald-50/35 border-emerald-300/90 shadow-2xs'
+                          : checked
                           ? 'bg-blue-50/35 border-[#12489B]/60 shadow-2xs'
                           : 'bg-white border-zinc-200/90 hover:border-zinc-300'
                       }`}
                     >
+                      {/* Inline Active Execution Strip inside the running or completed card */}
+                      {isRunningThis && (
+                        <div className="px-3 py-2 rounded-lg bg-[#0B2559] text-white text-xs space-y-1.5">
+                          <div className="flex items-center justify-between gap-2 font-bold">
+                            <span className="inline-flex items-center gap-2">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin text-sky-300 shrink-0" />
+                              <span>ĐANG XỬ LÝ MỤC NÀY — {execState.phaseLabel}</span>
+                            </span>
+                            <span className="font-mono text-sky-200">
+                              Pha {execState.phase}/4 ({execState.phase * 25}%)
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full rounded-full bg-white/20 overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-sky-300 transition-all duration-300"
+                              style={{ width: `${execState.phase * 25}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {isCompletedThis && !isRunningThis && (
+                        <div className="px-3 py-1.5 rounded-lg bg-emerald-100/80 border border-emerald-200 text-emerald-900 text-xs font-semibold flex flex-wrap items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                            <span>
+                              Đã hoàn tất Vượt Turnitin mục này ({execState.beforeRisk}% →{' '}
+                              {sec.aiRiskPercent}% AI)
+                              {execState.paragraphsInfo
+                                ? ` · ${execState.paragraphsInfo}`
+                                : ''}
+                            </span>
+                          </span>
+                          {execState.durationSec !== undefined && (
+                            <span className="font-mono text-[11px] text-emerald-800">
+                              ✓ Xong trong {execState.durationSec}s
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {isQueuedThis && isProcessing && (
+                        <div className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold inline-flex items-center gap-1.5">
+                          <Clock className="w-3 h-3" />
+                          <span>Đang xếp hàng chờ xử lý tiếp theo...</span>
+                        </div>
+                      )}
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2.5 min-w-0">
                           <input

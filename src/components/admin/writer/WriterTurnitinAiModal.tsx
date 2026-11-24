@@ -205,22 +205,42 @@ export function WriterTurnitinAiModal({
 
         {/* Live Progress Banner when Humanizing */}
         {isHumanizing && progressState && (
-          <div className="px-6 py-3 bg-blue-50 border-b border-blue-200 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-2.5 text-xs font-bold text-[#0B2559]">
-              <Loader2 className="w-4 h-4 animate-spin text-[#12489B]" />
-              <span>
-                Đang tự động Humanize vượt Turnitin &amp; đối chiếu khóa trích dẫn ({progressState.currentStep}/
-                {progressState.totalSteps}): &ldquo;{progressState.currentSectionTitle}&rdquo;...
+          <div className="px-6 py-3.5 bg-blue-50 border-b border-blue-200 space-y-2">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-2.5 text-xs font-bold text-[#0B2559]">
+                <Loader2 className="w-4 h-4 animate-spin text-[#12489B] shrink-0" />
+                <span>
+                  Đang xử lý mục {progressState.currentStep}/
+                  {progressState.totalSteps}: &ldquo;
+                  {progressState.currentSectionTitle}&rdquo;...
+                </span>
+                {progressState.totalSteps - progressState.currentStep <= 1 && (
+                  <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[11px] font-bold">
+                    ⚡ Đang ở mục cuối — Sắp hoàn thành!
+                  </span>
+                )}
+              </div>
+              <span className="font-mono text-xs font-bold text-[#12489B]">
+                {Math.round(
+                  (progressState.currentStep /
+                    Math.max(1, progressState.totalSteps)) *
+                    100
+                )}
+                %
               </span>
             </div>
-            <span className="font-mono text-xs font-bold text-[#12489B]">
-              {Math.round(
-                (progressState.currentStep /
-                  Math.max(1, progressState.totalSteps)) *
-                  100
-              )}
-              %
-            </span>
+            <div className="h-2 w-full rounded-full bg-blue-200/70 overflow-hidden">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#0B2559] to-[#12489B] transition-all duration-300"
+                style={{
+                  width: `${Math.round(
+                    (progressState.currentStep /
+                      Math.max(1, progressState.totalSteps)) *
+                      100
+                  )}%`,
+                }}
+              />
+            </div>
           </div>
         )}
 
@@ -270,16 +290,27 @@ export function WriterTurnitinAiModal({
           ) : (
             report.sections.map((sec) => {
               const checked = selectedIds.includes(sec.sectionId);
+              const isCurrentRunning =
+                isHumanizing &&
+                progressState?.currentSectionTitle === sec.sectionTitle;
               return (
                 <div
                   key={sec.sectionId}
                   onClick={() => !isHumanizing && toggleSelect(sec.sectionId)}
                   className={`p-4 rounded-xl border transition-all cursor-pointer space-y-2.5 ${
-                    checked
+                    isCurrentRunning
+                      ? 'bg-blue-100/70 border-[#12489B] ring-2 ring-[#12489B] shadow-md'
+                      : checked
                       ? 'bg-blue-50/40 border-[#12489B]/60 shadow-2xs'
                       : 'bg-white border-zinc-200/90 hover:border-zinc-300'
                   }`}
                 >
+                  {isCurrentRunning && (
+                    <div className="px-2.5 py-1 rounded-lg bg-[#0B2559] text-white text-[11px] font-bold inline-flex items-center gap-1.5">
+                      <Loader2 className="w-3 h-3 animate-spin text-sky-300" />
+                      <span>ĐANG XỬ LÝ MỤC NÀY — Đang lọc 6 lớp &amp; phẫu thuật đoạn nguy cơ cao...</span>
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2.5 min-w-0">
                       <input

@@ -900,18 +900,29 @@ export async function humanizeSectionForTurnitinWithAi(opts: {
   skills: SkillDocument[];
   profile: AiProviderProfile;
   signal?: AbortSignal;
+  onPhaseChange?: (phase: 1 | 2 | 3 | 4, label: string) => void;
 }): Promise<{
   content: string;
   restoredCount: number;
   beforeRisk: number;
   afterRisk: number;
   tokensSavedEstimate: number;
+  flaggedParagraphsCount: number;
+  totalParagraphsCount: number;
   changeSummary: string;
 }> {
-  const { session, section, profile, signal } = opts;
+  const { session, section, profile, signal, onPhaseChange } = opts;
+  onPhaseChange?.(
+    1,
+    'Pha 1/4: Đang quét cửa sổ 250 từ & khóa trích dẫn / số liệu...'
+  );
   const beforeScan = scanSectionTurnitinAiRisk(section);
 
   // Step 1: Run 6-Layer 0-Token Deterministic Breaker first
+  onPhaseChange?.(
+    2,
+    'Pha 2/4: Đang chạy 6 lớp 0-Token (Xóa Unicode ẩn, cắt đuôi -ing & AIR-1)...'
+  );
   const zeroTokenPass = ensureUnder20PercentAiGate(
     section.id,
     section.title,
@@ -920,6 +931,9 @@ export async function humanizeSectionForTurnitinWithAi(opts: {
 
   // Step 2: Check which paragraphs still need AI surgical restructuring
   const paragraphs = zeroTokenPass.split(/\n\s*\n/);
+  const totalParagraphsCount = paragraphs.filter(
+    (p) => p.trim().length > 0 && !parseFigureMarkerTag(p.trim())
+  ).length;
   const flaggedIndices: number[] = [];
 
   paragraphs.forEach((p, idx) => {
@@ -957,6 +971,10 @@ export async function humanizeSectionForTurnitinWithAi(opts: {
   let workingText = zeroTokenPass;
 
   if (flaggedIndices.length > 0) {
+    onPhaseChange?.(
+      3,
+      `Pha 3/4: Đang phẫu thuật AI ${flaggedIndices.length}/${Math.max(1, totalParagraphsCount)} đoạn văn có nguy cơ cao...`
+    );
     const isVi = session.writingLanguage === 'Vietnamese';
     const taggedBlocks = flaggedIndices
       .map((pIdx) => `[[PARA_${pIdx}]]\n${paragraphs[pIdx].trim()}`)
@@ -1032,6 +1050,10 @@ ${taggedBlocks}`;
   }
 
   // Step 3: Final < 20% AI Gate + Section-Wide Frozen Citation & Figure Integrity Guardrail
+  onPhaseChange?.(
+    4,
+    'Pha 4/4: Đang kiểm định ngưỡng < 20% AI & đối chiếu khôi phục 100% trích dẫn...'
+  );
   const finalGated = ensureUnder20PercentAiGate(
     section.id,
     section.title,
@@ -1058,6 +1080,8 @@ ${taggedBlocks}`;
     beforeRisk: beforeScan.aiRiskPercent,
     afterRisk: afterScan.aiRiskPercent,
     tokensSavedEstimate,
+    flaggedParagraphsCount: flaggedIndices.length,
+    totalParagraphsCount: Math.max(1, totalParagraphsCount),
     changeSummary: `Turnitin ProMax Surgical: Giảm AI từ ${beforeScan.aiRiskPercent}% → ${afterScan.aiRiskPercent}% (Tiết kiệm ~${tokensSavedEstimate.toLocaleString()} tokens · Khóa 100% trích dẫn).`,
   };
 }
