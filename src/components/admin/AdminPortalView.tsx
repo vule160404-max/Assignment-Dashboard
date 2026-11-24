@@ -10,7 +10,6 @@ import {
   ExternalLink,
   FileSpreadsheet,
   FileText,
-  Fingerprint,
   LayoutList,
   LogOut,
   Menu,
@@ -84,10 +83,9 @@ import { OrderInquiriesInbox } from './OrderInquiriesInbox';
 import { OrderWorkspaceModal } from './OrderWorkspaceModal';
 import { RevenueDashboardView } from './RevenueDashboardView';
 import { TeamManagementView } from './TeamManagementView';
-import { TurnitinProMaxView } from './TurnitinProMaxView';
 import { WordHumanizerView } from './WordHumanizerView';
 
-type AdminTab = 'orders' | 'calendar' | 'ai_writer' | 'data_lab' | 'turnitin_promax' | 'humanizer' | 'clients' | 'revenue' | 'team' | 'settings';
+type AdminTab = 'orders' | 'calendar' | 'ai_writer' | 'data_lab' | 'humanizer' | 'clients' | 'revenue' | 'team' | 'settings';
 type OrderFilter = 'all' | 'active' | 'urgent' | 'unpaid_balance' | 'completed';
 
 const ADMIN_TAB_STORAGE_KEY = 'assigntrack_admin_tab_v1';
@@ -96,7 +94,6 @@ const VALID_ADMIN_TABS: AdminTab[] = [
   'calendar',
   'ai_writer',
   'data_lab',
-  'turnitin_promax',
   'humanizer',
   'clients',
   'revenue',
@@ -796,7 +793,6 @@ export function AdminPortalView({
     { key: 'calendar', label: 'Lịch Deadline', icon: Calendar },
     { key: 'ai_writer', label: 'AI Writer Studio', icon: Wand2 },
     { key: 'data_lab', label: 'Khảo sát & Dữ liệu', icon: BarChart3 },
-    { key: 'turnitin_promax', label: 'Vượt Turnitin AI', icon: Fingerprint },
     { key: 'humanizer', label: 'Humanize Word (HIX)', icon: FileText },
     { key: 'clients', label: 'Khách hàng (CRM)', icon: Users, adminOnly: true },
     { key: 'revenue', label: 'Doanh thu & Công CTV', icon: TrendingUp, adminOnly: true },
@@ -1450,18 +1446,6 @@ export function AdminPortalView({
                 setPendingDataLabPayload(payload);
                 setActiveTab('ai_writer');
               }}
-              onToast={onToast}
-            />
-          )}
-
-          {activeTab === 'turnitin_promax' && (
-            <TurnitinProMaxView
-              orders={orders}
-              onOpenInAiWriter={(orderCode) => {
-                if (orderCode) setWriterOrderCode(orderCode);
-                setActiveTab('ai_writer');
-              }}
-              onAttachDocxToOrder={handleAttachHumanizedDocx}
               onToast={onToast}
             />
           )}

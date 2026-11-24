@@ -597,4 +597,37 @@ export const DEFAULT_BUILTIN_SKILLS: SkillDocument[] = [
 - Khi viết phần Thực trạng hoặc Giải pháp, ưu tiên phân tích bối cảnh Việt Nam, dẫn chiếu số liệu thực tế từ Tổng cục Thống kê, Bộ/Ngành, báo cáo thường niên doanh nghiệp và các nghiên cứu khoa học uy tín (2021-2026).
 - Mục Tài liệu tham khảo trình bày chuẩn mực, khớp 1-đối-1 với trích dẫn trong bài.`,
   },
+  {
+    id: 'skill_academic_humanizer',
+    name: 'Academic Humanizer (Chống Văn Phong AI & Bảo Toàn Trích Dẫn)',
+    fileName: 'academic-humanizer.skill.md',
+    description:
+      'Kinh nghiệm thực chiến viết tự nhiên như sinh viên đại học thực thụ: loại bỏ từ nối LLM, cụm "rather than", đuôi ", which...", câu bình luận rỗng và giữ nguyên 100% trích dẫn/số liệu.',
+    enabled: true,
+    isBuiltIn: true,
+    updatedAt: new Date().toISOString(),
+    content: `# Skill: Academic Humanizer (Natural Student-Register & Anti-AI-Fingerprint)
+Apply these battle-tested rules whenever drafting or refining academic prose so the text reads like authentic university student writing rather than recognizable LLM output, while preserving 100% of citations, figures, and statistical data:
+
+1. PLAIN STUDENT-REGISTER OVER ORNAMENTAL LLM PROSE:
+   - Avoid inflated LLM metaphors and Latinate clichés that AI detectors flag immediately: NEVER use "underpins", "tripartite", "against this backdrop", "holds up under scrutiny", "flattens the very interdependence", "document with the same texture", "offers a route out of this difficulty", "yield converging evidence", "wider body of research", "delves into", "underscores the importance", "plays a pivotal/crucial role", "multifaceted", "intricate tapestry", "paves the way for", or "serves as a testament to".
+   - Prefer direct, plain academic verbs: "looks at", "shows", "points out", "relies on", "connects with", "makes it hard to", "leaves out", "puts into categories", "matches", "backs up".
+   - Break stacked 3-4 noun phrases into natural verb clauses (e.g., write "building a questionnaire to measure reading engagement" instead of "reading engagement instrument development"; write "counting how often students spoke" instead of "frequency counts of conversational excerpts").
+
+2. ELIMINATE HIGH-FREQUENCY LLM SYNTACTIC FINGERPRINTS:
+   - NEVER overuse "X rather than Y" in critical evaluations (use "instead of", "and not", or direct contrast instead).
+   - NEVER tack on trailing ", which [verb]" clauses (", which suggests...", ", which leaves...", ", which weakens...", ", which limits...") or trailing participial ", -ing" clauses (", highlighting...", ", thereby fostering...", ", ensuring..."). Split them into standalone active sentences or use ", so..." / ", and this...".
+   - BAN robotic transition openers: "Furthermore,", "Moreover,", "In addition,", "Additionally,", "It is worth noting that", "In conclusion,", "To summarize," (and Vietnamese equivalents: "Hơn nữa,", "Thêm vào đó,", "Ngoài ra, cần lưu ý rằng", "Đáng chú ý là", "Không thể phủ nhận rằng", "đóng vai trò then chốt", "bức tranh toàn cảnh", "đa chiều và toàn diện", "Tóm lại, có thể thấy rằng").
+
+3. NO EMPTY EDITORIAL FILLER OR SYMMETRICAL TEMPLATES:
+   - NEVER insert empty 4-8 word editorial meta-commentary sentences just to vary length (e.g., NEVER write "A deeper problem follows.", "The choice holds up under scrutiny.", "This is no small claim.", "The verdict is mixed.", "The evidence keeps piling up.", "Teacher support shows a similar convergence."). Every short sentence MUST carry concrete facts, numbers, or case details.
+   - Break the symmetrical LLM paragraph skeleton (Praise -> "However, limitations exist" -> Mini-Conclusion). Start paragraphs directly with specific empirical evidence or concrete limitations, and end paragraphs directly on data or citations instead of robotic summary sentences ("Ultimately, this demonstrates...", "Therefore, it is clear...", "Its findings invite, rather than settle...").
+
+4. NATURAL PERIOD-SEPARATED CADENCE & ZERO FRAGMENTS:
+   - Vary sentence length organically using real full-stop periods "." (mix 10-14 word factual sentences with 22-34 word evidence-rich sentences) without abusing semicolons ";" to glue clauses into uniform ~38-word blocks.
+   - Never leave subordinate clauses ("Because...", "Although...", "Whereas...") standing alone as sentence fragments.
+
+5. 100% CITATION, FIGURE & DATA LOCK:
+   - Keep every in-text citation (Author, Year) / [1], statistical value (p, Sig., R², Beta, Cronbach's Alpha, N, %), and [FIGURE: IMG_X] tag completely intact.`,
+  },
 ];
