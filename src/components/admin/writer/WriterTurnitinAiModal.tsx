@@ -412,28 +412,17 @@ export function WriterTurnitinAiModal({
             <button
               type="button"
               disabled={isHumanizing || selectedIds.length === 0}
-              onClick={() => onRunFastBreaker(selectedIds)}
-              className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white border border-blue-200 hover:bg-blue-50 text-[#12489B] text-xs font-bold disabled:opacity-40"
-              title="Chạy 6 lớp phá vân tay Turnitin AIW-2 & AIR-1 trực tiếp trên trình duyệt (0 giây, 0 Token, hoàn toàn miễn phí)"
-            >
-              <Zap className="w-3.5 h-3.5 text-[#EA580C]" />
-              <span>Phá vân tay 6 Lớp (0 Token · Miễn phí)</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={isHumanizing || selectedIds.length === 0}
               onClick={() => onRunDeepAiHumanize(selectedIds)}
-              className="btn-press inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#0B2559] to-[#12489B] hover:from-[#071A42] hover:to-[#0B2559] text-white text-xs font-bold shadow-sm disabled:opacity-40"
-              title="Chạy lọc 0-Token trước, sau đó chỉ gửi đúng các đoạn văn còn nguy cơ cao lên AI với Prompt siêu gọn (Tiết kiệm ~85% Token & cam kết < 20% AI)"
+              className="btn-press inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#0B2559] to-[#12489B] hover:from-[#071A42] hover:to-[#0B2559] text-white text-xs sm:text-sm font-bold shadow-sm disabled:opacity-40"
+              title="AI thực thi đồng thời cả 6 lớp lý thuyết chống Turnitin AIW-2 & AIR-1 trên 100% đoạn văn, khóa chống tăng điểm AI và bảo toàn 100% trích dẫn"
             >
               {isHumanizing ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Wand2 className="w-3.5 h-3.5" />
+                <Wand2 className="w-4 h-4" />
               )}
               <span>
-                AI Phẫu Thuật (&lt; 20% AI · Tiết kiệm ~{report.tokenSavingsPercent}% Token)
+                Chạy Vượt Turnitin ProMax (&lt; 20% AI · {selectedIds.length} mục)
               </span>
             </button>
           </div>

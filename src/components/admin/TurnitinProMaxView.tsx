@@ -1137,33 +1137,22 @@ export function TurnitinProMaxView({
             </button>
           </div>
 
-          {/* Primary Action Buttons */}
+          {/* Primary Single Unified Action Button */}
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               disabled={isProcessing || unifiedSections.length === 0}
-              onClick={handleRunFastZeroToken}
-              className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-300 text-amber-900 text-xs font-bold disabled:opacity-40"
-              title="Chạy 6 lớp khử ký tự ẩn Unicode, cắt đuôi -ing/góp phần, phá câu tóm tắt cuối đoạn AIR-1 và tách nhịp câu ngay trên trình duyệt (0 giây)"
-            >
-              <Zap className="w-3.5 h-3.5 text-[#EA580C]" />
-              <span>Lọc Nhanh 6 Lớp (0s)</span>
-            </button>
-
-            <button
-              type="button"
-              disabled={isProcessing || unifiedSections.length === 0}
               onClick={() => void handleRunFullProMaxAi()}
-              className="btn-press inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-gradient-to-r from-[#0B2559] to-[#12489B] hover:from-[#071A42] hover:to-[#0B2559] text-white text-xs font-bold shadow-sm disabled:opacity-40"
-              title="Viết lại toàn diện 100% đoạn văn theo cửa sổ trượt 250 từ của Turnitin (Cắt 100% token rác, chống cộng dồn xác suất giữa các đoạn, cam kết < 20% AI & khóa trích dẫn)"
+              className="btn-press inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-[#0B2559] to-[#12489B] hover:from-[#071A42] hover:to-[#0B2559] text-white text-xs sm:text-sm font-bold shadow-sm disabled:opacity-40"
+              title="AI tự động thực thi đồng thời cả 6 lớp lý thuyết chống Turnitin AIW-2 (Xanh) & AIR-1 (Tím) trên 100% đoạn văn, cam kết < 20% AI, khóa chống tăng điểm AI và bảo toàn 100% trích dẫn"
             >
               {isProcessing ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Sparkles className="w-3.5 h-3.5 text-sky-300" />
+                <Sparkles className="w-4 h-4 text-sky-300" />
               )}
               <span>
-                Chạy Vượt Turnitin ProMax (&lt; 20% AI · Toàn Diện 250w)
+                Chạy Vượt Turnitin ProMax (&lt; 20% AI · AI Toàn Diện 6 Lớp)
               </span>
             </button>
           </div>
@@ -1457,23 +1446,23 @@ export function TurnitinProMaxView({
               {[
                 {
                   p: 1 as const,
-                  title: '1. Quét & Khóa Trích dẫn',
-                  sub: 'Cửa sổ 250 từ + Frozen Vault',
+                  title: '1. Quét Cửa Sổ 250 Từ',
+                  sub: 'Khóa 100% Trích dẫn & Số liệu',
                 },
                 {
                   p: 2 as const,
-                  title: '2. Lọc 6 Lớp 0-Token',
-                  sub: 'Xóa Unicode, đuôi -ing & AIR-1',
+                  title: '2. Nạp 6 Lớp Lý Thuyết',
+                  sub: 'Chống AIW-2 (Xanh) & AIR-1 (Tím)',
                 },
                 {
                   p: 3 as const,
-                  title: '3. Viết Lại 100% Đoạn',
-                  sub: 'Xuyên suốt ranh giới 250 từ',
+                  title: '3. AI Viết Lại 100% Đoạn',
+                  sub: 'Biến thiên câu bằng dấu chấm (.)',
                 },
                 {
                   p: 4 as const,
-                  title: '4. Kiểm định < 20% AI',
-                  sub: 'Khôi phục 1-1 trích dẫn',
+                  title: '4. Khóa Chống Tăng Điểm',
+                  sub: 'Đảm bảo < 20% AI & Khôi phục 1-1',
                 },
               ].map((st) => {
                 const isDone = progressInfo.phase > st.p;
