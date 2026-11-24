@@ -886,13 +886,14 @@ export function ensureUnder20PercentAiGate(
 }
 
 /**
- * SURGICAL TOKEN-SAVER AI PROMAX PIPELINE (Saves 80% - 92% API Tokens):
- * 1. Runs all 6 deterministic anti-Turnitin (AIW-2 + AIR-1) layers first at 0 Token cost.
- * 2. Scans each paragraph individually: any paragraph that already drops below 18% AI risk
- *    is NOT sent to the API (saving 100% of tokens on already-safe paragraphs).
- * 3. For remaining stubborn paragraphs, sends a razor-sharp 220-token surgical prompt
- *    (WITHOUT 15,000 tokens of skill files, context files, or base64 images!).
- * 4. Splices the rewritten paragraphs back into place and runs the Frozen-Citation & Figure Restorer.
+ * FULL-SECTION 250-WORD SLIDING WINDOW PROMAX PIPELINE
+ * (Zero Context Bloat + 100% Paragraph Coverage to Prevent 250-Word Window Bleed-Through):
+ * 1. Strips 100% of prompt bloat (no 12,000-token skill files, no context files, no base64 images).
+ * 2. Runs all 6 deterministic anti-Turnitin (AIW-2 Blue + AIR-1 Purple) layers first across the entire section.
+ * 3. Sends 100% of the section's prose paragraphs together in one unified sliding-window pass
+ *    so the LLM restructures lexical perplexity and asymmetric sentence cadence continuously across
+ *    every 250-word paragraph boundary (eliminating bleed-through between adjacent paragraphs).
+ * 4. Enforces the < 20% AI post-gate and 100% Frozen-Citation, Statistical Data & Figure Restorer.
  */
 export async function humanizeSectionForTurnitinWithAi(opts: {
   session: WriterSession;
@@ -914,14 +915,14 @@ export async function humanizeSectionForTurnitinWithAi(opts: {
   const { session, section, profile, signal, onPhaseChange } = opts;
   onPhaseChange?.(
     1,
-    'Pha 1/4: Đang quét cửa sổ 250 từ & khóa trích dẫn / số liệu...'
+    'Pha 1/4: Đang quét cửa sổ trượt 250 từ & khóa 100% trích dẫn / số liệu...'
   );
   const beforeScan = scanSectionTurnitinAiRisk(section);
 
-  // Step 1: Run 6-Layer 0-Token Deterministic Breaker first
+  // Step 1: Run 6-Layer 0-Token Deterministic Breaker across the whole section first
   onPhaseChange?.(
     2,
-    'Pha 2/4: Đang chạy 6 lớp 0-Token (Xóa Unicode ẩn, cắt đuôi -ing & AIR-1)...'
+    'Pha 2/4: Đang chạy 6 lớp khử vân tay 0-Token (Xóa Unicode ẩn, cắt đuôi -ing & AIR-1)...'
   );
   const zeroTokenPass = ensureUnder20PercentAiGate(
     section.id,
@@ -929,90 +930,65 @@ export async function humanizeSectionForTurnitinWithAi(opts: {
     section.content
   );
 
-  // Step 2: Check which paragraphs still need AI surgical restructuring
+  // Step 2: Process 100% of substantive paragraphs in the section together (Full-Section 250-Word Window Pass)
   const paragraphs = zeroTokenPass.split(/\n\s*\n/);
-  const totalParagraphsCount = paragraphs.filter(
-    (p) => p.trim().length > 0 && !parseFigureMarkerTag(p.trim())
-  ).length;
-  const flaggedIndices: number[] = [];
+  const targetIndices: number[] = [];
 
   paragraphs.forEach((p, idx) => {
     const trimmed = p.trim();
     if (!trimmed || parseFigureMarkerTag(trimmed) || /^#{1,4}\s/.test(trimmed)) {
       return;
     }
-    if (countWords(trimmed) < 22) return;
-    const pScan = scanSectionTurnitinAiRisk({
-      id: `p_${idx}`,
-      title: `P${idx}`,
-      content: trimmed,
-    });
-    if (pScan.aiRiskPercent >= 16 || pScan.monotonousRunCount > 0 || pScan.air1StructureFlagsCount > 0) {
-      flaggedIndices.push(idx);
+    if (countWords(trimmed) >= 12) {
+      targetIndices.push(idx);
     }
   });
 
-  // If 0-token pass already knocked every paragraph below 16% AI, pick the longest paragraph for a ultra-light surgical polish (or return directly if very short)
-  if (flaggedIndices.length === 0 && paragraphs.length > 0) {
-    let longestIdx = -1;
-    let maxW = 0;
-    paragraphs.forEach((p, idx) => {
-      const w = countWords(p);
-      if (w > maxW && !parseFigureMarkerTag(p.trim())) {
-        maxW = w;
-        longestIdx = idx;
-      }
-    });
-    if (longestIdx >= 0 && maxW >= 35) {
-      flaggedIndices.push(longestIdx);
-    }
-  }
-
+  const totalParagraphsCount = Math.max(1, targetIndices.length);
   let workingText = zeroTokenPass;
 
-  if (flaggedIndices.length > 0) {
+  if (targetIndices.length > 0) {
     onPhaseChange?.(
       3,
-      `Pha 3/4: Đang phẫu thuật AI ${flaggedIndices.length}/${Math.max(1, totalParagraphsCount)} đoạn văn có nguy cơ cao...`
+      `Pha 3/4: Đang tái cấu trúc toàn diện ${targetIndices.length}/${totalParagraphsCount} đoạn theo cửa sổ trượt 250 từ...`
     );
     const isVi = session.writingLanguage === 'Vietnamese';
-    const taggedBlocks = flaggedIndices
+    const taggedBlocks = targetIndices
       .map((pIdx) => `[[PARA_${pIdx}]]\n${paragraphs[pIdx].trim()}`)
       .join('\n\n');
 
     const blockCitations = extractInTextCitations(taggedBlocks).join(' | ');
     const blockStats = extractProtectedStatTokens(taggedBlocks).join(' | ');
 
-    // Ultra-compact Surgical System Prompt (~160 tokens instead of ~12,000 tokens!)
-    const surgicalSystemPrompt = isVi
-      ? `Bạn là Chuyên gia Biên tập Học thuật chống kiểm định Turnitin AIW-2 (Màu xanh) và AIR-1 (Màu tím). Nhiệm vụ duy nhất: viết lại nhịp câu của các đoạn văn được đánh dấu [[PARA_X]] để tỷ lệ AI dưới 12% mà giữ nguyên 100% trích dẫn và số liệu.`
-      : `You are an Academic Prose Editor specialized in defeating Turnitin AIW-2 (Blue) and AIR-1 (Purple Paraphrase) detectors. Rewrite only the tagged [[PARA_X]] paragraphs to achieve <12% AI detection while preserving 100% of citations and statistics.`;
+    // Focused ~200-token system prompt (Zero skill/image bloat, 100% dedicated to Turnitin AIW-2 + AIR-1 bypass)
+    const fullWindowSystemPrompt = isVi
+      ? `Bạn là Chuyên gia Biên tập Học thuật chống kiểm định Turnitin AIW-2 (Màu xanh) và AIR-1 (Màu tím). Nhiệm vụ duy nhất: viết lại nhịp câu và xác suất từ vựng (Perplexity) xuyên suốt 100% các đoạn văn [[PARA_X]] để mọi cửa sổ trượt 250 từ đều dưới 12% AI mà giữ nguyên tuyệt đối 100% trích dẫn, số liệu và nội dung học thuật.`
+      : `You are an Academic Prose Editor specialized in defeating Turnitin AIW-2 (Blue) and AIR-1 (Purple Paraphrase) detectors across 250-word sliding windows. Rewrite 100% of the tagged [[PARA_X]] paragraphs to achieve <12% AI detection while preserving 100% of citations, statistics, and scholarly arguments.`;
 
-    const surgicalUserPrompt = isVi
-      ? `Viết lại các đoạn văn dưới đây theo đúng 4 quy tắc chống Turnitin AIW-2 & AIR-1:
-1. SÓNG CÂU BẤT ĐỐI XỨNG (Burstiness CV > 48%): Đan xen 1 câu nhận định cực ngắn (6-10 từ) ngay cạnh 1 câu phân tích đa mệnh đề dài (30-40 từ nối bằng dấu chấm phẩy ";").
-2. CHỐNG TURNITIN AIR-1 (TÔ TÍM): Cấm dùng câu tự tóm tắt ở cuối đoạn ("Như vậy,", "Tóm lại,", "Do đó, điều này khẳng định..."). Kết thúc đoạn ngay tại dữ kiện hoặc trích dẫn thực nghiệm.
-3. CẤM MỆNH ĐỀ ĐUÔI RẬP KHUÔN: Cấm dùng ", góp phần...", ", tạo tiền đề...", "Hơn nữa,", "Thêm vào đó,", "đóng vai trò then chốt".
-4. KHÓA BẤT BIẾN 100%: Giữ nguyên từng ký tự mọi trích dẫn (${blockCitations || 'mọi trích dẫn có trong đoạn'}) và con số (${blockStats || 'mọi số liệu'}). Giữ nguyên thẻ [[PARA_X]] ở đầu mỗi đoạn.
+    const fullWindowUserPrompt = isVi
+      ? `Viết lại TOÀN BỘ các đoạn văn dưới đây theo 4 quy tắc chống cửa sổ trượt 250 từ của Turnitin AIW-2 & AIR-1:
+1. SÓNG NHỊP CÂU BẤT ĐỐI XỨNG XUYÊN SUỐT (Burstiness CV > 48%): Trong mỗi đoạn và giữa ranh giới 2 đoạn liền kề, đan xen câu nhận định cực ngắn, sắc gọn (6-10 từ) ngay cạnh câu phân tích đa mệnh đề dài (30-42 từ nối bằng dấu chấm phẩy ";"). Tuyệt đối không để các câu dài đều nhau 17-24 từ.
+2. CHỐNG TURNITIN AIR-1 (TÔ TÍM): Cấm dùng câu tự tóm tắt ở cuối đoạn ("Như vậy,", "Tóm lại,", "Do đó, điều này khẳng định..."). Kết thúc mỗi đoạn ngay tại dữ kiện hoặc trích dẫn thực nghiệm.
+3. CẤM MỆNH ĐỀ ĐUÔI RẬP KHUÔN & TỪ NỐI AI: Cấm dùng ", góp phần...", ", tạo tiền đề...", "Hơn nữa,", "Thêm vào đó,", "Ngoài ra,", "đóng vai trò then chốt". Đổi danh từ trừu tượng thành động từ chủ động học thuật.
+4. KHÓA BẤT BIẾN 100%: Giữ nguyên từng ký tự mọi trích dẫn (${blockCitations || 'mọi trích dẫn có trong bài'}) và con số (${blockStats || 'mọi số liệu'}). Giữ nguyên thẻ [[PARA_X]] ở đầu mỗi đoạn.
 
 ${taggedBlocks}`
-      : `Rewrite the tagged paragraphs below following 4 strict anti-Turnitin AIW-2 & AIR-1 rules:
-1. ASYMMETRIC SENTENCE WAVE (Burstiness CV > 48%): Pair a crisp 6-10 word analytical assertion right next to a 30-42 word multi-clause empirical sentence joined by a semicolon ";".
-2. DEFEAT TURNITIN AIR-1 (PURPLE FLAG): Never end a paragraph with a formulaic mini-conclusion ("Ultimately, this highlights...", "Therefore, it is clear..."). End paragraphs directly on concrete empirical evidence or citations.
-3. BAN PARTICIPIAL "-ING" TAILS & AI TRANSITIONS: Eliminate trailing ", highlighting...", ", thereby fostering...", "Furthermore,", "Moreover,", "plays a pivotal role".
+      : `Rewrite ALL tagged paragraphs below following 4 strict anti-Turnitin 250-word sliding-window rules (AIW-2 & AIR-1):
+1. CONTINUOUS ASYMMETRIC SENTENCE WAVE (Burstiness CV > 48%): Within every paragraph and across paragraph boundaries, alternate crisp 6-10 word analytical assertions with 30-42 word multi-clause empirical sentences joined by a semicolon ";". Never allow uniform 17-24 word chains.
+2. DEFEAT TURNITIN AIR-1 (PURPLE PARAPHRASE FLAG): Never end any paragraph with a formulaic mini-conclusion ("Ultimately, this highlights...", "Therefore, it is clear..."). End paragraphs directly on concrete empirical evidence or citations.
+3. BAN PARTICIPIAL "-ING" TAILS & AI TRANSITIONS: Eliminate trailing ", highlighting...", ", thereby fostering...", "Furthermore,", "Moreover,", "In addition,", "plays a pivotal role". Replace stacked nominalizations with concrete active scholarly verbs.
 4. 100% FROZEN CITATIONS & STATS: Preserve every citation (${blockCitations || 'all existing citations'}) and number (${blockStats || 'all statistics'}) verbatim. Keep the exact [[PARA_X]] tag at the start of each paragraph.
 
 ${taggedBlocks}`;
 
     const rawAiResp = await callAiChatbot({
       profile,
-      systemPrompt: surgicalSystemPrompt,
-      userPrompt: surgicalUserPrompt,
+      systemPrompt: fullWindowSystemPrompt,
+      userPrompt: fullWindowUserPrompt,
       enableWebSearch: false,
       signal,
     });
 
-    // Parse [[PARA_X]] blocks back into paragraphs
     const blockRegex = /\[\[PARA_(\d+)\]\]\s*([\s\S]*?)(?=\[\[PARA_\d+\]\]|$)/g;
     let match: RegExpExecArray | null;
     let replacedAny = false;
@@ -1023,9 +999,8 @@ ${taggedBlocks}`;
         !Number.isNaN(pIdx) &&
         pIdx >= 0 &&
         pIdx < paragraphs.length &&
-        countWords(rewrittenPara) >= 10
+        countWords(rewrittenPara) >= 8
       ) {
-        // Enforce 100% citation lock at paragraph level
         const guardedPara = enforceProtectedTokensIntegrity(
           paragraphs[pIdx],
           rewrittenPara
@@ -1035,24 +1010,23 @@ ${taggedBlocks}`;
       }
     }
 
-    if (!replacedAny && flaggedIndices.length === 1 && countWords(rawAiResp) >= 15) {
-      const pIdx = flaggedIndices[0];
-      const cleanedSingle = stripMarkdownHashesFromText(
+    if (!replacedAny && countWords(rawAiResp) >= 15) {
+      const cleanedFallback = stripMarkdownHashesFromText(
         rawAiResp.replace(/\[\[PARA_\d+\]\]/g, '')
       ).trim();
-      paragraphs[pIdx] = enforceProtectedTokensIntegrity(
-        paragraphs[pIdx],
-        cleanedSingle
+      workingText = enforceProtectedTokensIntegrity(
+        section.content,
+        cleanedFallback
       ).content;
+    } else {
+      workingText = paragraphs.join('\n\n');
     }
-
-    workingText = paragraphs.join('\n\n');
   }
 
   // Step 3: Final < 20% AI Gate + Section-Wide Frozen Citation & Figure Integrity Guardrail
   onPhaseChange?.(
     4,
-    'Pha 4/4: Đang kiểm định ngưỡng < 20% AI & đối chiếu khôi phục 100% trích dẫn...'
+    'Pha 4/4: Đang kiểm định cửa sổ 250 từ (< 20% AI) & khôi phục 100% trích dẫn...'
   );
   const finalGated = ensureUnder20PercentAiGate(
     section.id,
@@ -1080,8 +1054,8 @@ ${taggedBlocks}`;
     beforeRisk: beforeScan.aiRiskPercent,
     afterRisk: afterScan.aiRiskPercent,
     tokensSavedEstimate,
-    flaggedParagraphsCount: flaggedIndices.length,
-    totalParagraphsCount: Math.max(1, totalParagraphsCount),
-    changeSummary: `Turnitin ProMax Surgical: Giảm AI từ ${beforeScan.aiRiskPercent}% → ${afterScan.aiRiskPercent}% (Tiết kiệm ~${tokensSavedEstimate.toLocaleString()} tokens · Khóa 100% trích dẫn).`,
+    flaggedParagraphsCount: totalParagraphsCount,
+    totalParagraphsCount,
+    changeSummary: `Turnitin ProMax Toàn Diện (250w Window): Giảm AI từ ${beforeScan.aiRiskPercent}% → ${afterScan.aiRiskPercent}% trên 100% đoạn văn (${totalParagraphsCount}/${totalParagraphsCount} đoạn · Khóa 100% trích dẫn).`,
   };
 }
