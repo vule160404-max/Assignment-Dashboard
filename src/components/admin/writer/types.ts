@@ -311,7 +311,12 @@ export interface CohortCloneMeta {
   cohortSize: number;
   archetypeId: string;
   archetypeLabel: string;
+  methodologyId?: string;
+  methodologyLabel?: string;
+  customTopic?: string;
   customCaseFocus?: string;
+  customFramework?: string;
+  customInstructions?: string;
   sampledSourceCount: number;
   poolTotalCount: number;
   needsDistinctOutline?: boolean;

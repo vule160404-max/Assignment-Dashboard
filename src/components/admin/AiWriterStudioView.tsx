@@ -69,10 +69,13 @@ import {
   WriterSession,
 } from './writer/types';
 import {
+  COHORT_METHODOLOGIES,
   COHORT_STRUCTURAL_ARCHETYPES,
   CohortPairSimilarity,
   buildRandomSampledDossierForClone,
+  buildSlotQueryCacheKey,
   fetchCohortMasterCrossrefPool,
+  fetchCohortTargetedCrossrefCache,
 } from '../../lib/cohortEngine';
 import { DataLabAiWriterPayload } from './DataLabView';
 import { WriterApiSettingsModal } from './writer/WriterApiSettingsModal';
@@ -1847,9 +1850,11 @@ export function AiWriterStudioView({
 
   /**
    * Launches N independent Same-Class Cohort Clones from `activeSession`:
-   * 1. Queries ONE rich Master CrossRef Pool (~35-45 real peer-reviewed DOI works) + optional shared Perplexity context.
+   * 1. Queries ONE rich Master CrossRef Pool (~35-45 real peer-reviewed DOI works) PLUS
+   *    parallel targeted CrossRef queries for slots that chose custom sub-topics/methods/frameworks.
    * 2. Randomly shuffles & draws `config.sourcesPerPaper` (e.g. 15) sources per student clone.
-   * 3. Assigns distinct structural/rhetorical archetypes, optional student metadata & typography diversity.
+   * 3. Applies each student's freely chosen Font, Font Size, Line Spacing, Alignment, Methodology,
+   *    Structural Lens, Sub-Topic, Case Study, Theoretical Model, Citation Style & Language.
    * 4. Optionally runs parallel distinct outline + full-paper writing immediately.
    */
   const handleLaunchCohortClones = async (config: CohortCloneLaunchConfig) => {
@@ -1863,15 +1868,20 @@ export function AiWriterStudioView({
 
     setLaunchingCohort(true);
     setCohortLaunchStatus(
-      `Đang quét bể nguồn học thuật lớn (CrossRef DOI${
+      `Đang quét bể nguồn học thuật (CrossRef chung + chuyên biệt theo đề tài/phương pháp${
         effectiveWriter.isHybrid ? ' + Perplexity Web' : ''
-      }) cho cả nhóm...`
+      }) cho ${config.cloneCount} bài...`
     );
 
     const signal = getFreshAiSignal();
     try {
       const masterPoolPromise = fetchCohortMasterCrossrefPool(
         activeSession,
+        signal
+      );
+      const targetedCachePromise = fetchCohortTargetedCrossrefCache(
+        config.slots,
+        activeSession.subject || '',
         signal
       );
 
@@ -1896,38 +1906,70 @@ export function AiWriterStudioView({
         }
       }
 
-      const masterPool = await masterPoolPromise;
+      const [masterPool, targetedCache] = await Promise.all([
+        masterPoolPromise,
+        targetedCachePromise,
+      ]);
       const cohortGroupId = `cohort_${Date.now().toString(36)}`;
-      const topicKey = (activeSession.topic || activeSession.title || '').trim();
       const nowMs = Date.now();
-      const isViPaper = activeSession.writingLanguage === 'Vietnamese';
 
       const createdClones: WriterSession[] = config.slots.map((slot, idx) => {
         const cloneNumber = idx + 1;
         const archetype =
+          COHORT_STRUCTURAL_ARCHETYPES.find((a) => a.id === slot.archetypeId) ||
           COHORT_STRUCTURAL_ARCHETYPES[
             idx % COHORT_STRUCTURAL_ARCHETYPES.length
           ];
+        const methodology =
+          COHORT_METHODOLOGIES.find((m) => m.id === slot.methodologyId) ||
+          COHORT_METHODOLOGIES[0];
+
+        const queryKey = buildSlotQueryCacheKey(slot, activeSession.subject || '');
+        const targetedPool = queryKey ? targetedCache.get(queryKey) || [] : [];
+
+        const slotCitationStyle = slot.citationStyle || activeSession.citationStyle;
         const { dossier, sampledCount } = buildRandomSampledDossierForClone(
           masterPool,
-          activeSession.citationStyle,
+          slotCitationStyle,
           config.sourcesPerPaper,
-          sharedWebContext
+          sharedWebContext,
+          targetedPool
         );
 
-        const jitteredWords = config.diversifyTypography
-          ? Math.max(
-              300,
-              Math.round(
-                (activeSession.targetWordCount * archetype.wordJitterRatio) / 25
-              ) * 25
-            )
-          : activeSession.targetWordCount;
+        const resolvedWords = Math.max(
+          300,
+          Number(slot.targetWordCount) || activeSession.targetWordCount || 2000
+        );
+        const resolvedTopic = slot.customTopic.trim() || activeSession.topic;
+        const resolvedLang =
+          slot.writingLanguage || activeSession.writingLanguage;
+
+        // Preserve original shared brief context if student overrode the sub-topic
+        const instructionChunks: string[] = [];
+        if (
+          slot.customTopic.trim() &&
+          activeSession.topic.trim() &&
+          slot.customTopic.trim().toLowerCase() !==
+            activeSession.topic.trim().toLowerCase()
+        ) {
+          instructionChunks.push(
+            `[OVERARCHING CLASS PROMPT]: ${activeSession.topic.trim()}`
+          );
+        }
+        if (activeSession.instructions.trim()) {
+          instructionChunks.push(activeSession.instructions.trim());
+        }
+        if (slot.customInstructions.trim()) {
+          instructionChunks.push(
+            `[INDIVIDUAL PAPER DIRECTIVES (#${cloneNumber})]: ${slot.customInstructions.trim()}`
+          );
+        }
+        const resolvedInstructions = instructionChunks.join('\n\n');
 
         const baseOutline = parseAiOutlineJson(
           '',
-          jitteredWords,
-          activeSession.citationStyle
+          resolvedWords,
+          slotCitationStyle
         ).map((sec, sIdx) => ({
           ...sec,
           id: `sec_${nowMs}_${cloneNumber}_${sIdx}`,
@@ -1947,36 +1989,32 @@ export function AiWriterStudioView({
           enabled: Boolean(
             baseCover.enabled || resolvedStudentName || resolvedStudentId
           ),
-          templateId: config.diversifyTypography
-            ? archetype.coverTemplate
-            : baseCover.templateId,
+          templateId: slot.coverTemplateId || baseCover.templateId,
           studentName: resolvedStudentName || baseCover.studentName,
           studentId: resolvedStudentId || baseCover.studentId,
         };
 
-        const nextFormat: DocumentFormatConfig =
-          config.diversifyTypography && !isViPaper
-            ? {
-                ...activeSession.format,
-                fontFamily: archetype.fontEn,
-                fontSizePt: archetype.fontSizeEn,
-                lineSpacing: archetype.lineSpacingEn,
-                textAlign: archetype.alignEn,
-                coverPage: nextCover,
-              }
-            : {
-                ...activeSession.format,
-                coverPage: nextCover,
-              };
+        const nextFormat: DocumentFormatConfig = {
+          ...activeSession.format,
+          preset: 'CUSTOM',
+          fontFamily: slot.fontFamily || activeSession.format.fontFamily,
+          fontSizePt:
+            Number(slot.fontSizePt) || activeSession.format.fontSizePt || 12,
+          lineSpacing:
+            slot.lineSpacing || activeSession.format.lineSpacing || 1.5,
+          textAlign: slot.textAlign || activeSession.format.textAlign || 'left',
+          runningHeader: formatDefaultRunningHeader(resolvedTopic),
+          coverPage: nextCover,
+        };
 
-        const shortTopic = (activeSession.topic || activeSession.subject || 'Nhóm')
+        const shortTopic = (resolvedTopic || activeSession.subject || 'Nhóm')
           .trim()
-          .slice(0, 26);
+          .slice(0, 24);
         const tabTitle = slot.linkedOrderCode
           ? `${slot.linkedOrderCode} · Bản #${cloneNumber}`
           : resolvedStudentName
           ? `Bản #${cloneNumber} (${resolvedStudentName}) · ${shortTopic}`
-          : `Bản #${cloneNumber}/${config.cloneCount} · ${shortTopic}`;
+          : `Bản #${cloneNumber}/${config.cloneCount} · ${methodology.shortTag}`;
 
         return {
           ...activeSession,
@@ -1985,7 +2023,11 @@ export function AiWriterStudioView({
             .slice(2, 6)}`,
           title: tabTitle,
           linkedOrderCode: slot.linkedOrderCode,
-          targetWordCount: jitteredWords,
+          topic: resolvedTopic,
+          targetWordCount: resolvedWords,
+          citationStyle: slotCitationStyle,
+          writingLanguage: resolvedLang,
+          instructions: resolvedInstructions,
           format: nextFormat,
           outline: baseOutline,
           activeSectionId: baseOutline[0]?.id || '',
@@ -1993,16 +2035,21 @@ export function AiWriterStudioView({
           batchStatus: config.autoRunImmediately ? 'queued' : 'idle',
           batchErrorMsg: undefined,
           researchedSources: dossier || activeSession.researchedSources || '',
-          researchedSourcesTopic: topicKey,
+          researchedSourcesTopic: (resolvedTopic || tabTitle).trim(),
           cohortMeta: {
             cohortGroupId,
             cloneIndex: cloneNumber,
             cohortSize: config.cloneCount,
             archetypeId: archetype.id,
             archetypeLabel: archetype.label,
+            methodologyId: methodology.id,
+            methodologyLabel: methodology.label,
+            customTopic: slot.customTopic.trim() || undefined,
             customCaseFocus: slot.customCaseFocus.trim() || undefined,
+            customFramework: slot.customFramework.trim() || undefined,
+            customInstructions: slot.customInstructions.trim() || undefined,
             sampledSourceCount: sampledCount,
-            poolTotalCount: masterPool.length,
+            poolTotalCount: masterPool.length + targetedPool.length,
             needsDistinctOutline: true,
           },
           historyStack: [],
@@ -2022,8 +2069,8 @@ export function AiWriterStudioView({
 
       onToast(
         masterPool.length > 0
-          ? `Đã tạo ${createdClones.length} bản nhân bản độc lập (bốc ngẫu nhiên ${config.sourcesPerPaper} nguồn/bài từ bể ${masterPool.length} nguồn DOI thật)!`
-          : `Đã tạo ${createdClones.length} bản nhân bản độc lập với cấu trúc dàn ý riêng!`
+          ? `Đã tạo ${createdClones.length} bài riêng biệt (mỗi bài tự chọn Font/Cỡ chữ, Phương pháp & bốc ngẫu nhiên ${config.sourcesPerPaper} nguồn DOI thật)!`
+          : `Đã tạo ${createdClones.length} bài riêng biệt với cấu trúc & phương pháp khác nhau!`
       );
 
       if (config.autoRunImmediately) {

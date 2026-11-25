@@ -37,6 +37,132 @@ export interface CohortStructuralArchetype {
   wordJitterRatio: number;
 }
 
+export interface CohortMethodologyOption {
+  id: string;
+  label: string;
+  shortTag: string;
+  crossrefHint: string;
+  outlineDirectiveEn: string;
+  outlineDirectiveVi: string;
+  proseDirectiveEn: string;
+  proseDirectiveVi: string;
+}
+
+export const COHORT_METHODOLOGIES: CohortMethodologyOption[] = [
+  {
+    id: 'auto_by_lens',
+    label: 'Theo đề gốc / Tự động theo Lăng kính',
+    shortTag: 'Theo đề gốc',
+    crossrefHint: '',
+    outlineDirectiveEn:
+      'Follow the exact methodological or analytical structure implied by the prompt while differentiating chapter titles and analytical sequencing via the assigned structural lens.',
+    outlineDirectiveVi:
+      'Bám sát cấu trúc đề bài gốc nhưng tổ chức lại tên mục và trình tự phân tích theo lăng kính đã chọn.',
+    proseDirectiveEn:
+      'Maintain natural disciplinary methodology alignment with varied paragraph transitions and distinct empirical framing.',
+    proseDirectiveVi:
+      'Giữ đúng mạch phương pháp của đề gốc nhưng đổi hoàn toàn cách dẫn chứng và triển khai lập luận.',
+  },
+  {
+    id: 'qualitative_thematic',
+    label: 'Định tính · Phỏng vấn sâu & Mã hóa Chủ đề (Thematic)',
+    shortTag: 'Định tính Thematic',
+    crossrefHint: 'qualitative thematic analysis semi-structured interview findings',
+    outlineDirectiveEn:
+      'Design an empirical QUALITATIVE research structure: include qualitative research philosophy (interpretivist), purposive semi-structured interview sampling, Braun & Clarke thematic coding steps, qualitative theme-by-theme findings, and trustworthiness discussion.',
+    outlineDirectiveVi:
+      'Thiết kế dàn ý theo hướng NGHIÊN CỨU ĐỊNH TÍNH: làm rõ phương pháp chọn mẫu có chủ đích, phỏng vấn bán cấu trúc, quy trình mã hóa chủ đề (Thematic Analysis), kết quả phân tích theo từng nhóm chủ đề (Themes) và tính tin cậy dữ liệu.',
+    proseDirectiveEn:
+      'Frame evidence qualitatively around lived experiences, managerial perceptions, contextual mechanisms, purposive sample depth, and thematic synthesis rather than survey regression statistics.',
+    proseDirectiveVi:
+      'Phân tích sâu cơ chế vận hành, nhận thức chủ thể, trích thuật quan điểm nhóm phỏng vấn và bóc tách từng chủ đề nghiên cứu thay vì dùng công thức hồi quy.',
+  },
+  {
+    id: 'quantitative_survey',
+    label: 'Định lượng · Khảo sát Likert & Hồi quy Thống kê (SPSS)',
+    shortTag: 'Định lượng SPSS',
+    crossrefHint: 'quantitative survey structural equation modeling regression reliability',
+    outlineDirectiveEn:
+      'Design an empirical QUANTITATIVE research structure: include explicit research hypotheses (H1–H4) or testable propositions, structured Likert-scale measurement items, sampling frame, reliability/validity & regression evaluation, and empirical hypothesis testing discussion.',
+    outlineDirectiveVi:
+      'Thiết kế dàn ý theo hướng NGHIÊN CỨU ĐỊNH LƯỢNG: xây dựng giả thuyết nghiên cứu (H1–H4), thang đo Likert chi tiết theo biến quan sát, phương pháp chọn mẫu định lượng, kiểm định độ tin cậy (Cronbach Alpha / hồi quy) và thảo luận bác bỏ/chấp nhận giả thuyết.',
+    proseDirectiveEn:
+      'Emphasize operationalized constructs, independent/dependent variable relationships, empirical effect directions, measurement validity, and statistical rigor in clear, direct prose.',
+    proseDirectiveVi:
+      'Nhấn mạnh mối quan hệ biến độc lập – biến phụ thuộc, thang đo lường, tính hợp lệ của mẫu khảo sát và giải thích ý nghĩa thực tiễn của từng giả thuyết.',
+  },
+  {
+    id: 'comparative_case_study',
+    label: 'Tình huống So sánh Đối chiếu (Multi-Case Study)',
+    shortTag: 'So sánh Case Study',
+    crossrefHint: 'comparative case study cross-case organizational analysis',
+    outlineDirectiveEn:
+      'Organize the outline as a COMPARATIVE MULTI-CASE STUDY: establish clear case-selection criteria comparing 2 contrasting real-world organizations/markets (e.g., high-performing benchmark vs. constrained adapter), conduct structured cross-case pattern matching, and derive transferable strategic lessons.',
+    outlineDirectiveVi:
+      'Tổ chức dàn ý dạng NGHIÊN CỨU TÌNH HUỐNG SO SÁNH (Multi-Case Study): nêu tiêu chí chọn ít nhất 2 doanh nghiệp/bối cảnh đối lập, phân tích từng trường hợp rồi lập ma trận đối chiếu chéo tìm điểm tương đồng và khác biệt cốt lõi.',
+    proseDirectiveEn:
+      'Anchor every middle section in explicit side-by-side cross-case comparisons, highlighting institutional contrasts, boundary conditions, and structural divergence between cases.',
+    proseDirectiveVi:
+      'Triển khai lập luận song song theo phép đối chiếu giữa các Case Study, chỉ rõ vì sao cùng một giải pháp lại thành công ở bối cảnh này nhưng gặp rào cản ở bối cảnh kia.',
+  },
+  {
+    id: 'mixed_methods',
+    label: 'Hỗn hợp · Định lượng + Định tính (Mixed-Methods)',
+    shortTag: 'Mixed-Methods',
+    crossrefHint: 'mixed methods explanatory sequential triangulation empirical',
+    outlineDirectiveEn:
+      'Design a MIXED-METHODS triangulation outline: structure methodology and analysis into two complementary phases (Phase 1 broad quantitative trend / survey benchmark + Phase 2 targeted qualitative explanation of why patterns occur) followed by integrated meta-inference synthesis.',
+    outlineDirectiveVi:
+      'Xây dựng dàn ý PHƯƠNG PHÁP HỖN HỢP (Mixed-Methods): tách rõ 2 pha bổ trợ (Pha 1 đo lường xu hướng định lượng tổng quát + Pha 2 giải thích cơ chế sâu bằng định tính) và chương tổng hợp đối chiếu chéo (Triangulation).',
+    proseDirectiveEn:
+      'Connect macro empirical patterns explicitly with micro qualitative mechanisms, showing where numerical findings and practitioner explanations reinforce or complicate one another.',
+    proseDirectiveVi:
+      'Kết nối chặt chẽ giữa bức tranh số liệu tổng quan ở Pha 1 với lý giải nguyên nhân bản chất ở Pha 2 để tạo chiều sâu học thuật.',
+  },
+  {
+    id: 'systematic_literature_review',
+    label: 'Tổng quan Hệ thống & Ma trận Khoảng trống (SLR / PRISMA)',
+    shortTag: 'Systematic Review',
+    crossrefHint: 'systematic literature review PRISMA synthesis research gaps',
+    outlineDirectiveEn:
+      'Design a SYSTEMATIC LITERATURE REVIEW (SLR) structure: include explicit search strings, database screening & inclusion/exclusion protocol (PRISMA logic), chronological/thematic taxonomy of reviewed studies, critical synthesis of methodological contradictions, and a future research agenda.',
+    outlineDirectiveVi:
+      'Thiết kế dàn ý TỔNG QUAN TÀI LIỆU CÓ HỆ THỐNG (SLR / PRISMA): quy trình tìm kiếm từ khóa và tiêu chí sàng lọc tài liệu, phân loại cụm chủ đề nghiên cứu theo thời gian/trường phái, bảng tổng hợp mâu thuẫn học thuật và khoảng trống nghiên cứu tương lai.',
+    proseDirectiveEn:
+      'Synthesize across multiple scholarly clusters rigorously, comparing study designs, geographic scopes, and conflicting findings across published articles without claiming fake primary data collection.',
+    proseDirectiveVi:
+      'Tổng hợp đối chiếu nhiều nhóm công trình đã công bố theo tiêu chí rõ ràng, làm nổi bật sự tiến hóa của học thuật và khoảng trống nghiên cứu.',
+  },
+  {
+    id: 'secondary_empirical_data',
+    label: 'Dữ liệu Thứ cấp · Số liệu Ngành / Tài chính / Vĩ mô',
+    shortTag: 'Dữ liệu Thứ cấp',
+    crossrefHint: 'secondary data industry report panel longitudinal empirical performance',
+    outlineDirectiveEn:
+      'Structure the paper as a SECONDARY EMPIRICAL ANALYSIS: rely strictly on verifiable published industry metrics, institutional/financial indicators, and longitudinal archival trends rather than primary interviews or self-administered surveys, followed by ratio/trend evaluation and policy/managerial implications.',
+    outlineDirectiveVi:
+      'Thiết kế dàn ý PHÂN TÍCH DỮ LIỆU THỨ CẤP: sử dụng báo cáo ngành, chỉ số tài chính/vĩ mô, dữ liệu công bố công khai qua nhiều năm (không tự bịa bảng khảo sát sơ cấp) để đánh giá biến động và đề xuất giải pháp quản trị.',
+    proseDirectiveEn:
+      'Focus tightly on verified macro/industry evidence, longitudinal shifts, cost-benefit structure, and institutional constraints grounded cleanly in cited reports and scholarly papers.',
+    proseDirectiveVi:
+      'Bám sát diễn biến số liệu ngành/tài chính theo giai đoạn, phân tích tương quan chi phí – hiệu quả và ràng buộc thực tiễn từ tài liệu công bố.',
+  },
+  {
+    id: 'conceptual_critical_essay',
+    label: 'Phân tích Lý thuyết Thuần & Phản biện Học thuật',
+    shortTag: 'Lý thuyết & Phản biện',
+    crossrefHint: 'theoretical framework critical conceptual review debate',
+    outlineDirectiveEn:
+      'Organize the outline as a CRITICAL CONCEPTUAL ESSAY: deconstruct core theoretical assumptions, contrast two or more competing scholarly schools directly, critique practical applicability limits across modern contexts, and formulate an integrated conceptual proposition.',
+    outlineDirectiveVi:
+      'Tổ chức dàn ý dạng TIỂU LUẬN LÝ THUYẾT & PHẢN BIỆN SÂU: giải cấu trúc các giả định lý thuyết gốc, đặt 2–3 trường phái học thuật đối lập lên bàn cân, phản biện giới hạn ứng dụng thực tế và đề xuất khung khái niệm tổng hợp.',
+    proseDirectiveEn:
+      'Prioritize conceptual precision, theoretical trade-offs, and persuasive critical reasoning built strictly around peer-reviewed arguments rather than empirical field-study mechanics.',
+    proseDirectiveVi:
+      'Ưu tiên độ sắc sảo của lập luận khái niệm, chỉ rõ ưu – nhược điểm từng học thuyết và điều kiện biên khi áp dụng vào bối cảnh đương đại.',
+  },
+];
+
 export const COHORT_STRUCTURAL_ARCHETYPES: CohortStructuralArchetype[] = [
   {
     id: 'deductive_theoretical',
@@ -420,17 +546,141 @@ function cryptoRandomShuffle<T>(items: T[]): T[] {
 }
 
 /**
- * Randomly draws `sourcesPerPaper` (e.g. 15) sources from the shared Master Pool
+ * Fetches supplementary targeted CrossRef works for a student's specific sub-topic,
+ * case focus, theoretical framework, or methodology, then blends + randomly draws
+ * `sourcesPerPaper` (e.g. 15) sources from `[targeted + masterPool]` cleanly.
+ */
+export async function fetchCohortTargetedCrossrefCache(
+  slots: Array<{
+    customTopic?: string;
+    customCaseFocus?: string;
+    customFramework?: string;
+    methodologyId?: string;
+  }>,
+  baseSubject: string,
+  signal?: AbortSignal
+): Promise<Map<string, CohortPoolSourceItem[]>> {
+  const queryMap = new Map<string, string>();
+  for (const slot of slots) {
+    const methodObj = COHORT_METHODOLOGIES.find(
+      (m) => m.id === slot.methodologyId
+    );
+    const pieces = [
+      (slot.customTopic || '').trim(),
+      (slot.customFramework || '').trim(),
+      (slot.customCaseFocus || '').trim(),
+      (methodObj?.crossrefHint || '').trim(),
+    ].filter(Boolean);
+    if (pieces.length === 0) continue;
+    const rawQuery = `${pieces.join(' ')} ${baseSubject || ''}`
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 220);
+    const key = rawQuery.toLowerCase();
+    if (!queryMap.has(key)) {
+      queryMap.set(key, rawQuery);
+    }
+  }
+
+  const resultsCache = new Map<string, CohortPoolSourceItem[]>();
+  if (queryMap.size === 0) return resultsCache;
+
+  const entries = Array.from(queryMap.entries()).slice(0, 8);
+  await Promise.all(
+    entries.map(async ([key, q]) => {
+      const works = await queryCrossrefSlice(q, 16, 2017, signal);
+      resultsCache.set(key, works);
+    })
+  );
+  return resultsCache;
+}
+
+export function buildSlotQueryCacheKey(
+  slot: {
+    customTopic?: string;
+    customCaseFocus?: string;
+    customFramework?: string;
+    methodologyId?: string;
+  },
+  baseSubject: string
+): string {
+  const methodObj = COHORT_METHODOLOGIES.find(
+    (m) => m.id === slot.methodologyId
+  );
+  const pieces = [
+    (slot.customTopic || '').trim(),
+    (slot.customFramework || '').trim(),
+    (slot.customCaseFocus || '').trim(),
+    (methodObj?.crossrefHint || '').trim(),
+  ].filter(Boolean);
+  if (pieces.length === 0) return '';
+  return `${pieces.join(' ')} ${baseSubject || ''}`
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 220)
+    .toLowerCase();
+}
+
+/**
+ * Randomly draws `sourcesPerPaper` (e.g. 15) sources from `[targetedPool + masterPool]`
  * in a freshly shuffled order for one student's paper.
  */
 export function buildRandomSampledDossierForClone(
   masterPool: CohortPoolSourceItem[],
   citationStyle: CitationStyle,
   sourcesPerPaper: number,
-  sharedWebAppendix = ''
+  sharedWebAppendix = '',
+  targetedPool: CohortPoolSourceItem[] = []
 ): { dossier: string; sampledCount: number } {
   const safeTarget = Math.max(5, Math.min(30, sourcesPerPaper || 15));
-  const sampled = cryptoRandomShuffle(masterPool).slice(0, safeTarget);
+
+  // Deduplicate targeted works vs master pool by DOI and Author+Year
+  const seenDois = new Set<string>();
+  const seenAuthorYear = new Set<string>();
+  const cleanTargeted: CohortPoolSourceItem[] = [];
+  const cleanMaster: CohortPoolSourceItem[] = [];
+
+  for (const w of targetedPool) {
+    const dk = w.doi.toLowerCase();
+    const ay = `${(w.authors[0]?.family || '').toLowerCase()}_${w.year}`;
+    if (seenDois.has(dk) || seenAuthorYear.has(ay)) continue;
+    seenDois.add(dk);
+    seenAuthorYear.add(ay);
+    cleanTargeted.push(w);
+  }
+
+  for (const w of masterPool) {
+    const dk = w.doi.toLowerCase();
+    const ay = `${(w.authors[0]?.family || '').toLowerCase()}_${w.year}`;
+    if (seenDois.has(dk) || seenAuthorYear.has(ay)) continue;
+    seenDois.add(dk);
+    seenAuthorYear.add(ay);
+    cleanMaster.push(w);
+  }
+
+  // Blend targeted works (~40-60% of quota when present) + randomly drawn core course works
+  let sampled: CohortPoolSourceItem[];
+  if (cleanTargeted.length > 0) {
+    const targetedQuota = Math.min(
+      cleanTargeted.length,
+      Math.max(4, Math.ceil(safeTarget * 0.5))
+    );
+    const pickedTargeted = cryptoRandomShuffle(cleanTargeted).slice(
+      0,
+      targetedQuota
+    );
+    const remainingQuota = Math.max(0, safeTarget - pickedTargeted.length);
+    const pickedMaster = cryptoRandomShuffle(cleanMaster).slice(
+      0,
+      remainingQuota
+    );
+    sampled = cryptoRandomShuffle([...pickedTargeted, ...pickedMaster]).slice(
+      0,
+      safeTarget
+    );
+  } else {
+    sampled = cryptoRandomShuffle(cleanMaster).slice(0, safeTarget);
+  }
 
   const crossrefBlock =
     sampled.length > 0
@@ -439,7 +689,7 @@ export function buildRandomSampledDossierForClone(
           .map((w, idx) => {
             const inText = formatPoolSourceInText(w, citationStyle);
             const fullRef = formatPoolSourceFullRef(w, citationStyle);
-            return `[S${idx + 1}] In-Text: ${inText}\n    Full ${citationStyle}: ${fullRef}`;
+            return `[S${idx + 1}] In-Text: ${inText}\n    Full ${sessionCitationSafe(citationStyle)}: ${fullRef}`;
           })
           .join('\n')
       : '';
@@ -455,9 +705,13 @@ export function buildRandomSampledDossierForClone(
   };
 }
 
+function sessionCitationSafe(style: CitationStyle): string {
+  return style || 'APA';
+}
+
 /**
- * Builds the strict anti-cross-similarity instruction block injected into BOTH
- * Outline Generation and Section Prose Writing for Cohort Clones.
+ * Builds the comprehensive differentiation & anti-cross-similarity instruction block
+ * injected into BOTH Outline Generation and Section Prose Writing for Cohort Clones.
  */
 export function buildCohortAntiSimilarityPromptBlock(
   session: WriterSession,
@@ -472,32 +726,73 @@ export function buildCohortAntiSimilarityPromptBlock(
       (Math.max(1, meta.cloneIndex) - 1) % COHORT_STRUCTURAL_ARCHETYPES.length
     ];
 
+  const methodology =
+    COHORT_METHODOLOGIES.find((m) => m.id === meta.methodologyId) ||
+    COHORT_METHODOLOGIES[0];
+
   const isVi = session.writingLanguage === 'Vietnamese';
-  const focusInstruction = meta.customCaseFocus?.trim()
-    ? isVi
-      ? `- GÓC NHÌN / VÍ DỤ ĐỘC QUYỀN CỦA BẢN NÀY: Tập trung phân tích sâu ví dụ/tình huống "${meta.customCaseFocus.trim()}" làm minh chứng chủ đạo xuyên suốt bài.`
-      : `- EXCLUSIVE CASE / EMPIRICAL FOCUS FOR THIS STUDENT: Anchor empirical illustrations and applied examples specifically around "${meta.customCaseFocus.trim()}".`
-    : isVi
-    ? `- PHÂN NHÁNH VÍ DỤ ĐỘC LẬP (Bản #${meta.cloneIndex}/${meta.cohortSize}): Không chọn ví dụ doanh nghiệp đầu bảng quá phổ biến mà các bạn cùng lớp hay lấy giống nhau; hãy chọn bối cảnh/ví dụ minh họa đặc thù theo lăng kính số #${meta.cloneIndex}.`
-    : `- INDEPENDENT EMPIRICAL ILLUSTRATION (Student Paper #${meta.cloneIndex} of ${meta.cohortSize}): Avoid cliché default textbook company examples when the brief allows open examples; select distinct real-world cases aligned with Analytical Lens #${meta.cloneIndex}.`;
+  const focusParts: string[] = [];
+
+  if (meta.customTopic?.trim()) {
+    focusParts.push(
+      isVi
+        ? `- ĐỀ TÀI / NHÁNH CHỦ ĐỀ ĐỘC QUYỀN CỦA BẢN NÀY: "${meta.customTopic.trim()}"`
+        : `- STUDENT'S SPECIFIC SUB-TOPIC / RESEARCH ANGLE: "${meta.customTopic.trim()}"`
+    );
+  }
+  if (meta.customFramework?.trim()) {
+    focusParts.push(
+      isVi
+        ? `- MÔ HÌNH / KHUNG LÝ THUYẾT BẮT BUỘC: Vận dụng trực tiếp "${meta.customFramework.trim()}" làm trục phân tích.`
+        : `- ASSIGNED THEORETICAL MODEL / FRAMEWORK: Explicitly ground analysis in "${meta.customFramework.trim()}".`
+    );
+  }
+  if (meta.customCaseFocus?.trim()) {
+    focusParts.push(
+      isVi
+        ? `- TÌNH HUỐNG / DOANH NGHIỆP / BỐI CẢNH MINH HỌA: "${meta.customCaseFocus.trim()}" làm minh chứng chủ đạo xuyên suốt bài.`
+        : `- EMPIRICAL CASE / INDUSTRY / SAMPLE CONTEXT: Anchor applied illustrations specifically around "${meta.customCaseFocus.trim()}".`
+    );
+  } else {
+    focusParts.push(
+      isVi
+        ? `- PHÂN NHÁNH VÍ DỤ ĐỘC LẬP (Bản #${meta.cloneIndex}/${meta.cohortSize}): Không chọn ví dụ doanh nghiệp đầu bảng quá phổ biến mà các bạn cùng lớp hay lấy giống nhau; hãy chọn bối cảnh/ví dụ minh họa đặc thù riêng.`
+        : `- INDEPENDENT EMPIRICAL ILLUSTRATION (Student Paper #${meta.cloneIndex} of ${meta.cohortSize}): Avoid cliché default textbook company examples when the brief allows open choices; select distinct real-world examples.`
+    );
+  }
+  if (meta.customInstructions?.trim()) {
+    focusParts.push(
+      isVi
+        ? `- YÊU CẦU BỔ SUNG RIÊNG CHO BÀI NÀY: ${meta.customInstructions.trim()}`
+        : `- INDIVIDUAL STUDENT BRIEF CONSTRAINTS: ${meta.customInstructions.trim()}`
+    );
+  }
 
   if (isVi) {
-    return `\n\n=== CHẾ ĐỘ ĐA HÌNH CÙNG LỚP — CHỐNG ĐỤNG TURNITIN SIMILARITY CHÉO (BẢN #${meta.cloneIndex}/${meta.cohortSize}: ${archetype.label}) ===
-Bài này thuộc nhóm ${meta.cohortSize} sinh viên học CÙNG MỘT LỚP nộp chung hệ thống quét chéo Turnitin. Danh mục nguồn trích dẫn có thể giao thoa tự nhiên từ bể nguồn chung, NHƯNG VĂN BẢN THÂN BÀI VÀ ĐỀ MỤC TUYỆT ĐỐI KHÔNG ĐƯỢC TRÙNG CỤM TỪ LIÊN TIẾP (>= 5 TỪ) VỚI BÀI KHÁC:
-1. LĂNG KÍNH BỐ CỤC RIÊNG: ${mode === 'outline' ? archetype.outlineDirectiveVi : archetype.proseDirectiveVi}
-2. CẤM SAO CHÉP NGUYÊN VĂN CÂU ĐỀ BÀI: Tuyệt đối không lặp lại nguyên xi câu hỏi trong đề bài hoặc tên tiêu chí Rubric dài quá 4 từ liên tiếp làm câu mở đầu hay tiêu đề mục — phải diễn đạt lại bằng từ vựng học thuật riêng.
-${focusInstruction}
-4. NHỊP TRÍCH DẪN & TRIỂN KHAI: Sử dụng linh hoạt khoảng ${meta.sampledSourceCount} nguồn đã cấp trong danh sách [S1]..[S${meta.sampledSourceCount}], viết hoàn toàn bằng cấu trúc câu độc lập của riêng Bản #${meta.cloneIndex}.`;
+    return `\n\n=== CHẾ ĐỘ ĐA HÌNH CÙNG LỚP — BÀI #${meta.cloneIndex}/${meta.cohortSize} (${methodology.shortTag} · ${archetype.label}) ===
+Bài này thuộc nhóm ${meta.cohortSize} sinh viên học CÙNG MỘT HỌC PHẦN nộp chung hệ thống kiểm tra chéo. Danh mục trích dẫn có thể giao thoa tự nhiên từ bể nguồn chung, NHƯNG PHƯƠNG PHÁP, CHỦ ĐỀ TIẾP CẬN, TÊN ĐỀ MỤC VÀ CÂU CHỮ THÂN BÀI PHẢI ĐỘC LẬP HOÀN TOÀN (KHÔNG TRÙNG CỤM >= 5 TỪ):
+1. PHƯƠNG PHÁP NGHIÊN CỨU & PHÂN TÍCH RIÊNG (${methodology.label}): ${
+      mode === 'outline' ? methodology.outlineDirectiveVi : methodology.proseDirectiveVi
+    }
+2. LĂNG KÍNH BỐ CỤC DÀN Ý RIÊNG (${archetype.label}): ${
+      mode === 'outline' ? archetype.outlineDirectiveVi : archetype.proseDirectiveVi
+    }
+3. CẤM SAO CHÉP NGUYÊN VĂN CÂU ĐỀ BÀI: Tuyệt đối không lặp lại nguyên xi câu hỏi đề bài hay tiêu chí Rubric dài quá 4 từ liên tiếp làm tiêu đề mục hoặc câu mở đoạn.
+${focusParts.join('\n')}
+5. TÍCH HỢP NGUỒN NGẪU NHIÊN: Sử dụng linh hoạt khoảng ${meta.sampledSourceCount} nguồn đã cấp ([S1]..[S${meta.sampledSourceCount}]), không liệt kê máy móc theo đúng thứ tự đánh số.`;
   }
 
-  return `\n\n=== SAME-CLASS COHORT ANTI-SIMILARITY ENGINE (STUDENT PAPER #${meta.cloneIndex} OF ${meta.cohortSize} · ${archetype.shortTag}) ===
-CRITICAL CONTEXT: ${meta.cohortSize} students in the SAME university class are submitting papers on this exact brief to the same Turnitin assignment inbox. Sharing some scholarly sources from the random course pool is completely natural, BUT BODY PROSE AND HEADINGS MUST HAVE ZERO CONTIGUOUS PHRASE OVERLAP (>= 5 WORDS) WITH ANY CLASSMATE:
-1. ASSIGNED STRUCTURAL & RHETORICAL LENS: ${
+  return `\n\n=== SAME-CLASS COHORT DIFFERENTIATION & ANTI-SIMILARITY ENGINE (PAPER #${meta.cloneIndex} OF ${meta.cohortSize} · ${methodology.shortTag} · ${archetype.shortTag}) ===
+CRITICAL CONTEXT: ${meta.cohortSize} students in the SAME class are submitting papers for this shared course brief. Natural overlap in foundational references is completely acceptable, BUT METHODOLOGY, ANALYTICAL ANGLE, SECTION HEADINGS, AND BODY PROSE MUST HAVE ZERO CONTIGUOUS PHRASE OVERLAP (>= 5 WORDS):
+1. ASSIGNED RESEARCH METHODOLOGY (${methodology.label}): ${
+    mode === 'outline' ? methodology.outlineDirectiveEn : methodology.proseDirectiveEn
+  }
+2. ASSIGNED STRUCTURAL & RHETORICAL LENS (${archetype.shortTag}): ${
     mode === 'outline' ? archetype.outlineDirectiveEn : archetype.proseDirectiveEn
   }
-2. NEVER PARROT PROMPT OR RUBRIC PHRASING: Never copy 5+ consecutive words verbatim from the assignment prompt, topic sentence, or rubric descriptors into your headings or opening sentences. Reformulate every concept in fresh wording.
-${focusInstruction}
-4. NATURAL RANDOMIZED SOURCE INTEGRATION: Weave sources organically from this student's randomly sampled bibliography pack ([S1]..[S${meta.sampledSourceCount}]), varying citation placement and never listing sources in the exact order [S1], [S2], [S3].`;
+3. NEVER PARROT PROMPT OR RUBRIC PHRASING: Never copy 5+ consecutive words verbatim from the assignment brief or rubric descriptors into your headings or topic sentences.
+${focusParts.join('\n')}
+5. NATURAL RANDOMIZED SOURCE INTEGRATION: Weave sources organically from this paper's sampled bibliography pack ([S1]..[S${meta.sampledSourceCount}]), varying citation placement and synthesis style.`;
 }
 
 // ---------------------------------------------------------------------------

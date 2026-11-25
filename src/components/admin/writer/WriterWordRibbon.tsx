@@ -61,7 +61,7 @@ const FONT_FAMILIES: FontFamilyOption[] = [
   'Cambria',
 ];
 
-const FONT_SIZES: number[] = [10, 11, 12, 13, 14, 16];
+const FONT_SIZES: number[] = [10, 11, 11.5, 12, 13, 14, 16];
 
 const LINE_SPACINGS: { value: LineSpacingOption; label: string }[] = [
   { value: 1.0, label: '1.0' },

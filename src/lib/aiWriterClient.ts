@@ -834,16 +834,16 @@ function compactResearchedSourcesForPrompt(
   const perpMarker = '=== PERPLEXITY REAL-TIME WEB RESEARCH';
   const splitIdx = trimmed.indexOf(perpMarker);
   if (splitIdx === -1) {
-    return trimmed.slice(0, mode === 'outline' ? 4200 : 7200);
+    return trimmed.slice(0, mode === 'outline' ? 5200 : 9000);
   }
   const crossrefPart = trimmed.slice(0, splitIdx).trim();
   if (mode === 'outline') {
-    // Outline generation keeps all verified [S1]..[S20] Crossref titles/citations
-    return crossrefPart.slice(0, 4800);
+    // Outline generation keeps all verified Crossref titles/citations
+    return crossrefPart.slice(0, 5600);
   }
-  // Body writing keeps 100% of verified [S1]..[S25] Crossref pack + compact capped Perplexity web context
+  // Body writing keeps up to 30 verified Crossref works + compact capped Perplexity web context
   const perplexityPart = trimmed.slice(splitIdx).trim().slice(0, 2600);
-  return `${crossrefPart.slice(0, 6800)}\n\n${perplexityPart}`.trim();
+  return `${crossrefPart.slice(0, 9000)}\n\n${perplexityPart}`.trim();
 }
 
 export function buildSkillsAndContextSystemPrompt(
@@ -2044,7 +2044,7 @@ function buildVerifiedCitationWhitelistBlock(session: WriterSession): string {
   const rawSources = session.researchedSources || '';
   const sMatches = rawSources.match(/^\[S\d+\]\s+In-Text:.*$/gm) || [];
   if (sMatches.length > 0) {
-    verifiedLines.push(...sMatches.slice(0, 14));
+    verifiedLines.push(...sMatches.slice(0, 30));
   }
   if (verifiedLines.length === 0) return '';
   return `\n=== VERIFIED IN-TEXT CITATION WHITELIST (USE THESE EXACT AUTHOR-YEAR CITATIONS) ===\n${verifiedLines.join(

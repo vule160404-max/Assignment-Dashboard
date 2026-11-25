@@ -170,6 +170,34 @@ export function WriterBriefPanel({
 
   return (
     <div className="tab-panel-enter p-4 space-y-3.5">
+      {session.cohortMeta && (
+        <div className="rounded-xl bg-slate-900 text-white p-3 space-y-1.5 border border-slate-800">
+          <div className="flex items-center justify-between gap-2 text-[10.5px]">
+            <span className="font-mono font-bold text-amber-300 uppercase tracking-wider">
+              Hồ sơ Nhóm #{session.cohortMeta.cloneIndex}/{session.cohortMeta.cohortSize}
+            </span>
+            <span className="font-mono text-sky-300">
+              {session.cohortMeta.sampledSourceCount}/{session.cohortMeta.poolTotalCount} nguồn DOI
+            </span>
+          </div>
+          {session.cohortMeta.methodologyLabel && (
+            <div className="text-[11px] font-semibold text-white leading-snug">
+              PP: {session.cohortMeta.methodologyLabel}
+            </div>
+          )}
+          <div className="text-[10.5px] text-slate-300 leading-snug">
+            Lăng kính: {session.cohortMeta.archetypeLabel}
+          </div>
+          {(session.cohortMeta.customFramework || session.cohortMeta.customCaseFocus) && (
+            <div className="text-[10.5px] text-emerald-300 leading-snug">
+              {[session.cohortMeta.customFramework, session.cohortMeta.customCaseFocus]
+                .filter(Boolean)
+                .join(' · ')}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 1-Click Academic Document Type Selector (VN Thesis / Report / Research & EN Essay) */}
       <div>
         <label className="block text-[11px] font-semibold text-zinc-600 mb-1.5">

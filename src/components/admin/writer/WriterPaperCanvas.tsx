@@ -759,7 +759,7 @@ export function WriterPaperCanvas({
           minHeight: `${Math.round((1123 * zoomPercent) / 100)}px`,
           padding: `${Math.round((pagePaddingPx * zoomPercent) / 100)}px`,
           fontFamily: `"${format.fontFamily}", serif`,
-          fontSize: `${Math.round((format.fontSizePt * zoomPercent) / 100)}pt`,
+          fontSize: `${Number(((format.fontSizePt * zoomPercent) / 100).toFixed(2))}pt`,
           lineHeight: format.lineSpacing,
           textAlign: format.textAlign,
         }}
