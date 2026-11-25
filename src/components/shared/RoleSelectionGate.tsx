@@ -378,31 +378,33 @@ export function RoleSelectionGate({
             {/* 2. UNIVERSITY LOGO MARQUEE STRIP */}
             <section
               aria-label="Các trường Đại học tiêu biểu"
-              className="py-8 sm:py-10 bg-[#FCFCFF] border-y border-slate-200/70"
+              className="py-10 sm:py-12 bg-[#FCFCFF] border-y border-slate-200/70"
             >
-              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-5">
-                <p className="text-center text-xs sm:text-[13px] font-medium text-slate-500">
+              <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+                <p className="text-center text-xs sm:text-sm font-medium text-slate-500">
                   Bài mẫu &amp; chuẩn Rubric được đối chiếu theo 25+ trường Đại học Quốc tế
                 </p>
 
                 <div className="logo-marquee-wrap logo-marquee-mask overflow-hidden">
-                  <div className="logo-marquee-track items-center gap-8 sm:gap-12">
+                  <div className="logo-marquee-track items-center gap-6 sm:gap-9 py-1">
                     {[...UNI_MARQUEE_LOGOS, ...UNI_MARQUEE_LOGOS].map((uni, idx) => (
                       <button
                         key={`${uni.name}-${idx}`}
                         type="button"
                         onClick={openSampleLibrary}
                         title={`Xem bài mẫu ${uni.name}`}
-                        className="group shrink-0 inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl grayscale opacity-70 hover:grayscale-0 hover:opacity-100 hover:bg-white transition-all cursor-pointer"
+                        className="group shrink-0 inline-flex items-center gap-3.5 px-3.5 py-2 rounded-2xl bg-white/80 hover:bg-white border border-slate-200/75 hover:border-[#12489B]/35 shadow-[0_1px_4px_rgba(15,23,42,0.03)] hover:shadow-[0_6px_16px_rgba(11,37,89,0.07)] opacity-90 hover:opacity-100 transition-all cursor-pointer"
                       >
-                        <img
-                          src={uni.logoUrl}
-                          alt={uni.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="h-7 w-7 object-contain shrink-0"
-                        />
-                        <span className="text-xs font-semibold text-slate-700 whitespace-nowrap">
+                        <span className="w-14 h-12 sm:w-16 sm:h-14 rounded-xl bg-white border border-slate-100 p-1.5 flex items-center justify-center shrink-0">
+                          <img
+                            src={uni.logoUrl}
+                            alt={uni.name}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105"
+                          />
+                        </span>
+                        <span className="text-[13px] sm:text-sm font-semibold text-slate-800 whitespace-nowrap pr-1">
                           {uni.name}
                         </span>
                       </button>
