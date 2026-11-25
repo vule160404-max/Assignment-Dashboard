@@ -291,16 +291,18 @@ export function RoleSelectionGate({
               />
 
               <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="max-w-3xl mx-auto text-center space-y-5">
+                <div className="max-w-4xl mx-auto text-center space-y-5">
                   <div className="hero-reveal inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F8FAFC] border border-slate-200/90 text-[11px] sm:text-[11.5px] font-semibold text-[#12489B] whitespace-nowrap">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#12489B]" />
                     <span>Bảo mật 100%</span>
                   </div>
 
-                  <h1 className="hero-reveal hero-delay-1 text-[34px] sm:text-5xl lg:text-[58px] font-semibold tracking-[-0.03em] leading-[1.09] text-[#0F172A] text-balance">
-                    Viết học thuật &amp;{' '}
-                    <span className="whitespace-nowrap">Luận văn</span>{' '}
-                    <span className="text-[#12489B]">chuẩn từng trích dẫn.</span>
+                  <h1 className="hero-reveal hero-delay-1 text-[30px] sm:text-[42px] lg:text-[52px] font-semibold tracking-[-0.03em] leading-[1.12] text-[#0F172A] text-balance">
+                    Hỗ trợ Assignment chuẩn học thuật{' '}
+                    <span className="whitespace-nowrap">quốc tế.</span>{' '}
+                    <span className="text-[#12489B] inline-block">
+                      No Plagiarism · AI Free
+                    </span>
                   </h1>
 
                   <p className="hero-reveal hero-delay-2 text-base sm:text-lg text-slate-600 max-w-2xl mx-auto leading-relaxed">
