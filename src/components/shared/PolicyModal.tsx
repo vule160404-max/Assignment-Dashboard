@@ -48,6 +48,9 @@ export function PolicyModal({ initialTab, onClose }: PolicyModalProps) {
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Chính sách và điều khoản AssignTrack"
       className="modal-backdrop fixed inset-0 z-[110] bg-slate-900/55 backdrop-blur-[2px] flex items-center justify-center p-4"
       onClick={onClose}
     >

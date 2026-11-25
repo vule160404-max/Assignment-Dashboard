@@ -62,8 +62,21 @@ export function LiveConversionFomoDock({
   onOrderNow,
 }: LiveConversionFomoDockProps) {
   const [dismissed, setDismissed] = useState(false);
+  const [scrolledEnough, setScrolledEnough] = useState(false);
   const [index, setIndex] = useState(0);
   const [visible, setVisible] = useState(true);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY;
+      const docHeight = document.documentElement.scrollHeight;
+      const nearFooter = y + window.innerHeight >= docHeight - 240;
+      setScrolledEnough(y > 320 && !nearFooter);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     if (dismissed) return;
@@ -78,13 +91,13 @@ export function LiveConversionFomoDock({
     return () => window.clearInterval(cycleTimer);
   }, [dismissed]);
 
-  if (dismissed) return null;
+  if (dismissed || !scrolledEnough) return null;
 
   const item = FOMO_ACTIVITIES[index];
 
   return (
     <div
-      className={`fixed bottom-4 left-4 z-40 max-w-[330px] sm:max-w-[360px] transition-all duration-300 ${
+      className={`hidden md:block fixed bottom-4 left-4 z-40 max-w-[330px] transition-all duration-300 ${
         visible
           ? 'opacity-100 translate-y-0'
           : 'opacity-0 translate-y-3 pointer-events-none'

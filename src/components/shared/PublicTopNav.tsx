@@ -1,10 +1,7 @@
-import {
-  ArrowUpRight,
-  LogIn,
-} from 'lucide-react';
+import { ArrowUpRight, BookOpen, LogIn, ShieldCheck } from 'lucide-react';
 import { BrandLogo } from './BrandLogo';
 
-export type PublicNavKey = 'home' | 'order' | 'lookup' | 'checker' | 'samples';
+export type PublicNavKey = 'home' | 'lookup' | 'order' | 'checker' | 'samples';
 
 interface PublicTopNavProps {
   activeNav: PublicNavKey;
@@ -16,6 +13,17 @@ interface PublicTopNavProps {
   onSelectAdmin: () => void;
 }
 
+function scrollToHomeSection(sectionId: string, onGoHome: () => void, isHome: boolean) {
+  if (!isHome) {
+    onGoHome();
+    window.setTimeout(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+    return;
+  }
+  document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 export function PublicTopNav({
   activeNav,
   onGoHome,
@@ -25,207 +33,174 @@ export function PublicTopNav({
   onOpenSamples,
   onSelectAdmin,
 }: PublicTopNavProps) {
-  const scrollToHomeSection = (sectionId: string) => {
-    if (activeNav !== 'home') {
-      onGoHome();
-      window.setTimeout(() => {
-        document
-          .getElementById(sectionId)
-          ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 120);
-      return;
-    }
-    document
-      .getElementById(sectionId)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
+  const isHome = activeNav === 'home';
 
-  const navLinkClass = (isActive: boolean) =>
-    `relative py-5 text-[13px] font-semibold transition-colors whitespace-nowrap ${
-      isActive
-        ? 'text-[#0B2559] font-bold after:content-[""] after:absolute after:inset-x-0 after:bottom-0 after:h-[2.5px] after:rounded-full after:bg-[#12489B]'
-        : 'text-slate-600 hover:text-[#12489B]'
+  const navLinkClass = (active: boolean) =>
+    `px-3 py-1.5 rounded-lg text-[13px] font-medium whitespace-nowrap transition-colors cursor-pointer ${
+      active
+        ? 'text-[#0B2559] font-semibold bg-slate-100/90'
+        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/60'
     }`;
 
   return (
-    <>
-      {/* Top Promo Strip */}
-      <div className="bg-gradient-to-r from-[#071A42] via-[#0B2559] to-[#12489B] text-white/95 text-[11.5px] font-medium py-2 px-4 text-center">
-        <span className="inline-flex items-center gap-2 flex-wrap justify-center">
-          <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-          <span>
-            Ưu đãi sinh viên mới: Miễn phí báo cáo Turnitin &amp; AI Check khi đặt bài ngay hôm nay
-          </span>
-          <button
-            type="button"
-            onClick={onOpenOrder}
-            className="underline decoration-amber-300/80 underline-offset-2 font-semibold text-amber-300 hover:text-amber-200 transition-colors"
-          >
-            Nhận ưu đãi &amp; Đặt bài →
-          </button>
-        </span>
-      </div>
+    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200/75">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={onGoHome}
+          className="text-left focus:outline-none shrink-0 cursor-pointer"
+          aria-label="AssignTrack Trang chủ"
+        >
+          <BrandLogo size="sm" />
+        </button>
 
-      {/* Unified Editorial Sticky White Header */}
-      <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-zinc-200/85">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-6">
+        {/* Center Minimalist Nav */}
+        <nav
+          aria-label="Điều hướng chính"
+          className="hidden lg:flex items-center gap-1"
+        >
           <button
             type="button"
             onClick={onGoHome}
-            className="text-left focus:outline-none shrink-0"
+            className={navLinkClass(activeNav === 'home')}
           >
-            <BrandLogo />
+            Trang chủ
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToHomeSection('quy-trinh', onGoHome, isHome)}
+            className={navLinkClass(false)}
+          >
+            Quy trình
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToHomeSection('cam-ket', onGoHome, isHome)}
+            className={navLinkClass(false)}
+          >
+            Gói cam kết
+          </button>
+          <button
+            type="button"
+            onClick={onOpenLookup}
+            className={navLinkClass(activeNav === 'lookup')}
+          >
+            Tra cứu đơn
+          </button>
+          <button
+            type="button"
+            onClick={onOpenChecker}
+            className={`px-3 py-1.5 rounded-lg text-[13px] whitespace-nowrap transition-colors inline-flex items-center gap-1.5 cursor-pointer ${
+              activeNav === 'checker'
+                ? 'bg-[#0B2559] text-white font-semibold'
+                : 'text-slate-600 font-medium hover:text-[#12489B] hover:bg-blue-50/70'
+            }`}
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-[#12489B]" />
+            <span>Check AI Free</span>
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSamples}
+            className={`px-3 py-1.5 rounded-lg text-[13px] whitespace-nowrap transition-colors inline-flex items-center gap-1.5 cursor-pointer ${
+              activeNav === 'samples'
+                ? 'bg-[#0B2559] text-white font-semibold'
+                : 'text-slate-600 font-medium hover:text-[#12489B] hover:bg-blue-50/70'
+            }`}
+          >
+            <BookOpen className="w-3.5 h-3.5 text-[#12489B]" />
+            <span>Bài mẫu</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToHomeSection('faq', onGoHome, isHome)}
+            className={navLinkClass(false)}
+          >
+            FAQ
+          </button>
+        </nav>
+
+        {/* Clean Right Action Pair (Jenni style) */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={onSelectAdmin}
+            className="btn-press hidden sm:inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer"
+          >
+            <LogIn className="w-3.5 h-3.5 text-slate-500" />
+            <span>Đăng nhập</span>
           </button>
 
-          {/* Clean Editorial Navigation Links (Synchronized with Landing Page Sections + Core Services) */}
-          <nav
-            aria-label="Điều hướng chính"
-            className="hidden lg:flex items-center gap-6 xl:gap-7"
+          <button
+            type="button"
+            onClick={onOpenOrder}
+            className={`btn-press inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold whitespace-nowrap shadow-[0_1px_2px_rgba(11,37,89,0.12)] transition-colors cursor-pointer ${
+              activeNav === 'order'
+                ? 'bg-[#12489B] text-white'
+                : 'bg-[#0B2559] hover:bg-[#12489B] text-white'
+            }`}
           >
-            <button
-              type="button"
-              onClick={onGoHome}
-              className={navLinkClass(activeNav === 'home')}
-            >
-              Trang chủ
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollToHomeSection('quy-trinh')}
-              className={navLinkClass(false)}
-            >
-              Quy trình
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollToHomeSection('cam-ket')}
-              className={navLinkClass(false)}
-            >
-              Gói cam kết
-            </button>
-            <button
-              type="button"
-              onClick={onOpenLookup}
-              className={navLinkClass(activeNav === 'lookup')}
-            >
-              Tra cứu đơn
-            </button>
-            <button
-              type="button"
-              onClick={onOpenChecker}
-              className={navLinkClass(activeNav === 'checker')}
-            >
-              Check AI Free
-            </button>
-            <button
-              type="button"
-              onClick={onOpenSamples}
-              className={navLinkClass(activeNav === 'samples')}
-            >
-              Bài mẫu
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollToHomeSection('faq')}
-              className={navLinkClass(false)}
-            >
-              FAQ
-            </button>
-          </nav>
-
-          {/* Right Action Controls */}
-          <div className="flex items-center gap-2.5 shrink-0">
-            <button
-              type="button"
-              onClick={onSelectAdmin}
-              className="btn-press inline-flex items-center gap-1.5 px-3.5 py-2 rounded-full border border-zinc-200 bg-white hover:border-[#12489B]/50 hover:text-[#12489B] text-xs font-semibold text-slate-700 transition-colors whitespace-nowrap"
-              title="Chuyển sang cổng dành cho Admin / Nhân sự"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Đăng nhập</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={onOpenOrder}
-              className="btn-press group inline-flex items-center gap-2 pl-4 pr-1.5 py-1.5 rounded-full bg-gradient-to-r from-[#F59E0B] to-[#EA580C] hover:from-[#D97706] hover:to-[#C2410C] text-white text-xs font-bold shadow-[0_6px_20px_rgba(234,88,12,0.28)] transition-colors whitespace-nowrap"
-            >
-              <span>ORDER NOW</span>
-              <span className="w-6 h-6 rounded-full bg-white/20 group-hover:bg-white group-hover:text-[#EA580C] flex items-center justify-center transition-colors">
-                <ArrowUpRight className="w-3.5 h-3.5" />
-              </span>
-            </button>
-          </div>
+            <span>Đặt bài ngay</span>
+            <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
         </div>
+      </div>
 
-        {/* Tablet & Mobile Clean Quick Nav Bar */}
-        <div className="lg:hidden border-t border-zinc-100 px-3 py-2 bg-white/95 overflow-x-auto">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-1.5 min-w-max text-xs font-semibold">
-            <button
-              type="button"
-              onClick={onGoHome}
-              className={`px-3 py-1.5 rounded-full transition-colors ${
-                activeNav === 'home'
-                  ? 'bg-[#0B2559] text-white'
-                  : 'text-slate-600 hover:bg-zinc-100'
-              }`}
-            >
-              Trang chủ
-            </button>
-            <button
-              type="button"
-              onClick={onOpenOrder}
-              className={`px-3 py-1.5 rounded-full transition-colors ${
-                activeNav === 'order'
-                  ? 'bg-[#EA580C] text-white'
-                  : 'text-slate-600 hover:bg-zinc-100'
-              }`}
-            >
-              Đặt bài
-            </button>
-            <button
-              type="button"
-              onClick={onOpenLookup}
-              className={`px-3 py-1.5 rounded-full transition-colors ${
-                activeNav === 'lookup'
-                  ? 'bg-[#0B2559] text-white'
-                  : 'text-slate-600 hover:bg-zinc-100'
-              }`}
-            >
-              Tra cứu đơn
-            </button>
-            <button
-              type="button"
-              onClick={onOpenChecker}
-              className={`px-3 py-1.5 rounded-full transition-colors ${
-                activeNav === 'checker'
-                  ? 'bg-[#0B2559] text-white'
-                  : 'text-slate-600 hover:bg-zinc-100'
-              }`}
-            >
-              Check AI
-            </button>
-            <button
-              type="button"
-              onClick={onOpenSamples}
-              className={`px-3 py-1.5 rounded-full transition-colors ${
-                activeNav === 'samples'
-                  ? 'bg-[#0B2559] text-white'
-                  : 'text-slate-600 hover:bg-zinc-100'
-              }`}
-            >
-              Bài mẫu
-            </button>
-            <button
-              type="button"
-              onClick={() => scrollToHomeSection('cam-ket')}
-              className="px-3 py-1.5 rounded-full text-slate-600 hover:bg-zinc-100 transition-colors"
-            >
-              Gói cam kết
-            </button>
-          </div>
+      {/* Compact Mobile Bar */}
+      <div className="lg:hidden border-t border-slate-100 bg-white/95">
+        <div className="max-w-7xl mx-auto px-3 py-2 flex items-center gap-1 overflow-x-auto no-scrollbar text-[11.5px] font-medium whitespace-nowrap">
+          <button
+            type="button"
+            onClick={onGoHome}
+            className={`shrink-0 px-2.5 py-1.5 rounded-lg transition-colors ${
+              activeNav === 'home' ? 'bg-[#0B2559] text-white font-semibold' : 'text-slate-600'
+            }`}
+          >
+            Trang chủ
+          </button>
+          <button
+            type="button"
+            onClick={onOpenLookup}
+            className={`shrink-0 px-2.5 py-1.5 rounded-lg transition-colors ${
+              activeNav === 'lookup' ? 'bg-[#0B2559] text-white font-semibold' : 'text-slate-600'
+            }`}
+          >
+            Tra cứu
+          </button>
+          <button
+            type="button"
+            onClick={onOpenChecker}
+            className={`shrink-0 px-2.5 py-1.5 rounded-lg transition-colors ${
+              activeNav === 'checker' ? 'bg-[#0B2559] text-white font-semibold' : 'text-slate-600'
+            }`}
+          >
+            Check AI
+          </button>
+          <button
+            type="button"
+            onClick={onOpenSamples}
+            className={`shrink-0 px-2.5 py-1.5 rounded-lg transition-colors ${
+              activeNav === 'samples' ? 'bg-[#0B2559] text-white font-semibold' : 'text-slate-600'
+            }`}
+          >
+            Bài mẫu
+          </button>
+          <button
+            type="button"
+            onClick={() => scrollToHomeSection('cam-ket', onGoHome, isHome)}
+            className="shrink-0 px-2.5 py-1.5 rounded-lg text-slate-600"
+          >
+            Cam kết
+          </button>
+          <button
+            type="button"
+            onClick={onSelectAdmin}
+            className="sm:hidden shrink-0 px-2.5 py-1.5 rounded-lg text-slate-600"
+          >
+            Đăng nhập
+          </button>
         </div>
-      </header>
-    </>
+      </div>
+    </header>
   );
 }
