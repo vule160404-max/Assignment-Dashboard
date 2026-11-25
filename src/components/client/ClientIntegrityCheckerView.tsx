@@ -7,6 +7,7 @@ import {
   FileCheck2,
   FileText,
   FolderUp,
+  GraduationCap,
   Info,
   Loader2,
   Printer,
@@ -615,48 +616,48 @@ export function ClientIntegrityCheckerView({
           </div>
         </section>
 
-        {/* Right 4-Col Forensic Capability Rail (Shown when idle before report runs) */}
+        {/* Right 4-Col Master Writer Assurance Rail (Shown when idle before report runs) */}
         {!report && (
           <aside className="lg:col-span-4 space-y-4">
             <div className="rounded-2xl bg-white border border-slate-200/90 p-5 space-y-4 shadow-[0_4px_20px_rgba(15,23,42,0.03)]">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-2">
                 <span className="text-xs font-bold uppercase tracking-wider text-[#0B2559]">
-                  Cơ chế 3 tầng phân tích
+                  Đội ngũ Thạc sĩ đa ngành
                 </span>
-                <ShieldCheck className="w-4 h-4 text-[#12489B]" />
+                <GraduationCap className="w-4 h-4 text-[#12489B] shrink-0" />
               </div>
 
               <div className="space-y-3">
                 {[
                   {
                     code: '01',
-                    title: 'Đối chiếu nguồn học thuật mở',
-                    desc: 'Quét chéo văn bản với cơ sở dữ liệu bài báo khoa học trực tuyến và nguồn internet công khai.',
+                    title: '100% Người thật trực tiếp viết bài',
+                    desc: 'Biên soạn hoàn toàn bởi Thạc sĩ & Nghiên cứu sinh chuyên ngành — tuyệt đối không dùng AI sinh bài tự động.',
                   },
                   {
                     code: '02',
-                    title: 'Đo dấu vết ngôn ngữ AI (Forensics)',
-                    desc: 'Phân tích độ đồng đều cấu trúc câu (Burstiness) và cụm từ đặc trưng của các mô hình LLM.',
+                    title: 'Đa dạng mọi khối ngành học thuật',
+                    desc: 'Kinh tế, Tài chính, Quản trị – Marketing, CNTT & Dữ liệu (SPSS/R/SmartPLS), Luật, Giáo dục & Kỹ thuật.',
                   },
                   {
                     code: '03',
-                    title: 'Khoanh vùng từng câu rủi ro',
-                    desc: 'Tô màu trực quan từng câu nghi vấn kèm xuất bản in PDF phục vụ tự rà soát trước khi nộp.',
+                    title: 'Văn phong chuẩn Rubric · AI 0%',
+                    desc: 'Lập luận phản biện sâu sắc, trích dẫn nguồn DOI thật 100% giúp bài đạt chuẩn tự nhiên trước mọi bộ lọc.',
                   },
-                ].map((layer) => (
+                ].map((item) => (
                   <div
-                    key={layer.code}
+                    key={item.code}
                     className="flex items-start gap-3 pb-3 last:pb-0 border-b last:border-b-0 border-slate-100"
                   >
                     <span className="w-6 h-6 rounded-md bg-slate-100 text-[#0B2559] font-mono text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                      {layer.code}
+                      {item.code}
                     </span>
                     <div className="space-y-0.5">
                       <div className="text-xs font-bold text-slate-900">
-                        {layer.title}
+                        {item.title}
                       </div>
                       <p className="text-[11.5px] text-slate-500 leading-relaxed">
-                        {layer.desc}
+                        {item.desc}
                       </p>
                     </div>
                   </div>

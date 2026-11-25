@@ -72,10 +72,19 @@ const PROCESS_STEPS = [
 ];
 
 const COMPARISON_ASSIGNTRACK = [
-  '100% nguồn học thuật DOI / peer-reviewed có thật, đối chiếu từng luận điểm',
-  'Bám sát Marking Rubric từng môn (RMIT, Melbourne, UK/Úc/Mỹ, ĐH Việt Nam)',
-  'Kiểm định Turnitin không lưu kho & giữ AI Detection ở mức 0% an toàn',
-  'Chỉnh sửa miễn phí theo feedback giảng viên trực tiếp trong Cổng đơn hàng',
+  '100% do đội ngũ Thạc sĩ chuyên ngành trực tiếp viết — KHÔNG dùng AI viết bài',
+  'Phủ đủ đa dạng ngành: Kinh tế, Tài chính, Marketing, CNTT/Dữ liệu, Luật, Y sinh',
+  'Nguồn học thuật DOI / peer-reviewed có thật, bám sát Marking Rubric từng môn',
+  'Kiểm định Turnitin không lưu kho, AI 0% & bảo hành chỉnh sửa miễn phí',
+];
+
+const MASTER_WRITER_DISCIPLINES = [
+  { field: 'Kinh tế & Tài chính', degree: 'ThS. Finance / Economics' },
+  { field: 'Quản trị & Marketing', degree: 'ThS. MBA / Strategic Mgmt' },
+  { field: 'CNTT & Dữ liệu (SPSS/R)', degree: 'ThS. Data Science / CS' },
+  { field: 'Luật & Xã hội học', degree: 'ThS. LL.M / Social Sciences' },
+  { field: 'Kỹ thuật & Y sinh', degree: 'ThS. Engineering / Biomedical' },
+  { field: 'Giáo dục & Ngôn ngữ', degree: 'ThS. TESOL / Education' },
 ];
 
 const COMPARISON_GENERIC_AI = [
@@ -464,59 +473,90 @@ export function RoleSelectionGate({
                     Vì sao chọn AssignTrack
                   </div>
                   <h2 className="text-2xl sm:text-4xl font-semibold tracking-[-0.025em] text-slate-900">
-                    Không phải AI viết đại trà
+                    Đội ngũ Thạc sĩ trực tiếp viết — Không phải AI
                   </h2>
                   <p className="text-sm text-slate-600">
-                    Sự khác biệt giữa bài nghiên cứu đạt High Distinction và văn bản sao chép máy móc.
+                    Mỗi bài làm do Thạc sĩ đúng chuyên ngành chấp bút, nghiên cứu nguồn thật và bám sát Rubric.
                   </p>
                 </div>
 
                 <RevealOnScroll>
-                  <div className="rounded-3xl border border-slate-200/90 bg-white p-2 sm:p-3 shadow-[0_12px_40px_-16px_rgba(11,37,89,0.1)] grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {/* AssignTrack Solid Navy Column */}
-                    <div className="rounded-2xl bg-[#0B2559] text-white p-6 sm:p-7 space-y-5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-base font-bold tracking-tight">
-                          Assign<span className="text-amber-400">Track</span>
-                        </span>
-                        <span className="text-[10.5px] font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/10 text-sky-200">
-                          Chuẩn học thuật
-                        </span>
+                  <div className="space-y-6">
+                    <div className="rounded-3xl border border-slate-200/90 bg-white p-2 sm:p-3 shadow-[0_12px_40px_-16px_rgba(11,37,89,0.1)] grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {/* AssignTrack Solid Navy Column */}
+                      <div className="rounded-2xl bg-[#0B2559] text-white p-6 sm:p-7 space-y-5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-base font-bold tracking-tight">
+                            Assign<span className="text-amber-400">Track</span>
+                          </span>
+                          <span className="text-[10.5px] font-semibold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-white/10 text-sky-200">
+                            Thạc sĩ chuyên ngành
+                          </span>
+                        </div>
+                        <ul className="divide-y divide-white/10">
+                          {COMPARISON_ASSIGNTRACK.map((item) => (
+                            <li
+                              key={item}
+                              className="py-3 first:pt-0 last:pb-0 flex items-start gap-2.5 text-xs sm:text-[13px] text-slate-100 leading-relaxed"
+                            >
+                              <Check className="w-4 h-4 text-sky-300 shrink-0 mt-0.5" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
                       </div>
-                      <ul className="divide-y divide-white/10">
-                        {COMPARISON_ASSIGNTRACK.map((item) => (
-                          <li
-                            key={item}
-                            className="py-3 first:pt-0 last:pb-0 flex items-start gap-2.5 text-xs sm:text-[13px] text-slate-100 leading-relaxed"
-                          >
-                            <Check className="w-4 h-4 text-sky-300 shrink-0 mt-0.5" />
-                            <span>{item}</span>
-                          </li>
-                        ))}
-                      </ul>
+
+                      {/* Generic AI Muted Column */}
+                      <div className="rounded-2xl bg-[#FCFCFF] text-slate-700 p-6 sm:p-7 space-y-5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-base font-semibold text-slate-800">
+                            AI Chatbot đại trà
+                          </span>
+                          <span className="text-[10.5px] font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
+                            Rủi ro cao
+                          </span>
+                        </div>
+                        <ul className="divide-y divide-slate-200/75">
+                          {COMPARISON_GENERIC_AI.map((item) => (
+                            <li
+                              key={item}
+                              className="py-3 first:pt-0 last:pb-0 flex items-start gap-2.5 text-xs sm:text-[13px] text-slate-500 leading-relaxed"
+                            >
+                              <X className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+                              <span>{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
 
-                    {/* Generic AI Muted Column */}
-                    <div className="rounded-2xl bg-[#FCFCFF] text-slate-700 p-6 sm:p-7 space-y-5">
-                      <div className="flex items-center justify-between">
-                        <span className="text-base font-semibold text-slate-800">
-                          AI Chatbot đại trà
-                        </span>
-                        <span className="text-[10.5px] font-medium px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                          Rủi ro cao
+                    {/* Multidisciplinary Master-Degree Writer Roster Strip */}
+                    <div className="rounded-2xl bg-[#FCFCFF] border border-slate-200/85 p-5 sm:p-6 space-y-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 text-xs sm:text-[13px] font-semibold text-slate-900">
+                          <GraduationCap className="w-4 h-4 text-[#12489B]" />
+                          <span>Đội ngũ Thạc sĩ đa dạng chuyên ngành (100% Người viết thật)</span>
+                        </div>
+                        <span className="text-[11px] text-slate-500">
+                          Ghép đúng người viết có bằng cấp cùng ngành học
                         </span>
                       </div>
-                      <ul className="divide-y divide-slate-200/75">
-                        {COMPARISON_GENERIC_AI.map((item) => (
-                          <li
-                            key={item}
-                            className="py-3 first:pt-0 last:pb-0 flex items-start gap-2.5 text-xs sm:text-[13px] text-slate-500 leading-relaxed"
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                        {MASTER_WRITER_DISCIPLINES.map((item) => (
+                          <div
+                            key={item.field}
+                            className="px-3.5 py-2.5 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between gap-2"
                           >
-                            <X className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
-                            <span>{item}</span>
-                          </li>
+                            <span className="text-xs font-semibold text-slate-800">
+                              {item.field}
+                            </span>
+                            <span className="text-[10.5px] font-mono font-medium text-[#12489B] shrink-0">
+                              {item.degree}
+                            </span>
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     </div>
                   </div>
                 </RevealOnScroll>

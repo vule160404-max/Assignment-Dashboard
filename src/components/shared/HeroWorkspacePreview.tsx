@@ -6,7 +6,9 @@ import {
   CheckCircle2,
   FileCheck2,
   FileText,
+  GraduationCap,
   Layers,
+  RefreshCw,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react';
@@ -18,6 +20,33 @@ interface HeroWorkspacePreviewProps {
 }
 
 type PreviewTabKey = 'editor' | 'turnitin' | 'samples';
+type SampleLang = 'en' | 'vi';
+
+interface WorkspaceSampleDoc {
+  id: string;
+  lang: SampleLang;
+  fileName: string;
+  docHeaderMeta: string[];
+  rubricBadge: string;
+  authorLabel: string;
+  sectionHeading: string;
+  beforeMark: string;
+  markText: string;
+  afterMark: string;
+  citation: string;
+  middleText: string;
+  autocompleteText: string;
+  footerMeta: string;
+  orderCta: string;
+  sourcesTitle: string;
+  sourcesPill: string;
+  sources: { code: string; title: string; meta: string }[];
+  qcTitle: string;
+  qcScore: string;
+  qcMetrics: { name: string; score: string; color: string }[];
+  qcGiftTitle: string;
+  qcGiftDesc: string;
+}
 
 const WORKSPACE_TABS: { key: PreviewTabKey; label: string; shortLabel: string }[] = [
   { key: 'editor', label: 'Soạn thảo & Trích dẫn', shortLabel: 'Soạn thảo' },
@@ -25,29 +54,202 @@ const WORKSPACE_TABS: { key: PreviewTabKey; label: string; shortLabel: string }[
   { key: 'samples', label: 'Thư viện Bài mẫu', shortLabel: 'Bài mẫu' },
 ];
 
-const SOURCE_ITEMS = [
+const EDITOR_SAMPLES: WorkspaceSampleDoc[] = [
   {
-    code: 'Peer-Reviewed · 2024',
-    title: 'Supply Chain Agility in Omnichannel Retail',
-    meta: 'Porter, M. & Kramer · J. Strategy · DOI Verified',
+    id: 'en-strategy',
+    lang: 'en',
+    fileName: 'BUSM2570 · Strategic_Retail_HD.docx',
+    docHeaderMeta: ['Academic English', 'Harvard Style', '2,500 words'],
+    rubricBadge: 'Rubric Aligned',
+    authorLabel: 'Written by MSc Business & Strategy',
+    sectionHeading: '2.1 Dynamic Capabilities & Retail Supply Resilience',
+    beforeMark: 'Empirical research across omnichannel retailers indicates that deploying ',
+    markText: 'agile inventory reconfiguration',
+    afterMark: ' strengthens operational responsiveness during demand shocks ',
+    citation: '(Porter & Kramer, 2019)',
+    middleText:
+      '. Longitudinal data from 42 APAC retail networks confirms that standardizing point-of-sale telemetry',
+    autocompleteText:
+      ' lowers holding costs by 18.4% while lifting service fulfillment to 4.7/5 (Teece et al., 2023).',
+    footerMeta: 'Similarity: 3% · AI: 0% · Times New Roman 12pt',
+    orderCta: 'Order Similar Paper',
+    sourcesTitle: 'Academic Sources (15)',
+    sourcesPill: 'DOI Verified',
+    sources: [
+      {
+        code: 'Peer-Reviewed · 2024',
+        title: 'Supply Chain Agility in Omnichannel Retail',
+        meta: 'Porter, M. & Kramer · J. Strategy · DOI Verified',
+      },
+      {
+        code: 'Q1 Journal · 2023',
+        title: 'Dynamic Capabilities & Firm Performance',
+        meta: 'Teece, D. & Peteraf · Strategic Mgmt J.',
+      },
+      {
+        code: 'Empirical · 2023',
+        title: 'Retail Telemetry Modeling in APAC Markets',
+        meta: 'Nguyen, T. & Lee · Int. Business Review',
+      },
+    ],
+    qcTitle: 'Quality Audit',
+    qcScore: 'HD 88/100',
+    qcMetrics: [
+      { name: 'Marking Rubric Coverage', score: '96%', color: 'bg-[#12489B]' },
+      { name: 'Critical Analysis Depth', score: '92%', color: 'bg-emerald-600' },
+      { name: 'Peer-Reviewed Citations', score: '100%', color: 'bg-emerald-600' },
+    ],
+    qcGiftTitle: 'Included Free:',
+    qcGiftDesc: 'Official Non-Repository Turnitin Similarity & AI PDF Report.',
   },
   {
-    code: 'Q1 Journal · 2023',
-    title: 'Dynamic Capabilities & Firm Performance',
-    meta: 'Teece, D., Peteraf · Strategic Mgmt J. · Harvard',
+    id: 'en-finance',
+    lang: 'en',
+    fileName: 'FNCE30010 · Corporate_Valuation_H1.docx',
+    docHeaderMeta: ['Academic English', 'APA 7th Edition', '3,000 words'],
+    rubricBadge: 'Rubric Aligned',
+    authorLabel: 'Written by MSc Finance & Econometrics',
+    sectionHeading: '3.2 Capital Structure & Weighted Cost of Capital',
+    beforeMark: 'Under dynamic trade-off theory, listed enterprises balance tax shields against ',
+    markText: 'marginal financial distress costs',
+    afterMark: ' when calibrating long-term target leverage ratios ',
+    citation: '(Modigliani & Miller, 2020)',
+    middleText:
+      '. Fixed-effects panel regression on ASX-200 constituents demonstrates that optimal debt discipline',
+    autocompleteText:
+      ' reduces firm WACC by 115 bps across capital-intensive utilities (Fama & French, 2022).',
+    footerMeta: 'Similarity: 2% · AI: 0% · Times New Roman 12pt',
+    orderCta: 'Order Similar Paper',
+    sourcesTitle: 'Academic Sources (18)',
+    sourcesPill: 'DOI Verified',
+    sources: [
+      {
+        code: 'Q1 Finance · 2023',
+        title: 'Dynamic Capital Structure & Debt Capacity',
+        meta: 'Graham, J. & Leary · J. Financial Economics',
+      },
+      {
+        code: 'Econometrics · 2022',
+        title: 'Cost of Equity & Multi-Factor Asset Pricing',
+        meta: 'Fama, E. & French · Review of Finance',
+      },
+      {
+        code: 'Empirical · 2024',
+        title: 'ASX-200 Leverage Sensitivity Analysis',
+        meta: 'Chen, W. & Patel · Corporate Finance Rev.',
+      },
+    ],
+    qcTitle: 'Quality Audit',
+    qcScore: 'H1 86/100',
+    qcMetrics: [
+      { name: 'Marking Rubric Coverage', score: '95%', color: 'bg-[#12489B]' },
+      { name: 'Econometric Rigor', score: '94%', color: 'bg-emerald-600' },
+      { name: 'Peer-Reviewed Citations', score: '100%', color: 'bg-emerald-600' },
+    ],
+    qcGiftTitle: 'Included Free:',
+    qcGiftDesc: 'Full Excel DCF Workbook, Stata Output & Turnitin AI Report.',
   },
   {
-    code: 'Empirical · 2023',
-    title: 'SPSS Regression Modeling in ASEAN Markets',
-    meta: 'Nguyen, T. & Lee · Int. Business Review',
+    id: 'vi-strategy',
+    lang: 'vi',
+    fileName: 'LV_ThacSi_QTKD_UEH.docx',
+    docHeaderMeta: ['Tiếng Việt học thuật', 'Chuẩn APA 7th', '12,000 từ'],
+    rubricBadge: 'Chuẩn Đề cương',
+    authorLabel: 'Biên soạn: ThS. Quản trị Kinh doanh',
+    sectionHeading: '2.1 Năng lực động và Khả năng phục hồi Chuỗi cung ứng',
+    beforeMark: 'Kết quả phân tích chuỗi giá trị cho thấy doanh nghiệp bán lẻ áp dụng mô hình ',
+    markText: 'tái cấu trúc tồn kho linh hoạt',
+    afterMark: ' duy trì hiệu suất vượt trội trong giai đoạn biến động cầu ',
+    citation: '(Nguyễn & Trần, 2023)',
+    middleText:
+      '. Thực nghiệm tại 42 chuỗi bán lẻ khu vực phía Nam chứng minh việc chuẩn hóa dữ liệu điểm bán',
+    autocompleteText:
+      ' giúp giảm 18,4% chi phí lưu kho và nâng tỷ lệ đáp ứng đơn hàng lên 96,2% (Lê, 2024).',
+    footerMeta: 'Tương đồng: 4% · AI: 0% · Times New Roman 12pt',
+    orderCta: 'Đặt bài tương tự',
+    sourcesTitle: 'Nguồn học thuật (22)',
+    sourcesPill: 'Tạp chí uy tín',
+    sources: [
+      {
+        code: 'Tạp chí KT&PT · 2024',
+        title: 'Chuỗi cung ứng linh hoạt trong ngành Bán lẻ',
+        meta: 'Nguyễn Văn Minh & Trần · Tạp chí Kinh tế & PT',
+      },
+      {
+        code: 'Hội thảo QG · 2023',
+        title: 'Năng lực động và Năng lực cạnh tranh Doanh nghiệp',
+        meta: 'Lê Hoàng Nam · ĐH Kinh tế TP.HCM',
+      },
+      {
+        code: 'Thực nghiệm · 2024',
+        title: 'Mô hình hóa dữ liệu bán lẻ đa kênh tại Việt Nam',
+        meta: 'Phạm Quỳnh Anh · Nghiên cứu Kinh tế',
+      },
+    ],
+    qcTitle: 'Kiểm định chất lượng',
+    qcScore: '9.0 / 10',
+    qcMetrics: [
+      { name: 'Bám sát Đề cương & Rubric', score: '96%', color: 'bg-[#12489B]' },
+      { name: 'Chiều sâu lập luận phản biện', score: '92%', color: 'bg-emerald-600' },
+      { name: 'Trích dẫn khoa học hợp lệ', score: '100%', color: 'bg-emerald-600' },
+    ],
+    qcGiftTitle: 'Tặng kèm:',
+    qcGiftDesc: 'File kiểm định Turnitin chính hãng (Không lưu kho trường).',
+  },
+  {
+    id: 'vi-spss',
+    lang: 'vi',
+    fileName: 'KLTN_TaiChinh_SPSS_NEU.docx',
+    docHeaderMeta: ['Tiếng Việt học thuật', 'Chuẩn APA 7th', '8,500 từ'],
+    rubricBadge: 'Chuẩn Hội đồng',
+    authorLabel: 'Biên soạn: ThS. Tài chính – Kinh tế lượng',
+    sectionHeading: '3.2 Kiểm định Mô hình Hồi quy Tuyến tính Đa biến (OLS)',
+    beforeMark: 'Hệ số phóng đại phương sai VIF đều nhỏ hơn 2,0 khẳng định mô hình không xuất hiện ',
+    markText: 'hiện tượng đa cộng tuyến',
+    afterMark: ' giữa các biến độc lập giải thích tỷ suất sinh lời ',
+    citation: '(Phạm & Hoàng, 2024)',
+    middleText:
+      '. Kết quả phân tích SPSS 26 trên mẫu khảo sát 315 doanh nghiệp niêm yết cho thấy biến chuyển đổi số',
+    autocompleteText:
+      ' tác động cùng chiều lên ROA với mức ý nghĩa thống kê p < 0,01 (Đặng, 2023).',
+    footerMeta: 'Tương đồng: 3% · AI: 0% · Times New Roman 12pt',
+    orderCta: 'Đặt bài tương tự',
+    sourcesTitle: 'Nguồn học thuật (20)',
+    sourcesPill: 'Tạp chí uy tín',
+    sources: [
+      {
+        code: 'Tài chính · 2024',
+        title: 'Chuyển đổi số và Hiệu quả Tài chính Doanh nghiệp',
+        meta: 'Phạm Đức Mạnh & Hoàng · Tạp chí Tài chính',
+      },
+      {
+        code: 'Kinh tế lượng · 2023',
+        title: 'Ứng dụng Hồi quy Đa biến SPSS trong Nghiên cứu',
+        meta: 'Đặng Thị Thu Hà · ĐH Kinh tế Quốc dân',
+      },
+      {
+        code: 'Thực nghiệm · 2024',
+        title: 'Quản trị Vốn lưu động và Tỷ suất Sinh lời ROA',
+        meta: 'Bùi Xuân Trường · Tạp chí Ngân hàng',
+      },
+    ],
+    qcTitle: 'Kiểm định chất lượng',
+    qcScore: '9.2 / 10',
+    qcMetrics: [
+      { name: 'Chuẩn mô hình Định lượng', score: '97%', color: 'bg-[#12489B]' },
+      { name: 'Diễn giải Output SPSS/SmartPLS', score: '95%', color: 'bg-emerald-600' },
+      { name: 'Trích dẫn khoa học hợp lệ', score: '100%', color: 'bg-emerald-600' },
+    ],
+    qcGiftTitle: 'Tặng kèm:',
+    qcGiftDesc: 'Toàn bộ file Data (.sav), Output SPSS & báo cáo Turnitin.',
   },
 ];
 
 const TURNITIN_CHECKS = [
+  { label: 'Biên soạn 100% bởi Thạc sĩ chuyên ngành', value: 'Human Written', tone: 'emerald' as const },
   { label: 'Trích dẫn chuẩn DOI / Peer-Reviewed', value: '15 / 15 đạt', tone: 'emerald' as const },
   { label: 'Tỷ lệ tương đồng Turnitin (Non-repository)', value: '4% An toàn', tone: 'emerald' as const },
-  { label: 'AI Detection (Turnitin AI Module)', value: '0% Human', tone: 'emerald' as const },
-  { label: 'Độ phủ tiêu chí Rubric (Critical Analysis)', value: '96% HD Band', tone: 'blue' as const },
+  { label: 'AI Detection (Turnitin AI Module)', value: '0% Human', tone: 'blue' as const },
 ];
 
 const SAMPLE_CARDS = [
@@ -56,26 +258,23 @@ const SAMPLE_CARDS = [
     school: 'RMIT University',
     title: 'Business Decision Making – Strategic Retail Expansion',
     score: '88% HD',
-    meta: '2,500 từ · Harvard · Turnitin 3%',
+    meta: '2,500 words · Harvard · Turnitin 3%',
   },
   {
     code: 'FNCE30010',
     school: 'University of Melbourne',
     title: 'Corporate Valuation & WACC Sensitivity Modeling',
     score: '84% H1',
-    meta: '3,000 từ · APA 7th · SPSS & Excel',
+    meta: '3,000 words · APA 7th · SPSS & Excel',
   },
   {
     code: 'MKT20025',
     school: 'Swinburne University',
     title: 'Omnichannel Consumer Journey & Attribution Audit',
     score: '86% HD',
-    meta: '2,200 từ · Harvard · Kèm bảng dữ liệu',
+    meta: '2,200 words · Harvard · Full Data Tables',
   },
 ];
-
-const AUTOCOMPLETE_SNIPPET =
-  ' giúp giảm 18.4% chi phí tồn kho và nâng điểm hài lòng khách hàng lên 4.7/5 (Teece et al., 2023).';
 
 export function HeroWorkspacePreview({
   onOpenOrder,
@@ -83,8 +282,12 @@ export function HeroWorkspacePreview({
   onOpenSamples,
 }: HeroWorkspacePreviewProps) {
   const [activeTab, setActiveTab] = useState<PreviewTabKey>('editor');
-  const [typedLen, setTypedLen] = useState(42);
+  const [sampleIdx, setSampleIdx] = useState(0);
+  const [typedLen, setTypedLen] = useState(38);
   const [paused, setPaused] = useState(false);
+
+  const currentSample = EDITOR_SAMPLES[sampleIdx];
+  const fullAutocomplete = currentSample.autocompleteText;
 
   useEffect(() => {
     if (
@@ -98,12 +301,36 @@ export function HeroWorkspacePreview({
 
     const interval = window.setInterval(() => {
       setTypedLen((prev) =>
-        prev >= AUTOCOMPLETE_SNIPPET.length ? 18 : prev + 1
+        prev >= fullAutocomplete.length ? 16 : prev + 1
       );
     }, 55);
 
     return () => window.clearInterval(interval);
-  }, [paused, activeTab]);
+  }, [paused, activeTab, fullAutocomplete.length]);
+
+  const handleSelectLanguage = (targetLang: SampleLang) => {
+    const firstMatchIdx = EDITOR_SAMPLES.findIndex((s) => s.lang === targetLang);
+    if (firstMatchIdx !== -1) {
+      setSampleIdx(firstMatchIdx);
+      setTypedLen(20);
+    }
+  };
+
+  const handleSwitchNextSample = () => {
+    const sameLangSamples = EDITOR_SAMPLES
+      .map((item, idx) => ({ item, idx }))
+      .filter(({ item }) => item.lang === currentSample.lang);
+
+    if (sameLangSamples.length > 1) {
+      const curPos = sameLangSamples.findIndex((entry) => entry.idx === sampleIdx);
+      const nextEntry = sameLangSamples[(curPos + 1) % sameLangSamples.length];
+      setSampleIdx(nextEntry.idx);
+      setTypedLen(18);
+    } else {
+      setSampleIdx((prev) => (prev + 1) % EDITOR_SAMPLES.length);
+      setTypedLen(18);
+    }
+  };
 
   return (
     <div
@@ -121,7 +348,7 @@ export function HeroWorkspacePreview({
           </div>
           <span className="hidden md:inline-block h-3.5 w-px bg-slate-200" />
           <span className="text-[12px] font-medium text-slate-600 truncate font-mono">
-            BUSM2570 · Strategic_Retail_HD.docx
+            {currentSample.fileName}
           </span>
         </div>
 
@@ -156,20 +383,20 @@ export function HeroWorkspacePreview({
 
       {/* Interactive Workspace Body */}
       {activeTab === 'editor' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[340px] divide-y lg:divide-y-0 lg:divide-x divide-slate-200/80">
-          {/* Left Pane: Verified Sources */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[360px] divide-y lg:divide-y-0 lg:divide-x divide-slate-200/80">
+          {/* Left Pane: Verified Sources (Strictly matches sample language) */}
           <div className="lg:col-span-3 p-4 bg-[#FCFCFF] space-y-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Nguồn học thuật (15)
+                {currentSample.sourcesTitle}
               </span>
-              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200/80">
-                DOI Thật
+              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-bold border border-emerald-200/80 shrink-0">
+                {currentSample.sourcesPill}
               </span>
             </div>
 
             <div className="space-y-2">
-              {SOURCE_ITEMS.map((src, idx) => (
+              {currentSample.sources.map((src, idx) => (
                 <div
                   key={src.title}
                   className={`p-2.5 rounded-xl border transition-colors ${
@@ -192,37 +419,91 @@ export function HeroWorkspacePreview({
             </div>
           </div>
 
-          {/* Center Pane: Live Paper Editor */}
+          {/* Center Pane: Live Paper Editor + Language & Sample Switcher */}
           <div className="lg:col-span-6 p-5 sm:p-6 bg-white flex flex-col justify-between gap-4">
             <div className="space-y-3">
-              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100 text-[11px] text-slate-500">
-                <div className="flex items-center gap-3 font-medium">
-                  <span className="text-slate-900 font-semibold">Tiếng Anh học thuật</span>
-                  <span>Harvard Style</span>
-                  <span>2,500 từ</span>
+              {/* Sample Language & Article Switcher Controls */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
+                  {currentSample.docHeaderMeta.map((item, i) => (
+                    <span
+                      key={item}
+                      className={i === 0 ? 'text-slate-900 font-semibold' : ''}
+                    >
+                      {item}
+                    </span>
+                  ))}
+                  <span className="hidden sm:inline-flex items-center gap-1 text-emerald-700 font-semibold">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    {currentSample.rubricBadge}
+                  </span>
                 </div>
-                <span className="inline-flex items-center gap-1 text-emerald-700 font-semibold">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  Bám sát Rubric
-                </span>
+
+                {/* Language Switch + Cycle Another Sample Button */}
+                <div className="flex items-center gap-1.5">
+                  <div
+                    className="inline-flex items-center p-0.5 rounded-lg bg-slate-100 border border-slate-200/80"
+                    role="group"
+                    aria-label="Chọn ngôn ngữ bài mẫu"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => handleSelectLanguage('en')}
+                      className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold transition-colors cursor-pointer ${
+                        currentSample.lang === 'en'
+                          ? 'bg-white text-[#0B2559] shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      English
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectLanguage('vi')}
+                      className={`px-2 py-0.5 rounded-md text-[10.5px] font-bold transition-colors cursor-pointer ${
+                        currentSample.lang === 'vi'
+                          ? 'bg-white text-[#0B2559] shadow-2xs'
+                          : 'text-slate-500 hover:text-slate-900'
+                      }`}
+                    >
+                      Tiếng Việt
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSwitchNextSample}
+                    title="Chuyển bài mẫu khác"
+                    className="btn-press inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#0B2559]/[0.06] hover:bg-[#0B2559] text-[#0B2559] hover:text-white border border-[#0B2559]/15 text-[10.5px] font-semibold transition-colors cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Đổi bài mẫu</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Human MSc Author Badge */}
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50/80 border border-blue-200/70 text-[10.5px] font-semibold text-[#12489B]">
+                <GraduationCap className="w-3.5 h-3.5 shrink-0" />
+                <span>{currentSample.authorLabel}</span>
               </div>
 
               <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                2.1 Dynamic Capabilities &amp; Retail Supply Resilience
+                {currentSample.sectionHeading}
               </h3>
 
               <p className="text-[13px] sm:text-[13.5px] leading-[1.75] text-slate-700">
-                Phân tích chuỗi giá trị cho thấy các doanh nghiệp bán lẻ áp dụng mô hình{' '}
+                {currentSample.beforeMark}
                 <mark className="bg-amber-100/85 text-slate-900 px-1 rounded">
-                  tái cấu trúc tồn kho linh hoạt
-                </mark>{' '}
-                đạt hiệu quả vượt trội trong giai đoạn biến động cầu{' '}
+                  {currentSample.markText}
+                </mark>
+                {currentSample.afterMark}
                 <span className="text-[#12489B] font-medium">
-                  (Porter &amp; Kramer, 2019)
+                  {currentSample.citation}
                 </span>
-                . Thực nghiệm tại 42 chuỗi bán lẻ khu vực APAC chứng minh việc chuẩn hóa dữ liệu điểm bán
+                {currentSample.middleText}
                 <span className="text-slate-400 transition-opacity">
-                  {AUTOCOMPLETE_SNIPPET.slice(0, typedLen)}
+                  {fullAutocomplete.slice(0, typedLen)}
                 </span>
                 <span
                   aria-hidden="true"
@@ -232,36 +513,32 @@ export function HeroWorkspacePreview({
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
-              <span className="font-mono">Similarity: 4% · AI: 0% · Chuẩn chữ Times New Roman 12pt</span>
+              <span className="font-mono">{currentSample.footerMeta}</span>
               <button
                 type="button"
                 onClick={onOpenOrder}
                 className="inline-flex items-center gap-1 font-semibold text-[#12489B] hover:text-[#0B2559] cursor-pointer"
               >
-                <span>Đặt bài tương tự</span>
+                <span>{currentSample.orderCta}</span>
                 <ArrowUpRight className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {/* Right Pane: Rubric & QC Inspector */}
+          {/* Right Pane: Rubric & QC Inspector (Strictly matches sample language) */}
           <div className="lg:col-span-3 p-4 bg-[#FCFCFF] flex flex-col justify-between gap-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Kiểm định chất lượng
+                  {currentSample.qcTitle}
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-[#0B2559] text-white text-[10px] font-bold font-mono">
-                  HD 88/100
+                  {currentSample.qcScore}
                 </span>
               </div>
 
               <div className="space-y-2">
-                {[
-                  { name: 'Bám sát Rubric đề bài', score: '96%', color: 'bg-[#12489B]' },
-                  { name: 'Lập luận phản biện (Critical)', score: '91%', color: 'bg-emerald-600' },
-                  { name: 'Trích dẫn Peer-Reviewed', score: '100%', color: 'bg-emerald-600' },
-                ].map((metric) => (
+                {currentSample.qcMetrics.map((metric) => (
                   <div
                     key={metric.name}
                     className="p-2.5 rounded-xl bg-white border border-slate-200/80 space-y-1.5"
@@ -284,24 +561,25 @@ export function HeroWorkspacePreview({
             </div>
 
             <div className="p-3 rounded-xl bg-[#0B2559]/[0.04] border border-[#0B2559]/10 text-[11px] text-slate-600 leading-relaxed">
-              <span className="font-semibold text-[#0B2559]">Tặng kèm:</span> File PDF Turnitin chính hãng (không lưu kho trường).
+              <span className="font-semibold text-[#0B2559]">{currentSample.qcGiftTitle}</span>{' '}
+              {currentSample.qcGiftDesc}
             </div>
           </div>
         </div>
       )}
 
       {activeTab === 'turnitin' && (
-        <div className="p-5 sm:p-8 bg-white grid grid-cols-1 lg:grid-cols-12 gap-6 items-center min-h-[340px]">
+        <div className="p-5 sm:p-8 bg-white grid grid-cols-1 lg:grid-cols-12 gap-6 items-center min-h-[360px]">
           <div className="lg:col-span-5 space-y-4">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-[11px] font-bold text-[#12489B]">
               <ShieldCheck className="w-3.5 h-3.5" />
               <span>Kiểm định độc lập trước bàn giao</span>
             </div>
             <h3 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
-              Cam kết AI 0% &amp; Turnitin an toàn tuyệt đối
+              Thạc sĩ trực tiếp viết — AI 0% &amp; Turnitin an toàn
             </h3>
             <p className="text-sm text-slate-600 leading-relaxed">
-              Mỗi bài viết đều được rà soát từng câu, đối chiếu DOI nguồn thật và xuất báo cáo Turnitin không lưu dữ liệu.
+              Mỗi bài làm do đội ngũ Thạc sĩ chuyên ngành biên soạn trực tiếp, đối chiếu DOI thật và tặng báo cáo Turnitin không lưu kho.
             </p>
             <div className="flex flex-wrap items-center gap-2.5 pt-1">
               <button
@@ -350,7 +628,7 @@ export function HeroWorkspacePreview({
       )}
 
       {activeTab === 'samples' && (
-        <div className="p-5 sm:p-8 bg-white space-y-5 min-h-[340px] flex flex-col justify-between">
+        <div className="p-5 sm:p-8 bg-white space-y-5 min-h-[360px] flex flex-col justify-between">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#12489B]">
