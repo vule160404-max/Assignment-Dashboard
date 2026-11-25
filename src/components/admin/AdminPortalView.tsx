@@ -26,6 +26,11 @@ import {
 } from 'lucide-react';
 import { auth, clearAllSensitiveBrowserStorage } from '../../lib/firebase';
 import {
+  AdminTabKey,
+  buildAdminTabPath,
+  parseAppRoute,
+} from '../../lib/routes';
+import {
   deleteServerFile,
   moveServerFileToBackup,
 } from '../../services/apiClient';
@@ -85,7 +90,7 @@ import { RevenueDashboardView } from './RevenueDashboardView';
 import { TeamManagementView } from './TeamManagementView';
 import { WordHumanizerView } from './WordHumanizerView';
 
-type AdminTab = 'orders' | 'calendar' | 'ai_writer' | 'data_lab' | 'humanizer' | 'clients' | 'revenue' | 'team' | 'settings';
+type AdminTab = AdminTabKey;
 type OrderFilter = 'all' | 'active' | 'urgent' | 'unpaid_balance' | 'completed';
 
 const ADMIN_TAB_STORAGE_KEY = 'assigntrack_admin_tab_v1';
@@ -102,6 +107,10 @@ const VALID_ADMIN_TABS: AdminTab[] = [
 ];
 
 function resolveInitialAdminTab(): AdminTab {
+  const parsed = parseAppRoute(window.location);
+  if (parsed.adminTab && VALID_ADMIN_TABS.includes(parsed.adminTab)) {
+    return parsed.adminTab;
+  }
   const urlTab = new URLSearchParams(window.location.search).get('tab') as AdminTab | null;
   if (urlTab && VALID_ADMIN_TABS.includes(urlTab)) {
     return urlTab;
@@ -173,17 +182,38 @@ export function AdminPortalView({
     });
   };
 
+  useEffect(() => {
+    const targetPath = buildAdminTabPath(activeTab);
+    if (window.location.pathname !== targetPath || window.location.search) {
+      window.history.replaceState({}, '', targetPath);
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      const parsed = parseAppRoute(window.location);
+      if (parsed.mode === 'admin') {
+        setActiveTabState(parsed.adminTab || 'orders');
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
   const setActiveTab = (nextTab: AdminTab) => {
+    const changed = nextTab !== activeTab;
     setActiveTabState(nextTab);
     try {
       localStorage.setItem(ADMIN_TAB_STORAGE_KEY, nextTab);
     } catch {
       // ignore
     }
-    const url = new URL(window.location.href);
-    url.searchParams.set('portal', 'admin');
-    url.searchParams.set('tab', nextTab);
-    window.history.replaceState({}, '', url.toString());
+    const nextPath = buildAdminTabPath(nextTab);
+    if (changed) {
+      window.history.pushState({}, '', nextPath);
+    } else {
+      window.history.replaceState({}, '', nextPath);
+    }
   };
 
   const [orders, setOrders] = useState<OrderRecord[]>([]);

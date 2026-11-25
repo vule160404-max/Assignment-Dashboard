@@ -206,6 +206,7 @@ export function SampleLibraryView({
   // Synchronize clean SEO URLs (/samples/<slug>, /uni/<school-slug>, /samples) + dynamic <head> SEO tags
   useEffect(() => {
     if (typeof window === 'undefined' || loading) return;
+    if (window.location.pathname === '/dat-bai') return;
 
     if (activeItem) {
       const targetPath = getSampleCanonicalPath(activeItem.slug);

@@ -14,14 +14,17 @@ interface PublicTopNavProps {
 }
 
 function scrollToHomeSection(sectionId: string, onGoHome: () => void, isHome: boolean) {
+  const hashUrl = `/#${sectionId}`;
   if (!isHome) {
     onGoHome();
     window.setTimeout(() => {
       document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.history.replaceState({}, '', hashUrl);
     }, 120);
     return;
   }
   document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  window.history.replaceState({}, '', hashUrl);
 }
 
 export function PublicTopNav({

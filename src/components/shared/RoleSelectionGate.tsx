@@ -294,7 +294,7 @@ export function RoleSelectionGate({
                 <div className="max-w-3xl mx-auto text-center space-y-5">
                   <div className="hero-reveal inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#F8FAFC] border border-slate-200/90 text-[11px] sm:text-[11.5px] font-semibold text-[#12489B] whitespace-nowrap">
                     <span className="w-1.5 h-1.5 rounded-full bg-[#12489B]" />
-                    <span>Chuẩn High Distinction · Đúng hẹn 100%</span>
+                    <span>Bảo mật 100%</span>
                   </div>
 
                   <h1 className="hero-reveal hero-delay-1 text-[34px] sm:text-5xl lg:text-[58px] font-semibold tracking-[-0.03em] leading-[1.09] text-[#0F172A] text-balance">

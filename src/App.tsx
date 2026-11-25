@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, User } from 'firebase/auth';
 import { CheckCircle2, X } from 'lucide-react';
 import { AdminPortalView } from './components/admin/AdminPortalView';
@@ -19,9 +19,11 @@ import {
   testConnection,
 } from './lib/firebase';
 import {
-  parseSampleRouteFromLocation,
-  type OrderPrefillData,
-} from './lib/sampleSeo';
+  PortalMode,
+  buildPortalUrl,
+  parseAppRoute,
+} from './lib/routes';
+import { type OrderPrefillData } from './lib/sampleSeo';
 import { normalizeOrderCode } from './lib/utils';
 import {
   ensureOwnerOrReadProfile,
@@ -31,29 +33,50 @@ import { UserProfile } from './types/domain';
 
 const PORTAL_MODE_STORAGE_KEY = 'assigntrack_portal_mode_v1';
 
-function resolveInitialPortalMode(): 'select' | 'admin' | 'client' {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get('code')) return 'client';
-  const urlPortal = params.get('portal');
-  if (urlPortal === 'admin' || urlPortal === 'client' || urlPortal === 'select') {
-    return urlPortal;
+function resolveInitialPortalState(): {
+  mode: PortalMode;
+  rolePage: 'home' | 'samples';
+  clientTab: ClientPortalTab;
+  orderCode: string;
+} {
+  const parsed = parseAppRoute(window.location);
+  const pathname = window.location.pathname.replace(/\/+$/, '') || '/';
+  const hasExplicitRoute =
+    pathname !== '/' || window.location.search.length > 0;
+
+  if (hasExplicitRoute) {
+    return {
+      mode: parsed.mode,
+      rolePage: parsed.rolePage,
+      clientTab: parsed.clientTab,
+      orderCode: parsed.orderCode,
+    };
   }
-  // Always honor direct SEO landings (/samples, /samples/<slug>, /uni/<school>, ?sample=...)
-  if (parseSampleRouteFromLocation(window.location).isSamplesRoute) {
-    return 'select';
-  }
+
   try {
     const saved = localStorage.getItem(PORTAL_MODE_STORAGE_KEY);
     if (saved === 'admin' || saved === 'client') {
-      return saved;
+      return {
+        mode: saved,
+        rolePage: 'home',
+        clientTab: 'lookup',
+        orderCode: '',
+      };
     }
   } catch {
     // ignore storage errors
   }
-  return 'select';
+
+  return {
+    mode: 'select',
+    rolePage: 'home',
+    clientTab: 'lookup',
+    orderCode: '',
+  };
 }
 
 export default function App() {
+  const [initialRoute] = useState(resolveInitialPortalState);
   const [user, setUser] = useState<User | null>(null);
   const [emailVerified, setEmailVerified] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
@@ -62,21 +85,19 @@ export default function App() {
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [toast, setToast] = useState<{ id: number; message: string } | null>(null);
 
-  const initialCodeParam = new URLSearchParams(window.location.search).get('code') || '';
-  const [mode, setMode] = useState<'select' | 'admin' | 'client'>(
-    resolveInitialPortalMode
+  const [mode, setMode] = useState<PortalMode>(initialRoute.mode);
+  const [clientInitialCode, setClientInitialCode] = useState(initialRoute.orderCode);
+  const [clientInitialTab, setClientInitialTab] = useState<ClientPortalTab>(
+    initialRoute.clientTab
   );
-  const [clientInitialCode, setClientInitialCode] = useState(() =>
-    normalizeOrderCode(initialCodeParam)
-  );
-  const [clientInitialTab, setClientInitialTab] = useState<ClientPortalTab>('lookup');
   const [clientInitialServiceType, setClientInitialServiceType] = useState<string | undefined>(undefined);
-  const [roleGatePage, setRoleGatePage] = useState<'home' | 'samples'>(() =>
-    parseSampleRouteFromLocation(window.location).isSamplesRoute ? 'samples' : 'home'
+  const [roleGatePage, setRoleGatePage] = useState<'home' | 'samples'>(
+    initialRoute.rolePage
   );
   const [quickOrderOpen, setQuickOrderOpen] = useState(false);
   const [quickOrderServiceType, setQuickOrderServiceType] = useState<string | undefined>(undefined);
   const [quickOrderPrefill, setQuickOrderPrefill] = useState<OrderPrefillData | undefined>(undefined);
+  const quickOrderReturnUrlRef = useRef<string>('/');
 
   const isAdminSession = Boolean(
     user &&
@@ -175,40 +196,27 @@ export default function App() {
     return () => window.clearTimeout(t);
   }, [toast]);
 
-  // Support native browser Back / Forward button across public, SEO & client views
+  // Support native browser Back / Forward button across dedicated tab URLs
   useEffect(() => {
     const handlePopState = () => {
-      const params = new URLSearchParams(window.location.search);
-      const code = params.get('code') || '';
-      const portalParam = params.get('portal');
-      const tabParam = params.get('tab');
-      const sampleRoute = parseSampleRouteFromLocation(window.location);
+      const parsed = parseAppRoute(window.location);
 
       setQuickOrderOpen(false);
 
-      if (code) {
-        setClientInitialCode(normalizeOrderCode(code));
-        setClientInitialTab('lookup');
-        setMode('client');
-        return;
-      }
-
-      if (portalParam === 'admin') {
+      if (parsed.mode === 'admin') {
         setMode('admin');
         return;
       }
 
-      if (portalParam === 'client') {
-        setClientInitialCode('');
-        if (tabParam === 'order' || tabParam === 'lookup' || tabParam === 'checker') {
-          setClientInitialTab(tabParam);
-        }
+      if (parsed.mode === 'client') {
+        setClientInitialCode(parsed.orderCode);
+        setClientInitialTab(parsed.clientTab);
         setMode('client');
         return;
       }
 
       setClientInitialCode('');
-      setRoleGatePage(sampleRoute.isSamplesRoute ? 'samples' : 'home');
+      setRoleGatePage(parsed.rolePage);
       setMode('select');
     };
 
@@ -218,7 +226,7 @@ export default function App() {
 
   const persistPortalMode = useCallback(
     (
-      nextMode: 'select' | 'admin' | 'client',
+      nextMode: PortalMode,
       extraParams?: { tab?: ClientPortalTab; code?: string; page?: 'home' | 'samples' }
     ) => {
       try {
@@ -226,37 +234,16 @@ export default function App() {
       } catch {
         // ignore
       }
-      const url = new URL(window.location.href);
-      if (nextMode === 'select') {
-        url.searchParams.delete('portal');
-        url.searchParams.delete('tab');
-        url.searchParams.delete('code');
-        url.searchParams.delete('page');
-        url.searchParams.delete('sample');
-        url.searchParams.delete('uni');
-        url.pathname = extraParams?.page === 'samples' ? '/samples' : '/';
-      } else {
-        url.pathname = '/';
-        url.searchParams.set('portal', nextMode);
-        url.searchParams.delete('page');
-        url.searchParams.delete('sample');
-        url.searchParams.delete('uni');
-        if (nextMode === 'client') {
-          if (extraParams?.code) {
-            url.searchParams.set('code', extraParams.code);
-            url.searchParams.delete('tab');
-          } else {
-            url.searchParams.delete('code');
-            if (extraParams?.tab) {
-              url.searchParams.set('tab', extraParams.tab);
-            }
-          }
-        } else {
-          url.searchParams.delete('code');
-          url.searchParams.delete('tab');
-        }
+      const nextUrl = buildPortalUrl({
+        mode: nextMode,
+        page: extraParams?.page,
+        clientTab: extraParams?.tab,
+        orderCode: extraParams?.code,
+      });
+      const currentFullUrl = window.location.pathname + window.location.search;
+      if (currentFullUrl !== nextUrl) {
+        window.history.pushState({}, '', nextUrl);
       }
-      window.history.pushState({}, '', url.toString());
     },
     []
   );
@@ -265,9 +252,27 @@ export default function App() {
     serviceType?: string,
     orderPrefill?: OrderPrefillData
   ) => {
+    const currentPath =
+      window.location.pathname + window.location.search + window.location.hash;
+    if (window.location.pathname !== '/dat-bai') {
+      quickOrderReturnUrlRef.current = currentPath || '/';
+      window.history.pushState({ quickOrderModal: true }, '', '/dat-bai');
+    }
     setQuickOrderServiceType(serviceType);
     setQuickOrderPrefill(orderPrefill);
     setQuickOrderOpen(true);
+  };
+
+  const closeQuickOrderModal = () => {
+    setQuickOrderOpen(false);
+    if (window.location.pathname === '/dat-bai' && mode === 'select') {
+      const fallback = quickOrderReturnUrlRef.current || '/';
+      window.history.replaceState(
+        {},
+        '',
+        fallback === '/dat-bai' ? '/' : fallback
+      );
+    }
   };
 
   const handleSwitchToClient = (
@@ -367,7 +372,7 @@ export default function App() {
           isOpen={quickOrderOpen}
           defaultServiceType={quickOrderServiceType}
           orderPrefill={quickOrderPrefill}
-          onClose={() => setQuickOrderOpen(false)}
+          onClose={closeQuickOrderModal}
           onGoToLookup={() => handleSwitchToClient(undefined, { tab: 'lookup' })}
           onToast={showToast}
         />

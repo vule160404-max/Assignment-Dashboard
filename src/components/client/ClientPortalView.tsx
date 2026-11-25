@@ -32,6 +32,12 @@ import {
   normalizeOrderCode,
 } from '../../lib/utils';
 import {
+  buildClientTabPath,
+  getCanonicalClientUrl,
+  parseAppRoute,
+} from '../../lib/routes';
+import { syncDocumentSeoMeta } from '../../lib/sampleSeo';
+import {
   AttachmentItem,
   FIELD_LIMITS,
   ORDER_STAGES,
@@ -129,11 +135,7 @@ export function ClientPortalView({
   const [homeTab, setHomeTabState] = useState<ClientPortalTab>(() => {
     if (initialOrderCode) return 'lookup';
     if (initialTab) return initialTab;
-    const urlTab = new URLSearchParams(window.location.search).get('tab');
-    if (urlTab === 'order' || urlTab === 'lookup' || urlTab === 'checker') {
-      return urlTab;
-    }
-    return 'order';
+    return parseAppRoute(window.location).clientTab;
   });
 
   useEffect(() => {
@@ -142,15 +144,64 @@ export function ClientPortalView({
     }
   }, [initialTab]);
 
+  useEffect(() => {
+    const onPopState = () => {
+      const parsed = parseAppRoute(window.location);
+      if (parsed.mode === 'client') {
+        setHomeTabState(parsed.clientTab);
+        setActiveCode(parsed.orderCode);
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  // Keep dedicated URL path and SEO title synchronized with active tab
+  useEffect(() => {
+    const activeOrderParam = homeTab === 'lookup' ? activeCode : '';
+    const targetPath = buildClientTabPath(homeTab, activeOrderParam);
+    const currentFull = window.location.pathname + window.location.search;
+    if (currentFull !== targetPath && window.location.pathname !== '/dat-bai') {
+      window.history.replaceState({}, '', targetPath);
+    }
+
+    if (homeTab === 'checker') {
+      syncDocumentSeoMeta({
+        title: 'Kiểm tra Đạo văn & Dấu vết AI miễn phí | AssignTrack',
+        description:
+          'Công cụ quét sơ bộ tỷ lệ trùng lặp và văn phong AI miễn phí từng câu — không lưu bài viết vào hệ thống.',
+        canonicalUrl: getCanonicalClientUrl('checker'),
+      });
+    } else if (homeTab === 'order') {
+      syncDocumentSeoMeta({
+        title: 'Đặt bài & Nhận báo giá trong 15 phút | AssignTrack',
+        description:
+          'Gửi đề bài Assignment, Essay, Luận văn & Rubric để được đội ngũ Thạc sĩ chuyên ngành hỗ trợ chuẩn High Distinction.',
+        canonicalUrl: getCanonicalClientUrl('order'),
+      });
+    } else {
+      syncDocumentSeoMeta({
+        title: activeCode
+          ? `Đơn hàng ${activeCode} — Theo dõi tiến độ | AssignTrack`
+          : 'Tra cứu tiến độ đơn hàng bằng Passcode | AssignTrack',
+        description:
+          'Theo dõi trực tuyến 6 mốc tiến độ bài làm, xem bản nháp, tải báo cáo Turnitin và thanh toán minh bạch.',
+        canonicalUrl: getCanonicalClientUrl('lookup'),
+      });
+    }
+  }, [homeTab, activeCode]);
+
   const setHomeTab = (nextTab: ClientPortalTab) => {
     const changed = nextTab !== homeTab;
     setHomeTabState(nextTab);
-    const url = new URL(window.location.href);
-    url.searchParams.set('tab', nextTab);
+    const targetPath = buildClientTabPath(
+      nextTab,
+      nextTab === 'lookup' ? activeCode : ''
+    );
     if (changed) {
-      window.history.pushState({}, '', url.toString());
+      window.history.pushState({}, '', targetPath);
     } else {
-      window.history.replaceState({}, '', url.toString());
+      window.history.replaceState({}, '', targetPath);
     }
   };
 
@@ -223,9 +274,11 @@ export function ClientPortalView({
       }
       setActiveCode(normalized);
       rememberOrderCode(normalized);
-      const url = new URL(window.location.href);
-      url.searchParams.set('code', normalized);
-      window.history.replaceState({}, '', url.toString());
+      window.history.replaceState(
+        {},
+        '',
+        buildClientTabPath('lookup', normalized)
+      );
     } catch {
       setLookupError('Không thể tra cứu mã đơn lúc này.');
       setLoading(false);
@@ -241,9 +294,7 @@ export function ClientPortalView({
     setActiveCode('');
     setPortal(null);
     setLookupError('');
-    const url = new URL(window.location.href);
-    url.searchParams.delete('code');
-    window.history.replaceState({}, '', url.toString());
+    window.history.replaceState({}, '', buildClientTabPath('lookup'));
   };
 
   const handleSubmitRevision = async (e: React.FormEvent) => {
