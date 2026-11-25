@@ -180,13 +180,18 @@ export function WriterBriefPanel({
               {session.cohortMeta.sampledSourceCount}/{session.cohortMeta.poolTotalCount} nguồn DOI
             </span>
           </div>
-          {session.cohortMeta.methodologyLabel && (
+          {(session.cohortMeta.customMethodology ||
+            session.cohortMeta.methodologyLabel) && (
             <div className="text-[11px] font-semibold text-white leading-snug">
-              PP: {session.cohortMeta.methodologyLabel}
+              PP:{' '}
+              {session.cohortMeta.customMethodology ||
+                session.cohortMeta.methodologyLabel}
             </div>
           )}
           <div className="text-[10.5px] text-slate-300 leading-snug">
-            Lăng kính: {session.cohortMeta.archetypeLabel}
+            Cấu trúc:{' '}
+            {session.cohortMeta.customApproach ||
+              session.cohortMeta.archetypeLabel}
           </div>
           {(session.cohortMeta.customFramework || session.cohortMeta.customCaseFocus) && (
             <div className="text-[10.5px] text-emerald-300 leading-snug">

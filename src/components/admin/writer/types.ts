@@ -50,7 +50,12 @@ export type FontFamilyOption =
   | 'Arial'
   | 'Calibri'
   | 'Georgia'
-  | 'Cambria';
+  | 'Cambria'
+  | 'Tahoma'
+  | 'Verdana'
+  | 'Garamond'
+  | 'Palatino Linotype'
+  | (string & {});
 
 export type TextAlignmentOption = 'left' | 'center' | 'right' | 'justify';
 
@@ -311,8 +316,10 @@ export interface CohortCloneMeta {
   cohortSize: number;
   archetypeId: string;
   archetypeLabel: string;
+  customApproach?: string;
   methodologyId?: string;
   methodologyLabel?: string;
+  customMethodology?: string;
   customTopic?: string;
   customCaseFocus?: string;
   customFramework?: string;

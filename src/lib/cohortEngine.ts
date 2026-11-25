@@ -545,9 +545,70 @@ function cryptoRandomShuffle<T>(items: T[]): T[] {
   return copy;
 }
 
+const VI_EN_ACADEMIC_BRIDGE: Array<[RegExp, string]> = [
+  [/định tính|phỏng vấn|thảo luận nhóm|mã hóa chủ đề/i, 'qualitative interview thematic'],
+  [/định lượng|khảo sát|hồi quy|spss|smartpls|pls-sem|amos|thống kê/i, 'quantitative survey regression empirical'],
+  [/hỗn hợp|kết hợp/i, 'mixed methods triangulation'],
+  [/tình huống|case study|so sánh/i, 'comparative case study analysis'],
+  [/tổng quan hệ thống|prisma|khoảng trống/i, 'systematic literature review'],
+  [/thứ cấp|báo cáo tài chính|vĩ mô|dữ liệu ngành/i, 'secondary empirical data report'],
+  [/ngân hàng|tài chính|fintech|chứng khoán/i, 'banking finance performance'],
+  [/marketing|thương hiệu|hành vi khách hàng|người tiêu dùng|gen z/i, 'marketing consumer behavior'],
+  [/chuỗi cung ứng|logistics|vận hành/i, 'supply chain logistics management'],
+  [/nhân sự|quản trị nhân lực|gắn kết nhân viên/i, 'human resource management engagement'],
+  [/chuyển đổi số|trí tuệ nhân tạo|thương mại điện tử/i, 'digital transformation artificial intelligence'],
+  [/bền vững|môi trường|esg/i, 'sustainability corporate governance'],
+];
+
+function buildCrossrefSearchTextFromSlot(
+  slot: {
+    customTopic?: string;
+    customCaseFocus?: string;
+    customFramework?: string;
+    methodologyId?: string;
+    customMethodology?: string;
+    customApproach?: string;
+  },
+  baseSubject: string
+): string {
+  const methodObj = COHORT_METHODOLOGIES.find(
+    (m) => m.id === slot.methodologyId
+  );
+  const rawCombined = [
+    (slot.customTopic || '').trim(),
+    (slot.customMethodology || '').trim(),
+    (slot.customFramework || '').trim(),
+    (slot.customCaseFocus || '').trim(),
+    (slot.customApproach || '').trim(),
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  if (!rawCombined && !methodObj?.crossrefHint) return '';
+
+  // Keep English/ASCII words + acronyms, plus bridge key Vietnamese academic phrases into CrossRef keywords
+  const asciiTerms = rawCombined
+    .replace(/[^\x20-\x7E]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  const bridgedTerms: string[] = [];
+  for (const [rx, en] of VI_EN_ACADEMIC_BRIDGE) {
+    if (rx.test(rawCombined)) bridgedTerms.push(en);
+  }
+  if (methodObj?.crossrefHint) {
+    bridgedTerms.push(methodObj.crossrefHint);
+  }
+
+  return `${asciiTerms} ${bridgedTerms.join(' ')} ${baseSubject || ''}`
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 220);
+}
+
 /**
  * Fetches supplementary targeted CrossRef works for a student's specific sub-topic,
- * case focus, theoretical framework, or methodology, then blends + randomly draws
+ * case focus, theoretical framework, or free-text methodology, then blends + randomly draws
  * `sourcesPerPaper` (e.g. 15) sources from `[targeted + masterPool]` cleanly.
  */
 export async function fetchCohortTargetedCrossrefCache(
@@ -556,29 +617,19 @@ export async function fetchCohortTargetedCrossrefCache(
     customCaseFocus?: string;
     customFramework?: string;
     methodologyId?: string;
+    customMethodology?: string;
+    customApproach?: string;
   }>,
   baseSubject: string,
   signal?: AbortSignal
 ): Promise<Map<string, CohortPoolSourceItem[]>> {
   const queryMap = new Map<string, string>();
   for (const slot of slots) {
-    const methodObj = COHORT_METHODOLOGIES.find(
-      (m) => m.id === slot.methodologyId
-    );
-    const pieces = [
-      (slot.customTopic || '').trim(),
-      (slot.customFramework || '').trim(),
-      (slot.customCaseFocus || '').trim(),
-      (methodObj?.crossrefHint || '').trim(),
-    ].filter(Boolean);
-    if (pieces.length === 0) continue;
-    const rawQuery = `${pieces.join(' ')} ${baseSubject || ''}`
-      .replace(/\s+/g, ' ')
-      .trim()
-      .slice(0, 220);
-    const key = rawQuery.toLowerCase();
+    const q = buildCrossrefSearchTextFromSlot(slot, baseSubject);
+    if (!q) continue;
+    const key = q.toLowerCase();
     if (!queryMap.has(key)) {
-      queryMap.set(key, rawQuery);
+      queryMap.set(key, q);
     }
   }
 
@@ -601,24 +652,13 @@ export function buildSlotQueryCacheKey(
     customCaseFocus?: string;
     customFramework?: string;
     methodologyId?: string;
+    customMethodology?: string;
+    customApproach?: string;
   },
   baseSubject: string
 ): string {
-  const methodObj = COHORT_METHODOLOGIES.find(
-    (m) => m.id === slot.methodologyId
-  );
-  const pieces = [
-    (slot.customTopic || '').trim(),
-    (slot.customFramework || '').trim(),
-    (slot.customCaseFocus || '').trim(),
-    (methodObj?.crossrefHint || '').trim(),
-  ].filter(Boolean);
-  if (pieces.length === 0) return '';
-  return `${pieces.join(' ')} ${baseSubject || ''}`
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 220)
-    .toLowerCase();
+  const q = buildCrossrefSearchTextFromSlot(slot, baseSubject);
+  return q ? q.toLowerCase() : '';
 }
 
 /**
@@ -730,6 +770,26 @@ export function buildCohortAntiSimilarityPromptBlock(
     COHORT_METHODOLOGIES.find((m) => m.id === meta.methodologyId) ||
     COHORT_METHODOLOGIES[0];
 
+  const resolvedMethodText = (meta.customMethodology || '').trim();
+  const matchedPresetMethod = resolvedMethodText
+    ? COHORT_METHODOLOGIES.find(
+        (m) =>
+          m.label.toLowerCase() === resolvedMethodText.toLowerCase() ||
+          m.shortTag.toLowerCase() === resolvedMethodText.toLowerCase()
+      )
+    : undefined;
+  const activeMethod = matchedPresetMethod || methodology;
+
+  const resolvedApproachText = (meta.customApproach || '').trim();
+  const matchedPresetApproach = resolvedApproachText
+    ? COHORT_STRUCTURAL_ARCHETYPES.find(
+        (a) =>
+          a.label.toLowerCase() === resolvedApproachText.toLowerCase() ||
+          a.shortTag.toLowerCase() === resolvedApproachText.toLowerCase()
+      )
+    : undefined;
+  const activeArchetype = matchedPresetApproach || archetype;
+
   const isVi = session.writingLanguage === 'Vietnamese';
   const focusParts: string[] = [];
 
@@ -743,8 +803,8 @@ export function buildCohortAntiSimilarityPromptBlock(
   if (meta.customFramework?.trim()) {
     focusParts.push(
       isVi
-        ? `- MÔ HÌNH / KHUNG LÝ THUYẾT BẮT BUỘC: Vận dụng trực tiếp "${meta.customFramework.trim()}" làm trục phân tích.`
-        : `- ASSIGNED THEORETICAL MODEL / FRAMEWORK: Explicitly ground analysis in "${meta.customFramework.trim()}".`
+        ? `- MÔ HÌNH / KHUNG LÝ THUYẾT / CÔNG CỤ BẮT BUỘC: Vận dụng trực tiếp "${meta.customFramework.trim()}" làm trục phân tích.`
+        : `- ASSIGNED THEORETICAL MODEL / SOFTWARE / FRAMEWORK: Explicitly ground analysis in "${meta.customFramework.trim()}".`
     );
   }
   if (meta.customCaseFocus?.trim()) {
@@ -768,28 +828,84 @@ export function buildCohortAntiSimilarityPromptBlock(
     );
   }
 
+  const methodInstruction = resolvedMethodText
+    ? matchedPresetMethod
+      ? isVi
+        ? `${matchedPresetMethod.label}: ${
+            mode === 'outline'
+              ? matchedPresetMethod.outlineDirectiveVi
+              : matchedPresetMethod.proseDirectiveVi
+          }`
+        : `${matchedPresetMethod.label}: ${
+            mode === 'outline'
+              ? matchedPresetMethod.outlineDirectiveEn
+              : matchedPresetMethod.proseDirectiveEn
+          }`
+      : isVi
+      ? `THỰC HIỆN CHÍNH XÁC PHƯƠNG PHÁP DO NGƯỜI DÙNG CHỈ ĐỊNH: "${resolvedMethodText}". ${
+          mode === 'outline'
+            ? 'Xây dựng cấu trúc các chương, tiểu mục phương pháp, thu thập/xử lý dữ liệu và thảo luận kết quả bám sát tuyệt đối đặc thù của phương pháp này.'
+            : 'Triển khai lập luận, thuật ngữ chuyên môn, thiết kế bảng biểu/mẫu và đánh giá giới hạn phương pháp đúng chuẩn mực của phương pháp đã chỉ định.'
+        }`
+      : `STRICTLY EXECUTE USER-SPECIFIED METHODOLOGY: "${resolvedMethodText}". ${
+          mode === 'outline'
+            ? 'Design chapters, methodology protocol sub-headings, sampling/analytical procedure, and evaluation sections tailored specifically to this method.'
+            : 'Use authentic methodological terminology, design logic, evaluation criteria, and limitation analysis faithful to this exact specified method.'
+        }`
+    : isVi
+    ? `${activeMethod.label}: ${
+        mode === 'outline'
+          ? activeMethod.outlineDirectiveVi
+          : activeMethod.proseDirectiveVi
+      }`
+    : `${activeMethod.label}: ${
+        mode === 'outline'
+          ? activeMethod.outlineDirectiveEn
+          : activeMethod.proseDirectiveEn
+      }`;
+
+  const structureInstruction = resolvedApproachText
+    ? matchedPresetApproach
+      ? isVi
+        ? mode === 'outline'
+          ? matchedPresetApproach.outlineDirectiveVi
+          : matchedPresetApproach.proseDirectiveVi
+        : mode === 'outline'
+        ? matchedPresetApproach.outlineDirectiveEn
+        : matchedPresetApproach.proseDirectiveEn
+      : isVi
+      ? `TỔ CHỨC BỐ CỤC & GÓC TIẾP CẬN THEO YÊU CẦU RIÊNG: "${resolvedApproachText}". ${
+          mode === 'outline'
+            ? activeArchetype.outlineDirectiveVi
+            : activeArchetype.proseDirectiveVi
+        }`
+      : `STRUCTURAL APPROACH & ANALYTICAL DIRECTION: "${resolvedApproachText}". ${
+          mode === 'outline'
+            ? activeArchetype.outlineDirectiveEn
+            : activeArchetype.proseDirectiveEn
+        }`
+    : isVi
+    ? mode === 'outline'
+      ? activeArchetype.outlineDirectiveVi
+      : activeArchetype.proseDirectiveVi
+    : mode === 'outline'
+    ? activeArchetype.outlineDirectiveEn
+    : activeArchetype.proseDirectiveEn;
+
   if (isVi) {
-    return `\n\n=== CHẾ ĐỘ ĐA HÌNH CÙNG LỚP — BÀI #${meta.cloneIndex}/${meta.cohortSize} (${methodology.shortTag} · ${archetype.label}) ===
+    return `\n\n=== CHẾ ĐỘ ĐA HÌNH CÙNG LỚP — BÀI #${meta.cloneIndex}/${meta.cohortSize} ===
 Bài này thuộc nhóm ${meta.cohortSize} sinh viên học CÙNG MỘT HỌC PHẦN nộp chung hệ thống kiểm tra chéo. Danh mục trích dẫn có thể giao thoa tự nhiên từ bể nguồn chung, NHƯNG PHƯƠNG PHÁP, CHỦ ĐỀ TIẾP CẬN, TÊN ĐỀ MỤC VÀ CÂU CHỮ THÂN BÀI PHẢI ĐỘC LẬP HOÀN TOÀN (KHÔNG TRÙNG CỤM >= 5 TỪ):
-1. PHƯƠNG PHÁP NGHIÊN CỨU & PHÂN TÍCH RIÊNG (${methodology.label}): ${
-      mode === 'outline' ? methodology.outlineDirectiveVi : methodology.proseDirectiveVi
-    }
-2. LĂNG KÍNH BỐ CỤC DÀN Ý RIÊNG (${archetype.label}): ${
-      mode === 'outline' ? archetype.outlineDirectiveVi : archetype.proseDirectiveVi
-    }
+1. PHƯƠNG PHÁP NGHIÊN CỨU & PHÂN TÍCH RIÊNG: ${methodInstruction}
+2. CẤU TRÚC DÀN Ý & LĂNG KÍNH TIẾP CẬN: ${structureInstruction}
 3. CẤM SAO CHÉP NGUYÊN VĂN CÂU ĐỀ BÀI: Tuyệt đối không lặp lại nguyên xi câu hỏi đề bài hay tiêu chí Rubric dài quá 4 từ liên tiếp làm tiêu đề mục hoặc câu mở đoạn.
 ${focusParts.join('\n')}
 5. TÍCH HỢP NGUỒN NGẪU NHIÊN: Sử dụng linh hoạt khoảng ${meta.sampledSourceCount} nguồn đã cấp ([S1]..[S${meta.sampledSourceCount}]), không liệt kê máy móc theo đúng thứ tự đánh số.`;
   }
 
-  return `\n\n=== SAME-CLASS COHORT DIFFERENTIATION & ANTI-SIMILARITY ENGINE (PAPER #${meta.cloneIndex} OF ${meta.cohortSize} · ${methodology.shortTag} · ${archetype.shortTag}) ===
+  return `\n\n=== SAME-CLASS COHORT DIFFERENTIATION & ANTI-SIMILARITY ENGINE (PAPER #${meta.cloneIndex} OF ${meta.cohortSize}) ===
 CRITICAL CONTEXT: ${meta.cohortSize} students in the SAME class are submitting papers for this shared course brief. Natural overlap in foundational references is completely acceptable, BUT METHODOLOGY, ANALYTICAL ANGLE, SECTION HEADINGS, AND BODY PROSE MUST HAVE ZERO CONTIGUOUS PHRASE OVERLAP (>= 5 WORDS):
-1. ASSIGNED RESEARCH METHODOLOGY (${methodology.label}): ${
-    mode === 'outline' ? methodology.outlineDirectiveEn : methodology.proseDirectiveEn
-  }
-2. ASSIGNED STRUCTURAL & RHETORICAL LENS (${archetype.shortTag}): ${
-    mode === 'outline' ? archetype.outlineDirectiveEn : archetype.proseDirectiveEn
-  }
+1. ASSIGNED RESEARCH METHODOLOGY: ${methodInstruction}
+2. STRUCTURAL & RHETORICAL ARCHITECTURE: ${structureInstruction}
 3. NEVER PARROT PROMPT OR RUBRIC PHRASING: Never copy 5+ consecutive words verbatim from the assignment brief or rubric descriptors into your headings or topic sentences.
 ${focusParts.join('\n')}
 5. NATURAL RANDOMIZED SOURCE INTEGRATION: Weave sources organically from this paper's sampled bibliography pack ([S1]..[S${meta.sampledSourceCount}]), varying citation placement and synthesis style.`;

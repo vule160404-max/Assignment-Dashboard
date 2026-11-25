@@ -55,13 +55,17 @@ interface WriterWordRibbonProps {
 
 const FONT_FAMILIES: FontFamilyOption[] = [
   'Times New Roman',
-  'Arial',
   'Calibri',
   'Georgia',
   'Cambria',
+  'Arial',
+  'Tahoma',
+  'Verdana',
+  'Garamond',
+  'Palatino Linotype',
 ];
 
-const FONT_SIZES: number[] = [10, 11, 11.5, 12, 13, 14, 16];
+const FONT_SIZES: number[] = [9, 10, 10.5, 11, 11.5, 12, 12.5, 13, 14, 16];
 
 const LINE_SPACINGS: { value: LineSpacingOption; label: string }[] = [
   { value: 1.0, label: '1.0' },
@@ -172,6 +176,11 @@ export function WriterWordRibbon({
             }
             className="px-2 py-1 text-xs font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-slate-900 focus:outline-none focus:border-[#12489B]"
           >
+            {!FONT_FAMILIES.includes(format.fontFamily) && format.fontFamily && (
+              <option value={format.fontFamily} style={{ fontFamily: format.fontFamily }}>
+                {format.fontFamily}
+              </option>
+            )}
             {FONT_FAMILIES.map((f) => (
               <option key={f} value={f} style={{ fontFamily: f }}>
                 {f}
@@ -190,6 +199,9 @@ export function WriterWordRibbon({
             }
             className="px-1.5 py-1 text-xs font-mono font-medium bg-zinc-50 hover:bg-zinc-100/80 border border-zinc-200 rounded-md text-slate-900 focus:outline-none focus:border-[#12489B]"
           >
+            {!FONT_SIZES.includes(format.fontSizePt) && (
+              <option value={format.fontSizePt}>{format.fontSizePt}pt</option>
+            )}
             {FONT_SIZES.map((sz) => (
               <option key={sz} value={sz}>
                 {sz}pt

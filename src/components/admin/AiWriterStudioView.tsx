@@ -2007,6 +2007,12 @@ export function AiWriterStudioView({
           coverPage: nextCover,
         };
 
+        const customMethodText = slot.customMethodology.trim();
+        const customApproachText = slot.customApproach.trim();
+        const displayMethodTag = customMethodText
+          ? customMethodText.slice(0, 22)
+          : methodology.shortTag;
+
         const shortTopic = (resolvedTopic || activeSession.subject || 'Nhóm')
           .trim()
           .slice(0, 24);
@@ -2014,7 +2020,7 @@ export function AiWriterStudioView({
           ? `${slot.linkedOrderCode} · Bản #${cloneNumber}`
           : resolvedStudentName
           ? `Bản #${cloneNumber} (${resolvedStudentName}) · ${shortTopic}`
-          : `Bản #${cloneNumber}/${config.cloneCount} · ${methodology.shortTag}`;
+          : `Bản #${cloneNumber}/${config.cloneCount} · ${displayMethodTag}`;
 
         return {
           ...activeSession,
@@ -2041,9 +2047,11 @@ export function AiWriterStudioView({
             cloneIndex: cloneNumber,
             cohortSize: config.cloneCount,
             archetypeId: archetype.id,
-            archetypeLabel: archetype.label,
+            archetypeLabel: customApproachText || archetype.label,
+            customApproach: customApproachText || undefined,
             methodologyId: methodology.id,
-            methodologyLabel: methodology.label,
+            methodologyLabel: customMethodText || methodology.label,
+            customMethodology: customMethodText || undefined,
             customTopic: slot.customTopic.trim() || undefined,
             customCaseFocus: slot.customCaseFocus.trim() || undefined,
             customFramework: slot.customFramework.trim() || undefined,
