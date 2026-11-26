@@ -4,6 +4,7 @@ import {
   BookOpen,
   Check,
   CheckCircle2,
+  ExternalLink,
   FileCheck2,
   FileText,
   GraduationCap,
@@ -22,6 +23,18 @@ interface HeroWorkspacePreviewProps {
 type PreviewTabKey = 'editor' | 'turnitin' | 'samples';
 type SampleLang = 'en' | 'vi';
 
+interface VerifiedReferenceEntry {
+  id: string;
+  tag: string;
+  shortTitle: string;
+  shortMeta: string;
+  authorsYear: string;
+  articleTitle: string;
+  journalName: string;
+  issuePages: string;
+  doi: string;
+}
+
 interface WorkspaceSampleDoc {
   id: string;
   lang: SampleLang;
@@ -33,19 +46,24 @@ interface WorkspaceSampleDoc {
   beforeMark: string;
   markText: string;
   afterMark: string;
-  citation: string;
-  middleText: string;
+  citation1: string;
+  citation1RefId: string;
+  sentence2Lead: string;
+  citation2: string;
+  citation2RefId: string;
+  autocompleteLead: string;
   autocompleteText: string;
+  referencesHeading: string;
   footerMeta: string;
   orderCta: string;
   sourcesTitle: string;
   sourcesPill: string;
-  sources: { code: string; title: string; meta: string }[];
   qcTitle: string;
   qcScore: string;
   qcMetrics: { name: string; score: string; color: string }[];
   qcGiftTitle: string;
   qcGiftDesc: string;
+  references: VerifiedReferenceEntry[];
 }
 
 const WORKSPACE_TABS: { key: PreviewTabKey; label: string; shortLabel: string }[] = [
@@ -58,96 +76,147 @@ const EDITOR_SAMPLES: WorkspaceSampleDoc[] = [
   {
     id: 'en-strategy',
     lang: 'en',
-    fileName: 'BUSM2570 · Strategic_Retail_HD.docx',
+    fileName: 'BUSM2570 · Dynamic_Capabilities_HD.docx',
     docHeaderMeta: ['Academic English', 'Harvard Style', '2,500 words'],
     rubricBadge: 'Rubric Aligned',
     authorLabel: 'Written by MSc Business & Strategy',
-    sectionHeading: '2.1 Dynamic Capabilities & Retail Supply Resilience',
-    beforeMark: 'Empirical research across omnichannel retailers indicates that deploying ',
-    markText: 'agile inventory reconfiguration',
-    afterMark: ' strengthens operational responsiveness during demand shocks ',
-    citation: '(Porter & Kramer, 2019)',
-    middleText:
-      '. Longitudinal data from 42 APAC retail networks confirms that standardizing point-of-sale telemetry',
+    sectionHeading: '2.1 Dynamic Capabilities & Supply Chain Resilience',
+    beforeMark:
+      'The dynamic capabilities perspective emphasizes integrating, building, and reconfiguring internal and external competences to address ',
+    markText: 'rapidly changing environments',
+    afterMark: ' rather than relying solely on static resource ownership ',
+    citation1: '(Teece, Pisano & Shuen, 1997)',
+    citation1RefId: 'teece-1997',
+    sentence2Lead:
+      '. Building resilient supply networks similarly depends on systematic risk mitigation, structural flexibility, and end-to-end visibility across partner tiers ',
+    citation2: '(Christopher & Peck, 2004)',
+    citation2RefId: 'christopher-2004',
+    autocompleteLead:
+      '. Extending resource-based theory with empirical survey evidence,',
     autocompleteText:
-      ' lowers holding costs by 18.4% while lifting service fulfillment to 4.7/5 (Teece et al., 2023).',
-    footerMeta: 'Similarity: 3% · AI: 0% · Times New Roman 12pt',
+      ' information sharing and supply chain visibility directly improve organizational resilience and robustness (Brandon-Jones et al., 2014).',
+    referencesHeading: 'References',
+    footerMeta: 'Similarity: 3% · AI: 0% · Times New Roman 12pt · DOI Verified',
     orderCta: 'Order Similar Paper',
-    sourcesTitle: 'Academic Sources (15)',
-    sourcesPill: 'DOI Verified',
-    sources: [
-      {
-        code: 'Peer-Reviewed · 2024',
-        title: 'Supply Chain Agility in Omnichannel Retail',
-        meta: 'Porter, M. & Kramer · J. Strategy · DOI Verified',
-      },
-      {
-        code: 'Q1 Journal · 2023',
-        title: 'Dynamic Capabilities & Firm Performance',
-        meta: 'Teece, D. & Peteraf · Strategic Mgmt J.',
-      },
-      {
-        code: 'Empirical · 2023',
-        title: 'Retail Telemetry Modeling in APAC Markets',
-        meta: 'Nguyen, T. & Lee · Int. Business Review',
-      },
-    ],
+    sourcesTitle: 'Verified Sources (3/15)',
+    sourcesPill: 'DOI Checked',
     qcTitle: 'Quality Audit',
     qcScore: 'HD 88/100',
     qcMetrics: [
       { name: 'Marking Rubric Coverage', score: '96%', color: 'bg-[#12489B]' },
       { name: 'Critical Analysis Depth', score: '92%', color: 'bg-emerald-600' },
-      { name: 'Peer-Reviewed Citations', score: '100%', color: 'bg-emerald-600' },
+      { name: 'Verified DOI Citations', score: '100%', color: 'bg-emerald-600' },
     ],
     qcGiftTitle: 'Included Free:',
     qcGiftDesc: 'Official Non-Repository Turnitin Similarity & AI PDF Report.',
+    references: [
+      {
+        id: 'teece-1997',
+        tag: 'SMJ · 1997',
+        shortTitle: 'Dynamic Capabilities and Strategic Management',
+        shortMeta: 'Teece, Pisano & Shuen · Vol. 18(7)',
+        authorsYear: 'Teece, D.J., Pisano, G. & Shuen, A. (1997) ',
+        articleTitle: '‘Dynamic capabilities and strategic management’, ',
+        journalName: 'Strategic Management Journal',
+        issuePages: ', 18(7), pp. 509–533.',
+        doi: '10.1002/(SICI)1097-0266(199708)18:7<509::AID-SMJ882>3.0.CO;2-Z',
+      },
+      {
+        id: 'christopher-2004',
+        tag: 'IJLM · 2004',
+        shortTitle: 'Building the Resilient Supply Chain',
+        shortMeta: 'Christopher & Peck · Vol. 15(2)',
+        authorsYear: 'Christopher, M. & Peck, H. (2004) ',
+        articleTitle: '‘Building the resilient supply chain’, ',
+        journalName: 'The International Journal of Logistics Management',
+        issuePages: ', 15(2), pp. 1–14.',
+        doi: '10.1108/09574090410700275',
+      },
+      {
+        id: 'brandon-jones-2014',
+        tag: 'JSCM · 2014',
+        shortTitle: 'A Contingent Resource-Based Perspective of Supply Chain Resilience and Robustness',
+        shortMeta: 'Brandon-Jones et al. · Vol. 50(3)',
+        authorsYear: 'Brandon-Jones, E., Squire, B., Autry, C.W. & Petersen, K.J. (2014) ',
+        articleTitle:
+          '‘A contingent resource-based perspective of supply chain resilience and robustness’, ',
+        journalName: 'Journal of Supply Chain Management',
+        issuePages: ', 50(3), pp. 55–73.',
+        doi: '10.1111/jscm.12050',
+      },
+    ],
   },
   {
     id: 'en-finance',
     lang: 'en',
-    fileName: 'FNCE30010 · Corporate_Valuation_H1.docx',
-    docHeaderMeta: ['Academic English', 'APA 7th Edition', '3,000 words'],
+    fileName: 'BAFI2094 · Capital_Structure_HD.docx',
+    docHeaderMeta: ['Academic English', 'APA 7th Edition', '2,616 words'],
     rubricBadge: 'Rubric Aligned',
     authorLabel: 'Written by MSc Finance & Econometrics',
-    sectionHeading: '3.2 Capital Structure & Weighted Cost of Capital',
-    beforeMark: 'Under dynamic trade-off theory, listed enterprises balance tax shields against ',
-    markText: 'marginal financial distress costs',
-    afterMark: ' when calibrating long-term target leverage ratios ',
-    citation: '(Modigliani & Miller, 2020)',
-    middleText:
-      '. Fixed-effects panel regression on ASX-200 constituents demonstrates that optimal debt discipline',
+    sectionHeading: '3.2 Capital Structure & Multi-Factor Valuation',
+    beforeMark:
+      'In corporate financing theory, firms weigh interest tax shields against asymmetric information costs and ',
+    markText: 'expected financial distress',
+    afterMark: ' when balancing debt and equity issuance ',
+    citation1: '(Myers, 1984)',
+    citation1RefId: 'myers-1984',
+    sentence2Lead:
+      '. Cross-country panel evidence across major industrial economies further indicates that leverage relates negatively to profitability and market-to-book ratios ',
+    citation2: '(Rajan & Zingales, 1995)',
+    citation2RefId: 'rajan-1995',
+    autocompleteLead: '. Within asset pricing models evaluating firm risk,',
     autocompleteText:
-      ' reduces firm WACC by 115 bps across capital-intensive utilities (Fama & French, 2022).',
-    footerMeta: 'Similarity: 2% · AI: 0% · Times New Roman 12pt',
+      ' incorporating profitability and investment patterns alongside size and value explains average stock returns more accurately (Fama & French, 2015).',
+    referencesHeading: 'References',
+    footerMeta: 'Similarity: 2% · AI: 0% · Times New Roman 12pt · DOI Verified',
     orderCta: 'Order Similar Paper',
-    sourcesTitle: 'Academic Sources (18)',
-    sourcesPill: 'DOI Verified',
-    sources: [
-      {
-        code: 'Q1 Finance · 2023',
-        title: 'Dynamic Capital Structure & Debt Capacity',
-        meta: 'Graham, J. & Leary · J. Financial Economics',
-      },
-      {
-        code: 'Econometrics · 2022',
-        title: 'Cost of Equity & Multi-Factor Asset Pricing',
-        meta: 'Fama, E. & French · Review of Finance',
-      },
-      {
-        code: 'Empirical · 2024',
-        title: 'ASX-200 Leverage Sensitivity Analysis',
-        meta: 'Chen, W. & Patel · Corporate Finance Rev.',
-      },
-    ],
+    sourcesTitle: 'Verified Sources (3/18)',
+    sourcesPill: 'DOI Checked',
     qcTitle: 'Quality Audit',
     qcScore: 'H1 86/100',
     qcMetrics: [
       { name: 'Marking Rubric Coverage', score: '95%', color: 'bg-[#12489B]' },
       { name: 'Econometric Rigor', score: '94%', color: 'bg-emerald-600' },
-      { name: 'Peer-Reviewed Citations', score: '100%', color: 'bg-emerald-600' },
+      { name: 'Verified DOI Citations', score: '100%', color: 'bg-emerald-600' },
     ],
     qcGiftTitle: 'Included Free:',
     qcGiftDesc: 'Full Excel DCF Workbook, Stata Output & Turnitin AI Report.',
+    references: [
+      {
+        id: 'myers-1984',
+        tag: 'J. Finance · 1984',
+        shortTitle: 'The Capital Structure Puzzle',
+        shortMeta: 'Myers, S. C. · Vol. 39(3)',
+        authorsYear: 'Myers, S. C. (1984). ',
+        articleTitle: 'The capital structure puzzle. ',
+        journalName: 'The Journal of Finance',
+        issuePages: ', 39(3), 575–592.',
+        doi: '10.1111/j.1540-6261.1984.tb03646.x',
+      },
+      {
+        id: 'rajan-1995',
+        tag: 'J. Finance · 1995',
+        shortTitle: 'What Do We Know about Capital Structure? Some Evidence from International Data',
+        shortMeta: 'Rajan & Zingales · Vol. 50(5)',
+        authorsYear: 'Rajan, R. G., & Zingales, L. (1995). ',
+        articleTitle:
+          'What do we know about capital structure? Some evidence from international data. ',
+        journalName: 'The Journal of Finance',
+        issuePages: ', 50(5), 1421–1460.',
+        doi: '10.1111/j.1540-6261.1995.tb05184.x',
+      },
+      {
+        id: 'fama-2015',
+        tag: 'JFE · 2015',
+        shortTitle: 'A Five-Factor Asset Pricing Model',
+        shortMeta: 'Fama & French · Vol. 116(1)',
+        authorsYear: 'Fama, E. F., & French, K. R. (2015). ',
+        articleTitle: 'A five-factor asset pricing model. ',
+        journalName: 'Journal of Financial Economics',
+        issuePages: ', 116(1), 1–22.',
+        doi: '10.1016/j.jfineco.2014.10.010',
+      },
+    ],
   },
   {
     id: 'vi-strategy',
@@ -156,98 +225,156 @@ const EDITOR_SAMPLES: WorkspaceSampleDoc[] = [
     docHeaderMeta: ['Tiếng Việt học thuật', 'Chuẩn APA 7th', '12,000 từ'],
     rubricBadge: 'Chuẩn Đề cương',
     authorLabel: 'Biên soạn: ThS. Quản trị Kinh doanh',
-    sectionHeading: '2.1 Năng lực động và Khả năng phục hồi Chuỗi cung ứng',
-    beforeMark: 'Kết quả phân tích chuỗi giá trị cho thấy doanh nghiệp bán lẻ áp dụng mô hình ',
-    markText: 'tái cấu trúc tồn kho linh hoạt',
-    afterMark: ' duy trì hiệu suất vượt trội trong giai đoạn biến động cầu ',
-    citation: '(Nguyễn & Trần, 2023)',
-    middleText:
-      '. Thực nghiệm tại 42 chuỗi bán lẻ khu vực phía Nam chứng minh việc chuẩn hóa dữ liệu điểm bán',
+    sectionHeading: '2.1 Năng lực động và Chuyển đổi số Doanh nghiệp',
+    beforeMark:
+      'Theo khung lý thuyết năng lực động, doanh nghiệp duy trì lợi thế cạnh tranh dài hạn thông qua việc tích hợp, xây dựng và ',
+    markText: 'tái cấu trúc năng lực cốt lõi',
+    afterMark: ' nhằm thích ứng với môi trường biến động nhanh ',
+    citation1: '(Teece et al., 1997)',
+    citation1RefId: 'teece-1997-vi',
+    sentence2Lead:
+      '. Bằng chứng thực nghiệm tại các doanh nghiệp nhỏ và vừa ở Việt Nam cho thấy chuyển đổi số nâng cao năng lực cạnh tranh thông qua vai trò trung gian của năng lực đổi mới ',
+    citation2: '(Bùi, 2024)',
+    citation2RefId: 'bui-2024',
+    autocompleteLead:
+      '. Tương đồng về mặt quản trị chuỗi cung ứng,',
     autocompleteText:
-      ' giúp giảm 18,4% chi phí lưu kho và nâng tỷ lệ đáp ứng đơn hàng lên 96,2% (Lê, 2024).',
-    footerMeta: 'Tương đồng: 4% · AI: 0% · Times New Roman 12pt',
+      ' khả năng phục hồi hệ thống phân phối đòi hỏi sự minh bạch thông tin và phối hợp quản trị rủi ro giữa các đối tác (Christopher & Peck, 2004).',
+    referencesHeading: 'Tài liệu tham khảo',
+    footerMeta: 'Tương đồng: 4% · AI: 0% · Times New Roman 12pt · Chuẩn DOI',
     orderCta: 'Đặt bài tương tự',
-    sourcesTitle: 'Nguồn học thuật (22)',
-    sourcesPill: 'Tạp chí uy tín',
-    sources: [
-      {
-        code: 'Tạp chí KT&PT · 2024',
-        title: 'Chuỗi cung ứng linh hoạt trong ngành Bán lẻ',
-        meta: 'Nguyễn Văn Minh & Trần · Tạp chí Kinh tế & PT',
-      },
-      {
-        code: 'Hội thảo QG · 2023',
-        title: 'Năng lực động và Năng lực cạnh tranh Doanh nghiệp',
-        meta: 'Lê Hoàng Nam · ĐH Kinh tế TP.HCM',
-      },
-      {
-        code: 'Thực nghiệm · 2024',
-        title: 'Mô hình hóa dữ liệu bán lẻ đa kênh tại Việt Nam',
-        meta: 'Phạm Quỳnh Anh · Nghiên cứu Kinh tế',
-      },
-    ],
+    sourcesTitle: 'Nguồn đối chiếu (3/22)',
+    sourcesPill: 'Đã xác thực DOI',
     qcTitle: 'Kiểm định chất lượng',
     qcScore: '9.0 / 10',
     qcMetrics: [
       { name: 'Bám sát Đề cương & Rubric', score: '96%', color: 'bg-[#12489B]' },
       { name: 'Chiều sâu lập luận phản biện', score: '92%', color: 'bg-emerald-600' },
-      { name: 'Trích dẫn khoa học hợp lệ', score: '100%', color: 'bg-emerald-600' },
+      { name: 'Trích dẫn tạp chí có DOI', score: '100%', color: 'bg-emerald-600' },
     ],
     qcGiftTitle: 'Tặng kèm:',
     qcGiftDesc: 'File kiểm định Turnitin chính hãng (Không lưu kho trường).',
+    references: [
+      {
+        id: 'bui-2024',
+        tag: 'KT&PT · 2024',
+        shortTitle:
+          'Vai trò trung gian của năng lực đổi mới trong chuyển đổi số doanh nghiệp vừa và nhỏ',
+        shortMeta: 'Bùi Thành Khoa · Số 321(2)',
+        authorsYear: 'Bùi, T. K. (2024). ',
+        articleTitle:
+          'Khám phá vai trò trung gian của năng lực đổi mới và định hướng sáng nghiệp trong ảnh hưởng của chuyển đổi số đối với năng lực cạnh tranh của doanh nghiệp nhỏ và vừa. ',
+        journalName: 'Tạp chí Kinh tế và Phát triển',
+        issuePages: ', 321(2), 70–78.',
+        doi: '10.33301/JED.VI.1581',
+      },
+      {
+        id: 'christopher-2004-vi',
+        tag: 'IJLM · 2004',
+        shortTitle: 'Building the Resilient Supply Chain',
+        shortMeta: 'Christopher & Peck · Vol. 15(2)',
+        authorsYear: 'Christopher, M., & Peck, H. (2004). ',
+        articleTitle: 'Building the resilient supply chain. ',
+        journalName: 'The International Journal of Logistics Management',
+        issuePages: ', 15(2), 1–14.',
+        doi: '10.1108/09574090410700275',
+      },
+      {
+        id: 'teece-1997-vi',
+        tag: 'SMJ · 1997',
+        shortTitle: 'Dynamic Capabilities and Strategic Management',
+        shortMeta: 'Teece, Pisano & Shuen · Vol. 18(7)',
+        authorsYear: 'Teece, D. J., Pisano, G., & Shuen, A. (1997). ',
+        articleTitle: 'Dynamic capabilities and strategic management. ',
+        journalName: 'Strategic Management Journal',
+        issuePages: ', 18(7), 509–533.',
+        doi: '10.1002/(SICI)1097-0266(199708)18:7<509::AID-SMJ882>3.0.CO;2-Z',
+      },
+    ],
   },
   {
     id: 'vi-spss',
     lang: 'vi',
-    fileName: 'KLTN_TaiChinh_SPSS_NEU.docx',
+    fileName: 'KLTN_TaiChinh_FGLS_UFM.docx',
     docHeaderMeta: ['Tiếng Việt học thuật', 'Chuẩn APA 7th', '8,500 từ'],
     rubricBadge: 'Chuẩn Hội đồng',
     authorLabel: 'Biên soạn: ThS. Tài chính – Kinh tế lượng',
-    sectionHeading: '3.2 Kiểm định Mô hình Hồi quy Tuyến tính Đa biến (OLS)',
-    beforeMark: 'Hệ số phóng đại phương sai VIF đều nhỏ hơn 2,0 khẳng định mô hình không xuất hiện ',
-    markText: 'hiện tượng đa cộng tuyến',
-    afterMark: ' giữa các biến độc lập giải thích tỷ suất sinh lời ',
-    citation: '(Phạm & Hoàng, 2024)',
-    middleText:
-      '. Kết quả phân tích SPSS 26 trên mẫu khảo sát 315 doanh nghiệp niêm yết cho thấy biến chuyển đổi số',
+    sectionHeading: '3.2 Các yếu tố tác động đến Khả năng sinh lời (ROA & ROE)',
+    beforeMark:
+      'Phân tích mô hình FGLS trên dữ liệu bảng của 652 công ty niêm yết Việt Nam giai đoạn 2018–2022 cho thấy quy mô và vòng quay tài sản thúc đẩy sinh lời, trong khi ',
+    markText: 'đòn bẩy tài chính',
+    afterMark: ' tác động ngược chiều đến cả ROA và ROE ',
+    citation1: '(Lê & Nguyễn, 2024)',
+    citation1RefId: 'le-2024',
+    sentence2Lead:
+      '. Xét riêng tác động của chuyển đổi số tại khối doanh nghiệp tư nhân niêm yết, chi phí đầu tư hạ tầng ban đầu tạo ra độ trễ nhất định lên hiệu quả tài chính ngắn hạn ',
+    citation2: '(Phan et al., 2023)',
+    citation2RefId: 'phan-2023',
+    autocompleteLead: '. Đối chiếu với bằng chứng thực nghiệm quốc tế,',
     autocompleteText:
-      ' tác động cùng chiều lên ROA với mức ý nghĩa thống kê p < 0,01 (Đặng, 2023).',
-    footerMeta: 'Tương đồng: 3% · AI: 0% · Times New Roman 12pt',
+      ' mối tương quan nghịch giữa đòn bẩy nợ và khả năng sinh lời phù hợp với kết quả kiểm định tại các nền kinh tế G7 (Rajan & Zingales, 1995).',
+    referencesHeading: 'Tài liệu tham khảo',
+    footerMeta: 'Tương đồng: 3% · AI: 0% · Times New Roman 12pt · Chuẩn DOI',
     orderCta: 'Đặt bài tương tự',
-    sourcesTitle: 'Nguồn học thuật (20)',
-    sourcesPill: 'Tạp chí uy tín',
-    sources: [
-      {
-        code: 'Tài chính · 2024',
-        title: 'Chuyển đổi số và Hiệu quả Tài chính Doanh nghiệp',
-        meta: 'Phạm Đức Mạnh & Hoàng · Tạp chí Tài chính',
-      },
-      {
-        code: 'Kinh tế lượng · 2023',
-        title: 'Ứng dụng Hồi quy Đa biến SPSS trong Nghiên cứu',
-        meta: 'Đặng Thị Thu Hà · ĐH Kinh tế Quốc dân',
-      },
-      {
-        code: 'Thực nghiệm · 2024',
-        title: 'Quản trị Vốn lưu động và Tỷ suất Sinh lời ROA',
-        meta: 'Bùi Xuân Trường · Tạp chí Ngân hàng',
-      },
-    ],
+    sourcesTitle: 'Nguồn đối chiếu (3/20)',
+    sourcesPill: 'Đã xác thực DOI',
     qcTitle: 'Kiểm định chất lượng',
     qcScore: '9.2 / 10',
     qcMetrics: [
       { name: 'Chuẩn mô hình Định lượng', score: '97%', color: 'bg-[#12489B]' },
-      { name: 'Diễn giải Output SPSS/SmartPLS', score: '95%', color: 'bg-emerald-600' },
-      { name: 'Trích dẫn khoa học hợp lệ', score: '100%', color: 'bg-emerald-600' },
+      { name: 'Diễn giải FGLS / Stata / SPSS', score: '95%', color: 'bg-emerald-600' },
+      { name: 'Trích dẫn tạp chí có DOI', score: '100%', color: 'bg-emerald-600' },
     ],
     qcGiftTitle: 'Tặng kèm:',
-    qcGiftDesc: 'Toàn bộ file Data (.sav), Output SPSS & báo cáo Turnitin.',
+    qcGiftDesc: 'Toàn bộ file Data (.dta/.sav), Output & báo cáo Turnitin.',
+    references: [
+      {
+        id: 'le-2024',
+        tag: 'JFM · 2024',
+        shortTitle:
+          'Các yếu tố tác động đến khả năng sinh lời tại các công ty niêm yết trên thị trường chứng khoán Việt Nam',
+        shortMeta: 'Lê Thị Bảo Như & Nguyễn Thị Thu Hậu · 15(6)',
+        authorsYear: 'Lê, T. B. N., & Nguyễn, T. T. H. (2024). ',
+        articleTitle:
+          'Các yếu tố tác động đến khả năng sinh lời tại các công ty niêm yết trên thị trường chứng khoán Việt Nam. ',
+        journalName: 'Tạp chí Nghiên cứu Tài chính – Marketing',
+        issuePages: ', 15(6), 16–28.',
+        doi: '10.52932/jfm.v15i6.456',
+      },
+      {
+        id: 'phan-2023',
+        tag: 'JFM · 2023',
+        shortTitle:
+          'Tác động của chuyển đổi số đến hiệu quả kinh doanh của các doanh nghiệp tư nhân Việt Nam',
+        shortMeta: 'Phan Thị Hằng Nga et al. · 14(2)',
+        authorsYear:
+          'Phan, T. H. N., Thi, T. M. D., Nguyễn, T. H. N., Võ, H. N. H., Vương, T. V., & Trương, N. H. (2023). ',
+        articleTitle:
+          'Tác động của chuyển đổi số đến hiệu quả kinh doanh của các doanh nghiệp tư nhân Việt Nam. ',
+        journalName: 'Tạp chí Nghiên cứu Tài chính – Marketing',
+        issuePages: ', 14(2), 13–24.',
+        doi: '10.52932/jfm.vi2.385',
+      },
+      {
+        id: 'rajan-1995-vi',
+        tag: 'J. Finance · 1995',
+        shortTitle:
+          'What Do We Know about Capital Structure? Some Evidence from International Data',
+        shortMeta: 'Rajan & Zingales · Vol. 50(5)',
+        authorsYear: 'Rajan, R. G., & Zingales, L. (1995). ',
+        articleTitle:
+          'What do we know about capital structure? Some evidence from international data. ',
+        journalName: 'The Journal of Finance',
+        issuePages: ', 50(5), 1421–1460.',
+        doi: '10.1111/j.1540-6261.1995.tb05184.x',
+      },
+    ],
   },
 ];
 
 const TURNITIN_CHECKS = [
   { label: 'Biên soạn 100% bởi Thạc sĩ chuyên ngành', value: 'Human Written', tone: 'emerald' as const },
-  { label: 'Trích dẫn chuẩn DOI / Peer-Reviewed', value: '15 / 15 đạt', tone: 'emerald' as const },
+  { label: 'Trích dẫn chuẩn DOI / Peer-Reviewed', value: '100% Có thật', tone: 'emerald' as const },
   { label: 'Tỷ lệ tương đồng Turnitin (Non-repository)', value: '4% An toàn', tone: 'emerald' as const },
   { label: 'AI Detection (Turnitin AI Module)', value: '0% Human', tone: 'blue' as const },
 ];
@@ -256,23 +383,23 @@ const SAMPLE_CARDS = [
   {
     code: 'BUSM2570',
     school: 'RMIT University',
-    title: 'Business Decision Making – Strategic Retail Expansion',
-    score: '88% HD',
-    meta: '2,500 words · Harvard · Turnitin 3%',
+    title: 'Business Decision Making – BUSM2570 – Sample DI',
+    score: 'DI',
+    meta: '1,813 words · Assignment/Essay/Report',
   },
   {
-    code: 'FNCE30010',
-    school: 'University of Melbourne',
-    title: 'Corporate Valuation & WACC Sensitivity Modeling',
-    score: '84% H1',
-    meta: '3,000 words · APA 7th · SPSS & Excel',
+    code: 'BAFI2094',
+    school: 'RMIT University',
+    title: 'Corporate Finance – BAFI2094 Sample HD',
+    score: 'HD',
+    meta: '2,616 words · Finance & Banking',
   },
   {
-    code: 'MKT20025',
+    code: 'FIN80005',
     school: 'Swinburne University',
-    title: 'Omnichannel Consumer Journey & Attribution Audit',
-    score: '86% HD',
-    meta: '2,200 words · Harvard · Full Data Tables',
+    title: 'FIN80005 – Corporate Financial Management',
+    score: 'HD',
+    meta: '1,516 words · 4 Data Tables',
   },
 ];
 
@@ -283,7 +410,8 @@ export function HeroWorkspacePreview({
 }: HeroWorkspacePreviewProps) {
   const [activeTab, setActiveTab] = useState<PreviewTabKey>('editor');
   const [sampleIdx, setSampleIdx] = useState(0);
-  const [typedLen, setTypedLen] = useState(38);
+  const [highlightedRefId, setHighlightedRefId] = useState<string | null>(null);
+  const [typedLen, setTypedLen] = useState(48);
   const [paused, setPaused] = useState(false);
 
   const currentSample = EDITOR_SAMPLES[sampleIdx];
@@ -301,7 +429,7 @@ export function HeroWorkspacePreview({
 
     const interval = window.setInterval(() => {
       setTypedLen((prev) =>
-        prev >= fullAutocomplete.length ? 16 : prev + 1
+        prev >= fullAutocomplete.length ? 20 : prev + 1
       );
     }, 55);
 
@@ -312,7 +440,8 @@ export function HeroWorkspacePreview({
     const firstMatchIdx = EDITOR_SAMPLES.findIndex((s) => s.lang === targetLang);
     if (firstMatchIdx !== -1) {
       setSampleIdx(firstMatchIdx);
-      setTypedLen(20);
+      setHighlightedRefId(null);
+      setTypedLen(28);
     }
   };
 
@@ -321,14 +450,15 @@ export function HeroWorkspacePreview({
       .map((item, idx) => ({ item, idx }))
       .filter(({ item }) => item.lang === currentSample.lang);
 
+    setHighlightedRefId(null);
     if (sameLangSamples.length > 1) {
       const curPos = sameLangSamples.findIndex((entry) => entry.idx === sampleIdx);
       const nextEntry = sameLangSamples[(curPos + 1) % sameLangSamples.length];
       setSampleIdx(nextEntry.idx);
-      setTypedLen(18);
+      setTypedLen(24);
     } else {
       setSampleIdx((prev) => (prev + 1) % EDITOR_SAMPLES.length);
-      setTypedLen(18);
+      setTypedLen(24);
     }
   };
 
@@ -383,8 +513,8 @@ export function HeroWorkspacePreview({
 
       {/* Interactive Workspace Body */}
       {activeTab === 'editor' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[360px] divide-y lg:divide-y-0 lg:divide-x divide-slate-200/80">
-          {/* Left Pane: Verified Sources (Strictly matches sample language) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 min-h-[460px] divide-y lg:divide-y-0 lg:divide-x divide-slate-200/80">
+          {/* Left Pane: Verified Real DOI Sources */}
           <div className="lg:col-span-3 p-4 bg-[#FCFCFF] space-y-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -396,32 +526,42 @@ export function HeroWorkspacePreview({
             </div>
 
             <div className="space-y-2">
-              {currentSample.sources.map((src, idx) => (
-                <div
-                  key={src.title}
-                  className={`p-2.5 rounded-xl border transition-colors ${
-                    idx === 0
-                      ? 'bg-white border-blue-200 shadow-2xs'
-                      : 'bg-white/70 border-slate-200/70'
-                  }`}
-                >
-                  <div className="text-[10px] font-semibold text-[#12489B]">
-                    {src.code}
-                  </div>
-                  <div className="text-[12px] font-semibold text-slate-900 leading-snug mt-0.5 line-clamp-2">
-                    {src.title}
-                  </div>
-                  <div className="text-[10.5px] text-slate-500 mt-1 truncate">
-                    {src.meta}
-                  </div>
-                </div>
-              ))}
+              {currentSample.references.map((ref) => {
+                const isSelected = highlightedRefId === ref.id;
+                return (
+                  <button
+                    key={ref.id}
+                    type="button"
+                    onClick={() =>
+                      setHighlightedRefId((prev) => (prev === ref.id ? null : ref.id))
+                    }
+                    className={`w-full text-left p-2.5 rounded-xl border transition-colors cursor-pointer ${
+                      isSelected
+                        ? 'bg-blue-50/70 border-[#12489B] shadow-2xs'
+                        : 'bg-white border-slate-200/80 hover:border-blue-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-1 text-[10px] font-semibold text-[#12489B]">
+                      <span>{ref.tag}</span>
+                      <span className="font-mono text-[9.5px] text-slate-400">
+                        DOI ✓
+                      </span>
+                    </div>
+                    <div className="text-[11.5px] font-semibold text-slate-900 leading-snug mt-0.5 line-clamp-2">
+                      {ref.shortTitle}
+                    </div>
+                    <div className="text-[10.5px] text-slate-500 mt-1 truncate">
+                      {ref.shortMeta}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Center Pane: Live Paper Editor + Language & Sample Switcher */}
-          <div className="lg:col-span-6 p-5 sm:p-6 bg-white flex flex-col justify-between gap-4">
-            <div className="space-y-3">
+          {/* Center Pane: Live Academic Paper + Extended Verified References Section */}
+          <div className="lg:col-span-6 p-5 sm:p-6 bg-white flex flex-col justify-between gap-5">
+            <div className="space-y-4">
               {/* Sample Language & Article Switcher Controls */}
               <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
@@ -488,28 +628,85 @@ export function HeroWorkspacePreview({
                 <span>{currentSample.authorLabel}</span>
               </div>
 
-              <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                {currentSample.sectionHeading}
-              </h3>
+              {/* Body Prose with Clickable Verified Citations */}
+              <div className="space-y-2.5">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                  {currentSample.sectionHeading}
+                </h3>
 
-              <p className="text-[13px] sm:text-[13.5px] leading-[1.75] text-slate-700">
-                {currentSample.beforeMark}
-                <mark className="bg-amber-100/85 text-slate-900 px-1 rounded">
-                  {currentSample.markText}
-                </mark>
-                {currentSample.afterMark}
-                <span className="text-[#12489B] font-medium">
-                  {currentSample.citation}
-                </span>
-                {currentSample.middleText}
-                <span className="text-slate-400 transition-opacity">
-                  {fullAutocomplete.slice(0, typedLen)}
-                </span>
-                <span
-                  aria-hidden="true"
-                  className="jenni-caret inline-block w-[2px] h-3.5 bg-[#12489B] align-middle ml-0.5"
-                />
-              </p>
+                <p className="text-[13px] sm:text-[13.5px] leading-[1.72] text-slate-700">
+                  {currentSample.beforeMark}
+                  <mark className="bg-amber-100/85 text-slate-900 px-1 rounded">
+                    {currentSample.markText}
+                  </mark>
+                  {currentSample.afterMark}
+                  <button
+                    type="button"
+                    onClick={() => setHighlightedRefId(currentSample.citation1RefId)}
+                    className="text-[#12489B] font-medium hover:underline cursor-pointer"
+                  >
+                    {currentSample.citation1}
+                  </button>
+                  {currentSample.sentence2Lead}
+                  <button
+                    type="button"
+                    onClick={() => setHighlightedRefId(currentSample.citation2RefId)}
+                    className="text-[#12489B] font-medium hover:underline cursor-pointer"
+                  >
+                    {currentSample.citation2}
+                  </button>
+                  {currentSample.autocompleteLead}
+                  <span className="text-slate-400 transition-opacity">
+                    {fullAutocomplete.slice(0, typedLen)}
+                  </span>
+                  <span
+                    aria-hidden="true"
+                    className="jenni-caret inline-block w-[2px] h-3.5 bg-[#12489B] align-middle ml-0.5"
+                  />
+                </p>
+              </div>
+
+              {/* Extended Verified References Section (Exact DOI & Journal Citations) */}
+              <div className="pt-4 border-t border-slate-200/80 space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-bold text-slate-900 tracking-tight">
+                    {currentSample.referencesHeading}
+                  </h4>
+                  <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                    {currentSample.lang === 'vi' ? 'Đã đối chiếu DOI' : 'DOI Cross-Checked'}
+                  </span>
+                </div>
+
+                <div className="space-y-2">
+                  {currentSample.references.map((ref) => {
+                    const isHighlighted = highlightedRefId === ref.id;
+                    return (
+                      <p
+                        key={ref.id}
+                        className={`pl-5 -indent-5 text-[11.5px] sm:text-[12px] leading-[1.55] rounded-lg px-2 py-1 transition-colors ${
+                          isHighlighted
+                            ? 'bg-blue-50/90 text-slate-900 ring-1 ring-blue-200'
+                            : 'text-slate-600'
+                        }`}
+                      >
+                        <span>{ref.authorsYear}</span>
+                        <span>{ref.articleTitle}</span>
+                        <em className="italic">{ref.journalName}</em>
+                        <span>{ref.issuePages} </span>
+                        <a
+                          href={`https://doi.org/${encodeURI(ref.doi)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[#12489B] hover:underline break-all"
+                        >
+                          https://doi.org/{ref.doi}
+                          <ExternalLink className="w-2.5 h-2.5 inline-block ml-1 -mt-0.5 align-middle" />
+                        </a>
+                      </p>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
@@ -525,7 +722,7 @@ export function HeroWorkspacePreview({
             </div>
           </div>
 
-          {/* Right Pane: Rubric & QC Inspector (Strictly matches sample language) */}
+          {/* Right Pane: Rubric & QC Inspector */}
           <div className="lg:col-span-3 p-4 bg-[#FCFCFF] flex flex-col justify-between gap-4">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -569,7 +766,7 @@ export function HeroWorkspacePreview({
       )}
 
       {activeTab === 'turnitin' && (
-        <div className="p-5 sm:p-8 bg-white grid grid-cols-1 lg:grid-cols-12 gap-6 items-center min-h-[360px]">
+        <div className="p-5 sm:p-8 bg-white grid grid-cols-1 lg:grid-cols-12 gap-6 items-center min-h-[460px]">
           <div className="lg:col-span-5 space-y-4">
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200/80 text-[11px] font-bold text-[#12489B]">
               <ShieldCheck className="w-3.5 h-3.5" />
@@ -628,7 +825,7 @@ export function HeroWorkspacePreview({
       )}
 
       {activeTab === 'samples' && (
-        <div className="p-5 sm:p-8 bg-white space-y-5 min-h-[360px] flex flex-col justify-between">
+        <div className="p-5 sm:p-8 bg-white space-y-5 min-h-[460px] flex flex-col justify-between">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="space-y-1">
               <div className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-[#12489B]">
