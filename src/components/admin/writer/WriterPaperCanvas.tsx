@@ -748,7 +748,7 @@ export function WriterPaperCanvas({
 
       {/* A4 Paper Sheet */}
       <div
-        className="mx-auto bg-white shadow-lg border border-zinc-300 rounded-xs"
+        className="mx-auto bg-white shadow-[0_4px_24px_rgba(15,23,42,0.08)] border border-zinc-200/90 rounded-sm"
         style={{
           width: `${Math.round((794 * zoomPercent) / 100)}px`,
           minHeight: `${Math.round((1123 * zoomPercent) / 100)}px`,

@@ -391,14 +391,14 @@ export function WriterWorkspaceTabs({
           </div>
         )}
 
-        {anyRunning && (
+        {sessions.length >= 2 && anyRunning && (
           <button
             type="button"
             onClick={onPauseAll}
             className="btn-press shrink-0 inline-flex items-center gap-1 px-2 py-1 text-[10.5px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 hover:bg-rose-100 rounded-md"
           >
             <Pause className="w-2.5 h-2.5" />
-            <span>Dừng</span>
+            <span>Dừng tất cả</span>
           </button>
         )}
       </div>

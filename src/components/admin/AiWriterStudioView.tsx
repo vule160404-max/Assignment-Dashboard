@@ -2913,10 +2913,16 @@ export function AiWriterStudioView({
 
     const resolveIssueSectionId = (issue: PaperAuditReport['issues'][number]): string | undefined => {
       if (
-        (refSection && issue.sectionId === refSection.id) ||
         issue.category === 'doi_and_sources' ||
-        issue.category === 'citation_sync'
+        Boolean(issue.badDoi) ||
+        Boolean(issue.missingCitations?.length)
       ) {
+        return refSection?.id || issue.sectionId;
+      }
+      if (issue.sectionId) {
+        return issue.sectionId;
+      }
+      if (issue.category === 'citation_sync') {
         return refSection?.id;
       }
       return issue.sectionId;
@@ -3508,17 +3514,15 @@ export function AiWriterStudioView({
         />
       </div>
 
-      {/* Main 3-Zone Workspace Grid: Brief/Outline + Live A4 Paper + Right AI Status/History Panel */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+      {/* Main 3-Zone Workspace: Compact Left Brief/Outline + Centered A4 Paper + Compact Right AI Panel */}
+      <div className="flex flex-col lg:flex-row lg:flex-wrap xl:flex-nowrap gap-3.5 items-start">
         {!focusPaperMode && (
           <div
             style={{
               top: `${stickyPanelsTopPx}px`,
               maxHeight: `calc(100vh - ${stickyPanelsTopPx + 16}px)`,
             }}
-            className={`${
-              showActivityPanel ? 'lg:col-span-4 xl:col-span-3' : 'lg:col-span-4'
-            } lg:sticky lg:z-20 lg:flex lg:flex-col bg-white border border-zinc-200/90 rounded-2xl shadow-2xs overflow-hidden transition-[top] duration-150`}
+            className="w-full lg:w-[290px] xl:w-[300px] shrink-0 lg:sticky lg:z-20 lg:flex lg:flex-col bg-white border border-zinc-200/90 rounded-2xl shadow-sm overflow-hidden transition-[top] duration-150"
           >
             {/* Segmented Tab Switcher (Brief vs Outline) */}
             <div className="shrink-0 p-1.5 bg-zinc-100/80 border-b border-zinc-200/80 grid grid-cols-2 gap-1">
@@ -3554,16 +3558,16 @@ export function AiWriterStudioView({
                 <div className="m-3 mb-0 rounded-xl bg-[#0B2559] text-white p-3 space-y-2 shadow-sm">
                   <div className="flex items-center justify-between gap-2">
                     <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300">
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse" />
                       <span>CHẾ ĐỘ HOÀN TOÀN TỰ ĐỘNG</span>
                     </span>
-                    <button
-                      type="button"
-                      onClick={handleStopActiveAi}
-                      className="px-2 py-0.5 rounded bg-rose-500/90 hover:bg-rose-600 text-[10px] font-bold text-white cursor-pointer"
-                    >
-                      Dừng
-                    </button>
+                    <span className="text-[10px] font-mono text-sky-200/80">
+                      {fullAutoPhase === 'outlining'
+                        ? 'Bước 1/3'
+                        : fullAutoPhase === 'writing'
+                        ? 'Bước 2/3'
+                        : 'Bước 3/3'}
+                    </span>
                   </div>
                   <div className="grid grid-cols-3 gap-1 text-[10px] font-semibold">
                     <div
@@ -3662,15 +3666,7 @@ export function AiWriterStudioView({
           currentSectionId={currentSection?.id || ''}
           zoomPercent={zoomPercent}
           focusPaperMode={focusPaperMode}
-          containerClassName={
-            focusPaperMode
-              ? showActivityPanel
-                ? 'lg:col-span-12 xl:col-span-9'
-                : 'lg:col-span-12'
-              : showActivityPanel
-              ? 'lg:col-span-8 xl:col-span-6'
-              : 'lg:col-span-8'
-          }
+          containerClassName="w-full lg:flex-1 min-w-0"
           activeTextareaRef={activeTextareaRef}
           sectionAuditStates={sectionAuditStates}
           auditIssues={auditReport?.issues || []}

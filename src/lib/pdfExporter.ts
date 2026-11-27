@@ -3,6 +3,7 @@ import {
   DEFAULT_COVER_PAGE_CONFIG,
   WriterSession,
 } from '../components/admin/writer/types';
+import { stripDuplicateLeadingHeading } from './aiWriterClient';
 import {
   findSessionImageByTag,
   parseFigureMarkerTag,
@@ -349,7 +350,8 @@ export async function exportWriterSessionToPdf(
     cursorY += Math.round(6 * SCALE);
 
     // Body paragraphs
-    const rawParas = sec.content
+    const cleanBody = stripDuplicateLeadingHeading(sec.content || '', sec.title || '');
+    const rawParas = cleanBody
       .split(/\r?\n+/)
       .map((l) => stripMarkdown(l))
       .filter(Boolean);

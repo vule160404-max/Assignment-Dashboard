@@ -68,58 +68,52 @@ export function WriterOutlinePanel({
 
   return (
     <div className="tab-panel-enter flex flex-col">
-      {/* ───── Action Strip ───── */}
-      <div className="px-4 py-3 bg-white border-b border-zinc-100 flex flex-wrap items-center justify-between gap-2">
-        <button
-          type="button"
-          disabled={generatingOutline || runningAllSections || fullAutoRunning}
-          onClick={onAiGenerateOutline}
-          className="btn-press px-3 py-2 text-[11.5px] font-bold bg-white border border-blue-200 text-[#12489B] hover:bg-blue-50 rounded-xl inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
-        >
-          {generatingOutline ? (
-            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-          ) : (
-            <Sparkles className="w-3.5 h-3.5" />
-          )}
-          <span>{generatingOutline ? 'Đang lập...' : 'AI Lập Dàn Ý'}</span>
-        </button>
-
-        <div className="flex items-center gap-1.5">
-          {runningAllSections || fullAutoRunning ? (
-            <button
-              type="button"
-              onClick={onStopSequential}
-              className="btn-press px-3.5 py-2 text-[11.5px] font-bold bg-rose-600 text-white hover:bg-rose-700 rounded-xl"
-            >
-              Dừng viết
-            </button>
+      {/* ───── Action Strip (hidden while Full Auto banner is active to avoid duplicate loaders/stop buttons) ───── */}
+      {!fullAutoRunning && (
+        <div className="px-4 py-3 bg-white border-b border-zinc-100 flex flex-wrap items-center justify-between gap-2">
+          {generatingOutline || runningAllSections ? (
+            <div className="w-full flex items-center gap-2 text-[11.5px] font-semibold text-[#12489B]">
+              <span className="w-2 h-2 rounded-full bg-[#12489B] animate-pulse" />
+              <span>
+                {generatingOutline ? 'Đang lập dàn ý...' : 'Đang viết tuần tự...'}
+              </span>
+            </div>
           ) : (
             <>
               <button
                 type="button"
-                disabled={generatingOutline}
-                onClick={onWriteAllSequentially}
-                className="btn-press px-3 py-2 text-[11.5px] font-bold bg-[#12489B] text-white hover:bg-[#0B2559] rounded-xl inline-flex items-center gap-1.5 shadow-sm"
+                onClick={onAiGenerateOutline}
+                className="btn-press px-3 py-2 text-[11.5px] font-bold bg-white border border-blue-200 text-[#12489B] hover:bg-blue-50 rounded-xl inline-flex items-center gap-1.5 transition-colors"
               >
-                <Play className="w-3 h-3" />
-                <span>Viết tuần tự</span>
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>AI Lập Dàn Ý</span>
               </button>
-              {onRunFullAuto && (
+
+              <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  disabled={generatingOutline}
-                  onClick={onRunFullAuto}
-                  title="Full Auto → HixBypass"
-                  className="btn-press px-2.5 py-2 text-[11.5px] font-bold bg-[#0B2559] text-amber-300 hover:bg-[#12489B] rounded-xl inline-flex items-center gap-1 shadow-sm"
+                  onClick={onWriteAllSequentially}
+                  className="btn-press px-3 py-2 text-[11.5px] font-bold bg-[#12489B] text-white hover:bg-[#0B2559] rounded-xl inline-flex items-center gap-1.5 shadow-sm"
                 >
-                  <Sparkles className="w-3 h-3" />
-                  <span>Auto</span>
+                  <Play className="w-3 h-3" />
+                  <span>Viết tuần tự</span>
                 </button>
-              )}
+                {onRunFullAuto && (
+                  <button
+                    type="button"
+                    onClick={onRunFullAuto}
+                    title="Full Auto → HixBypass"
+                    className="btn-press px-2.5 py-2 text-[11.5px] font-bold bg-[#0B2559] text-amber-300 hover:bg-[#12489B] rounded-xl inline-flex items-center gap-1 shadow-sm"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Auto</span>
+                  </button>
+                )}
+              </div>
             </>
           )}
         </div>
-      </div>
+      )}
 
       {/* ───── Progress bar ───── */}
       <div className="px-4 py-2.5 bg-[#FAFBFC] border-b border-zinc-100">

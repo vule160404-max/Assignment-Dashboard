@@ -5,6 +5,7 @@ import {
   SectionHeadingLevel,
   WriterSession,
 } from '../components/admin/writer/types';
+import { stripDuplicateLeadingHeading } from './aiWriterClient';
 import { countWords, parseDocxFile } from './wordHumanizer';
 import {
   decodeBase64DataUrl,
@@ -867,7 +868,10 @@ export async function buildFormattedDocxFromSession(
         );
       }
       if (sec.content.trim()) {
-        pushBlockParagraphs(sec.content, isRefSection);
+        pushBlockParagraphs(
+          stripDuplicateLeadingHeading(sec.content, sec.title),
+          isRefSection
+        );
       } else {
         cumulativeWords += sec.targetWords || 250;
       }

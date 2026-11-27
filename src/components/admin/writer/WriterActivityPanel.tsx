@@ -151,7 +151,7 @@ export function WriterActivityPanel({
         top: `${stickyTopPx}px`,
         maxHeight: `calc(100vh - ${stickyTopPx + 16}px)`,
       }}
-      className="xl:col-span-3 xl:sticky xl:z-20 xl:flex xl:flex-col bg-white border border-zinc-200/80 rounded-2xl shadow-sm overflow-hidden transition-[top] duration-150"
+      className="w-full xl:w-[265px] shrink-0 xl:sticky xl:z-20 xl:flex xl:flex-col bg-white border border-zinc-200/80 rounded-2xl shadow-sm overflow-hidden transition-[top] duration-150"
     >
       {/* ── Header ── */}
       <div className="shrink-0 px-4 py-3 bg-white border-b border-zinc-100 flex items-center justify-between gap-2">
@@ -189,7 +189,7 @@ export function WriterActivityPanel({
 
       {/* ── Live running strip ── */}
       {isBusy && (
-        <div className="shrink-0 px-4 py-3 bg-blue-50/50 border-b border-blue-100 space-y-2">
+        <div className="shrink-0 px-4 py-3 bg-blue-50/50 border-b border-blue-100 space-y-2.5">
           <div className="flex items-start gap-2">
             <Loader2 className="w-3.5 h-3.5 text-[#12489B] animate-spin shrink-0 mt-0.5" />
             <p className="text-[11px] font-semibold text-[#0B2559] leading-snug flex-1 break-words">
@@ -201,8 +201,8 @@ export function WriterActivityPanel({
             onClick={onStopAi}
             className="btn-press w-full py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-bold inline-flex items-center justify-center gap-1.5"
           >
-            <Square className="w-3 h-3 fill-current" />
-            <span>Dừng ({formatElapsed(elapsedSec)})</span>
+            <Square className="w-2.5 h-2.5 fill-current" />
+            <span>Dừng AI</span>
           </button>
         </div>
       )}

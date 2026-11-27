@@ -178,7 +178,7 @@ export function WriterBriefPanel({
   const labelCls = 'block text-[11px] font-semibold text-zinc-500 uppercase tracking-wide mb-1.5';
 
   return (
-    <div className="tab-panel-enter p-4 space-y-4">
+    <div className="tab-panel-enter p-3 space-y-3">
       {/* Cohort badge */}
       {session.cohortMeta && (
         <div className="rounded-xl bg-slate-900 text-white p-3 space-y-1">
