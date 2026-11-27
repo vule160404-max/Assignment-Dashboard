@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   FileText,
   Layers,
+  Loader2,
   RotateCcw,
   Trash2,
   X,
@@ -116,7 +117,11 @@ interface AiWriterStudioViewProps {
     file: File,
     opts: { isDraftOnly: boolean; isLocked: boolean; note: string }
   ) => Promise<void>;
-  onSendDocxToHumanizer?: (orderCode: string, file: File) => void;
+  onSendDocxToHumanizer?: (
+    orderCode: string,
+    file: File,
+    options?: { autoStart?: boolean }
+  ) => void;
   onToast: (msg: string) => void;
 }
 
@@ -283,6 +288,10 @@ export function AiWriterStudioView({
     batchTotal: number;
     currentStepTitle: string;
   }>({ currentStepIndex: 0, batchTotal: 0, currentStepTitle: '' });
+  const [fullAutoSessionId, setFullAutoSessionId] = useState<string | null>(null);
+  const [fullAutoPhase, setFullAutoPhase] = useState<
+    'outlining' | 'writing' | 'pushing_hix' | null
+  >(null);
 
   useEffect(() => {
     setAuditReport(null);
@@ -402,6 +411,8 @@ export function AiWriterStudioView({
       }
     });
     setRefiningSection(false);
+    setFullAutoSessionId(null);
+    setFullAutoPhase(null);
     setCurrentStepLabel('');
     const currentKey = resolveLogKey();
     setActivityLogsByKey((prev) => {
@@ -1232,13 +1243,15 @@ export function AiWriterStudioView({
   };
 
   // --- Outline Management (Session-Safe) ---
-  const handleAiGenerateOutlineForSession = async (targetSessionId: string) => {
+  const handleAiGenerateOutlineForSession = async (
+    targetSessionId: string
+  ): Promise<boolean> => {
     const sess = sessionsRef.current.find((s) => s.id === targetSessionId);
-    if (!sess) return;
+    if (!sess) return false;
     if (!hasEffectiveApiKey) {
       setShowApiModal(true);
       onToast('Vui lòng nhập API Key Chatbot trước khi tạo dàn ý.');
-      return;
+      return false;
     }
     if (targetSessionId === activeSession?.id) {
       setLeftTab('outline');
@@ -1288,6 +1301,7 @@ export function AiWriterStudioView({
       onToast(
         `AI (${activeModelDisplayName}) đã lập dàn ý ${sections.length} mục cho "${sess.title}".`
       );
+      return sections.length > 0;
     } catch (err) {
       if (isAbortError(err)) {
         setCurrentStepLabel('');
@@ -1295,7 +1309,7 @@ export function AiWriterStudioView({
           ...s,
           batchStatus: 'idle',
         }));
-        return;
+        return false;
       }
       const msg =
         err instanceof Error ? err.message : 'Tạo dàn ý bằng AI thất bại.';
@@ -1314,6 +1328,7 @@ export function AiWriterStudioView({
         batchErrorMsg: msg,
       }));
       onToast(msg);
+      return false;
     }
   };
 
@@ -1782,6 +1797,91 @@ export function AiWriterStudioView({
       onToast(
         err instanceof Error ? err.message : 'Viết bài tuần tự bị gián đoạn.'
       );
+    }
+  };
+
+  /**
+   * 1-Click Full-Auto Mode:
+   * 1) Generate outline (and Hybrid sources if enabled)
+   * 2) Sequentially write all sections top-to-bottom
+   * 3) Export formatted .docx and auto-launch HixBypass inside Word Humanizer
+   */
+  const handleRunFullAutoPipeline = async (targetSessionId?: string) => {
+    const sessId = targetSessionId || activeSession?.id;
+    const sess = sessionsRef.current.find((s) => s.id === sessId);
+    if (!sess || !sessId) return;
+
+    if (!hasEffectiveApiKey) {
+      setShowApiModal(true);
+      onToast('Vui lòng nhập API Key Chatbot trước khi chạy Chế độ Tự động.');
+      return;
+    }
+
+    if (!(sess.topic || sess.title || '').trim()) {
+      onToast('Vui lòng điền Đề tài / Chủ đề bài viết trước khi chạy Tự động.');
+      return;
+    }
+
+    setFullAutoSessionId(sessId);
+    setFullAutoPhase('outlining');
+    setLeftTab('outline');
+
+    try {
+      const outlined = await handleAiGenerateOutlineForSession(sessId);
+      if (!outlined || pausedSessionIdsRef.current.has(sessId)) {
+        setFullAutoSessionId(null);
+        setFullAutoPhase(null);
+        return;
+      }
+
+      setFullAutoPhase('writing');
+      await runSinglePaperPipeline(sessId, false);
+
+      const finishedSess = sessionsRef.current.find((s) => s.id === sessId);
+      const finishedWords = (finishedSess?.outline || []).reduce(
+        (sum, sec) => sum + countWords(sec.content),
+        0
+      );
+
+      if (
+        !finishedSess ||
+        finishedSess.batchStatus !== 'completed' ||
+        finishedWords === 0 ||
+        pausedSessionIdsRef.current.has(sessId)
+      ) {
+        setFullAutoSessionId(null);
+        setFullAutoPhase(null);
+        return;
+      }
+
+      setFullAutoPhase('pushing_hix');
+      setCurrentStepLabel('Đang xuất Word & tự động chạy HixBypass...');
+      pushActivityLog(
+        'running',
+        'Chế độ Tự động · Chuyển sang HixBypass',
+        `Xuất .docx (${finishedWords.toLocaleString('vi-VN')} từ) và tự động kích hoạt Humanize.`
+      );
+
+      const docxFile = await buildFormattedDocxFromSession(finishedSess);
+      if (onSendDocxToHumanizer) {
+        onSendDocxToHumanizer(finishedSess.linkedOrderCode, docxFile, {
+          autoStart: true,
+        });
+      } else {
+        onToast(`Đã viết xong bài "${finishedSess.title}".`);
+      }
+    } catch (err) {
+      if (!isAbortError(err)) {
+        onToast(
+          err instanceof Error
+            ? err.message
+            : 'Chế độ Hoàn toàn Tự động bị gián đoạn.'
+        );
+      }
+    } finally {
+      setFullAutoSessionId(null);
+      setFullAutoPhase(null);
+      setCurrentStepLabel('');
     }
   };
 
@@ -3411,6 +3511,55 @@ export function AiWriterStudioView({
             </div>
 
             <div className="lg:flex-1 lg:min-h-0 lg:overflow-y-auto">
+              {fullAutoSessionId === activeSession.id && fullAutoPhase && (
+                <div className="m-3 mb-0 rounded-xl bg-[#0B2559] text-white p-3 space-y-2 shadow-sm">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-amber-300">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>CHẾ ĐỘ HOÀN TOÀN TỰ ĐỘNG</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleStopActiveAi}
+                      className="px-2 py-0.5 rounded bg-rose-500/90 hover:bg-rose-600 text-[10px] font-bold text-white cursor-pointer"
+                    >
+                      Dừng
+                    </button>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1 text-[10px] font-semibold">
+                    <div
+                      className={`px-2 py-1 rounded text-center ${
+                        fullAutoPhase === 'outlining'
+                          ? 'bg-sky-400/25 text-sky-200 ring-1 ring-sky-300/50'
+                          : 'bg-emerald-500/20 text-emerald-300'
+                      }`}
+                    >
+                      1. Lập dàn ý
+                    </div>
+                    <div
+                      className={`px-2 py-1 rounded text-center ${
+                        fullAutoPhase === 'writing'
+                          ? 'bg-sky-400/25 text-sky-200 ring-1 ring-sky-300/50'
+                          : fullAutoPhase === 'pushing_hix'
+                          ? 'bg-emerald-500/20 text-emerald-300'
+                          : 'bg-white/10 text-slate-300'
+                      }`}
+                    >
+                      2. Viết tuần tự
+                    </div>
+                    <div
+                      className={`px-2 py-1 rounded text-center ${
+                        fullAutoPhase === 'pushing_hix'
+                          ? 'bg-sky-400/25 text-sky-200 ring-1 ring-sky-300/50'
+                          : 'bg-white/10 text-slate-300'
+                      }`}
+                    >
+                      3. HixBypass
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {leftTab === 'brief' ? (
                 <WriterBriefPanel
                   session={activeSession}
@@ -3420,6 +3569,10 @@ export function AiWriterStudioView({
                     setLeftTab('outline');
                     void handleAiGenerateOutlineForSession(activeSession.id);
                   }}
+                  onRunFullAuto={() =>
+                    void handleRunFullAutoPipeline(activeSession.id)
+                  }
+                  fullAutoRunning={fullAutoSessionId === activeSession.id}
                 />
               ) : (
                 <WriterOutlinePanel
@@ -3429,6 +3582,7 @@ export function AiWriterStudioView({
                   totalOutlineTargetWords={totalOutlineTargetWords}
                   generatingOutline={isActivePaperOutlining}
                   runningAllSections={isActivePaperWriting}
+                  fullAutoRunning={fullAutoSessionId === activeSession.id}
                   onSelectSection={(secId) =>
                     mutateActiveSession((s) => ({ ...s, activeSectionId: secId }))
                   }
@@ -3438,8 +3592,15 @@ export function AiWriterStudioView({
                 onWriteAllSequentially={() =>
                   void handleWriteCurrentPaperSequentially()
                 }
+                onRunFullAuto={() =>
+                  void handleRunFullAutoPipeline(activeSession.id)
+                }
                 onStopSequential={() => {
                   pausedSessionIdsRef.current.add(activeSession.id);
+                  if (fullAutoSessionId === activeSession.id) {
+                    setFullAutoSessionId(null);
+                    setFullAutoPhase(null);
+                  }
                 }}
                 onWriteSingleSection={(secId) =>
                   void handleWriteSingleSection(secId)

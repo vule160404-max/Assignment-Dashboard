@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -25,9 +25,18 @@ import { WordUploadToolbar } from './humanizer/WordUploadToolbar';
 import { computeSessionChunks, isSessionRunning } from './humanizer/types';
 import { useHumanizerSessions } from './humanizer/useHumanizerSessions';
 
+export interface PendingAutoHumanizeJob {
+  id: number;
+  orderCode: string;
+  file: File;
+  autoStart: boolean;
+}
+
 interface WordHumanizerViewProps {
   orders: OrderRecord[];
   initialOrderCode?: string;
+  pendingAutoHumanizeJob?: PendingAutoHumanizeJob | null;
+  onConsumePendingAutoHumanizeJob?: () => void;
   onAttachDocxToOrder?: (order: OrderRecord, file: File) => Promise<void>;
   onToast: (msg: string) => void;
 }
@@ -35,6 +44,8 @@ interface WordHumanizerViewProps {
 export function WordHumanizerView({
   orders,
   initialOrderCode = '',
+  pendingAutoHumanizeJob = null,
+  onConsumePendingAutoHumanizeJob,
   onAttachDocxToOrder,
   onToast,
 }: WordHumanizerViewProps) {
@@ -105,6 +116,24 @@ export function WordHumanizerView({
   const isRunning = activeSession
     ? isSessionRunning(activeSession.playbackStatus)
     : false;
+
+  useEffect(() => {
+    if (!pendingAutoHumanizeJob) return;
+    const job = pendingAutoHumanizeJob;
+    onConsumePendingAutoHumanizeJob?.();
+    void (async () => {
+      const created = await handleUploadFiles([job.file]);
+      const target = created[0];
+      if (target && job.autoStart) {
+        handleStartOrResume(target.sessionId);
+      }
+    })();
+  }, [
+    pendingAutoHumanizeJob,
+    onConsumePendingAutoHumanizeJob,
+    handleUploadFiles,
+    handleStartOrResume,
+  ]);
   const progressPercent =
     chunks.length > 0 ? Math.round((completedCount / chunks.length) * 100) : 0;
 
@@ -178,7 +207,9 @@ export function WordHumanizerView({
           activeSession={activeSession}
           hixTabs={bridgeStatus.hixTabs}
           completedCount={completedCount}
-          onUploadFiles={handleUploadFiles}
+          onUploadFiles={async (files) => {
+            await handleUploadFiles(files);
+          }}
           onCreateFromPaste={handleCreateFromPaste}
           onUpdateSessionConfig={(sid, patch) =>
             mutateSession(sid, (cur) => ({ ...cur, ...patch }))

@@ -88,7 +88,10 @@ import { OrderInquiriesInbox } from './OrderInquiriesInbox';
 import { OrderWorkspaceModal } from './OrderWorkspaceModal';
 import { RevenueDashboardView } from './RevenueDashboardView';
 import { TeamManagementView } from './TeamManagementView';
-import { WordHumanizerView } from './WordHumanizerView';
+import {
+  PendingAutoHumanizeJob,
+  WordHumanizerView,
+} from './WordHumanizerView';
 
 type AdminTab = AdminTabKey;
 type OrderFilter = 'all' | 'active' | 'urgent' | 'unpaid_balance' | 'completed';
@@ -241,6 +244,8 @@ export function AdminPortalView({
   const [editingOrder, setEditingOrder] = useState<OrderRecord | null>(null);
   const [prefillInquiry, setPrefillInquiry] = useState<OrderInquiry | null>(null);
   const [humanizerOrderCode, setHumanizerOrderCode] = useState('');
+  const [pendingAutoHumanizeJob, setPendingAutoHumanizeJob] =
+    useState<PendingAutoHumanizeJob | null>(null);
   const [writerOrderCode, setWriterOrderCode] = useState('');
   const [pendingDataLabPayload, setPendingDataLabPayload] =
     useState<DataLabAiWriterPayload | null>(null);
@@ -1450,20 +1455,30 @@ export function AdminPortalView({
                 onToast(`Đã đính kèm bản thảo Word (${file.name}) vào đơn #${ord.orderCode}!`);
               }}
               onDeliverDocxToClient={handleDeliverDocxToClient}
-              onSendDocxToHumanizer={(orderCode, file) => {
-                // Download file and switch directly to humanizer tab
-                const url = URL.createObjectURL(file);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = file.name;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
+              onSendDocxToHumanizer={(orderCode, file, options) => {
+                const autoStart = Boolean(options?.autoStart);
+                if (!autoStart) {
+                  const url = URL.createObjectURL(file);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = file.name;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }
                 setHumanizerOrderCode(orderCode);
+                setPendingAutoHumanizeJob({
+                  id: Date.now(),
+                  orderCode,
+                  file,
+                  autoStart,
+                });
                 setActiveTab('humanizer');
                 onToast(
-                  `Đã xuất "${file.name}" và chuyển sang tab Word Humanizer!`
+                  autoStart
+                    ? `Đã viết xong "${file.name}" — tự động chuyển sang Word Humanizer & chạy HixBypass!`
+                    : `Đã mở "${file.name}" trong tab Word Humanizer!`
                 );
               }}
               onToast={onToast}
@@ -1484,6 +1499,10 @@ export function AdminPortalView({
             <WordHumanizerView
               orders={orders}
               initialOrderCode={humanizerOrderCode}
+              pendingAutoHumanizeJob={pendingAutoHumanizeJob}
+              onConsumePendingAutoHumanizeJob={() =>
+                setPendingAutoHumanizeJob(null)
+              }
               onAttachDocxToOrder={handleAttachHumanizedDocx}
               onToast={onToast}
             />

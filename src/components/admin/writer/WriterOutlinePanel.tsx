@@ -23,9 +23,11 @@ interface WriterOutlinePanelProps {
   totalOutlineTargetWords: number;
   generatingOutline: boolean;
   runningAllSections: boolean;
+  fullAutoRunning?: boolean;
   onSelectSection: (sectionId: string) => void;
   onAiGenerateOutline: () => void;
   onWriteAllSequentially: () => void;
+  onRunFullAuto?: () => void;
   onStopSequential: () => void;
   onWriteSingleSection: (sectionId: string) => void;
   onAddSection: () => void;
@@ -44,9 +46,11 @@ export function WriterOutlinePanel({
   totalOutlineTargetWords,
   generatingOutline,
   runningAllSections,
+  fullAutoRunning = false,
   onSelectSection,
   onAiGenerateOutline,
   onWriteAllSequentially,
+  onRunFullAuto,
   onStopSequential,
   onWriteSingleSection,
   onAddSection,
@@ -67,7 +71,7 @@ export function WriterOutlinePanel({
       <div className="px-3.5 py-2.5 bg-zinc-50/70 border-b border-zinc-200/80 flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
-          disabled={generatingOutline || runningAllSections}
+          disabled={generatingOutline || runningAllSections || fullAutoRunning}
           onClick={onAiGenerateOutline}
           className="btn-press px-2.5 py-1.5 text-xs font-semibold bg-white border border-blue-200 text-[#12489B] hover:bg-blue-50 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
         >
@@ -81,25 +85,41 @@ export function WriterOutlinePanel({
           </span>
         </button>
 
-        {runningAllSections ? (
-          <button
-            type="button"
-            onClick={onStopSequential}
-            className="btn-press px-3 py-1.5 text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 rounded-lg"
-          >
-            Dừng viết tự động
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={generatingOutline}
-            onClick={onWriteAllSequentially}
-            className="btn-press px-3 py-1.5 text-xs font-semibold bg-[#12489B] text-white hover:bg-[#0B2559] rounded-lg inline-flex items-center gap-1.5 shadow-2xs"
-          >
-            <Play className="w-3 h-3" />
-            <span>Viết tuần tự cả bài</span>
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-1.5">
+          {runningAllSections || fullAutoRunning ? (
+            <button
+              type="button"
+              onClick={onStopSequential}
+              className="btn-press px-3 py-1.5 text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 rounded-lg"
+            >
+              Dừng viết tự động
+            </button>
+          ) : (
+            <>
+              <button
+                type="button"
+                disabled={generatingOutline}
+                onClick={onWriteAllSequentially}
+                className="btn-press px-3 py-1.5 text-xs font-semibold bg-[#12489B] text-white hover:bg-[#0B2559] rounded-lg inline-flex items-center gap-1.5 shadow-2xs"
+              >
+                <Play className="w-3 h-3" />
+                <span>Viết tuần tự</span>
+              </button>
+              {onRunFullAuto && (
+                <button
+                  type="button"
+                  disabled={generatingOutline}
+                  onClick={onRunFullAuto}
+                  title="Tự lập dàn ý → Viết cả bài → Tự đẩy sang HixBypass"
+                  className="btn-press px-2.5 py-1.5 text-xs font-bold bg-[#0B2559] text-amber-300 hover:bg-[#12489B] rounded-lg inline-flex items-center gap-1 shadow-2xs"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  <span>Full Auto → Hix</span>
+                </button>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {/* Hardware-accelerated progress bar & word counter */}

@@ -83,6 +83,8 @@ interface WriterBriefPanelProps {
   onUpdateSession: (updater: (prev: WriterSession) => WriterSession) => void;
   onUploadContextFiles: (fileList: FileList | null) => Promise<void>;
   onSwitchToOutlineWithAi?: () => void;
+  onRunFullAuto?: () => void;
+  fullAutoRunning?: boolean;
 }
 
 export function WriterBriefPanel({
@@ -90,6 +92,8 @@ export function WriterBriefPanel({
   onUpdateSession,
   onUploadContextFiles,
   onSwitchToOutlineWithAi,
+  onRunFullAuto,
+  fullAutoRunning = false,
 }: WriterBriefPanelProps) {
   const contextFileInputRef = useRef<HTMLInputElement | null>(null);
   const contextImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -618,16 +622,44 @@ export function WriterBriefPanel({
         )}
       </div>
 
-      {onSwitchToOutlineWithAi && (
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={onSwitchToOutlineWithAi}
-            className="btn-press w-full py-2 text-xs font-semibold bg-[#12489B] text-white hover:bg-[#0B2559] rounded-lg inline-flex items-center justify-center gap-1.5 shadow-2xs"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Chuyển sang Dàn ý & Để AI Lập Dàn Ý →</span>
-          </button>
+      {(onRunFullAuto || onSwitchToOutlineWithAi) && (
+        <div className="pt-2 space-y-2">
+          {onRunFullAuto && (
+            <div className="rounded-xl bg-[#0B2559]/[0.04] border border-[#12489B]/20 p-2.5 space-y-1.5">
+              <button
+                type="button"
+                disabled={fullAutoRunning}
+                onClick={onRunFullAuto}
+                className="btn-press w-full py-2.5 px-3 text-xs font-bold bg-[#0B2559] hover:bg-[#12489B] text-white rounded-lg inline-flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {fullAutoRunning ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                )}
+                <span>
+                  {fullAutoRunning
+                    ? 'Đang chạy Chế độ Hoàn toàn Tự động...'
+                    : 'Chạy Hoàn toàn Tự động (Dàn ý → Viết → HixBypass)'}
+                </span>
+              </button>
+              <p className="text-[10.5px] text-slate-600 leading-snug text-center">
+                1 chạm: AI tự lập dàn ý, tự viết tuần tự từ trên xuống và tự đẩy sang Word Humanizer chạy HixBypass.
+              </p>
+            </div>
+          )}
+
+          {onSwitchToOutlineWithAi && (
+            <button
+              type="button"
+              disabled={fullAutoRunning}
+              onClick={onSwitchToOutlineWithAi}
+              className="btn-press w-full py-2 text-xs font-semibold bg-white border border-blue-200 text-[#12489B] hover:bg-blue-50 rounded-lg inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Hoặc chỉ Lập Dàn Ý thủ công →</span>
+            </button>
+          )}
         </div>
       )}
     </div>

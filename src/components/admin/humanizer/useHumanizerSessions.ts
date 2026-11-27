@@ -305,7 +305,8 @@ export function useHumanizerSessions(params: {
   );
 
   const handleUploadFiles = useCallback(
-    async (files: File[]) => {
+    async (files: File[]): Promise<HumanizerSession[]> => {
+      const importedSessions: HumanizerSession[] = [];
       for (const file of files) {
         if (!file.name.toLowerCase().endsWith('.docx')) {
           onToast(`Bỏ qua "${file.name}": chỉ hỗ trợ tệp .docx.`);
@@ -318,11 +319,13 @@ export function useHumanizerSessions(params: {
             onToast(`File "${file.name}" không chứa văn bản.`);
             continue;
           }
-          addParsedDocumentAsSession(parsed, { isPasted: false });
+          const created = addParsedDocumentAsSession(parsed, { isPasted: false });
+          importedSessions.push(created);
         } catch (err) {
           onToast(err instanceof Error ? err.message : `Không thể đọc "${file.name}".`);
         }
       }
+      return importedSessions;
     },
     [addParsedDocumentAsSession, onToast]
   );
