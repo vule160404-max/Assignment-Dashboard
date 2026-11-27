@@ -353,6 +353,7 @@ export interface WriterSession {
   batchErrorMsg?: string;
   researchedSources?: string;
   researchedSourcesTopic?: string;
+  sourceRotationCount?: number;
   cohortMeta?: CohortCloneMeta;
   historyStack: string[];
   historyIndex: number;

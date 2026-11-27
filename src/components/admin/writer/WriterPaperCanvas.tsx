@@ -576,37 +576,32 @@ export function WriterPaperCanvas({
       className={`${
         containerClassName ||
         (focusPaperMode ? 'lg:col-span-12' : 'lg:col-span-8')
-      } bg-zinc-200/65 border border-zinc-300/90 rounded-2xl p-4 sm:p-6 overflow-x-auto`}
+      } bg-[#F0F2F5] border border-zinc-200/80 rounded-2xl p-4 sm:p-6 overflow-x-auto`}
     >
-        {/* Paper Top Info Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-4 text-xs text-zinc-600">
+        {/* ───── Paper Top Info Strip ───── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={onToggleFocusPaperMode}
-            className="btn-press px-2.5 py-1 text-xs font-medium bg-white border border-zinc-200 rounded-lg text-slate-800 hover:bg-zinc-50 inline-flex items-center gap-1.5 shadow-2xs"
-            title={
-              focusPaperMode
-                ? 'Hiện lại cột Đề bài & Dàn ý'
-                : 'Ẩn cột bên trái để tập trung soạn thảo toàn màn hình'
-            }
+            className="btn-press px-2.5 py-1.5 text-[11px] font-semibold bg-white border border-zinc-200 rounded-xl text-slate-700 hover:bg-zinc-50 inline-flex items-center gap-1.5 shadow-sm"
+            title={focusPaperMode ? 'Hiện lại cột trái' : 'Tập trung A4'}
           >
             {focusPaperMode ? (
               <>
                 <Minimize2 className="w-3.5 h-3.5 text-[#12489B]" />
-                <span>Hiện cột Đề bài & Dàn ý</span>
+                <span>Hiện cột trái</span>
               </>
             ) : (
               <>
                 <Maximize2 className="w-3.5 h-3.5 text-[#12489B]" />
-                <span>Chế độ Tập trung A4</span>
+                <span>Focus A4</span>
               </>
             )}
           </button>
 
-          <span className="hidden sm:inline-block px-2 py-0.5 rounded bg-white/80 border border-zinc-200/80 font-mono text-[11px] text-zinc-600">
-            {format.fontFamily} · {format.fontSizePt}pt · Dòng{' '}
-            {format.lineSpacing} · Lề {format.marginInch}"
+          <span className="hidden sm:inline-block px-2.5 py-1 rounded-xl bg-white border border-zinc-200 font-mono text-[10.5px] text-zinc-500 shadow-sm">
+            {format.fontFamily} · {format.fontSizePt}pt · {format.lineSpacing}× · {format.marginInch}"
           </span>
 
           {onUpdateContextImages && session.outline.length > 0 && (
@@ -627,13 +622,13 @@ export function WriterPaperCanvas({
                   secEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 });
               }}
-              className="btn-press px-2.5 py-1 text-xs font-semibold bg-blue-50 border border-blue-200/90 rounded-lg text-[#12489B] hover:bg-blue-100 inline-flex items-center gap-1.5 shadow-2xs"
-              title="Tải ảnh mới, dán Ctrl+V hoặc chọn từ thư viện ảnh để chèn thủ công vào mục đang chọn"
+              className="btn-press px-2.5 py-1.5 text-[11px] font-semibold bg-blue-50 border border-blue-200/80 rounded-xl text-[#12489B] hover:bg-blue-100 inline-flex items-center gap-1.5 shadow-sm"
+              title="Chèn ảnh vào mục đang chọn"
             >
               <ImagePlus className="w-3.5 h-3.5" />
-              <span>Chèn ảnh vào bài</span>
+              <span>Ảnh</span>
               {(session.contextImages?.length || 0) > 0 && (
-                <span className="px-1.5 py-0.2 rounded-full bg-[#12489B] text-white font-mono text-[10px]">
+                <span className="px-1.5 py-px rounded-full bg-[#12489B] text-white font-mono text-[9px] font-bold">
                   {session.contextImages?.length}
                 </span>
               )}
@@ -641,28 +636,28 @@ export function WriterPaperCanvas({
           )}
         </div>
 
-        <div className="inline-flex rounded-lg bg-white border border-zinc-200 p-0.5">
+        <div className="inline-flex rounded-xl bg-white border border-zinc-200 p-0.5 shadow-sm">
           <button
             type="button"
             onClick={() => onUpdateViewMode('sections')}
-            className={`btn-press px-2.5 py-1 text-xs font-medium rounded-md ${
+            className={`btn-press px-3 py-1.5 text-[11px] font-semibold rounded-lg ${
               session.viewMode === 'sections'
                 ? 'bg-[#12489B] text-white'
-                : 'text-zinc-600 hover:text-slate-900'
+                : 'text-zinc-500 hover:text-slate-900'
             }`}
           >
-            Theo từng mục
+            Sections
           </button>
           <button
             type="button"
             onClick={() => onUpdateViewMode('full_paper')}
-            className={`btn-press px-2.5 py-1 text-xs font-medium rounded-md ${
+            className={`btn-press px-3 py-1.5 text-[11px] font-semibold rounded-lg ${
               session.viewMode === 'full_paper'
                 ? 'bg-[#12489B] text-white'
-                : 'text-zinc-600 hover:text-slate-900'
+                : 'text-zinc-500 hover:text-slate-900'
             }`}
           >
-            Liền mạch A4
+            Full A4
           </button>
         </div>
       </div>

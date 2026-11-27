@@ -64,35 +64,34 @@ export function WriterOutlinePanel({
       ? totalDraftedWords / session.targetWordCount
       : 0
   );
+  const progressPct = Math.round(progressRatio * 100);
 
   return (
     <div className="tab-panel-enter flex flex-col">
-      {/* Top Action Strip */}
-      <div className="px-3.5 py-2.5 bg-zinc-50/70 border-b border-zinc-200/80 flex flex-wrap items-center justify-between gap-2">
+      {/* ───── Action Strip ───── */}
+      <div className="px-4 py-3 bg-white border-b border-zinc-100 flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
           disabled={generatingOutline || runningAllSections || fullAutoRunning}
           onClick={onAiGenerateOutline}
-          className="btn-press px-2.5 py-1.5 text-xs font-semibold bg-white border border-blue-200 text-[#12489B] hover:bg-blue-50 rounded-lg inline-flex items-center gap-1.5 disabled:opacity-50"
+          className="btn-press px-3 py-2 text-[11.5px] font-bold bg-white border border-blue-200 text-[#12489B] hover:bg-blue-50 rounded-xl inline-flex items-center gap-1.5 disabled:opacity-50 transition-colors"
         >
           {generatingOutline ? (
             <Loader2 className="w-3.5 h-3.5 animate-spin" />
           ) : (
             <Sparkles className="w-3.5 h-3.5" />
           )}
-          <span>
-            {generatingOutline ? 'Đang lập dàn ý...' : 'AI Tự Lập Dàn Ý'}
-          </span>
+          <span>{generatingOutline ? 'Đang lập...' : 'AI Lập Dàn Ý'}</span>
         </button>
 
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex items-center gap-1.5">
           {runningAllSections || fullAutoRunning ? (
             <button
               type="button"
               onClick={onStopSequential}
-              className="btn-press px-3 py-1.5 text-xs font-semibold bg-rose-600 text-white hover:bg-rose-700 rounded-lg"
+              className="btn-press px-3.5 py-2 text-[11.5px] font-bold bg-rose-600 text-white hover:bg-rose-700 rounded-xl"
             >
-              Dừng viết tự động
+              Dừng viết
             </button>
           ) : (
             <>
@@ -100,7 +99,7 @@ export function WriterOutlinePanel({
                 type="button"
                 disabled={generatingOutline}
                 onClick={onWriteAllSequentially}
-                className="btn-press px-3 py-1.5 text-xs font-semibold bg-[#12489B] text-white hover:bg-[#0B2559] rounded-lg inline-flex items-center gap-1.5 shadow-2xs"
+                className="btn-press px-3 py-2 text-[11.5px] font-bold bg-[#12489B] text-white hover:bg-[#0B2559] rounded-xl inline-flex items-center gap-1.5 shadow-sm"
               >
                 <Play className="w-3 h-3" />
                 <span>Viết tuần tự</span>
@@ -110,11 +109,11 @@ export function WriterOutlinePanel({
                   type="button"
                   disabled={generatingOutline}
                   onClick={onRunFullAuto}
-                  title="Tự lập dàn ý → Viết cả bài → Tự đẩy sang HixBypass"
-                  className="btn-press px-2.5 py-1.5 text-xs font-bold bg-[#0B2559] text-amber-300 hover:bg-[#12489B] rounded-lg inline-flex items-center gap-1 shadow-2xs"
+                  title="Full Auto → HixBypass"
+                  className="btn-press px-2.5 py-2 text-[11.5px] font-bold bg-[#0B2559] text-amber-300 hover:bg-[#12489B] rounded-xl inline-flex items-center gap-1 shadow-sm"
                 >
                   <Sparkles className="w-3 h-3" />
-                  <span>Full Auto → Hix</span>
+                  <span>Auto</span>
                 </button>
               )}
             </>
@@ -122,50 +121,53 @@ export function WriterOutlinePanel({
         </div>
       </div>
 
-      {/* Hardware-accelerated progress bar & word counter */}
-      <div className="px-3.5 py-2 bg-white border-b border-zinc-100">
-        <div className="flex items-center justify-between text-[11px] text-zinc-500 mb-1">
+      {/* ───── Progress bar ───── */}
+      <div className="px-4 py-2.5 bg-[#FAFBFC] border-b border-zinc-100">
+        <div className="flex items-center justify-between text-[11px] text-zinc-500 mb-1.5">
           <span>
-            Tiến độ:{' '}
-            <strong className="font-mono text-slate-900 tabular-nums">
+            <strong className="font-mono text-slate-800 tabular-nums">
               {totalDraftedWords.toLocaleString('vi-VN')}
             </strong>{' '}
-            / {session.targetWordCount.toLocaleString('vi-VN')}w
+            / {session.targetWordCount.toLocaleString('vi-VN')} từ
           </span>
-          <span className="font-mono tabular-nums">
-            Dàn ý: {totalOutlineTargetWords.toLocaleString('vi-VN')}w
+          <span className="font-mono text-[10px] tabular-nums bg-white px-2 py-0.5 rounded-md border border-zinc-200">
+            {progressPct}%
           </span>
         </div>
-        <div className="h-1 bg-zinc-100 rounded-full overflow-hidden">
+        <div className="h-1.5 bg-zinc-200/80 rounded-full overflow-hidden">
           <div
-            className="progress-fill h-full w-full bg-[#12489B]"
-            style={{ transform: `scaleX(${progressRatio})` }}
+            className="progress-fill h-full w-full rounded-full"
+            style={{
+              transform: `scaleX(${progressRatio})`,
+              background: progressPct >= 90 ? '#16a34a' : '#12489B',
+            }}
           />
         </div>
       </div>
 
-      {/* Accordion-Style Outline Cards */}
-      <div className="p-3 space-y-2 max-h-[620px] overflow-y-auto">
+      {/* ───── Outline Cards ───── */}
+      <div className="p-3 space-y-1.5 max-h-[620px] overflow-y-auto">
         {session.outline.map((sec, idx) => {
           const isSelected = currentSectionId === sec.id;
           const actualWords = countWords(sec.content);
           const isGenerating = sec.status === 'generating';
+          const isRefSection = isReferencesSectionTitle(sec.title) || sec.targetWords === 0;
 
           return (
             <div
               key={sec.id}
               onClick={() => onSelectSection(sec.id)}
-              className={`card-interactive rounded-xl border p-2.5 cursor-pointer ${
+              className={`rounded-xl border p-2.5 cursor-pointer transition-all ${
                 isSelected
-                  ? 'border-[#12489B] bg-blue-50/35 ring-2 ring-blue-500/10'
-                  : 'border-zinc-200/90 bg-white'
+                  ? 'border-[#12489B]/40 bg-blue-50/30 ring-1 ring-blue-500/10'
+                  : 'border-zinc-200/80 bg-white hover:border-zinc-300'
               }`}
             >
-              {/* Compact Header Row (Always visible) */}
+              {/* Header row */}
               <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span
-                    className={`w-2 h-2 rounded-full shrink-0 ${
+                    className={`w-[7px] h-[7px] rounded-full shrink-0 ${
                       isGenerating
                         ? 'bg-amber-500 animate-pulse'
                         : actualWords > 0
@@ -178,105 +180,73 @@ export function WriterOutlinePanel({
                       type="text"
                       value={sec.title}
                       onClick={(e) => e.stopPropagation()}
-                      onChange={(e) =>
-                        onUpdateSection(sec.id, { title: e.target.value })
-                      }
-                      className="flex-1 px-2 py-0.5 text-xs font-bold text-slate-900 bg-white border border-blue-200 rounded focus:outline-none focus:border-[#12489B]"
+                      onChange={(e) => onUpdateSection(sec.id, { title: e.target.value })}
+                      className="flex-1 px-2 py-0.5 text-[12px] font-bold text-slate-900 bg-white border border-blue-200 rounded-lg focus:outline-none focus:border-[#12489B]"
                     />
                   ) : (
-                    <span className="text-xs font-semibold text-slate-800 truncate">
+                    <span className="text-[12px] font-semibold text-slate-800 truncate">
                       {sec.title}
                     </span>
                   )}
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span
-                    className="text-[11px] font-mono text-zinc-500 tabular-nums"
-                    title={
-                      isReferencesSectionTitle(sec.title) || sec.targetWords === 0
-                        ? 'Mục Tài liệu tham khảo không giới hạn số từ'
-                        : undefined
-                    }
-                  >
-                    {isReferencesSectionTitle(sec.title) || sec.targetWords === 0
-                      ? `${actualWords}w · ∞`
+                  <span className="text-[10.5px] font-mono text-zinc-400 tabular-nums">
+                    {isRefSection
+                      ? `${actualWords}w`
                       : `${actualWords}/${sec.targetWords}w`}
                   </span>
 
                   <button
                     type="button"
                     disabled={isGenerating || runningAllSections}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onWriteSingleSection(sec.id);
-                    }}
-                    className={`btn-press px-2 py-1 text-[11px] font-semibold rounded-md inline-flex items-center gap-1 ${
+                    onClick={(e) => { e.stopPropagation(); onWriteSingleSection(sec.id); }}
+                    className={`btn-press px-2 py-1 text-[10.5px] font-bold rounded-lg inline-flex items-center gap-1 transition-colors ${
                       actualWords > 0
-                        ? 'bg-white border border-blue-200 text-[#12489B] hover:bg-blue-50'
+                        ? 'bg-white border border-zinc-200 text-[#12489B] hover:bg-blue-50'
                         : 'bg-[#12489B] text-white hover:bg-[#0B2559]'
                     } disabled:opacity-50`}
                   >
                     {isGenerating ? (
-                      <>
-                        <Loader2 className="w-3 h-3 animate-spin" />
-                        <span>Đang viết</span>
-                      </>
+                      <><Loader2 className="w-3 h-3 animate-spin" /><span>...</span></>
                     ) : (
-                      <>
-                        <Sparkles className="w-3 h-3" />
-                        <span>{actualWords > 0 ? 'Viết lại' : 'Viết'}</span>
-                      </>
+                      <><Sparkles className="w-3 h-3" /><span>{actualWords > 0 ? 'Lại' : 'Viết'}</span></>
                     )}
                   </button>
                 </div>
               </div>
 
-              {/* Expanded Detail Controls ONLY for active selected section */}
+              {/* Expanded controls */}
               {isSelected && (
                 <div
-                  className="popover-enter mt-2.5 pt-2.5 border-t border-blue-100/80 space-y-2"
+                  className="popover-enter mt-2.5 pt-2.5 border-t border-zinc-100 space-y-2"
                   onClick={(e) => e.stopPropagation()}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="inline-flex items-center gap-1.5">
                       <select
-                        aria-label="Cấp tiêu đề"
+                        aria-label="Level"
                         value={sec.headingLevel}
-                        onChange={(e) =>
-                          onUpdateSection(sec.id, {
-                            headingLevel: e.target.value as SectionHeadingLevel,
-                          })
-                        }
-                        className="px-1.5 py-0.5 text-[11px] font-mono font-semibold bg-white border border-zinc-200 rounded text-zinc-700"
+                        onChange={(e) => onUpdateSection(sec.id, { headingLevel: e.target.value as SectionHeadingLevel })}
+                        className="px-1.5 py-0.5 text-[10.5px] font-mono font-semibold bg-white border border-zinc-200 rounded-lg text-zinc-700"
                       >
-                        <option value="h1">Heading 1</option>
-                        <option value="h2">Heading 2</option>
-                        <option value="h3">Heading 3</option>
+                        <option value="h1">H1</option>
+                        <option value="h2">H2</option>
+                        <option value="h3">H3</option>
                       </select>
 
-                      {isReferencesSectionTitle(sec.title) || sec.targetWords === 0 ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded">
-                          Không giới hạn từ (∞)
+                      {isRefSection ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10.5px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg">
+                          ∞ từ
                         </span>
                       ) : (
-                        <label className="inline-flex items-center gap-1 text-[11px] text-zinc-600">
-                          <span>Mục tiêu:</span>
+                        <label className="inline-flex items-center gap-1 text-[10.5px] text-zinc-600">
                           <input
                             type="number"
-                            min={50}
-                            max={10000}
-                            step={50}
+                            min={50} max={10000} step={50}
                             value={sec.targetWords}
-                            onChange={(e) =>
-                              onUpdateSection(sec.id, {
-                                targetWords: Math.max(
-                                  50,
-                                  Number(e.target.value) || 200
-                                ),
-                              })
-                            }
-                            className="w-16 px-1.5 py-0.5 text-[11px] font-mono text-right bg-white border border-zinc-200 rounded tabular-nums"
+                            onChange={(e) => onUpdateSection(sec.id, { targetWords: Math.max(50, Number(e.target.value) || 200) })}
+                            className="w-16 px-1.5 py-0.5 text-[10.5px] font-mono text-right bg-white border border-zinc-200 rounded-lg tabular-nums"
                           />
                           <span>từ</span>
                         </label>
@@ -284,31 +254,13 @@ export function WriterOutlinePanel({
                     </div>
 
                     <div className="inline-flex items-center gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() => onMoveSection(sec.id, -1)}
-                        disabled={idx === 0}
-                        className="btn-press p-1 text-zinc-500 hover:text-slate-900 disabled:opacity-30"
-                        title="Đưa lên trên"
-                      >
+                      <button type="button" onClick={() => onMoveSection(sec.id, -1)} disabled={idx === 0} className="btn-press p-1 text-zinc-400 hover:text-slate-900 disabled:opacity-30" title="Lên">
                         <ArrowUp className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => onMoveSection(sec.id, 1)}
-                        disabled={idx === session.outline.length - 1}
-                        className="btn-press p-1 text-zinc-500 hover:text-slate-900 disabled:opacity-30"
-                        title="Đưa xuống dưới"
-                      >
+                      <button type="button" onClick={() => onMoveSection(sec.id, 1)} disabled={idx === session.outline.length - 1} className="btn-press p-1 text-zinc-400 hover:text-slate-900 disabled:opacity-30" title="Xuống">
                         <ArrowDown className="w-3.5 h-3.5" />
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteSection(sec.id)}
-                        disabled={session.outline.length <= 1}
-                        className="btn-press p-1 text-zinc-400 hover:text-rose-600 disabled:opacity-30"
-                        title="Xóa mục này"
-                      >
+                      <button type="button" onClick={() => onDeleteSection(sec.id)} disabled={session.outline.length <= 1} className="btn-press p-1 text-zinc-400 hover:text-rose-600 disabled:opacity-30" title="Xóa">
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
@@ -317,21 +269,15 @@ export function WriterOutlinePanel({
                   <textarea
                     rows={2}
                     value={sec.guidanceNotes}
-                    onChange={(e) =>
-                      onUpdateSection(sec.id, {
-                        guidanceNotes: e.target.value,
-                      })
-                    }
-                    placeholder="Ghi chú luận điểm, lý thuyết, trích dẫn cần triển khai trong mục này..."
-                    className="w-full p-2 text-[11px] text-zinc-700 bg-white border border-blue-200/70 rounded-lg focus:outline-none focus:border-[#12489B]"
+                    onChange={(e) => onUpdateSection(sec.id, { guidanceNotes: e.target.value })}
+                    placeholder="Ghi chú luận điểm, lý thuyết, trích dẫn..."
+                    className="w-full p-2 text-[11px] text-zinc-700 bg-white border border-zinc-200 rounded-xl focus:outline-none focus:border-[#12489B]"
                   />
 
                   {actualWords > 0 && (
-                    <div className="flex items-center gap-1 text-[11px] text-emerald-700">
+                    <div className="flex items-center gap-1 text-[10.5px] text-emerald-700">
                       <CheckCircle2 className="w-3.5 h-3.5" />
-                      <span>
-                        Đã viết {actualWords} từ — có thể sửa trực tiếp trên giấy A4 bên phải.
-                      </span>
+                      <span>Đã viết {actualWords} từ — sửa trên A4 bên phải.</span>
                     </div>
                   )}
                 </div>
@@ -347,10 +293,10 @@ export function WriterOutlinePanel({
         <button
           type="button"
           onClick={onAddSection}
-          className="btn-press w-full py-2 text-xs font-semibold text-[#12489B] bg-blue-50/50 hover:bg-blue-100/70 border border-dashed border-blue-300 rounded-xl inline-flex items-center justify-center gap-1.5"
+          className="btn-press w-full py-2.5 text-[11.5px] font-semibold text-[#12489B] bg-blue-50/40 hover:bg-blue-100/50 border border-dashed border-blue-300 rounded-xl inline-flex items-center justify-center gap-1.5"
         >
           <Plus className="w-3.5 h-3.5" />
-          <span>Thêm mục dàn ý</span>
+          <span>Thêm mục</span>
         </button>
       </div>
     </div>

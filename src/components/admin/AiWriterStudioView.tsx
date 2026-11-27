@@ -1244,7 +1244,8 @@ export function AiWriterStudioView({
 
   // --- Outline Management (Session-Safe) ---
   const handleAiGenerateOutlineForSession = async (
-    targetSessionId: string
+    targetSessionId: string,
+    forceFreshSources = false
   ): Promise<boolean> => {
     const sess = sessionsRef.current.find((s) => s.id === targetSessionId);
     if (!sess) return false;
@@ -1257,8 +1258,20 @@ export function AiWriterStudioView({
       setLeftTab('outline');
     }
 
+    const hasExistingContent =
+      sess.outline.some((sec) => sec.content.trim().length > 0) ||
+      Boolean(sess.fullPaperOverride?.trim());
+    const shouldRefreshSources = forceFreshSources || hasExistingContent;
+
     mutateSessionById(targetSessionId, (s) => ({
       ...s,
+      ...(shouldRefreshSources
+        ? {
+            researchedSources: undefined,
+            researchedSourcesTopic: undefined,
+            sourceRotationCount: (s.sourceRotationCount || 0) + 1,
+          }
+        : {}),
       batchStatus: 'outlining',
       batchErrorMsg: undefined,
     }));
@@ -1268,7 +1281,11 @@ export function AiWriterStudioView({
     let outlineLogId = '';
     try {
       const preparedSess =
-        (await ensureHybridSourcesForSession(targetSessionId, signal)) || sess;
+        (await ensureHybridSourcesForSession(
+          targetSessionId,
+          signal,
+          shouldRefreshSources
+        )) || sess;
       setCurrentStepLabel(
         `Đang lập dàn ý chuẩn ${sess.citationStyle} (${sess.targetWordCount} từ)...`
       );
@@ -1806,7 +1823,10 @@ export function AiWriterStudioView({
    * 2) Sequentially write all sections top-to-bottom
    * 3) Export formatted .docx and auto-launch HixBypass inside Word Humanizer
    */
-  const handleRunFullAutoPipeline = async (targetSessionId?: string) => {
+  const handleRunFullAutoPipeline = async (
+    targetSessionId?: string,
+    forceFreshSources = false
+  ) => {
     const sessId = targetSessionId || activeSession?.id;
     const sess = sessionsRef.current.find((s) => s.id === sessId);
     if (!sess || !sessId) return;
@@ -1822,12 +1842,31 @@ export function AiWriterStudioView({
       return;
     }
 
+    const hasExistingContent =
+      sess.outline.some((sec) => sec.content.trim().length > 0) ||
+      Boolean(sess.fullPaperOverride?.trim());
+    const shouldRefreshSources = forceFreshSources || hasExistingContent;
+
+    if (shouldRefreshSources) {
+      mutateSessionById(sessId, (s) => ({
+        ...s,
+        researchedSources: undefined,
+        researchedSourcesTopic: undefined,
+        fullPaperOverride: undefined,
+        sourceRotationCount: (s.sourceRotationCount || 0) + 1,
+        outline: s.outline.map((sec) => ({ ...sec, content: '', status: 'idle' })),
+      }));
+    }
+
     setFullAutoSessionId(sessId);
     setFullAutoPhase('outlining');
     setLeftTab('outline');
 
     try {
-      const outlined = await handleAiGenerateOutlineForSession(sessId);
+      const outlined = await handleAiGenerateOutlineForSession(
+        sessId,
+        shouldRefreshSources
+      );
       if (!outlined || pausedSessionIdsRef.current.has(sessId)) {
         setFullAutoSessionId(null);
         setFullAutoPhase(null);
@@ -3572,6 +3611,9 @@ export function AiWriterStudioView({
                   onRunFullAuto={() =>
                     void handleRunFullAutoPipeline(activeSession.id)
                   }
+                  onRewriteNewPerspective={() =>
+                    void handleRunFullAutoPipeline(activeSession.id, true)
+                  }
                   fullAutoRunning={fullAutoSessionId === activeSession.id}
                 />
               ) : (
@@ -3833,6 +3875,8 @@ export function AiWriterStudioView({
       <WriterCohortSimilarityModal
         isOpen={showCohortSimilarityModal}
         sessions={sessions}
+        activeSession={activeSession}
+        orders={orders}
         scrubbingPairKey={scrubbingPairKey}
         exportingAll={exportingAllDocx}
         onScrubPairCollisions={handleScrubPairCollisions}

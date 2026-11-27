@@ -45,7 +45,7 @@ const QUICK_DOC_PRESETS: {
   },
   {
     id: 'vn_thesis',
-    label: 'Luận văn / Tiểu luận (VN)',
+    label: 'Luận văn (VN)',
     language: 'Vietnamese',
     academicTone: 'Chuẩn Luận văn / Tiểu luận Đại học & Thạc sĩ Việt Nam',
     fontSizePt: 13,
@@ -56,7 +56,7 @@ const QUICK_DOC_PRESETS: {
   },
   {
     id: 'vn_report',
-    label: 'Báo cáo Thực tập (VN)',
+    label: 'Báo cáo (VN)',
     language: 'Vietnamese',
     academicTone: 'Chuẩn Báo cáo Thực tập / Đồ án Doanh nghiệp Việt Nam',
     fontSizePt: 13,
@@ -67,7 +67,7 @@ const QUICK_DOC_PRESETS: {
   },
   {
     id: 'vn_research',
-    label: 'Nghiên cứu Khoa học (VN)',
+    label: 'Nghiên cứu (VN)',
     language: 'Vietnamese',
     academicTone: 'Chuẩn Bài báo & Đề tài Nghiên cứu Khoa học Tiếng Việt',
     fontSizePt: 13,
@@ -84,6 +84,7 @@ interface WriterBriefPanelProps {
   onUploadContextFiles: (fileList: FileList | null) => Promise<void>;
   onSwitchToOutlineWithAi?: () => void;
   onRunFullAuto?: () => void;
+  onRewriteNewPerspective?: () => void;
   fullAutoRunning?: boolean;
 }
 
@@ -93,6 +94,7 @@ export function WriterBriefPanel({
   onUploadContextFiles,
   onSwitchToOutlineWithAi,
   onRunFullAuto,
+  onRewriteNewPerspective,
   fullAutoRunning = false,
 }: WriterBriefPanelProps) {
   const contextFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -116,7 +118,7 @@ export function WriterBriefPanel({
 
     const remaining = Math.max(0, 6 - contextImages.length);
     if (remaining === 0) {
-      setImageError('Tối đa 6 ảnh tài liệu cho mỗi bài viết để đảm bảo tốc độ xử lý.');
+      setImageError('Tối đa 6 ảnh tài liệu cho mỗi bài viết.');
       return;
     }
 
@@ -172,30 +174,29 @@ export function WriterBriefPanel({
     }));
   };
 
+  const inputCls = 'w-full px-2.5 py-2 text-[12px] bg-white border border-zinc-200 rounded-xl focus:outline-none focus:border-[#12489B] focus:ring-1 focus:ring-blue-500/10 transition-colors';
+  const labelCls = 'block text-[11px] font-semibold text-zinc-500 uppercase tracking-wide mb-1.5';
+
   return (
-    <div className="tab-panel-enter p-4 space-y-3.5">
+    <div className="tab-panel-enter p-4 space-y-4">
+      {/* Cohort badge */}
       {session.cohortMeta && (
-        <div className="rounded-xl bg-slate-900 text-white p-3 space-y-1.5 border border-slate-800">
+        <div className="rounded-xl bg-slate-900 text-white p-3 space-y-1">
           <div className="flex items-center justify-between gap-2 text-[10.5px]">
             <span className="font-mono font-bold text-amber-300 uppercase tracking-wider">
-              Hồ sơ Nhóm #{session.cohortMeta.cloneIndex}/{session.cohortMeta.cohortSize}
+              Nhóm #{session.cohortMeta.cloneIndex}/{session.cohortMeta.cohortSize}
             </span>
             <span className="font-mono text-sky-300">
-              {session.cohortMeta.sampledSourceCount}/{session.cohortMeta.poolTotalCount} nguồn DOI
+              {session.cohortMeta.sampledSourceCount}/{session.cohortMeta.poolTotalCount} DOI
             </span>
           </div>
-          {(session.cohortMeta.customMethodology ||
-            session.cohortMeta.methodologyLabel) && (
-            <div className="text-[11px] font-semibold text-white leading-snug">
-              PP:{' '}
-              {session.cohortMeta.customMethodology ||
-                session.cohortMeta.methodologyLabel}
+          {(session.cohortMeta.customMethodology || session.cohortMeta.methodologyLabel) && (
+            <div className="text-[11px] font-semibold leading-snug">
+              PP: {session.cohortMeta.customMethodology || session.cohortMeta.methodologyLabel}
             </div>
           )}
           <div className="text-[10.5px] text-slate-300 leading-snug">
-            Cấu trúc:{' '}
-            {session.cohortMeta.customApproach ||
-              session.cohortMeta.archetypeLabel}
+            Cấu trúc: {session.cohortMeta.customApproach || session.cohortMeta.archetypeLabel}
           </div>
           {(session.cohortMeta.customFramework || session.cohortMeta.customCaseFocus) && (
             <div className="text-[10.5px] text-emerald-300 leading-snug">
@@ -207,11 +208,9 @@ export function WriterBriefPanel({
         </div>
       )}
 
-      {/* 1-Click Academic Document Type Selector (VN Thesis / Report / Research & EN Essay) */}
+      {/* ── Document type selector ── */}
       <div>
-        <label className="block text-[11px] font-semibold text-zinc-600 mb-1.5">
-          Loại bài &amp; Định dạng chuẩn nhanh
-        </label>
+        <label className={labelCls}>Loại bài</label>
         <div className="grid grid-cols-2 gap-1.5">
           {QUICK_DOC_PRESETS.map((p) => {
             const selected = activeDocType === p.id;
@@ -220,10 +219,10 @@ export function WriterBriefPanel({
                 key={p.id}
                 type="button"
                 onClick={() => applyDocPreset(p.id)}
-                className={`btn-press px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border text-left truncate transition-colors ${
+                className={`btn-press px-3 py-2 rounded-xl text-[11.5px] font-semibold border text-left transition-all ${
                   selected
-                    ? 'bg-blue-50 text-[#12489B] border-blue-300 ring-1 ring-blue-500/15'
-                    : 'bg-zinc-50/80 text-zinc-600 border-zinc-200 hover:bg-zinc-100 hover:text-slate-900'
+                    ? 'bg-[#12489B] text-white border-[#12489B] shadow-sm'
+                    : 'bg-white text-zinc-600 border-zinc-200 hover:border-[#12489B]/40 hover:bg-blue-50/30'
                 }`}
               >
                 {p.label}
@@ -233,203 +232,153 @@ export function WriterBriefPanel({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-        <div>
-          <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
-            Môn học / Học phần
-          </label>
-          <input
-            type="text"
-            value={session.subject}
-            onChange={(e) =>
-              onUpdateSession((s) => ({
-                ...s,
-                subject: e.target.value,
-              }))
-            }
-            placeholder="VD: Strategic Management / MBA701"
-            className="w-full px-2.5 py-1.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-2">
+      {/* ── Core fields ── */}
+      <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
-            <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
-              Tổng số từ
-            </label>
+            <label className={labelCls}>Môn học</label>
             <input
-              type="number"
-              min={200}
-              max={30000}
-              step={100}
-              value={session.targetWordCount}
-              onChange={(e) =>
-                onUpdateSession((s) => ({
-                  ...s,
-                  targetWordCount: Math.max(
-                    100,
-                    Number(e.target.value) || 1000
-                  ),
-                }))
-              }
-              className="w-full px-2.5 py-1.5 text-xs font-mono tabular-nums bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
+              type="text"
+              value={session.subject}
+              onChange={(e) => onUpdateSession((s) => ({ ...s, subject: e.target.value }))}
+              placeholder="Strategic Management / MBA701"
+              className={inputCls}
             />
           </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={labelCls}>Số từ</label>
+              <input
+                type="number"
+                min={200} max={30000} step={100}
+                value={session.targetWordCount}
+                onChange={(e) => onUpdateSession((s) => ({ ...s, targetWordCount: Math.max(100, Number(e.target.value) || 1000) }))}
+                className={`${inputCls} font-mono tabular-nums`}
+              />
+            </div>
+            <div>
+              <label className={labelCls}>Trích dẫn</label>
+              <select
+                value={session.citationStyle}
+                onChange={(e) => onUpdateSession((s) => ({ ...s, citationStyle: e.target.value as CitationStyle }))}
+                className={inputCls}
+              >
+                {CITATION_STYLES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
 
+        <div>
+          <label className={labelCls}>Chủ đề / Research question</label>
+          <textarea
+            rows={2}
+            value={session.topic}
+            onChange={(e) =>
+              onUpdateSession((s) => ({
+                ...s,
+                topic: e.target.value,
+                title: s.linkedOrderCode
+                  ? `${s.linkedOrderCode} · ${e.target.value.slice(0, 36)}`
+                  : e.target.value.slice(0, 48) || 'Bài nghiên cứu mới',
+              }))
+            }
+            placeholder="Nhập tên đề tài hoặc câu hỏi nghiên cứu..."
+            className={`${inputCls} resize-y leading-relaxed`}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
-              Trích dẫn
-            </label>
+            <label className={labelCls}>Ngôn ngữ</label>
             <select
-              value={session.citationStyle}
-              onChange={(e) =>
-                onUpdateSession((s) => ({
-                  ...s,
-                  citationStyle: e.target.value as CitationStyle,
-                }))
-              }
-              className="w-full px-2 py-1.5 text-xs font-medium bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
+              value={session.writingLanguage}
+              onChange={(e) => onUpdateSession((s) => ({ ...s, writingLanguage: e.target.value as WriterSession['writingLanguage'] }))}
+              className={inputCls}
             >
-              {CITATION_STYLES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              <option value="English">Academic English</option>
+              <option value="Vietnamese">Tiếng Việt</option>
+              <option value="Bilingual">Song ngữ</option>
             </select>
           </div>
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
-          Chủ đề / Câu hỏi nghiên cứu (Topic)
-        </label>
-        <textarea
-          rows={2}
-          value={session.topic}
-          onChange={(e) =>
-            onUpdateSession((s) => ({
-              ...s,
-              topic: e.target.value,
-              title: s.linkedOrderCode
-                ? `${s.linkedOrderCode} · ${e.target.value.slice(0, 36)}`
-                : e.target.value.slice(0, 48) || 'Bài nghiên cứu mới',
-            }))
-          }
-          placeholder="Nhập tên đề tài hoặc câu hỏi nghiên cứu..."
-          className="w-full px-2.5 py-1.5 text-xs font-medium bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B] leading-relaxed resize-y"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-2.5">
-        <div>
-          <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
-            Ngôn ngữ viết
-          </label>
-          <select
-            value={session.writingLanguage}
-            onChange={(e) =>
-              onUpdateSession((s) => ({
-                ...s,
-                writingLanguage: e.target
-                  .value as WriterSession['writingLanguage'],
-              }))
-            }
-            className="w-full px-2.5 py-1.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
-          >
-            <option value="English">Academic English</option>
-            <option value="Vietnamese">Tiếng Việt học thuật</option>
-            <option value="Bilingual">Song ngữ Anh - Việt</option>
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
-            Cấp độ học thuật
-          </label>
-          <input
-            type="text"
-            value={session.academicTone}
-            onChange={(e) =>
-              onUpdateSession((s) => ({
-                ...s,
-                academicTone: e.target.value,
-              }))
-            }
-            placeholder="VD: Master / High Distinction"
-            className="w-full px-2.5 py-1.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
-          />
-        </div>
-      </div>
-
-      <div>
-        <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
-          Yêu cầu đề bài & Hướng dẫn chi tiết (Instructions)
-        </label>
-        <textarea
-          rows={4}
-          value={session.instructions}
-          onChange={(e) =>
-            onUpdateSession((s) => ({
-              ...s,
-              instructions: e.target.value,
-            }))
-          }
-          placeholder="Dán yêu cầu chi tiết của giảng viên, cấu trúc bắt buộc, case study..."
-          className="w-full p-2.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
-        />
-      </div>
-
-      <div>
-        <label className="block text-[11px] font-semibold text-zinc-600 mb-1">
-          Thang điểm Rubric (Grading Criteria)
-        </label>
-        <textarea
-          rows={3}
-          value={session.rubricNotes}
-          onChange={(e) =>
-            onUpdateSession((s) => ({
-              ...s,
-              rubricNotes: e.target.value,
-            }))
-          }
-          placeholder="Dán tiêu chí Rubric (VD: Critical Analysis 40%, Literature 30%, APA 30%)..."
-          className="w-full p-2.5 text-xs bg-zinc-50/70 border border-zinc-200 rounded-lg focus:bg-white focus:outline-none focus:border-[#12489B]"
-        />
-      </div>
-
-      {/* Per-session context / reference files (including client draft if any) */}
-      <div className="pt-2.5 border-t border-zinc-100">
-        <div className="flex items-center justify-between mb-1.5">
           <div>
-            <span className="block text-[11px] font-semibold text-zinc-700">
-              Tài liệu đính kèm &amp; Bản nháp (Draft) của khách (.docx, .pdf, .txt, .md):
-            </span>
-            <span className="block text-[10px] text-zinc-400">
-              Nếu khách đã có bản nháp (draft) hoặc tài liệu gốc, đính kèm trực tiếp tại đây để AI đọc hiểu và viết tiếp.
-            </span>
+            <label className={labelCls}>Cấp độ học thuật</label>
+            <input
+              type="text"
+              value={session.academicTone}
+              onChange={(e) => onUpdateSession((s) => ({ ...s, academicTone: e.target.value }))}
+              placeholder="Master / HD"
+              className={inputCls}
+            />
           </div>
-          <input
-            ref={contextFileInputRef}
-            type="file"
-            multiple
-            accept=".md,.txt,.docx,.pdf,.json"
-            onChange={(e) => {
-              void onUploadContextFiles(e.target.files);
-              if (contextFileInputRef.current) {
-                contextFileInputRef.current.value = '';
-              }
-            }}
-            className="hidden"
+        </div>
+
+        <div>
+          <label className={labelCls}>Yêu cầu chi tiết (Instructions)</label>
+          <textarea
+            rows={3}
+            value={session.instructions}
+            onChange={(e) => onUpdateSession((s) => ({ ...s, instructions: e.target.value }))}
+            placeholder="Yêu cầu chi tiết từ giảng viên, cấu trúc bắt buộc, case study..."
+            className={`${inputCls} resize-y`}
           />
-          <button
-            type="button"
-            onClick={() => contextFileInputRef.current?.click()}
-            className="btn-press px-2.5 py-1 text-[11px] font-semibold text-[#12489B] bg-blue-50 hover:bg-blue-100 rounded-md inline-flex items-center gap-1"
-          >
-            <FolderUp className="w-3 h-3" />
-            <span>+ Đính kèm tệp</span>
-          </button>
+        </div>
+
+        <div>
+          <label className={labelCls}>Rubric (Thang điểm)</label>
+          <textarea
+            rows={2}
+            value={session.rubricNotes}
+            onChange={(e) => onUpdateSession((s) => ({ ...s, rubricNotes: e.target.value }))}
+            placeholder="Critical Analysis 40%, Literature 30%, APA 30%..."
+            className={`${inputCls} resize-y`}
+          />
+        </div>
+      </div>
+
+      {/* ── Attachments section ── */}
+      <div className="rounded-xl border border-zinc-200 bg-[#FAFBFC] p-3 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="text-[11px] font-bold text-slate-700">
+            Tài liệu đính kèm
+          </span>
+          <div className="flex items-center gap-1.5">
+            <input
+              ref={contextFileInputRef}
+              type="file"
+              multiple
+              accept=".md,.txt,.docx,.pdf,.json"
+              onChange={(e) => { void onUploadContextFiles(e.target.files); if (contextFileInputRef.current) contextFileInputRef.current.value = ''; }}
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => contextFileInputRef.current?.click()}
+              className="btn-press px-2.5 py-1 text-[10.5px] font-semibold text-[#12489B] bg-white hover:bg-blue-50 border border-blue-200 rounded-lg inline-flex items-center gap-1"
+            >
+              <FolderUp className="w-3 h-3" />
+              <span>Tệp</span>
+            </button>
+            <input
+              ref={contextImageInputRef}
+              type="file"
+              multiple
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              onChange={(e) => void handleAddContextImages(e.target.files)}
+              className="hidden"
+            />
+            <button
+              type="button"
+              disabled={processingImages || contextImages.length >= 6}
+              onClick={() => contextImageInputRef.current?.click()}
+              className="btn-press px-2.5 py-1 text-[10.5px] font-semibold text-emerald-700 bg-white hover:bg-emerald-50 border border-emerald-200 rounded-lg inline-flex items-center gap-1 disabled:opacity-50"
+            >
+              {processingImages ? <Loader2 className="w-3 h-3 animate-spin" /> : <ImagePlus className="w-3 h-3" />}
+              <span>Ảnh ({contextImages.length}/6)</span>
+            </button>
+          </div>
         </div>
 
         {session.contextFiles.length > 0 && (
@@ -437,23 +386,14 @@ export function WriterBriefPanel({
             {session.contextFiles.map((cf) => (
               <span
                 key={cf.id}
-                className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] bg-zinc-100 text-zinc-700 rounded-md"
+                className="inline-flex items-center gap-1.5 px-2 py-1 text-[11px] bg-white text-zinc-700 rounded-lg border border-zinc-200"
               >
                 <FileText className="w-3 h-3 text-[#12489B]" />
-                <span className="truncate max-w-[140px]">{cf.name}</span>
-                <span className="text-zinc-400 font-mono">
-                  ({cf.wordCount}w)
-                </span>
+                <span className="truncate max-w-[120px]">{cf.name}</span>
+                <span className="text-zinc-400 font-mono text-[10px]">({cf.wordCount}w)</span>
                 <button
                   type="button"
-                  onClick={() =>
-                    onUpdateSession((s) => ({
-                      ...s,
-                      contextFiles: s.contextFiles.filter(
-                        (item) => item.id !== cf.id
-                      ),
-                    }))
-                  }
+                  onClick={() => onUpdateSession((s) => ({ ...s, contextFiles: s.contextFiles.filter((item) => item.id !== cf.id) }))}
                   className="text-zinc-400 hover:text-rose-600"
                 >
                   ×
@@ -462,118 +402,63 @@ export function WriterBriefPanel({
             ))}
           </div>
         )}
-      </div>
-
-      {/* Per-session visual context images (Survey screenshots, Charts, SPSS tables -> Perplexity Vision + DOCX/PDF Figure Embed) */}
-      <div
-        className="pt-2.5 border-t border-zinc-100 space-y-2"
-        onPaste={(e) => {
-          const items = Array.from(e.clipboardData?.items || []);
-          const pastedImages: File[] = [];
-          for (const item of items) {
-            if (item.type.startsWith('image/')) {
-              const f = item.getAsFile();
-              if (f) pastedImages.push(f);
-            }
-          }
-          if (pastedImages.length > 0) {
-            e.preventDefault();
-            void handleAddContextImages(pastedImages);
-          }
-        }}
-      >
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <span className="block text-[11px] font-semibold text-zinc-700">
-              Tài liệu dạng ảnh (Biểu đồ, Khảo sát, Bảng số liệu) · AI Vision ({contextImages.length}/6)
-            </span>
-            <span className="block text-[10px] text-zinc-400">
-              Chọn ảnh hoặc dán (Ctrl+V) trực tiếp vào đây — Perplexity sẽ đọc số liệu chính xác &amp; tự động chèn ảnh vào bài Word/PDF.
-            </span>
-          </div>
-          <input
-            ref={contextImageInputRef}
-            type="file"
-            multiple
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            onChange={(e) => void handleAddContextImages(e.target.files)}
-            className="hidden"
-          />
-          <button
-            type="button"
-            disabled={processingImages || contextImages.length >= 6}
-            onClick={() => contextImageInputRef.current?.click()}
-            className="btn-press shrink-0 px-2.5 py-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 rounded-md inline-flex items-center gap-1"
-          >
-            {processingImages ? (
-              <Loader2 className="w-3 h-3 animate-spin" />
-            ) : (
-              <ImagePlus className="w-3 h-3" />
-            )}
-            <span>+ Thêm ảnh</span>
-          </button>
-        </div>
 
         {imageError && (
-          <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-200 rounded-md px-2.5 py-1.5">
+          <p className="text-[11px] text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-2.5 py-1.5">
             {imageError}
           </p>
         )}
 
         {contextImages.length > 0 && (
-          <div className="space-y-2">
+          <div
+            className="space-y-2"
+            onPaste={(e) => {
+              const items = Array.from(e.clipboardData?.items || []);
+              const pastedImages: File[] = [];
+              for (const item of items) {
+                if (item.type.startsWith('image/')) {
+                  const f = item.getAsFile();
+                  if (f) pastedImages.push(f);
+                }
+              }
+              if (pastedImages.length > 0) { e.preventDefault(); void handleAddContextImages(pastedImages); }
+            }}
+          >
             {contextImages.map((img) => (
               <div
                 key={img.id}
-                className="flex items-start gap-2.5 p-2 rounded-lg bg-zinc-50 border border-zinc-200/90"
+                className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-zinc-200"
               >
                 <img
                   src={img.dataUrl}
                   alt={img.caption || img.name}
-                  className="w-14 h-12 object-cover rounded-md border border-zinc-200 bg-white shrink-0"
+                  className="w-12 h-10 object-cover rounded-lg border border-zinc-100 bg-zinc-50 shrink-0"
                 />
                 <div className="flex-1 min-w-0 space-y-1">
                   <div className="flex items-center justify-between gap-1.5">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <span className="px-1.5 py-0.5 rounded bg-[#0B2559] text-white font-mono text-[10px] font-bold shrink-0">
+                      <span className="px-1.5 py-0.5 rounded-md bg-[#0B2559] text-white font-mono text-[9px] font-bold shrink-0">
                         {img.tag}
                       </span>
                       <button
                         type="button"
                         onClick={() => {
-                          void navigator.clipboard
-                            ?.writeText(`[FIGURE: ${img.tag}]`)
-                            .catch(() => {});
+                          void navigator.clipboard?.writeText(`[FIGURE: ${img.tag}]`).catch(() => {});
                           setCopiedImgTag(img.tag);
                           window.setTimeout(() => setCopiedImgTag(''), 1500);
                         }}
-                        title={`Sao chép thẻ [FIGURE: ${img.tag}] để dán thủ công vào bài`}
                         className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-[#12489B] hover:underline"
                       >
                         {copiedImgTag === img.tag ? (
-                          <>
-                            <Check className="w-2.5 h-2.5 text-emerald-600" />
-                            <span className="text-emerald-700">Đã copy</span>
-                          </>
+                          <><Check className="w-2.5 h-2.5 text-emerald-600" /><span className="text-emerald-700">Copied</span></>
                         ) : (
-                          <>
-                            <Copy className="w-2.5 h-2.5" />
-                            <span>Copy thẻ</span>
-                          </>
+                          <><Copy className="w-2.5 h-2.5" /><span>Copy</span></>
                         )}
                       </button>
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        onUpdateSession((s) => ({
-                          ...s,
-                          contextImages: (s.contextImages || []).filter(
-                            (item) => item.id !== img.id
-                          ),
-                        }))
-                      }
-                      aria-label={`Xóa ảnh ${img.tag}`}
+                      onClick={() => onUpdateSession((s) => ({ ...s, contextImages: (s.contextImages || []).filter((item) => item.id !== img.id) }))}
                       className="p-0.5 text-zinc-400 hover:text-rose-600"
                     >
                       <Trash2 className="w-3 h-3" />
@@ -585,15 +470,10 @@ export function WriterBriefPanel({
                     value={img.caption}
                     onChange={(e) => {
                       const val = e.target.value;
-                      onUpdateSession((s) => ({
-                        ...s,
-                        contextImages: (s.contextImages || []).map((item) =>
-                          item.id === img.id ? { ...item, caption: val } : item
-                        ),
-                      }));
+                      onUpdateSession((s) => ({ ...s, contextImages: (s.contextImages || []).map((item) => item.id === img.id ? { ...item, caption: val } : item) }));
                     }}
-                    placeholder="Chú thích hình (VD: Kết quả khảo sát hành vi người tiêu dùng)"
-                    className="w-full px-2 py-1 text-[11px] bg-white border border-zinc-200 rounded focus:outline-none focus:border-[#12489B]"
+                    placeholder="Chú thích ảnh..."
+                    className="w-full px-2 py-1 text-[11px] bg-zinc-50 border border-zinc-200 rounded-lg focus:outline-none focus:border-[#12489B]"
                   />
 
                   <label className="inline-flex items-center gap-1.5 text-[10.5px] text-zinc-600 cursor-pointer select-none">
@@ -602,18 +482,11 @@ export function WriterBriefPanel({
                       checked={img.insertIntoPaper}
                       onChange={(e) => {
                         const checked = e.target.checked;
-                        onUpdateSession((s) => ({
-                          ...s,
-                          contextImages: (s.contextImages || []).map((item) =>
-                            item.id === img.id
-                              ? { ...item, insertIntoPaper: checked }
-                              : item
-                          ),
-                        }));
+                        onUpdateSession((s) => ({ ...s, contextImages: (s.contextImages || []).map((item) => item.id === img.id ? { ...item, insertIntoPaper: checked } : item) }));
                       }}
                       className="rounded border-zinc-300 text-[#12489B] focus:ring-[#12489B]"
                     />
-                    <span>Chèn hình này vào bài viết &amp; Word/PDF</span>
+                    <span>Chèn vào bài</span>
                   </label>
                 </div>
               </div>
@@ -622,30 +495,42 @@ export function WriterBriefPanel({
         )}
       </div>
 
+      {/* ── Action buttons ── */}
       {(onRunFullAuto || onSwitchToOutlineWithAi) && (
-        <div className="pt-2 space-y-2">
+        <div className="space-y-2">
           {onRunFullAuto && (
-            <div className="rounded-xl bg-[#0B2559]/[0.04] border border-[#12489B]/20 p-2.5 space-y-1.5">
+            <div className="rounded-xl bg-gradient-to-br from-[#0B2559] to-[#12489B] p-3.5 space-y-2">
               <button
                 type="button"
                 disabled={fullAutoRunning}
                 onClick={onRunFullAuto}
-                className="btn-press w-full py-2.5 px-3 text-xs font-bold bg-[#0B2559] hover:bg-[#12489B] text-white rounded-lg inline-flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 transition-colors cursor-pointer"
+                className="btn-press w-full py-3 px-4 text-[12.5px] font-bold bg-white/10 hover:bg-white/15 text-white rounded-xl inline-flex items-center justify-center gap-2 disabled:opacity-50 transition-colors border border-white/20"
               >
                 {fullAutoRunning ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin" />
                 ) : (
-                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <Sparkles className="w-4 h-4 text-amber-300" />
                 )}
                 <span>
                   {fullAutoRunning
-                    ? 'Đang chạy Chế độ Hoàn toàn Tự động...'
-                    : 'Chạy Hoàn toàn Tự động (Dàn ý → Viết → HixBypass)'}
+                    ? 'Đang chạy tự động...'
+                    : 'Full Auto (Dàn ý → Viết → Humanize)'}
                 </span>
               </button>
-              <p className="text-[10.5px] text-slate-600 leading-snug text-center">
-                1 chạm: AI tự lập dàn ý, tự viết tuần tự từ trên xuống và tự đẩy sang Word Humanizer chạy HixBypass.
+              <p className="text-[10.5px] text-white/60 text-center leading-snug">
+                1 chạm: AI tự lập dàn ý → viết tuần tự → đẩy HixBypass
               </p>
+              {onRewriteNewPerspective && (
+                <button
+                  type="button"
+                  disabled={fullAutoRunning}
+                  onClick={onRewriteNewPerspective}
+                  className="btn-press w-full py-2 px-3 text-[11px] font-semibold bg-white/10 hover:bg-white/20 text-amber-200 rounded-xl inline-flex items-center justify-center gap-1.5 disabled:opacity-50 border border-white/10"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Viết lại góc nhìn mới (Xoay nguồn)</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -654,10 +539,10 @@ export function WriterBriefPanel({
               type="button"
               disabled={fullAutoRunning}
               onClick={onSwitchToOutlineWithAi}
-              className="btn-press w-full py-2 text-xs font-semibold bg-white border border-blue-200 text-[#12489B] hover:bg-blue-50 rounded-lg inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
+              className="btn-press w-full py-2.5 text-[12px] font-semibold bg-white border border-blue-200 text-[#12489B] hover:bg-blue-50 rounded-xl inline-flex items-center justify-center gap-1.5 disabled:opacity-50"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Hoặc chỉ Lập Dàn Ý thủ công →</span>
+              <span>Chỉ Lập Dàn Ý →</span>
             </button>
           )}
         </div>
