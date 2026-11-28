@@ -1372,7 +1372,7 @@ function citationKeyIdFromText(cite: string): string | null {
 function cleanNarrativeAuthorMatch(raw: string): string {
   return raw
     .replace(
-      /^(?:According to|Following|As|In|See|By|From|With|For|Like|Unlike|While|Whereas|Although|However|Moreover|Furthermore|Similarly|Meanwhile|Modelled by|Documented by|Synthesized by|Attributed to)\s+/i,
+      /^(?:According to|Following|As|In|See|By|From|With|For|Like|Unlike|While|Whereas|Although|However|Moreover|Furthermore|Similarly|Meanwhile|Specifically|Conversely|Notably|Consequently|Therefore|Additionally|Subsequently|Nevertheless|Nonetheless|Modelled by|Documented by|Synthesized by|Attributed to),?\s+/i,
       ''
     )
     .replace(/['’]s(?=\s*(?:\(|,|&|\band\b|\bvà\b|\bet\b))/gi, '')
@@ -1899,17 +1899,54 @@ const PROPER_NOUN_WORDS_APA = new Set([
   'spain', 'turkey', 'afghanistan', 'india', 'malaysia', 'singapore', 'philippines',
   'depok', 'batam', 'jakarta', 'hanoi', 'merdeka', 'cambridge', 'oxford', 'harvard',
   'bloomsbury', 'sage', 'springer', 'elsevier', 'routledge', 'wiley', 'google',
+  'iranian', 'iran', 'iraqi', 'iraq', 'cambodian', 'cambodia', 'malaysian',
+  'egyptian', 'egypt', 'saudi', 'taiwanese', 'taiwan', 'pakistani', 'pakistan',
+  'bangladeshi', 'bangladesh', 'mexican', 'mexico', 'chilean', 'chile',
+  'colombian', 'colombia', 'nigerian', 'nigeria', 'ethiopian', 'ethiopia',
+  'laotian', 'laos', 'burmese', 'myanmar', 'bruneian', 'brunei', 'nepalese',
+  'nepal', 'sri', 'lankan', 'uzbek', 'uzbekistan', 'kazakh', 'kazakhstan',
+  'omani', 'oman', 'jordanian', 'jordan', 'moroccan', 'morocco', 'algerian',
+  'algeria', 'tunisian', 'tunisia', 'finnish', 'finland', 'swedish', 'sweden',
+  'norwegian', 'norway', 'danish', 'denmark', 'dutch', 'netherlands', 'belgian',
+  'belgium', 'swiss', 'switzerland', 'austrian', 'austria', 'polish', 'poland',
+  'czech', 'hungarian', 'hungary', 'greek', 'greece', 'portuguese', 'portugal',
+  'italian', 'italy', 'brazilian', 'brazil', 'argentinian', 'argentina',
+  'peruvian', 'peru', 'erbil', 'tishk', 'teflin', 'mextesol', 'celta', 'delta',
+  'likert',
 ]);
 
 const KNOWN_ACADEMIC_ACRONYMS_RX =
-  /^(?:EFL|ESL|ELT|TESOL|TEFL|AI|ICT|STEM|STEAM|CALL|MALL|CLIL|EMI|GDP|SME|SMES|ESG|HR|HRM|ROI|SPSS|SEM|PLS|CFA|EFA|ANOVA|COVID-19|COVID|WHO|OECD|UNESCO|UNICEF|ASEAN|USA|UK|EU|APAC|GPA|TOEFL|IELTS|TOEIC|CEFR|FKIP|UKI|L1|L2|K-12|Q|PASSION|PRISMA|ANOVA|SLA|FLA)$/i;
+  /^(?:EFL|ESL|ELT|TESOL|TEFL|TEFLIN|MEXTESOL|CELTA|DELTA|AI|ICT|STEM|STEAM|CALL|MALL|CLIL|EMI|GDP|SME|SMES|ESG|HR|HRM|ROI|SPSS|SEM|PLS|CFA|EFA|ANOVA|COVID-19|COVID|WHO|OECD|UNESCO|UNICEF|ASEAN|USA|UK|EU|APAC|GPA|TOEFL|IELTS|TOEIC|CEFR|FKIP|UKI|L1|L2|K-12|Q|PASSION|PRISMA|SLA|FLA)$/i;
+
+const BRAND_CASING_MAP: Record<string, string> = {
+  chatgpt: 'ChatGPT',
+  youtube: 'YouTube',
+  whatsapp: 'WhatsApp',
+  tiktok: 'TikTok',
+  kahoot: 'Kahoot',
+  quizlet: 'Quizlet',
+  duolingo: 'Duolingo',
+  grammarly: 'Grammarly',
+  padlet: 'Padlet',
+  moodle: 'Moodle',
+  ios: 'iOS',
+  ipad: 'iPad',
+  iphone: 'iPhone',
+};
+
+function applyBrandCasingToText(text: string): string {
+  return text.replace(
+    /\b(chatgpt|youtube|whatsapp|tiktok|kahoot|quizlet|duolingo|grammarly|padlet|moodle)\b/gi,
+    (m) => BRAND_CASING_MAP[m.toLowerCase()] || m
+  );
+}
 
 /**
  * Converts Title Case or ALL CAPS article/book titles to strict APA/Harvard Sentence case:
  * keeps first word, first word after ':'/'?'/'!', acronyms (EFL, AI, TED, STEM),
  * and proper geographical/language nouns capitalized.
  */
-function toApaSentenceCase(rawTitle: string): string {
+export function toApaSentenceCase(rawTitle: string): string {
   const clean = cleanCrossrefText(rawTitle);
   if (!clean) return clean;
   const alphaOnly = clean.replace(/[^A-Za-z]/g, '');
@@ -1917,32 +1954,137 @@ function toApaSentenceCase(rawTitle: string): string {
     alphaOnly.length >= 8 &&
     (alphaOnly.match(/[A-Z]/g) || []).length / alphaOnly.length >= 0.75;
 
+  const formatSingleSubWord = (
+    subTok: string,
+    shouldCapFirst: boolean
+  ): string => {
+    const subStripped = subTok.replace(/^[^A-Za-z0-9À-ỹ]+|[^A-Za-z0-9À-ỹ]+$/g, '');
+    if (!subStripped) return subTok;
+    const lowerSub = subStripped.toLowerCase();
+    if (BRAND_CASING_MAP[lowerSub]) {
+      return subTok.replace(
+        new RegExp(subStripped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+        BRAND_CASING_MAP[lowerSub]
+      );
+    }
+    const isSubAcronym = wholeTitleAllCaps
+      ? KNOWN_ACADEMIC_ACRONYMS_RX.test(subStripped) || /^L[12]$/i.test(subStripped)
+      : /^[A-Z]{2,8}$/.test(subStripped) ||
+        /^L[12]$/.test(subStripped) ||
+        KNOWN_ACADEMIC_ACRONYMS_RX.test(subStripped);
+    if (isSubAcronym) {
+      if (KNOWN_ACADEMIC_ACRONYMS_RX.test(subStripped)) {
+        return subTok.replace(
+          new RegExp(subStripped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+          subStripped.toUpperCase()
+        );
+      }
+      return subTok;
+    }
+    if (shouldCapFirst || PROPER_NOUN_WORDS_APA.has(lowerSub)) {
+      return subTok.toLowerCase().replace(/[A-Za-zÀ-ỹ]/, (c) => c.toUpperCase());
+    }
+    return subTok.toLowerCase();
+  };
+
   const words = clean.split(/(\s+)/);
   let capitalizeNext = true;
   return words
     .map((tok) => {
       if (/^\s+$/.test(tok)) return tok;
-      const stripped = tok.replace(/^[^A-Za-z0-9]+|[^A-Za-z0-9]+$/g, '');
-      const isAcronym = wholeTitleAllCaps
-        ? KNOWN_ACADEMIC_ACRONYMS_RX.test(stripped) ||
-          /^(?:iOS|iPad|e-Learning|ChatGPT|YouTube|WhatsApp|TikTok)$/i.test(stripped)
-        : /^[A-Z]{2,8}(?:-[A-Z0-9]+)?$/.test(stripped) ||
-          /^L[12]$/.test(stripped) ||
-          KNOWN_ACADEMIC_ACRONYMS_RX.test(stripped) ||
-          /^(?:iOS|iPad|e-Learning|ChatGPT|YouTube|WhatsApp|TikTok)$/i.test(stripped);
+      const stripped = tok.replace(/^[^A-Za-z0-9À-ỹ]+|[^A-Za-z0-9À-ỹ]+$/g, '');
+      const lowerStripped = stripped.toLowerCase();
 
       let out = tok;
-      if (isAcronym) {
-        out = KNOWN_ACADEMIC_ACRONYMS_RX.test(stripped) && stripped === stripped.toUpperCase()
-          ? tok
-          : tok;
-      } else if (capitalizeNext || PROPER_NOUN_WORDS_APA.has(stripped.toLowerCase())) {
-        const isAllCaps = stripped.length >= 2 && stripped === stripped.toUpperCase();
-        out = isAllCaps
-          ? tok.toLowerCase().replace(/[A-Za-zÀ-ỹ]/, (c) => c.toUpperCase())
-          : tok.replace(/[A-Za-zÀ-ỹ]/, (c) => c.toUpperCase());
+      if (BRAND_CASING_MAP[lowerStripped]) {
+        out = tok.replace(
+          new RegExp(stripped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+          BRAND_CASING_MAP[lowerStripped]
+        );
+      } else if (/^(?:COVID-19|K-12|e-Learning)$/i.test(stripped)) {
+        const canonical = /^covid-19$/i.test(stripped)
+          ? 'COVID-19'
+          : /^k-12$/i.test(stripped)
+          ? 'K-12'
+          : 'e-Learning';
+        out = tok.replace(
+          new RegExp(stripped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+          canonical
+        );
+      } else if (tok.includes('-') && /[A-Za-zÀ-ỹ]-[A-Za-zÀ-ỹ0-9]/.test(tok)) {
+        const parts = tok.split('-');
+        out = parts
+          .map((part, idx) => formatSingleSubWord(part, idx === 0 && capitalizeNext))
+          .join('-');
       } else {
-        out = tok.toLowerCase();
+        out = formatSingleSubWord(tok, capitalizeNext);
+      }
+
+      capitalizeNext = /[:?!—–]$/.test(tok.trim());
+      return out;
+    })
+    .join('');
+}
+
+function polishExistingSentenceCaseTitle(cleanTitle: string): string {
+  const words = cleanTitle.split(/(\s+)/);
+  let capitalizeNext = true;
+  return words
+    .map((tok) => {
+      if (/^\s+$/.test(tok)) return tok;
+      const stripped = tok.replace(/^[^A-Za-z0-9À-ỹ]+|[^A-Za-z0-9À-ỹ]+$/g, '');
+      const lowerStripped = stripped.toLowerCase();
+      let out = tok;
+
+      if (BRAND_CASING_MAP[lowerStripped]) {
+        out = tok.replace(
+          new RegExp(stripped.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+          BRAND_CASING_MAP[lowerStripped]
+        );
+      } else if (/^(?:COVID-19|K-12|e-Learning)$/i.test(stripped)) {
+        // Keep special hyphenated tokens intact
+      } else if (tok.includes('-') && /[A-Za-zÀ-ỹ]-[A-Za-zÀ-ỹ0-9]/.test(tok)) {
+        const parts = tok.split('-');
+        out = parts
+          .map((part, idx) => {
+            const pStrip = part.replace(/^[^A-Za-z0-9À-ỹ]+|[^A-Za-z0-9À-ỹ]+$/g, '');
+            if (!pStrip) return part;
+            const pLow = pStrip.toLowerCase();
+            if (BRAND_CASING_MAP[pLow]) {
+              return part.replace(
+                new RegExp(pStrip.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i'),
+                BRAND_CASING_MAP[pLow]
+              );
+            }
+            if (
+              KNOWN_ACADEMIC_ACRONYMS_RX.test(pStrip) &&
+              pStrip === pStrip.toUpperCase()
+            ) {
+              return part;
+            }
+            if (/^[A-Z]{2,8}$/.test(pStrip) || /^L[12]$/.test(pStrip)) {
+              return part;
+            }
+            if (PROPER_NOUN_WORDS_APA.has(pLow)) {
+              return part.toLowerCase().replace(/[A-Za-zÀ-ỹ]/, (c) => c.toUpperCase());
+            }
+            if (idx === 0) {
+              return capitalizeNext
+                ? part.replace(/[A-Za-zÀ-ỹ]/, (c) => c.toUpperCase())
+                : part;
+            }
+            return part.toLowerCase();
+          })
+          .join('-');
+      } else if (
+        KNOWN_ACADEMIC_ACRONYMS_RX.test(stripped) &&
+        stripped === stripped.toUpperCase()
+      ) {
+        out = tok;
+      } else if (PROPER_NOUN_WORDS_APA.has(lowerStripped)) {
+        out = tok.toLowerCase().replace(/[A-Za-zÀ-ỹ]/, (c) => c.toUpperCase());
+      } else if (capitalizeNext) {
+        out = tok.replace(/[A-Za-zÀ-ỹ]/, (c) => c.toUpperCase());
       }
 
       capitalizeNext = /[:?!—–]$/.test(tok.trim());
@@ -1996,6 +2138,7 @@ function looksLikeTitleCaseOrAllCaps(cleanTitle: string): boolean {
     }
   }
   if (minorCappedAfterStart) return true;
+  if (eligibleWords >= 5 && capWords / eligibleWords >= 0.58) return true;
   return eligibleWords >= 4 && capWords / eligibleWords >= 0.72;
 }
 
@@ -2007,18 +2150,20 @@ function normalizeReferenceTitle(rawTitle: string, style = 'Harvard'): string {
     if (letters.length >= 8 && (letters.match(/[A-Z]/g) || []).length / letters.length >= 0.75) {
       return toApaSentenceCase(clean);
     }
-    return clean;
+    return applyBrandCasingToText(clean);
   }
   if (looksLikeTitleCaseOrAllCaps(clean)) {
     return toApaSentenceCase(clean);
   }
-  return clean;
+  return polishExistingSentenceCaseTitle(clean);
 }
 
 /**
  * Post-processes formatted or AI-drafted reference entries to fix:
  * - Missing spaces after colons in journal/book names ("Education:Journal" -> "Education: Journal")
  * - Title Case / ALL CAPS article titles inside Harvard quotes or APA entries
+ * - Mononym 2-author APA comma ("Burhanuddin, & Nur, S." -> "Burhanuddin & Nur, S.")
+ * - Brand casing (CHATGPT -> ChatGPT) and bare "doi: 10.xxxx" per APA/Harvard rules
  */
 export function normalizeReferenceEntryFormatting(
   rawEntry: string,
@@ -2026,6 +2171,13 @@ export function normalizeReferenceEntryFormatting(
 ): string {
   let out = cleanCrossrefText(rawEntry);
   if (!out) return out;
+  if (style === 'APA') {
+    // Normalize 2-author mononym first author before ", &" (e.g. "Burhanuddin, & Nur, S." -> "Burhanuddin & Nur, S.")
+    out = out.replace(
+      /^([A-ZÀ-Ỹ][A-Za-zÀ-ỹ'’-]+(?:\s+[A-ZÀ-Ỹ][A-Za-zÀ-ỹ'’-]+)?),\s*&\s+/,
+      '$1 & '
+    );
+  }
   if (style === 'Harvard' || style === 'APA') {
     // Harvard quoted title: Author (Year) 'Title Case Here', Journal...
     out = out.replace(
@@ -2036,11 +2188,30 @@ export function normalizeReferenceEntryFormatting(
     // APA unquoted article title: Author (Year). Title Case Here. Journal...
     if (style === 'APA') {
       out = out.replace(
-        /(\((?:19|20)\d{2}[a-z]?\)\.\s+)([^.]{15,280}?)(\.\s+[A-ZÀ-Ỹ])/,
+        /(\((?:19|20)\d{2}[a-z]?\)\.\s+)([^.]{12,280}?)(\.\s+[A-ZÀ-Ỹ]|\.\s*$|$)/,
         (_all, pre: string, titleInner: string, post: string) =>
           `${pre}${normalizeReferenceTitle(titleInner, style)}${post}`
       );
     }
+  }
+  out = applyBrandCasingToText(out);
+  if (style === 'Harvard') {
+    // Convert bare "doi: 10.xxxx" at the end of an entry into "Available at: https://doi.org/10.xxxx."
+    out = out.replace(
+      /(?:Available at:\s*)?\bdoi:\s*(?:https?:\/\/(?:dx\.)?doi\.org\/)?(10\.\d{4,9}\/[^\s.]+?)\.?\s*$/i,
+      'Available at: https://doi.org/$1.'
+    );
+    // Ensure Harvard entries ending with a raw URL have a trailing period "."
+    if (/https?:\/\/[^\s.]+$/.test(out)) {
+      out = `${out}.`;
+    }
+  } else if (style === 'APA') {
+    // Convert bare "doi: 10.xxxx" into "https://doi.org/10.xxxx" (with no trailing period per APA 7th)
+    out = out.replace(
+      /(?:Available at:\s*)?\bdoi:\s*(?:https?:\/\/(?:dx\.)?doi\.org\/)?(10\.\d{4,9}\/[^\s.]+?)\.?\s*$/i,
+      'https://doi.org/$1'
+    );
+    out = out.replace(/(https?:\/\/\S+?)\.+$/, '$1');
   }
   return out
     .replace(/\s*,\s*\./g, '.')
@@ -2077,6 +2248,8 @@ function formatCrossrefReference(
     const authorStr =
       names.length <= 1
         ? names[0] || ''
+        : names.length === 2 && !names[0].includes(',')
+        ? `${names[0]} & ${names[1]}`
         : `${names.slice(0, -1).join(', ')}, & ${names[names.length - 1]}`;
     if (isBook) {
       return normalizeReferenceEntryFormatting(
@@ -2170,13 +2343,73 @@ function formatCrossrefReference(
 /** Extracts the title-ish portion of a reference entry (text after the year, before the journal). */
 export function extractReferenceTitle(entry: string): string {
   const afterYear = entry.split(/\((?:19|20)\d{2}[a-z]?\)\.?/)[1] || '';
-  const quoted = afterYear.match(/['‘"“]([\s\S]{12,280}?)['’"”](?=\s*(?:,|\.|$))/);
+  const quoted = afterYear.match(/^\s*['‘"“]([\s\S]{12,280}?)['’"”](?=\s*(?:,|\.|$))/);
   const raw = quoted ? quoted[1] : afterYear.split(/\.\s|,\s(?=[A-Z])/)[0] || '';
   return raw.trim();
 }
 
 function normTitleKey(raw: string): string {
   return normName(raw).slice(0, 60);
+}
+
+function getEntryAuthorYearKey(entry: string): string {
+  const clean = (entry || '').trim();
+  if (!clean) return '';
+  const ym =
+    clean.match(/\(((?:19|20)\d{2}[a-z]?)\)/) ||
+    clean.match(/\b((?:19|20)\d{2}[a-z]?)\b/);
+  if (!ym) return '';
+  const year = ym[1].toLowerCase();
+  const beforeYear = clean.slice(0, ym.index ?? 0).trim();
+  const firstAuthorChunk = (
+    beforeYear.split(/\s*(?:,|&|\band\b|\bvà\b|\()\s*/i)[0] || ''
+  )
+    .replace(/\s+(?:[A-ZÀ-Ỹ]\.?\s*)+$/, '')
+    .trim();
+  const sur = normName(firstAuthorChunk);
+  if (!sur || sur.length < 2) return '';
+  return `${sur}_${year}`;
+}
+
+function enrichSinglePageFromContext(
+  work: CrossrefWorkMeta,
+  bodyText: string,
+  matchingEntries: string[]
+): string {
+  const rawPage = cleanCrossrefText(work.page).trim();
+  if (!/^\d+$/.test(rawPage)) return work.page || '';
+  const startNum = Number(rawPage);
+  if (!startNum || startNum <= 0) return work.page || '';
+  const rangeRx = new RegExp(`\\b${startNum}\\s*[–-]\\s*(\\d+)\\b`, 'g');
+
+  if (bodyText) {
+    let m: RegExpExecArray | null;
+    while ((m = rangeRx.exec(bodyText)) !== null) {
+      const endNum = Number(m[1]);
+      if (endNum > startNum && endNum - startNum <= 60) {
+        return `${startNum}–${endNum}`;
+      }
+    }
+  }
+
+  for (const e of matchingEntries) {
+    if (work.volume) {
+      const volMatch = e.match(/,\s*(\d+)\s*\(\d+\)/);
+      if (volMatch && volMatch[1] !== String(work.volume).trim()) {
+        continue;
+      }
+    }
+    rangeRx.lastIndex = 0;
+    let m: RegExpExecArray | null;
+    while ((m = rangeRx.exec(e)) !== null) {
+      const endNum = Number(m[1]);
+      if (endNum > startNum && endNum - startNum <= 60) {
+        return `${startNum}–${endNum}`;
+      }
+    }
+  }
+
+  return work.page || '';
 }
 
 function referenceStartsWithSurname(entry: string, surname: string): boolean {
@@ -2251,6 +2484,7 @@ export async function buildCrossrefVerifiedReferences(
   }
 
   const usedRefTitles = new Set<string>();
+  const usedAuthorYearKeys = new Set<string>();
   const isPromptTopicTitle = (t: string): boolean =>
     t.length >= 15 &&
     topicKey.length >= 15 &&
@@ -2282,6 +2516,7 @@ export async function buildCrossrefVerifiedReferences(
   const missingCitations: string[] = [];
   let verifiedCount = 0;
   let keptUnverifiedCount = 0;
+  let droppedDuplicateCount = 0;
 
   // Sort non-secondary citations first so legitimate primary articles (like Male 2011) claim their real title before any secondary lookalike
   const orderedKeys = [...keys].sort((a, b) => {
@@ -2304,13 +2539,17 @@ export async function buildCrossrefVerifiedReferences(
     const results = await Promise.all(
       batch.map(async (key) => {
         const keyId = `${normName(key.firstSurname)}_${key.year}`;
-        // Find existing entries for this exact citation (first surname + year)
+        // Find existing entries for this exact citation (first surname + year), prioritizing entries with a doi.org link
         const matchingIdx = existingEntries
           .map((e, idx) => ({ e, idx }))
           .filter(
             ({ e }) =>
               referenceStartsWithSurname(e, key.firstSurname) &&
               e.includes(`(${key.year}`)
+          )
+          .sort(
+            (a, b) =>
+              (/doi\.org\//i.test(b.e) ? 1 : 0) - (/doi\.org\//i.test(a.e) ? 1 : 0)
           );
         const cleanHintEntry = matchingIdx.find(
           ({ e }) => !isPoisonedTitle(e, keyId) && !isStubEntry(e)
@@ -2323,7 +2562,7 @@ export async function buildCrossrefVerifiedReferences(
         const draftTitleTokens = extractMeaningfulTokens(draftTitle);
 
         const hint = draftTitle
-          ? `${draftTitle} ${sentenceCtx.slice(0, 100)}`
+          ? draftTitle
           : `${sentenceCtx.slice(0, 120)} ${topicHint}`;
 
         let work = await searchCrossrefWorkForCitation(
@@ -2348,8 +2587,31 @@ export async function buildCrossrefVerifiedReferences(
 
     for (const { key, keyId, work, matchingIdx, cleanHintEntry, contextTokens } of results) {
       matchingIdx.forEach(({ idx }) => usedExisting.add(idx));
+      if (usedAuthorYearKeys.has(keyId)) {
+        droppedDuplicateCount++;
+        continue;
+      }
       if (work) {
+        if (work.page && /^\d+$/.test(work.page.trim())) {
+          work.page = enrichSinglePageFromContext(
+            work,
+            bodyText,
+            matchingIdx.map((m) => m.e)
+          );
+        }
         const formatted = formatCrossrefReference(work, session.citationStyle);
+        const entryAyKey = getEntryAuthorYearKey(formatted);
+        if (entryAyKey && usedAuthorYearKeys.has(entryAyKey)) {
+          droppedDuplicateCount++;
+          continue;
+        }
+        usedAuthorYearKeys.add(keyId);
+        if (entryAyKey) usedAuthorYearKeys.add(entryAyKey);
+        if (work.authors?.[0]) {
+          const a0 = work.authors[0];
+          const fullAuthorKey = `${normName(a0.given || '')}${normName(a0.family || a0.name || '')}_${work.year}`;
+          if (fullAuthorKey.length > 6) usedAuthorYearKeys.add(fullAuthorKey);
+        }
         const t = normTitleKey(work.title);
         if (t.length >= 15) usedRefTitles.add(t);
         finalEntries.push(formatted);
@@ -2412,6 +2674,13 @@ export async function buildCrossrefVerifiedReferences(
         } else if (!/[.!?)\]]$/.test(kept) && !/https?:\/\/\S+$/.test(kept)) {
           kept = `${kept}.`;
         }
+        const entryAyKey = getEntryAuthorYearKey(kept);
+        if (entryAyKey && usedAuthorYearKeys.has(entryAyKey)) {
+          droppedDuplicateCount++;
+          continue;
+        }
+        usedAuthorYearKeys.add(keyId);
+        if (entryAyKey) usedAuthorYearKeys.add(entryAyKey);
         const keptTitleKey = normTitleKey(extractReferenceTitle(kept));
         if (keptTitleKey.length >= 15) {
           usedRefTitles.add(keptTitleKey);
@@ -2426,17 +2695,20 @@ export async function buildCrossrefVerifiedReferences(
 
   // Keep orphan entries (not matched to any detected citation) only if they are clean & non-cloned
   const citedSurnames = keys.map((k) => k.firstSurname);
-  let droppedDuplicateCount = 0;
   existingEntries.forEach((e, idx) => {
     if (usedExisting.has(idx)) {
       return;
     }
-    const isVariantOfCited = citedSurnames.some((s) => referenceStartsWithSurname(e, s));
+    const entryAyKey = getEntryAuthorYearKey(e);
+    const isVariantOfCited =
+      citedSurnames.some((s) => referenceStartsWithSurname(e, s)) ||
+      Boolean(entryAyKey && usedAuthorYearKeys.has(entryAyKey));
     const t = normTitleKey(extractReferenceTitle(e));
     if (isVariantOfCited || isPoisonedTitle(e) || isStubEntry(e) || (t.length >= 15 && usedRefTitles.has(t))) {
       droppedDuplicateCount++;
       return;
     }
+    if (entryAyKey) usedAuthorYearKeys.add(entryAyKey);
     if (t.length >= 15) usedRefTitles.add(t);
     finalEntries.push(normalizeReferenceEntryFormatting(e, session.citationStyle));
   });
@@ -2444,9 +2716,21 @@ export async function buildCrossrefVerifiedReferences(
 
   const dedup: string[] = [];
   const seen = new Set<string>();
+  const seenAyMap = new Map<string, number>();
   for (const e of finalEntries) {
     const k = normName(e).slice(0, 70);
     if (seen.has(k)) continue;
+    const ayKey = getEntryAuthorYearKey(e);
+    if (ayKey) {
+      const prevIdx = seenAyMap.get(ayKey);
+      if (prevIdx !== undefined) {
+        if (/doi\.org\//i.test(e) && !/doi\.org\//i.test(dedup[prevIdx])) {
+          dedup[prevIdx] = e;
+        }
+        continue;
+      }
+      seenAyMap.set(ayKey, dedup.length);
+    }
     seen.add(k);
     dedup.push(e);
   }
@@ -2604,6 +2888,7 @@ CRITICAL ANTI-HALLUCINATION & ZERO-META RULES:
       const seen = new Set<string>();
       const seenDois = new Set<string>();
       const seenTitles = new Map<string, number>();
+      const seenAuthorYears = new Map<string, number>();
       const cleaned: string[] = [];
       for (const rawEntry of entries) {
         let line = stripInlineAiMetaNotes(
@@ -2645,23 +2930,35 @@ CRITICAL ANTI-HALLUCINATION & ZERO-META RULES:
         const key = line.toLowerCase().replace(/[^a-z0-9à-ỹ]/gi, '').slice(0, 48);
         if (seen.has(key)) continue;
 
+        const entryKeyId = getEntryAuthorYearKey(line);
+        if (entryKeyId) {
+          const prevAyIdx = seenAuthorYears.get(entryKeyId);
+          if (prevAyIdx !== undefined) {
+            const prevLine = cleaned[prevAyIdx];
+            if (/doi\.org\//i.test(line) && !/doi\.org\//i.test(prevLine)) {
+              cleaned[prevAyIdx] = line;
+              seen.add(key);
+            }
+            continue;
+          }
+        }
+
         // Prevent cloned titles across different authors during live streaming / assembly
         const titleKey = normTitleKey(extractReferenceTitle(line));
-        const entrySurname = normName(line.split(/[,(\s]/)[0] || '');
-        const entryYear = (line.match(/\(((?:19|20)\d{2})/) || [])[1] || '';
-        const entryKeyId = entrySurname && entryYear ? `${entrySurname}_${entryYear}` : '';
         if (titleKey.length >= 15) {
           const prevIdx = seenTitles.get(titleKey);
           if (prevIdx !== undefined) {
             const prevLine = cleaned[prevIdx];
-            const prevSurname = normName(prevLine.split(/[,(\s]/)[0] || '');
-            const prevYear = (prevLine.match(/\(((?:19|20)\d{2})/) || [])[1] || '';
-            const prevKeyId = prevSurname && prevYear ? `${prevSurname}_${prevYear}` : '';
+            const prevKeyId = getEntryAuthorYearKey(prevLine);
             const prevIsSecondary = Boolean(prevKeyId && priorAnalysis.secondaryKeySet.has(prevKeyId));
             const currIsSecondary = Boolean(entryKeyId && priorAnalysis.secondaryKeySet.has(entryKeyId));
-            // Prefer non-secondary owner over cloned secondary entry
-            if (prevIsSecondary && !currIsSecondary) {
+            // Prefer non-secondary owner over cloned secondary entry, or entry with doi.org link
+            if (
+              (prevIsSecondary && !currIsSecondary) ||
+              (/doi\.org\//i.test(line) && !/doi\.org\//i.test(prevLine) && !currIsSecondary)
+            ) {
               cleaned[prevIdx] = line;
+              if (entryKeyId) seenAuthorYears.set(entryKeyId, prevIdx);
               seen.add(key);
             }
             continue;
@@ -2669,6 +2966,9 @@ CRITICAL ANTI-HALLUCINATION & ZERO-META RULES:
           seenTitles.set(titleKey, cleaned.length);
         }
 
+        if (entryKeyId) {
+          seenAuthorYears.set(entryKeyId, cleaned.length);
+        }
         seen.add(key);
         cleaned.push(line);
       }
@@ -2758,6 +3058,10 @@ Return ONLY the ${batch.length} full reference entries (one per line, blank line
         );
 
         // Recover any genuine non-secondary missing citations (e.g., Perplexity-only 2025/2026 articles) if Crossref verification dropped them
+        const existingVerifiedList = verified.content.split(/\r?\n\s*\r?\n+/).filter(Boolean);
+        const existingVerifiedAySet = new Set(
+          existingVerifiedList.map((e) => getEntryAuthorYearKey(e)).filter(Boolean)
+        );
         const recoverableMissing = verified.missingCitations
           .filter((mc) => {
             const k = citationKeyIdFromText(mc);
@@ -2765,6 +3069,7 @@ Return ONLY the ${batch.length} full reference entries (one per line, blank line
             const sur = k.split('_')[0] || '';
             if (sur.length < 2) return false;
             if (priorAnalysis.secondaryKeySet.has(k)) return false;
+            if (existingVerifiedAySet.has(k)) return false;
             return true;
           })
           .slice(0, 5);
@@ -2792,7 +3097,7 @@ ${recoverableMissing.map((c, idx) => `${idx + 1}. ${c}`).join('\n')}`;
               .map((b) => normalizeReferenceEntryFormatting(stripMarkdownHashesFromText(b).replace(/\r?\n+/g, ' '), session.citationStyle))
               .filter((b) => b.length >= 20 && !isAiRefusalOrDisclaimerLine(b));
             if (recoveredBlocks.length > 0) {
-              const existingList = verified.content.split(/\r?\n\s*\r?\n+/).filter(Boolean);
+              const existingList = existingVerifiedList;
               const existingTitleSet = new Set(
                 existingList
                   .map((e) => normTitleKey(extractReferenceTitle(e)))
@@ -2821,8 +3126,11 @@ ${recoverableMissing.map((c, idx) => `${idx + 1}. ${c}`).join('\n')}`;
                       .trim();
                   }
                 }
+                const ayKey = getEntryAuthorYearKey(safeEntry);
+                if (ayKey && existingVerifiedAySet.has(ayKey)) continue;
                 const tk = normTitleKey(extractReferenceTitle(safeEntry));
                 if (tk.length >= 15 && existingTitleSet.has(tk)) continue;
+                if (ayKey) existingVerifiedAySet.add(ayKey);
                 if (tk.length >= 15) existingTitleSet.add(tk);
                 extraClean.push(normalizeReferenceEntryFormatting(safeEntry, session.citationStyle));
               }
@@ -4546,17 +4854,29 @@ ${uniqueMissing.map((c, idx) => `${idx + 1}. ${c}`).join('\n')}`;
     }
   }
 
-  // Deduplicate (by normalized entry AND cloned title) & sort alphabetically
+  // Deduplicate (by normalized entry, author-year key, AND cloned title) & sort alphabetically
   const deduped: string[] = [];
   const seenKeys = new Set<string>();
   const seenTitles = new Set<string>();
+  const seenAuthorYears = new Map<string, number>();
   for (const e of entries) {
     const formatted = normalizeReferenceEntryFormatting(e, session.citationStyle);
     const key = formatted.toLowerCase().replace(/[^a-z0-9à-ỹ]/gi, '').slice(0, 52);
     if (!key || seenKeys.has(key)) continue;
+    const ayKey = getEntryAuthorYearKey(formatted);
+    if (ayKey) {
+      const prevIdx = seenAuthorYears.get(ayKey);
+      if (prevIdx !== undefined) {
+        if (/doi\.org\//i.test(formatted) && !/doi\.org\//i.test(deduped[prevIdx])) {
+          deduped[prevIdx] = formatted;
+        }
+        continue;
+      }
+    }
     const tk = normTitleKey(extractReferenceTitle(formatted));
     if (tk.length >= 15 && seenTitles.has(tk)) continue;
     if (tk.length >= 15) seenTitles.add(tk);
+    if (ayKey) seenAuthorYears.set(ayKey, deduped.length);
     seenKeys.add(key);
     deduped.push(formatted);
   }

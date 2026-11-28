@@ -180,7 +180,9 @@ export async function exportWriterSessionToPdf(
     if (f.showTopic) {
       ctx.fillStyle = '#0F172A';
       ctx.font = `700 ${Math.round(17.5 * SCALE)}px ${fontStack}`;
-      const topicText = (session.topic || session.title || 'ACADEMIC PAPER').trim();
+      const topicText = (session.topic || session.title || 'ACADEMIC PAPER')
+        .trim()
+        .replace(/([A-Za-zÀ-ỹ0-9])([“"])(?=[A-Za-zÀ-ỹ0-9])/g, '$1 $2');
       const rawTopicParagraphs = topicText.split(/\r?\n/);
       for (const para of rawTopicParagraphs) {
         const trimmedPara = para.trim();
@@ -582,7 +584,11 @@ export async function exportWriterSessionToPdf(
 
   // --- 4. PACK INTO A REAL .PDF FILE VIA PDF-LIB & DOWNLOAD DIRECTLY ---
   const pdfDoc = await PDFDocument.create();
-  pdfDoc.setTitle(session.topic || session.title || 'Academic Paper');
+  pdfDoc.setTitle(
+    (session.topic || session.title || 'Academic Paper')
+      .trim()
+      .replace(/([A-Za-zÀ-ỹ0-9])([“"])(?=[A-Za-zÀ-ỹ0-9])/g, '$1 $2')
+  );
   pdfDoc.setCreator('AssignTrack Academic Studio');
 
   for (const pageCanvas of allCanvases) {

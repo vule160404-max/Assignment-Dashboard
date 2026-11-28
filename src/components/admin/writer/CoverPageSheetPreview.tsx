@@ -165,10 +165,12 @@ export function CoverPageSheetPreview({
                 compact ? 'text-[13px]' : 'text-[18px]'
               }`}
             >
-              {topic.trim() ||
+              {(
+                topic.trim() ||
                 (isVi
                   ? 'NHẬP TÊN ĐỀ TÀI LUẬN VĂN / BÁO CÁO'
-                  : 'RESEARCH PAPER / DISSERTATION TITLE')}
+                  : 'RESEARCH PAPER / DISSERTATION TITLE')
+              ).replace(/([A-Za-zÀ-ỹ0-9])([“"])(?=[A-Za-zÀ-ỹ0-9])/g, '$1 $2')}
             </div>
           </div>
         )}

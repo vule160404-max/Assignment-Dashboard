@@ -22,6 +22,12 @@ function escapeXml(str: string): string {
     .replace(/'/g, '&apos;');
 }
 
+export function normalizeCoverTitleSpacing(raw: string): string {
+  return (raw || '')
+    .trim()
+    .replace(/([A-Za-zÀ-ỹ0-9])([“"])(?=[A-Za-zÀ-ỹ0-9])/g, '$1 $2');
+}
+
 async function extractTextFromPdfFile(file: File): Promise<string> {
   if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
@@ -463,7 +469,7 @@ function buildCoverPageXml(session: WriterSession): string {
   if (f.showTopic && session.topic.trim()) {
     innerParagraphs.push(
       makeCoverPara({
-        text: session.topic.trim(),
+        text: normalizeCoverTitleSpacing(session.topic),
         sizeHalfPt: baseHalfPt + 10,
         bold: true,
         beforeTwips: 200,
@@ -551,7 +557,7 @@ function buildCoverPageXml(session: WriterSession): string {
   if (innerParagraphs.length === 0) {
     innerParagraphs.push(
       makeCoverPara({
-        text: session.topic.trim() || 'COVER PAGE',
+        text: normalizeCoverTitleSpacing(session.topic) || 'COVER PAGE',
         sizeHalfPt: baseHalfPt + 8,
         bold: true,
       })
@@ -681,7 +687,7 @@ export async function buildFormattedDocxFromSession(
   if (session.topic.trim()) {
     titleParagraphsXml.push(
       buildParagraphXml({
-        text: session.topic.trim(),
+        text: normalizeCoverTitleSpacing(session.topic),
         format,
         role: 'title',
       })
